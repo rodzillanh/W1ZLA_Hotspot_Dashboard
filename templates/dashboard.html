@@ -521,11 +521,13 @@
 </div>
 
 <div class="toolbar">
+    {% if settings.get('show_toolbar', True) %}
     {% for link in settings.links %}
     <a class="toolbar-btn" href="{{ link.url }}" target="_blank" rel="noopener">
         {{ link.label }}
     </a>
     {% endfor %}
+    {% endif %}
     <span class="toolbar-sep"></span>
     <a class="settings-link" href="/setup">⚙ Settings</a>
 </div>

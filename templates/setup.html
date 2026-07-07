@@ -263,6 +263,11 @@
                 <div class="toggle {{ 'on' if settings.show_host_stats else '' }}"
                      id="host-stats-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show toolbar links</span>
+                <div class="toggle {{ 'on' if settings.get('show_toolbar', True) else '' }}"
+                     id="toolbar-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveAppearance()">Save appearance</button>
         <span class="status-txt" id="appearance-status"></span>
@@ -704,6 +709,7 @@ function saveAppearance() {
             dashboard_name:  name,
             dark_mode:       darkMode,
             show_host_stats: document.getElementById('host-stats-toggle').classList.contains('on'),
+            show_toolbar:    document.getElementById('toolbar-toggle').classList.contains('on'),
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');

@@ -141,6 +141,7 @@ DEFAULT_SETTINGS = {
     "weather_location": "",   # city name, zip, or "City, ST" — blank = disabled
     "weather_unit": "F",      # "F" or "C"
     "show_host_stats": True,  # show host CPU + memory bar on dashboard
+    "show_toolbar": True,     # show the row of custom toolbar links on the dashboard
     # QRZ credentials — stored here so the Settings page works on all platforms.
     # Env vars QRZ_USERNAME / QRZ_PASSWORD are still read as a fallback so
     # existing Unraid installs with env vars keep working without reconfiguring.

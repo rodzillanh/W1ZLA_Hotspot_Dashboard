@@ -167,6 +167,8 @@ def api_settings_post():
         settings["weather_unit"] = data["weather_unit"] if data["weather_unit"] in ("F", "C") else "F"
     if "show_host_stats" in data:
         settings["show_host_stats"] = bool(data["show_host_stats"])
+    if "show_toolbar" in data:
+        settings["show_toolbar"] = bool(data["show_toolbar"])
     if "qrz_username" in data:
         settings["qrz_username"] = data["qrz_username"].strip().upper()
     if "qrz_password" in data:

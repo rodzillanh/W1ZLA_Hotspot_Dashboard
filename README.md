@@ -221,7 +221,9 @@ and **Version info**.
   page, map) reflows to the new theme.
 - **Toolbar links** — a row of buttons under the title (e.g. links to
   Brandmeister, QRZ, your reflector dashboard, APRS.fi). Add, remove, and
-  drag to reorder from the Settings page.
+  drag to reorder from the Settings page. A "Show toolbar links" toggle
+  (General tab) hides the whole row if you'd rather not show it; the ⚙
+  Settings link itself always stays visible either way.
 - **Card order** — drag hotspot cards into whatever order you want them
   to appear on the dashboard, from the same drag-and-drop list used for
   toolbar links.
