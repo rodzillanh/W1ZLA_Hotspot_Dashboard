@@ -86,7 +86,7 @@ class AprsMessenger:
 
     @staticmethod
     def _format_message(hotspot_status: dict) -> str:
-        call = hotspot_status.get("favorite_label") or hotspot_status.get("active_call") or "Unknown"
+        call = hotspot_status.get("active_call") or hotspot_status.get("favorite_label") or "Unknown"
         node = hotspot_status.get("name") or "hotspot"
         text = f"{call} active on {node}"
         return text[:MAX_MSG_LEN]
