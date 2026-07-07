@@ -142,6 +142,9 @@ DEFAULT_SETTINGS = {
     "weather_unit": "F",      # "F" or "C"
     "show_host_stats": True,  # show host CPU + memory bar on dashboard
     "show_toolbar": True,     # show the row of custom toolbar links on the dashboard
+    # Fleet activity metrics card — off by default since it adds a new SQLite
+    # table and a background write on every completed transmission.
+    "show_fleet_activity": False,
     # QRZ credentials — stored here so the Settings page works on all platforms.
     # Env vars QRZ_USERNAME / QRZ_PASSWORD are still read as a fallback so
     # existing Unraid installs with env vars keep working without reconfiguring.

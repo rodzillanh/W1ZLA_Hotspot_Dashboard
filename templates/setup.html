@@ -268,6 +268,15 @@
                 <div class="toggle {{ 'on' if settings.get('show_toolbar', True) else '' }}"
                      id="toolbar-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show fleet activity card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (adds a small SQLite log of completed transmissions)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_fleet_activity', False) else '' }}"
+                     id="fleet-activity-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveAppearance()">Save appearance</button>
         <span class="status-txt" id="appearance-status"></span>
@@ -710,6 +719,7 @@ function saveAppearance() {
             dark_mode:       darkMode,
             show_host_stats: document.getElementById('host-stats-toggle').classList.contains('on'),
             show_toolbar:    document.getElementById('toolbar-toggle').classList.contains('on'),
+            show_fleet_activity: document.getElementById('fleet-activity-toggle').classList.contains('on'),
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');

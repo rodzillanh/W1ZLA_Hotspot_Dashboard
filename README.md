@@ -9,6 +9,7 @@ app.py          Flask routes only
 config.py       all the tunables (timeouts, thresholds, regex patterns)
 models.py       HotspotStatus dataclass — the shape of each dashboard card
 storage.py      load/save hotspots.json and settings.json
+storage_activity.py  SQLite log for the optional Fleet activity card
 monitor.py      FleetMonitor: SSH polling + MMDVM log parsing
 qrz.py          optional QRZ.com lookup for the active caller's name/city/state/photo/coords
 templates/
@@ -230,6 +231,9 @@ and **Version info**.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.
+- **Fleet activity card** — off by default (General tab toggle). Adds a
+  small SQLite-backed log of completed transmissions; see "Fleet activity"
+  below.
 - **Per-hotspot latitude/longitude** — optional, set on the Hotspots tab's
   add/edit form. Plots that hotspot on the Live map (see "Live map" below).
 - **Per-hotspot Brandmeister ID** — optional, also on the Hotspots tab.
@@ -449,6 +453,30 @@ with an optional satellite tile view, no API key required for either) with:
 
 Only callers with known coordinates (from QRZ, or a live APRS beacon)
 appear as pins — the QRZ subscription caveat above applies here too.
+
+## Fleet activity
+
+Optional — off by default (Settings → General → "Show fleet activity
+card"), since it adds a small SQLite log (`activity.db` in the appdata
+folder alongside `hotspots.json`) and a write on every completed
+transmission. Once enabled, a "Fleet activity" card appears on the
+dashboard showing:
+
+- **Online** — hotspots currently online vs. total configured.
+- **Uptime** — how long the dashboard process itself has been running.
+- **Last activity** — how long ago and which hotspot last had a call,
+  live-updating the same way the per-card "last heard" timers do.
+- **Mode breakdown** — a stacked bar + legend showing the share of
+  transmissions by mode (DMR/D-Star/YSF/P25/NXDN) over the last 12 hours.
+- **Activity chart** — a line chart of transmission counts over the last
+  12 hours in 15-minute buckets, toggleable between **Per-hotspot** (one
+  line per hotspot that had any activity in the window) and **Aggregate**
+  (summed across the fleet).
+
+One row is logged per completed transmission (not per poll), and rows
+older than 13 hours are pruned automatically on each write — the table
+doesn't grow unbounded. Turning the toggle off stops new writes but
+doesn't delete the existing `activity.db` file.
 
 ## Talkgroup / reflector display
 

@@ -24,6 +24,7 @@ from brandmeister import BrandmeisterClient
 from mqtt_publisher import MqttPublisher
 from aprs_messaging import AprsMessenger
 from host_stats import HostStats
+import storage_activity
 
 import host_stats as host_stats_mod
 
@@ -32,6 +33,8 @@ monitor    = FleetMonitor()
 wx         = WeatherClient()
 host_stats = HostStats()
 host_stats.start()
+
+START_TIME = time.time()  # for /api/activity's dashboard_uptime_seconds
 
 
 def _qrz_credentials() -> tuple[str, str]:
@@ -169,6 +172,8 @@ def api_settings_post():
         settings["show_host_stats"] = bool(data["show_host_stats"])
     if "show_toolbar" in data:
         settings["show_toolbar"] = bool(data["show_toolbar"])
+    if "show_fleet_activity" in data:
+        settings["show_fleet_activity"] = bool(data["show_fleet_activity"])
     if "qrz_username" in data:
         settings["qrz_username"] = data["qrz_username"].strip().upper()
     if "qrz_password" in data:
@@ -267,6 +272,25 @@ def setup():
 @app.route("/api/host_stats")
 def api_host_stats():
     return jsonify(host_stats.snapshot())
+
+@app.route("/api/activity")
+def api_activity():
+    hours            = request.args.get("hours", default=12, type=int)
+    interval_minutes = request.args.get("interval_minutes", default=15, type=int)
+    result   = storage_activity.query_activity(hours=hours, interval_minutes=interval_minutes)
+    hotspots = load_hotspots()
+    snap     = monitor.snapshot()
+    hotspots_online = sum(
+        1 for h in hotspots if snap.get(h["ip"], {}).get("status") != "Offline"
+    )
+    return jsonify({
+        "buckets":                 result["buckets"],
+        "mode_breakdown":          result["mode_breakdown"],
+        "hotspots_online":         hotspots_online,
+        "hotspots_total":          len(hotspots),
+        "last_activity":           result["last_activity"],
+        "dashboard_uptime_seconds": time.time() - START_TIME,
+    })
 
 @app.route("/api/weather")
 def api_weather():

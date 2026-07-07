@@ -9,11 +9,12 @@ import paramiko
 
 import config
 from models import HotspotStatus
-from storage import load_hotspots, load_favorites, favorites_set
+from storage import load_hotspots, load_favorites, favorites_set, load_settings
 from qrz import QrzClient
 from radioid import RadioIdClient
 from aprs import AprsClient
 from brandmeister import BrandmeisterClient
+import storage_activity
 
 
 class FleetMonitor:
@@ -215,6 +216,19 @@ class FleetMonitor:
                 self._data[ip] = HotspotStatus(name=hotspot["name"], ip=ip)
                 self._failures[ip] = 0
 
+    def _log_activity(self, ip: str) -> None:
+        """Record one completed transmission for the Fleet activity metrics
+        card -- opt-in (see settings.show_fleet_activity), so skip the write
+        entirely when nobody will ever query it."""
+        if not load_settings().get("show_fleet_activity", False):
+            return
+        with self._lock:
+            status = self._data.get(ip)
+            if status is None:
+                return
+            name, mode = status.name, status.mode
+        storage_activity.log_activity(ip, name, mode)
+
     def _lookup_caller(self, call: str) -> dict:
         """Compose caller info from QRZ, RadioID.net (name/location fallback),
         and APRS.fi (live position override). Always returns a dict — missing
@@ -329,6 +343,8 @@ class FleetMonitor:
                 # poll cycle.
                 with self._lock:
                     existing_lh = self._data[ip].last_heard
+                if existing_lh is None:
+                    self._log_activity(ip)
                 updates.update({
                     "is_active":  False,
                     "tx_start":   None,
@@ -348,6 +364,8 @@ class FleetMonitor:
                         # end-of-transmission path: only set last_heard the first time.
                         with self._lock:
                             existing_lh = self._data[ip].last_heard
+                        if existing_lh is None:
+                            self._log_activity(ip)
                         updates.update({
                             "is_active":  False,
                             "tx_start":   None,
@@ -433,6 +451,7 @@ class FleetMonitor:
         updates["tx_start"]  = None
         if prev_call and existing_lh is None:
             updates["last_heard"] = time.time()
+            self._log_activity(ip)
         return updates
 
     # --- static helpers ---

@@ -6,6 +6,9 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    {% if settings.get('show_fleet_activity', False) %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    {% endif %}
     <style>
         /* --- theme tokens --- */
         :root {
@@ -293,6 +296,75 @@
         }
         .recent-call:hover { text-decoration: underline; }
 
+        /* --- fleet activity metrics card --- */
+        .metrics-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .metrics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 12px;
+        }
+        .fleet-mode-toggle { display: flex; gap: 6px; flex-shrink: 0; }
+        .fleet-mode-btn {
+            padding: 4px 11px;
+            background: var(--toolbar-btn);
+            border: 1px solid var(--toolbar-border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 11px;
+            cursor: pointer;
+            transition: color .15s, border-color .15s;
+        }
+        .fleet-mode-btn.active { color: var(--accent); border-color: var(--accent); }
+        .fleet-stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+        }
+        .fleet-mode-bar {
+            display: flex;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            background: var(--card-border);
+            margin-bottom: 8px;
+        }
+        .fleet-mode-seg { height: 100%; }
+        .fleet-mode-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+            min-height: 14px;
+        }
+        .fleet-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+        .fleet-legend-swatch {
+            width: 8px; height: 8px; border-radius: 2px; display: inline-block;
+        }
+        .fleet-legend-empty { color: var(--text-dim); }
+        .fleet-chart-wrap { position: relative; height: 220px; }
+        .fleet-chart-empty {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            font-size: 13px;
+            text-align: center;
+        }
+
         /* profile photo */
         .caller-photo {
             width: 80px;
@@ -554,7 +626,33 @@
 
 <!-- Dashboard tab -->
 <div id="panel-dashboard" class="tab-panel active">
-    <div class="cards-grid" id="cards"></div>
+    <div class="cards-grid" id="cards-outer">
+        {% if settings.get('show_fleet_activity', False) %}
+        <div class="metrics-card" id="fleet-activity-card">
+            <div class="metrics-header">
+                <div class="card-name">Fleet activity</div>
+                <div class="fleet-mode-toggle">
+                    <button class="fleet-mode-btn active" data-mode="per-hotspot"
+                            onclick="setFleetChartMode('per-hotspot')">Per-hotspot</button>
+                    <button class="fleet-mode-btn" data-mode="aggregate"
+                            onclick="setFleetChartMode('aggregate')">Aggregate</button>
+                </div>
+            </div>
+            <div class="fleet-stats-grid">
+                <div>Online: <span class="stat-val" id="fleet-online">— / —</span></div>
+                <div>Uptime: <span class="stat-val" id="fleet-uptime">—</span></div>
+                <div>Last activity: <span class="stat-val" id="fleet-last-activity">—</span></div>
+            </div>
+            <div class="fleet-mode-bar" id="fleet-mode-bar"></div>
+            <div class="fleet-mode-legend" id="fleet-mode-legend"></div>
+            <div class="fleet-chart-wrap">
+                <canvas id="fleet-chart-canvas"></canvas>
+                <div class="fleet-chart-empty" id="fleet-chart-empty">No activity in the last 12 hours</div>
+            </div>
+        </div>
+        {% endif %}
+        <div id="cards" style="display:contents"></div>
+    </div>
 </div>
 
 <!-- Live map tab -->
@@ -696,6 +794,7 @@ const HOST_STATS_MS      = 5000;
 const SHOW_HOST_STATS    = {{ 'true' if settings.get('show_host_stats', True) else 'false' }};
 const DISTANCE_UNIT      = "{{ settings.get('weather_unit', 'F') }}";  // "F" -> miles, "C" -> km
 const DARK_MODE          = {{ 'true' if settings.dark_mode else 'false' }};
+const SHOW_FLEET_ACTIVITY = {{ 'true' if settings.get('show_fleet_activity', False) else 'false' }};
 
 function updateSysbar(data) {
     if (!SHOW_HOST_STATS) return;
@@ -1006,6 +1105,7 @@ setInterval(() => {
             if (el) el.textContent = `⏱ ${m}:${s} ago`;
         }
     });
+    if (SHOW_FLEET_ACTIVITY) tickFleetLastActivity();
 }, 1000);
 
 // --- map ---
@@ -1209,6 +1309,159 @@ function refreshMap() {
         .catch(err => console.error('Map refresh failed:', err));
 }
 
+// --- fleet activity metrics card ---
+let fleetChart        = null;
+let fleetChartMode     = 'per-hotspot';
+let fleetActivityData  = null;  // last /api/activity response, reused when the toggle switches modes
+let fleetLastActivity  = null;  // {hotspot, ts}, ticked client-side same as tx/last-heard timers
+
+const FLEET_LINE_DASHES  = [[], [6, 3], [2, 2], [8, 3, 2, 3], [1, 3]];
+const FLEET_COLOR_VARS   = ['--accent', '--link', '--tx-color', '--fav-color', '--text-dim'];
+
+function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function fetchFleetActivity() {
+    fetch('/api/activity')
+        .then(r => r.json())
+        .then(renderFleetActivity)
+        .catch(err => console.error('Fleet activity refresh failed:', err));
+}
+
+function fmtRelative(elapsedSeconds) {
+    elapsedSeconds = Math.max(0, Math.floor(elapsedSeconds));
+    if (elapsedSeconds < 60) return `${elapsedSeconds}s ago`;
+    const m = Math.floor(elapsedSeconds / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ${m % 60}m ago`;
+    const d = Math.floor(h / 24);
+    return `${d}d ${h % 24}h ago`;
+}
+
+function tickFleetLastActivity() {
+    const el = document.getElementById('fleet-last-activity');
+    if (!el) return;
+    if (!fleetLastActivity) { el.textContent = '—'; return; }
+    el.textContent = `${fmtRelative(Date.now() / 1000 - fleetLastActivity.ts)} · ${fleetLastActivity.hotspot}`;
+}
+
+function renderModeBreakdown(modeBreakdown) {
+    const bar    = document.getElementById('fleet-mode-bar');
+    const legend = document.getElementById('fleet-mode-legend');
+    if (!modeBreakdown || modeBreakdown.length === 0) {
+        bar.innerHTML    = '';
+        legend.innerHTML = `<span class="fleet-legend-empty">No activity yet</span>`;
+        return;
+    }
+    bar.innerHTML = modeBreakdown.map((m, i) => {
+        const color = `var(${FLEET_COLOR_VARS[i % FLEET_COLOR_VARS.length]})`;
+        return `<div class="fleet-mode-seg" style="width:${m.pct}%;background:${color}" title="${m.mode}: ${m.pct}%"></div>`;
+    }).join('');
+    legend.innerHTML = modeBreakdown.map((m, i) => {
+        const color = `var(${FLEET_COLOR_VARS[i % FLEET_COLOR_VARS.length]})`;
+        return `<span class="fleet-legend-item"><span class="fleet-legend-swatch" style="background:${color}"></span>${m.mode} ${m.pct}%</span>`;
+    }).join('');
+}
+
+function renderFleetChart(buckets) {
+    const canvas  = document.getElementById('fleet-chart-canvas');
+    const emptyEl = document.getElementById('fleet-chart-empty');
+    const total   = buckets.reduce((sum, b) => sum + b.total, 0);
+
+    if (total === 0) {
+        canvas.style.display  = 'none';
+        emptyEl.style.display = 'flex';
+        return;
+    }
+    canvas.style.display  = 'block';
+    emptyEl.style.display = 'none';
+
+    const labels = buckets.map(b => {
+        const d = new Date(b.t + 'Z');  // 't' is a naive UTC ISO string from the server
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
+    const hotspotNames = buckets.length ? Object.keys(buckets[0].by_hotspot) : [];
+
+    let datasets;
+    if (fleetChartMode === 'aggregate') {
+        datasets = [{
+            label:           'Total',
+            data:            buckets.map(b => b.total),
+            borderColor:     cssVar('--accent'),
+            backgroundColor: cssVar('--accent-dim'),
+            borderDash:      [],
+            fill:            true,
+            tension:         0.25,
+            pointRadius:     0,
+        }];
+    } else {
+        datasets = hotspotNames.map((name, i) => ({
+            label:       name,
+            data:        buckets.map(b => b.by_hotspot[name] || 0),
+            borderColor: cssVar(FLEET_COLOR_VARS[i % FLEET_COLOR_VARS.length]),
+            borderDash:  FLEET_LINE_DASHES[i % FLEET_LINE_DASHES.length],
+            fill:        false,
+            tension:     0.25,
+            pointRadius: 0,
+        }));
+    }
+
+    if (fleetChart) {
+        fleetChart.data.labels   = labels;
+        fleetChart.data.datasets = datasets;
+        fleetChart.update();
+    } else {
+        fleetChart = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: { labels, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        ticks: { autoSkip: true, maxTicksLimit: 8, color: cssVar('--text-muted') },
+                        grid:  { color: cssVar('--card-border') },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { precision: 0, color: cssVar('--text-muted') },
+                        grid:  { color: cssVar('--card-border') },
+                    },
+                },
+                plugins: { legend: { display: false } },
+            },
+        });
+    }
+}
+
+function setFleetChartMode(mode) {
+    fleetChartMode = mode;
+    document.querySelectorAll('.fleet-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    if (fleetActivityData) renderFleetChart(fleetActivityData.buckets);
+}
+
+function renderFleetActivity(data) {
+    fleetActivityData = data;
+
+    document.getElementById('fleet-online').textContent =
+        `${data.hotspots_online} / ${data.hotspots_total}`;
+
+    const upSec = Math.floor(data.dashboard_uptime_seconds);
+    const days  = Math.floor(upSec / 86400);
+    const hrs   = Math.floor((upSec % 86400) / 3600);
+    document.getElementById('fleet-uptime').textContent = `${days}d ${hrs}h`;
+
+    fleetLastActivity = data.last_activity;
+    tickFleetLastActivity();
+
+    renderModeBreakdown(data.mode_breakdown);
+    renderFleetChart(data.buckets);
+}
+
 // --- main poll loop ---
 function refresh() {
     fetch('/api/data')
@@ -1217,6 +1470,7 @@ function refresh() {
             renderCards(data);
             refreshMap();
         });
+    if (SHOW_FLEET_ACTIVITY) fetchFleetActivity();
 }
 refresh();
 setInterval(refresh, POLL_MS);
