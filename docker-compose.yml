@@ -1,0 +1,17 @@
+services:
+  hotspot-dashboard:
+    build: .
+    container_name: hotspot-dashboard
+    ports:
+      - "5000:5000"
+    volumes:
+      # Unraid convention: bind-mount into appdata so it's visible/backed up
+      # like any other app. Change the host side if you keep appdata elsewhere.
+      - /mnt/user/appdata/hotspot-dashboard:/app/data
+    environment:
+      # Optional: enables QRZ lookup of the active caller's name/city/state.
+      # Looking up callsigns other than your own requires an active QRZ XML
+      # subscription. Leave both blank to disable the feature entirely.
+      - QRZ_USERNAME=
+      - QRZ_PASSWORD=
+    restart: unless-stopped

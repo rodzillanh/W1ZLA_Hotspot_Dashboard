@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html data-theme="{{ 'dark' if settings.dark_mode else 'light' }}">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings — {{ settings.dashboard_name }}</title>
+    <style>
+        :root {
+            --bg:          #121212;
+            --card-bg:     #1e1e1e;
+            --card-border: #2d2d2d;
+            --text:        #e0e0e0;
+            --text-muted:  #888;
+            --text-dim:    #555;
+            --accent:      #2ecc71;
+            --link:        #5bc0de;
+            --input-bg:    #2a2a2a;
+            --row-bg:      #252525;
+            --danger:      #c0392b;
+            --amber:       #f39c12;
+        }
+        [data-theme="light"] {
+            --bg:          #f0f2f5;
+            --card-bg:     #ffffff;
+            --card-border: #dde1e7;
+            --text:        #1a1a1a;
+            --text-muted:  #666;
+            --text-dim:    #aaa;
+            --accent:      #27ae60;
+            --link:        #2980b9;
+            --input-bg:    #f5f5f5;
+            --row-bg:      #f9f9f9;
+            --danger:      #e74c3c;
+            --amber:       #e67e22;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 14px;
+            min-height: 100vh;
+        }
+
+        /* --- top bar --- */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--card-border);
+        }
+        .page-title { font-size: 17px; font-weight: 500; }
+        .back-link {
+            color: var(--link);
+            text-decoration: none;
+            font-size: 13px;
+        }
+        .back-link:hover { text-decoration: underline; }
+
+        /* --- tab bar --- */
+        .tab-bar {
+            display: flex;
+            gap: 2px;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--card-border);
+            background: var(--bg);
+        }
+        .tab-btn {
+            padding: 10px 18px;
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: color .15s;
+        }
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        /* --- tab panels --- */
+        .tab-panel { display: none; padding: 20px; max-width: 720px; }
+        .tab-panel.active { display: block; }
+
+        /* --- sections --- */
+        .section {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+        .section-title {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-bottom: 12px;
+        }
+
+        /* --- form elements --- */
+        label { font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px; }
+        input[type="text"],
+        input[type="password"],
+        input[type="url"] {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 5px;
+            padding: 7px 10px;
+            color: var(--text);
+            font-size: 13px;
+        }
+        input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-grid.one { grid-template-columns: 1fr; }
+
+        /* --- toggles --- */
+        .toggle-group {
+            background: var(--row-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
+            padding: 0 12px;
+            margin-bottom: 12px;
+        }
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--card-border);
+        }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-label { font-size: 13px; flex: 1; }
+        .toggle {
+            width: 40px; height: 22px;
+            background: var(--card-border);
+            border-radius: 11px;
+            position: relative;
+            cursor: pointer;
+            transition: background .2s;
+            flex-shrink: 0;
+        }
+        .toggle.on { background: var(--accent); }
+        .toggle::after {
+            content: '';
+            width: 16px; height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px; left: 3px;
+            transition: left .2s;
+        }
+        .toggle.on::after { left: 21px; }
+
+        /* --- buttons --- */
+        .btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            border: 1px solid;
+            background: transparent;
+            transition: background .15s;
+        }
+        .btn-primary { color: var(--accent); border-color: var(--accent); }
+        .btn-primary:hover { background: rgba(46,204,113,.08); }
+        .btn-info    { color: var(--link);   border-color: var(--link); }
+        .btn-info:hover { background: rgba(91,192,222,.08); }
+        .btn-danger  { color: var(--danger); border-color: var(--danger); }
+        .btn-danger:hover { background: rgba(192,57,43,.08); }
+        .btn-sm { padding: 3px 10px; font-size: 12px; }
+        .status-txt { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+
+        /* --- drag rows --- */
+        .drag-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--row-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 5px;
+        }
+        .drag-row.dragging { opacity: .4; }
+        .drag-row.drag-over { border-color: var(--accent); }
+        .drag-handle {
+            color: var(--text-dim);
+            cursor: grab;
+            font-size: 16px;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .drag-handle:active { cursor: grabbing; }
+        .link-label-input { max-width: 140px; }
+        .link-row input[type="text"],
+        .link-row input[type="url"] { width: auto; flex: 1; }
+        .node-name { flex: 1; font-size: 13px; }
+        .node-meta { font-size: 11px; color: var(--text-dim); }
+
+        /* --- hotspot form --- */
+        #test-result { font-size: 12px; margin-top: 8px; min-height: 18px; }
+        .ok  { color: var(--accent); }
+        .err { color: var(--danger); }
+
+        /* --- version tab --- */
+        .version-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--card-border);
+            font-size: 13px;
+        }
+        .version-row:last-child { border-bottom: none; }
+        .version-label { color: var(--text-muted); }
+        .version-val   { font-family: monospace; font-size: 12px; color: var(--text); }
+        .version-accent { color: var(--accent); font-family: inherit; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div class="page-title">⚙ Settings</div>
+    <a class="back-link" href="/">← Back to dashboard</a>
+</div>
+
+<div class="tab-bar">
+    <div class="tab-btn active" onclick="switchTab('general',      this)">General</div>
+    <div class="tab-btn"       onclick="switchTab('weather',      this)">Weather</div>
+    <div class="tab-btn"       onclick="switchTab('integrations', this)">Integrations</div>
+    <div class="tab-btn"       onclick="switchTab('hotspots',     this)">Hotspots</div>
+    <div class="tab-btn"       onclick="switchTab('favorites',    this)">Favorites</div>
+    <div class="tab-btn"       onclick="switchTab('version',      this)">Version info</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     GENERAL TAB
+     Appearance, toolbar links
+═══════════════════════════════════════════════ -->
+<div id="panel-general" class="tab-panel active">
+
+    <div class="section">
+        <div class="section-title">Appearance</div>
+        <div class="form-grid one" style="margin-bottom:12px">
+            <div>
+                <label>Dashboard name</label>
+                <input type="text" id="dash-name" value="{{ settings.dashboard_name }}">
+            </div>
+        </div>
+        <div class="toggle-group">
+            <div class="toggle-row">
+                <span class="toggle-label">Light mode</span>
+                <div class="toggle {{ '' if settings.dark_mode else 'on' }}"
+                     id="theme-toggle" onclick="toggleTheme(this)"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show host CPU &amp; memory bar</span>
+                <div class="toggle {{ 'on' if settings.show_host_stats else '' }}"
+                     id="host-stats-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveAppearance()">Save appearance</button>
+        <span class="status-txt" id="appearance-status"></span>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Toolbar links</div>
+        <div id="links-list">
+            {% for link in settings.links %}
+            <div class="link-row drag-row" draggable="true">
+                <span class="drag-handle">⠿</span>
+                <input class="link-label-input" type="text"  placeholder="Label" value="{{ link.label }}">
+                <input type="url" placeholder="https://..." value="{{ link.url }}">
+                <button class="btn btn-danger btn-sm" onclick="this.closest('.link-row').remove()">✕</button>
+            </div>
+            {% endfor %}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <button class="btn btn-info"    onclick="addLink()">+ Add link</button>
+            <button class="btn btn-primary" onclick="saveLinks()">Save toolbar links</button>
+            <span class="status-txt" id="links-status"></span>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     WEATHER TAB
+═══════════════════════════════════════════════ -->
+<div id="panel-weather" class="tab-panel">
+
+    <div class="section">
+        <div class="section-title">Weather</div>
+        <div class="form-grid one" style="margin-bottom:12px">
+            <div>
+                <label>Weather location
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (city name, zip, or "City, ST" — leave blank to hide)
+                    </span>
+                </label>
+                <input type="text" id="wx-location" placeholder="e.g. Manchester, NH"
+                       value="{{ settings.weather_location }}">
+            </div>
+        </div>
+        <div class="toggle-group">
+            <div class="toggle-row">
+                <span class="toggle-label">Temperature in °F</span>
+                <div class="toggle {{ 'on' if settings.weather_unit == 'F' else '' }}"
+                     id="unit-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveWeather()">Save weather</button>
+        <span class="status-txt" id="weather-status"></span>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     INTEGRATIONS TAB
+═══════════════════════════════════════════════ -->
+<div id="panel-integrations" class="tab-panel">
+
+    <div class="section">
+        <div class="section-title">QRZ.com lookup
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — requires an active QRZ XML subscription
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            Looks up the active caller's name, location, photo, and map coordinates.
+            Requires a paid
+            <a href="https://www.qrz.com/page/xml_data.html" target="_blank"
+               style="color:var(--link)">QRZ XML subscription</a>
+            to see other callsigns' info. Leave blank to disable.
+        </p>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>QRZ username (your callsign)</label>
+                <input type="text" id="qrz-username"
+                       placeholder="W1ZLA"
+                       value="{{ settings.qrz_username }}"
+                       style="text-transform:uppercase">
+            </div>
+            <div>
+                <label>QRZ password</label>
+                <input type="password" id="qrz-password"
+                       placeholder="••••••••"
+                       value="{{ settings.qrz_password }}">
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-info"    onclick="testQrz()">Test connection</button>
+            <button class="btn btn-primary" onclick="saveQrz()">Save QRZ credentials</button>
+            <span class="status-txt" id="qrz-status"></span>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">RadioID.net lookup
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                free — no account needed
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            Free fallback for caller name and city/state — used only when QRZ has no
+            subscription or doesn't have the callsign. No lat/lon, so it doesn't add
+            map pins on its own.
+        </p>
+        <div class="toggle-group">
+            <div class="toggle-row">
+                <span class="toggle-label">Use RadioID.net as a fallback</span>
+                <div class="toggle {{ 'on' if settings.radioid_enabled else '' }}"
+                     id="radioid-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveRadioId()">Save RadioID.net setting</button>
+        <span class="status-txt" id="radioid-status"></span>
+    </div>
+
+    <div class="section">
+        <div class="section-title">APRS.fi live position
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — requires a free APRS.fi API key
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            When a caller has a live APRS beacon, their real-time position is used on
+            the map instead of QRZ's static home-station coordinates — handy for
+            mobile/portable operators. Get a free key at
+            <a href="https://aprs.fi/page/api" target="_blank" style="color:var(--link)">aprs.fi/page/api</a>.
+            Leave blank to disable.
+        </p>
+        <div class="form-grid one" style="margin-bottom:10px">
+            <div>
+                <label>APRS.fi API key</label>
+                <input type="password" id="aprs-key" placeholder="••••••••" value="{{ settings.aprs_api_key }}">
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-info"    onclick="testAprs()">Test connection</button>
+            <button class="btn btn-primary" onclick="saveAprs()">Save APRS.fi key</button>
+            <span class="status-txt" id="aprs-status"></span>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Home Assistant (MQTT)
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — requires an MQTT broker
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            Publishes each hotspot to Home Assistant via MQTT auto-discovery —
+            point this at the same broker your HA instance already uses and each
+            hotspot shows up as its own device with sensors for mode, active call,
+            talkgroup, temperature, CPU, RSSI, and online/active/favorite-active
+            binary sensors, with no manual HA configuration needed. Leave the
+            broker host blank to disable.
+        </p>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>Broker host</label>
+                <input type="text" id="mqtt-host" placeholder="192.168.1.50 or homeassistant.local"
+                       value="{{ settings.mqtt_host }}">
+            </div>
+            <div>
+                <label>Broker port</label>
+                <input type="text" id="mqtt-port" placeholder="1883" value="{{ settings.mqtt_port }}">
+            </div>
+            <div>
+                <label>Username <span style="font-size:10px;color:var(--text-dim)">(optional)</span></label>
+                <input type="text" id="mqtt-username" value="{{ settings.mqtt_username }}">
+            </div>
+            <div>
+                <label>Password <span style="font-size:10px;color:var(--text-dim)">(optional)</span></label>
+                <input type="password" id="mqtt-password" placeholder="••••••••" value="{{ settings.mqtt_password }}">
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-info"    onclick="testMqtt()">Test connection</button>
+            <button class="btn btn-primary" onclick="saveMqtt()">Save MQTT settings</button>
+            <span class="status-txt" id="mqtt-status"></span>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">APRS favorite alerts
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — requires your amateur radio callsign
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            Sends an APRS text message to yourself over APRS-IS whenever a favorite
+            becomes active — the same mechanism used for ham-to-ham APRS messaging.
+            No signup needed: your passcode is computed automatically from your
+            callsign. You'll need something watching for APRS messages addressed to
+            your callsign to actually see it — e.g. the
+            <a href="https://aprsdroid.org/" target="_blank" style="color:var(--link)">APRSdroid</a>
+            app, or aprs.fi's message inbox. Leave the callsign blank to disable.
+        </p>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>Your callsign</label>
+                <input type="text" id="aprsmsg-callsign" placeholder="W1ZLA"
+                       value="{{ settings.aprs_msg_callsign }}" style="text-transform:uppercase">
+            </div>
+            <div>
+                <label>Send to <span style="font-size:10px;color:var(--text-dim)">(optional — defaults to your callsign above)</span></label>
+                <input type="text" id="aprsmsg-to" placeholder="e.g. W1ZLA-9 for a specific device"
+                       value="{{ settings.aprs_msg_to_callsign }}" style="text-transform:uppercase">
+            </div>
+            <div>
+                <label>Minimum minutes between alerts <span style="font-size:10px;color:var(--text-dim)">(per favorite)</span></label>
+                <input type="text" id="aprsmsg-cooldown" placeholder="10"
+                       value="{{ settings.aprs_msg_cooldown_min }}">
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-info"    onclick="testAprsMsg()">Send test message</button>
+            <button class="btn btn-primary" onclick="saveAprsMsg()">Save APRS alert settings</button>
+            <span class="status-txt" id="aprsmsg-status"></span>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     HOTSPOTS TAB
+     Card order + add/edit
+═══════════════════════════════════════════════ -->
+<div id="panel-hotspots" class="tab-panel">
+
+    <div class="section">
+        <div class="section-title">Card order — drag to reorder</div>
+        <div id="card-order-list">
+            {% for hs in hotspots %}
+            <div class="drag-row" draggable="true" data-ip="{{ hs.ip }}">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">{{ hs.name }}</span>
+                <span class="node-meta">{{ hs.ip }}</span>
+                <button class="btn btn-info btn-sm"
+                        onclick="editHotspot('{{ hs.name }}','{{ hs.ip }}','{{ hs.user }}','{{ hs.pass }}','{{ hs.lat }}','{{ hs.lon }}','{{ hs.brandmeister_id }}')">
+                    Edit
+                </button>
+                <form action="/api/delete_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
+                    <button class="btn btn-danger btn-sm"
+                            onclick="return confirm('Delete {{ hs.name }}?')">Delete</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        <div style="margin-top:10px">
+            <button class="btn btn-primary" onclick="saveCardOrder()">Save card order</button>
+            <span class="status-txt" id="order-status"></span>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title" id="hotspot-form-title">Add hotspot</div>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div><label>Name</label>
+                 <input type="text" id="hs-name" placeholder="Name"></div>
+            <div><label>IP address</label>
+                 <input type="text" id="hs-ip" placeholder="192.168.1.x"></div>
+            <div><label>SSH user</label>
+                 <input type="text" id="hs-user" placeholder="pi"></div>
+            <div><label>SSH password</label>
+                 <input type="password" id="hs-pass" placeholder="••••••••"></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div><label>Latitude
+                     <span style="font-size:10px;color:var(--text-dim)">(optional — shows this node on the live map)</span>
+                 </label>
+                 <input type="text" id="hs-lat" placeholder="e.g. 42.9956"></div>
+            <div><label>Longitude</label>
+                 <input type="text" id="hs-lon" placeholder="e.g. -71.4548"></div>
+            <div><label>Brandmeister ID
+                     <span style="font-size:10px;color:var(--text-dim)">(optional — your hotspot's CCS7/repeater ID)</span>
+                 </label>
+                 <input type="text" id="hs-bmid" placeholder="e.g. 3101234"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-info" onclick="testConn()">Test connection</button>
+            <button class="btn btn-info" onclick="testBrandmeister()">Test Brandmeister ID</button>
+            <form method="POST" style="margin:0">
+                <input type="hidden" name="name" id="form-name">
+                <input type="hidden" name="ip"   id="form-ip">
+                <input type="hidden" name="user" id="form-user">
+                <input type="hidden" name="pass" id="form-pass">
+                <input type="hidden" name="lat"  id="form-lat">
+                <input type="hidden" name="lon"  id="form-lon">
+                <input type="hidden" name="brandmeister_id" id="form-bmid">
+                <button class="btn btn-primary" onclick="submitHotspot(event)">Save hotspot</button>
+            </form>
+            <button class="btn btn-danger btn-sm" onclick="clearHotspotForm()" style="margin-left:auto">Clear</button>
+        </div>
+        <div id="test-result"></div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     FAVORITES TAB
+     Favorites list + notifications
+═══════════════════════════════════════════════ -->
+<div id="panel-favorites" class="tab-panel">
+
+    <div class="section">
+        <div class="section-title">Favorites list</div>
+        <div id="friends-list">
+            {% for fav in favorites %}
+            <div class="drag-row friend-row" style="align-items:center">
+                <span style="color:var(--amber);font-size:13px;flex-shrink:0">⭐</span>
+                <input type="text" class="fav-call inp"
+                       value="{{ fav.call }}" placeholder="Callsign"
+                       style="width:100px;text-transform:uppercase">
+                <input type="text" class="fav-label inp"
+                       value="{{ fav.label }}" placeholder="Label (optional)"
+                       style="flex:1">
+                <button class="btn btn-danger btn-sm"
+                        onclick="this.closest('.friend-row').remove()">✕</button>
+            </div>
+            {% endfor %}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-info"    onclick="addFriend()">+ Add favorite</button>
+            <button class="btn btn-primary" onclick="saveFriends()">Save favorites list</button>
+            <span class="status-txt" id="friends-status"></span>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Browser alerts</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            Get a browser notification when a favorite callsign comes on the air —
+            even when the dashboard is in a background tab. Requires HTTPS.
+        </p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-info" id="notif-btn" onclick="requestNotifPermission()">
+                🔔 Enable alerts
+            </button>
+            <span class="status-txt" id="notif-status"></span>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     VERSION TAB
+     Container info + module hashes
+═══════════════════════════════════════════════ -->
+<div id="panel-version" class="tab-panel">
+
+    <div class="section">
+        <div class="section-title">Container</div>
+        <div class="version-row">
+            <span class="version-label">Started</span>
+            <span class="version-accent" id="v-start">—</span>
+        </div>
+        <div class="version-row">
+            <span class="version-label">Uptime</span>
+            <span class="version-accent" id="v-uptime">—</span>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">
+            Loaded modules
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                MD5 of file inside container
+            </span>
+        </div>
+        <div id="v-modules"></div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+            <button class="btn btn-info" onclick="copyHashes()">Copy all hashes</button>
+            <span class="status-txt" id="v-copy-status"></span>
+        </div>
+        <pre style="margin-top:10px;background:var(--row-bg);border-radius:5px;
+                    padding:10px;font-size:11px;overflow-x:auto;color:var(--text)">for f in /mnt/user/appdata/hotspot-dashboard-src/*.py; do md5sum $f; done</pre>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Changelog &amp; features</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            Full release history and complete feature list for this version.
+        </p>
+        <a href="/version" target="_blank" class="btn btn-info"
+           style="display:inline-block;text-decoration:none">
+            View changelog &amp; feature list →
+        </a>
+    </div>
+
+</div>
+
+<script>
+// --- tab switching ---
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-btn,.tab-panel').forEach(el => el.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + name).classList.add('active');
+    if (name === 'version') loadVersion();
+}
+
+// --- theme toggle ---
+let darkMode = {{ 'true' if settings.dark_mode else 'false' }};
+
+function toggleTheme(el) {
+    darkMode = !darkMode;
+    el.classList.toggle('on');
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+}
+
+// --- save appearance (General tab) ---
+function saveAppearance() {
+    const name = document.getElementById('dash-name').value.trim();
+    if (!name) return;
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            dashboard_name:  name,
+            dark_mode:       darkMode,
+            show_host_stats: document.getElementById('host-stats-toggle').classList.contains('on'),
+        })
+    }).then(() => {
+        const el = document.getElementById('appearance-status');
+        el.textContent = '✓ Saved';
+        setTimeout(() => el.textContent = '', 2000);
+    });
+}
+
+// --- save weather (Weather tab) ---
+function saveWeather() {
+    const unit = document.getElementById('unit-toggle').classList.contains('on') ? 'F' : 'C';
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            weather_location: document.getElementById('wx-location').value.trim(),
+            weather_unit:     unit,
+        })
+    }).then(() => {
+        const el = document.getElementById('weather-status');
+        el.textContent = '✓ Saved';
+        setTimeout(() => el.textContent = '', 2000);
+    });
+}
+
+// --- toolbar links ---
+function addLink() {
+    const row = document.createElement('div');
+    row.className = 'link-row drag-row';
+    row.draggable = true;
+    row.innerHTML = `<span class="drag-handle">⠿</span>
+        <input class="link-label-input" type="text"  placeholder="Label">
+        <input type="url" placeholder="https://...">
+        <button class="btn btn-danger btn-sm" onclick="this.closest('.link-row').remove()">✕</button>`;
+    document.getElementById('links-list').appendChild(row);
+    initDrag(row);
+}
+
+function saveLinks() {
+    const rows  = document.querySelectorAll('#links-list .link-row');
+    const links = Array.from(rows).map(r => {
+        const inputs = r.querySelectorAll('input');
+        return { label: inputs[0].value.trim(), url: inputs[1].value.trim() };
+    }).filter(l => l.label && l.url);
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ links })
+    }).then(() => {
+        document.getElementById('links-status').textContent = '✓ Saved';
+        setTimeout(() => document.getElementById('links-status').textContent = '', 2000);
+    });
+}
+
+// --- card order ---
+function saveCardOrder() {
+    const rows = document.querySelectorAll('#card-order-list .drag-row[data-ip]');
+    const ips  = Array.from(rows).map(r => r.dataset.ip);
+    fetch('/api/reorder_hotspots', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(ips)
+    }).then(() => {
+        document.getElementById('order-status').textContent = '✓ Saved';
+        setTimeout(() => document.getElementById('order-status').textContent = '', 2000);
+    });
+}
+
+// --- hotspot form ---
+function submitHotspot(e) {
+    document.getElementById('form-name').value = document.getElementById('hs-name').value;
+    document.getElementById('form-ip').value   = document.getElementById('hs-ip').value;
+    document.getElementById('form-user').value = document.getElementById('hs-user').value;
+    document.getElementById('form-pass').value = document.getElementById('hs-pass').value;
+    document.getElementById('form-lat').value  = document.getElementById('hs-lat').value;
+    document.getElementById('form-lon').value  = document.getElementById('hs-lon').value;
+    document.getElementById('form-bmid').value = document.getElementById('hs-bmid').value;
+}
+
+function editHotspot(name, ip, user, pass, lat, lon, bmid) {
+    document.getElementById('hs-name').value  = name;
+    document.getElementById('hs-ip').value    = ip;
+    document.getElementById('hs-user').value  = user;
+    document.getElementById('hs-pass').value  = pass;
+    document.getElementById('hs-lat').value   = (lat  && lat  !== 'None') ? lat  : '';
+    document.getElementById('hs-lon').value   = (lon  && lon  !== 'None') ? lon  : '';
+    document.getElementById('hs-bmid').value  = (bmid && bmid !== 'None') ? bmid : '';
+    document.getElementById('hotspot-form-title').textContent = 'Edit hotspot';
+    document.getElementById('hs-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('hs-name').focus();
+}
+
+function clearHotspotForm() {
+    ['hs-name','hs-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('hotspot-form-title').textContent = 'Add hotspot';
+    document.getElementById('test-result').textContent = '';
+}
+
+// --- connection test ---
+async function testConn() {
+    const res = document.getElementById('test-result');
+    res.textContent = 'Testing...';
+    res.className   = '';
+    const r = await fetch('/api/test_ssh', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            ip:   document.getElementById('hs-ip').value,
+            user: document.getElementById('hs-user').value,
+            pass: document.getElementById('hs-pass').value,
+        })
+    });
+    const data = await r.json();
+    res.textContent = data.success ? '✓ Connection successful' : '✕ Failed: ' + data.message;
+    res.className   = data.success ? 'ok' : 'err';
+}
+
+async function testBrandmeister() {
+    const res = document.getElementById('test-result');
+    const id  = document.getElementById('hs-bmid').value.trim();
+    if (!id) { res.textContent = 'Enter a Brandmeister ID first'; res.className = 'err'; return; }
+    res.textContent = 'Testing...';
+    res.className   = '';
+    const r = await fetch('/api/test_brandmeister', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ repeater_id: id })
+    });
+    const data = await r.json();
+    res.textContent = data.success ? '✓ ' + data.message : '✕ Failed: ' + data.message;
+    res.className   = data.success ? 'ok' : 'err';
+}
+
+// --- favorites ---
+function addFriend() {
+    const row = document.createElement('div');
+    row.className        = 'drag-row friend-row';
+    row.style.alignItems = 'center';
+    row.innerHTML = `<span style="color:var(--amber);font-size:13px;flex-shrink:0">⭐</span>
+        <input type="text" class="fav-call inp" placeholder="Callsign"
+               style="width:100px;text-transform:uppercase">
+        <input type="text" class="fav-label inp" placeholder="Label (optional)" style="flex:1">
+        <button class="btn btn-danger btn-sm"
+                onclick="this.closest('.friend-row').remove()">✕</button>`;
+    document.getElementById('friends-list').appendChild(row);
+}
+
+function saveFriends() {
+    const rows = document.querySelectorAll('#friends-list .friend-row');
+    const favs = Array.from(rows).map(r => ({
+        call:  r.querySelector('.fav-call').value.trim().toUpperCase(),
+        label: r.querySelector('.fav-label').value.trim(),
+    })).filter(f => f.call);
+    fetch('/api/favorites', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(favs)
+    }).then(() => {
+        const el = document.getElementById('friends-status');
+        el.textContent = '✓ Saved';
+        setTimeout(() => el.textContent = '', 2000);
+    });
+}
+
+// --- notifications ---
+function requestNotifPermission() {
+    const status = document.getElementById('notif-status');
+    if (!('Notification' in window)) {
+        status.textContent = '✕ Not supported by browser'; return;
+    }
+    if (!window.isSecureContext) {
+        status.textContent = '✕ Requires HTTPS';
+        status.title = 'Browser notifications only work over HTTPS or localhost. ' +
+            'Set up a reverse proxy (e.g. Nginx Proxy Manager on Unraid) to enable this.';
+        return;
+    }
+    if (Notification.permission === 'granted') {
+        status.textContent = '✓ Already enabled';
+        document.getElementById('notif-btn').style.opacity = '.5'; return;
+    }
+    if (Notification.permission === 'denied') {
+        status.textContent = '✕ Blocked — enable in browser site settings'; return;
+    }
+    Notification.requestPermission().then(p => {
+        if (p === 'granted') {
+            status.textContent = '✓ Enabled';
+            document.getElementById('notif-btn').style.opacity = '.5';
+            new Notification('✅ Favorite alerts enabled', {
+                body: 'You will be notified when a favorite callsign comes on the air.',
+                tag:  'notif-test',
+            });
+        } else {
+            status.textContent = '✕ Not allowed';
+        }
+    });
+}
+
+// --- version tab ---
+let versionLoaded = false;
+let vStartTime    = null;
+
+function loadVersion() {
+    if (versionLoaded) return;
+    versionLoaded = true;
+    fetch('/api/version')
+        .then(r => r.json())
+        .then(data => {
+            vStartTime = new Date(data.container_start.replace(' UTC','Z')).getTime();
+            document.getElementById('v-start').textContent = data.container_start;
+            updateUptime();
+            setInterval(updateUptime, 1000);
+            document.getElementById('v-modules').innerHTML = data.modules.map(m => `
+                <div class="version-row">
+                    <span class="version-label">${m.file}</span>
+                    <span class="version-val" style="text-align:right">
+                        <span style="color:var(--text-dim);font-size:11px;margin-right:8px">
+                            modified ${m.modified}
+                        </span>
+                        ${m.md5}
+                    </span>
+                </div>`).join('');
+        });
+}
+
+function updateUptime() {
+    if (!vStartTime) return;
+    const secs = Math.floor((Date.now() - vStartTime) / 1000);
+    const d = Math.floor(secs / 86400);
+    const h = Math.floor((secs % 86400) / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    const parts = [];
+    if (d) parts.push(d + 'd');
+    if (h) parts.push(h + 'h');
+    if (m) parts.push(m + 'm');
+    parts.push(s + 's');
+    document.getElementById('v-uptime').textContent = parts.join(' ');
+}
+
+function copyHashes() {
+    fetch('/api/version')
+        .then(r => r.json())
+        .then(data => {
+            const text = data.modules.map(m => `${m.md5}  ${m.file}`).join('\n');
+            navigator.clipboard.writeText(text).then(() => {
+                const el = document.getElementById('v-copy-status');
+                el.textContent = '✓ Copied';
+                setTimeout(() => el.textContent = '', 2000);
+            });
+        });
+}
+
+// --- QRZ credentials ---
+async function testQrz() {
+    const status = document.getElementById('qrz-status');
+    status.textContent = 'Testing...';
+    const r = await fetch('/api/test_qrz', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            username: document.getElementById('qrz-username').value.trim(),
+            password: document.getElementById('qrz-password').value.trim(),
+        })
+    });
+    const data = await r.json();
+    status.textContent = data.success ? '✓ ' + data.message : '✕ ' + data.message;
+    status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 4000);
+}
+
+function saveQrz() {
+    const status = document.getElementById('qrz-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            qrz_username: document.getElementById('qrz-username').value.trim().toUpperCase(),
+            qrz_password: document.getElementById('qrz-password').value.trim(),
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+// --- RadioID.net ---
+function saveRadioId() {
+    const status = document.getElementById('radioid-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            radioid_enabled: document.getElementById('radioid-toggle').classList.contains('on'),
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+// --- APRS.fi ---
+async function testAprs() {
+    const status = document.getElementById('aprs-status');
+    status.textContent = 'Testing...';
+    const r = await fetch('/api/test_aprs', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ api_key: document.getElementById('aprs-key').value.trim() })
+    });
+    const data = await r.json();
+    status.textContent = data.success ? '✓ ' + data.message : '✕ ' + data.message;
+    status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 4000);
+}
+
+function saveAprs() {
+    const status = document.getElementById('aprs-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ aprs_api_key: document.getElementById('aprs-key').value.trim() })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+// --- Home Assistant / MQTT ---
+async function testMqtt() {
+    const status = document.getElementById('mqtt-status');
+    status.textContent = 'Testing...';
+    const r = await fetch('/api/test_mqtt', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            host:     document.getElementById('mqtt-host').value.trim(),
+            port:     document.getElementById('mqtt-port').value.trim(),
+            username: document.getElementById('mqtt-username').value.trim(),
+            password: document.getElementById('mqtt-password').value,
+        })
+    });
+    const data = await r.json();
+    status.textContent = data.success ? '✓ ' + data.message : '✕ ' + data.message;
+    status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 4000);
+}
+
+function saveMqtt() {
+    const status = document.getElementById('mqtt-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            mqtt_host:     document.getElementById('mqtt-host').value.trim(),
+            mqtt_port:     document.getElementById('mqtt-port').value.trim() || 1883,
+            mqtt_username: document.getElementById('mqtt-username').value.trim(),
+            mqtt_password: document.getElementById('mqtt-password').value,
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+// --- APRS favorite alerts ---
+async function testAprsMsg() {
+    const status = document.getElementById('aprsmsg-status');
+    status.textContent = 'Sending...';
+    const r = await fetch('/api/test_aprs_msg', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            my_callsign: document.getElementById('aprsmsg-callsign').value.trim(),
+            to_callsign: document.getElementById('aprsmsg-to').value.trim(),
+        })
+    });
+    const data = await r.json();
+    status.textContent = data.success ? '✓ ' + data.message : '✕ ' + data.message;
+    status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 5000);
+}
+
+function saveAprsMsg() {
+    const status = document.getElementById('aprsmsg-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            aprs_msg_callsign:    document.getElementById('aprsmsg-callsign').value.trim(),
+            aprs_msg_to_callsign: document.getElementById('aprsmsg-to').value.trim(),
+            aprs_msg_cooldown_min: document.getElementById('aprsmsg-cooldown').value.trim() || 10,
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+// --- drag-to-reorder ---
+function initDrag(el) {
+    el.addEventListener('dragstart', () => el.classList.add('dragging'));
+    el.addEventListener('dragend',   () => {
+        el.classList.remove('dragging');
+        document.querySelectorAll('.drag-over').forEach(r => r.classList.remove('drag-over'));
+    });
+    el.addEventListener('dragover', e => {
+        e.preventDefault();
+        const dragging = document.querySelector('.dragging');
+        if (!dragging || dragging === el) return;
+        el.classList.add('drag-over');
+        const list  = el.parentNode;
+        const items = [...list.querySelectorAll('.drag-row')];
+        const idx   = items.indexOf(el);
+        const dIdx  = items.indexOf(dragging);
+        if (dIdx < idx) list.insertBefore(dragging, el.nextSibling);
+        else            list.insertBefore(dragging, el);
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop',      e  => { e.preventDefault(); el.classList.remove('drag-over'); });
+}
+document.querySelectorAll('.drag-row').forEach(initDrag);
+
+// --- notification status on load ---
+(function() {
+    const status = document.getElementById('notif-status');
+    const btn    = document.getElementById('notif-btn');
+    if (!('Notification' in window)) {
+        status.textContent = 'Not supported';
+    } else if (!window.isSecureContext) {
+        status.textContent = 'Requires HTTPS';
+        status.title = 'Set up a reverse proxy with SSL to enable notifications.';
+    } else if (Notification.permission === 'granted') {
+        status.textContent = '✓ Enabled';
+        btn.style.opacity  = '.5';
+    } else if (Notification.permission === 'denied') {
+        status.textContent = 'Blocked in browser settings';
+    }
+})();
+</script>
+</body>
+</html>

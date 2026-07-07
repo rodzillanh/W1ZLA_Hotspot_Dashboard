@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html data-theme="{{ 'dark' if settings.dark_mode else 'light' }}">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ settings.dashboard_name }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    <style>
+        /* --- theme tokens --- */
+        :root {
+            --bg:          #121212;
+            --card-bg:     #1e1e1e;
+            --card-border: #2d2d2d;
+            --text:        #e0e0e0;
+            --text-muted:  #888;
+            --text-dim:    #555;
+            --accent:      #2ecc71;
+            --accent-dim:  rgba(46,204,113,.18);
+            --link:        #5bc0de;
+            --toolbar-bg:  #1a1a1a;
+            --toolbar-btn: #252525;
+            --toolbar-border: #333;
+            --tab-active:  #1e1e1e;
+            --input-bg:    #2a2a2a;
+            --tx-color:    #f39c12;
+            --card-active-bg:      #1a2820;
+            --card-active-border:  #2a3d30;
+            --card-active-chip-bg: #0f1f15;
+            --fav-bg:              #221d0e;
+            --fav-border:          #3d3010;
+            --fav-chip-bg:         #1f1500;
+            --fav-color:           #f39c12;
+        }
+        [data-theme="light"] {
+            --bg:          #f0f2f5;
+            --card-bg:     #ffffff;
+            --card-border: #dde1e7;
+            --text:        #1a1a1a;
+            --text-muted:  #666;
+            --text-dim:    #aaa;
+            --accent:      #27ae60;
+            --accent-dim:  rgba(39,174,96,.12);
+            --link:        #2980b9;
+            --toolbar-bg:  #e8eaed;
+            --toolbar-btn: #ffffff;
+            --toolbar-border: #ccc;
+            --tab-active:  #ffffff;
+            --input-bg:    #f5f5f5;
+            --tx-color:    #e67e22;
+            --card-active-bg:      #edf7f1;
+            --card-active-border:  #a8d9bc;
+            --card-active-chip-bg: #d4eedd;
+            --fav-bg:              #fdf5e4;
+            --fav-border:          #e8c97a;
+            --fav-chip-bg:         #faecd0;
+            --fav-color:           #b8860b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 14px;
+            min-height: 100vh;
+        }
+
+        /* --- top bar --- */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px 10px;
+        }
+        .dashboard-title { font-size: 20px; font-weight: 500; }
+        .clocks { text-align: right; line-height: 1.4; }
+        .clock-local { font-size: 13px; }
+        .clock-utc   { font-size: 11px; color: var(--text-muted); }
+
+        /* --- toolbar --- */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px 18px;
+            background: var(--toolbar-bg);
+            border-top:    1px solid var(--toolbar-border);
+            border-bottom: 1px solid var(--toolbar-border);
+        }
+        .toolbar-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 13px;
+            background: var(--toolbar-btn);
+            border: 1px solid var(--toolbar-border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 12px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background .15s;
+        }
+        .toolbar-btn:hover { background: var(--card-bg); }
+        .toolbar-sep { flex: 1; }
+        .settings-link {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-decoration: none;
+            align-self: center;
+        }
+        .settings-link:hover { color: var(--text); }
+
+        /* --- system bar (host CPU + memory) --- */
+        .sysbar {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            padding: 5px 18px;
+            background: var(--toolbar-bg);
+            border-bottom: 1px solid var(--card-border);
+            font-size: 11px;
+        }
+        .sysbar-item { display: flex; align-items: center; gap: 6px; }
+        .sysbar-label { color: var(--text-dim); }
+        .sysbar-val   { color: var(--text-muted); min-width: 36px; }
+        .sysbar-bar {
+            width: 56px; height: 3px;
+            background: var(--card-border);
+            border-radius: 2px; overflow: hidden;
+        }
+        .sysbar-fill {
+            height: 100%; border-radius: 2px;
+            transition: width .8s ease;
+        }
+        .sysbar-fill.cpu { background: var(--accent); }
+        .sysbar-fill.mem { background: var(--link); }
+        .sysbar-host { margin-left: auto; color: var(--text-dim); font-size: 10px; }
+
+        /* --- tabs --- */
+        .tab-bar {
+            display: flex;
+            gap: 2px;
+            padding: 0 18px;
+            border-bottom: 1px solid var(--card-border);
+        }
+        .tab-btn {
+            padding: 8px 16px;
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            transition: color .15s;
+        }
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        /* --- tab content --- */
+        .tab-panel { display: none; padding: 14px 18px; }
+        .tab-panel.active { display: block; }
+
+        /* --- cards --- */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+            gap: 16px;
+        }
+        .hotspot-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 20px;
+            transition: background .3s, border-color .3s;
+        }
+        .hotspot-card.active {
+            background: var(--card-active-bg);
+            border-color: var(--card-active-border);
+        }
+        .hotspot-card.favorite {
+            background: var(--fav-bg);
+            border-color: var(--fav-border);
+        }
+        .friend-chip {
+            display: inline-block;
+            background: var(--fav-chip-bg);
+            border: 1px solid var(--fav-color);
+            color: var(--fav-color);
+            font-size: 10px;
+            font-weight: 500;
+            padding: 1px 7px;
+            border-radius: 10px;
+            margin-left: 7px;
+            vertical-align: middle;
+            animation: pulse 1.4s infinite;
+            letter-spacing: .3px;
+        }
+        .friend-label-inline {
+            display: inline-block;
+            color: var(--fav-color);
+            font-size: 11px;
+            margin-left: 6px;
+            opacity: .85;
+        }
+        .live-chip {
+            display: inline-block;
+            background: var(--card-active-chip-bg);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            font-size: 10px;
+            font-weight: 500;
+            padding: 1px 7px;
+            border-radius: 10px;
+            margin-left: 7px;
+            vertical-align: middle;
+            animation: pulse 1.4s infinite;
+            letter-spacing: .3px;
+        }
+        .card-inner {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+        .card-info { flex: 1; min-width: 0; }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 10px;
+        }
+        .card-name {
+            font-size: 17px;
+            font-weight: 500;
+            color: var(--text);
+            text-decoration: none;
+        }
+        .card-name:hover { text-decoration: underline; }
+        .card-tg {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+        .card-tg span { color: var(--text); }
+
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+        .active-label {
+            color: var(--accent);
+            font-weight: 500;
+            font-size: 15px;
+            margin-bottom: 3px;
+            animation: pulse 1.4s infinite;
+        }
+        .active-call-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .active-call-link:hover { text-decoration: underline; }
+        .caller-info {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        .tx-time {
+            font-size: 13px;
+            color: var(--tx-color);
+            margin-bottom: 10px;
+        }
+        .listening { color: var(--text-dim); font-size: 13px; margin-bottom: 10px; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .stat-val { color: var(--text); }
+
+        .recent-row {
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 1px solid var(--card-border);
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .recent-call {
+            color: var(--link);
+            text-decoration: none;
+            margin-right: 10px;
+        }
+        .recent-call:hover { text-decoration: underline; }
+
+        /* profile photo */
+        .caller-photo {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 10px;
+            cursor: pointer;
+            border: 2px solid var(--accent);
+            flex-shrink: 0;
+            display: block;
+        }
+        .photo-hint {
+            font-size: 9px;
+            color: var(--text-dim);
+            text-align: center;
+            margin-top: 4px;
+        }
+
+        /* --- weather slide-down panel --- */
+        .wx-panel-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0);
+            z-index: 150;
+            transition: background .25s;
+        }
+        .wx-panel-backdrop.open {
+            display: block;
+            background: rgba(0,0,0,.45);
+        }
+        .wx-panel {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100%);
+            width: min(420px, 95vw);
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,.4);
+            z-index: 151;
+            transition: transform .3s cubic-bezier(.4,0,.2,1);
+            padding: 16px;
+        }
+        .wx-panel.open {
+            transform: translateX(-50%) translateY(0);
+        }
+        .wx-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .wx-panel-title  { font-size: 14px; font-weight: 500; }
+        .wx-panel-sub    { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+        .wx-close-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 20px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+        }
+        .wx-close-btn:hover { color: var(--text); }
+
+        /* --- photo modal --- */
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.75);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-backdrop.open { display: flex; }
+        .modal-box {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 16px;
+            max-width: 340px;
+            width: 90%;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .modal-title { font-size: 14px; font-weight: 500; }
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 20px;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+        }
+        .modal-img {
+            width: 100%;
+            border-radius: 7px;
+            display: block;
+        }
+        .modal-footer {
+            margin-top: 8px;
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+        .modal-footer a { color: var(--link); }
+
+        /* --- map --- */
+        #map { height: 420px; border-radius: 8px; }
+        .map-legend {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: var(--text-muted);
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .legend-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+        }
+        .legend-square {
+            width: 10px; height: 10px;
+            display: inline-block;
+            margin-right: 4px;
+        }
+        .callers-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 12px;
+        }
+        .caller-chip {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 3px 10px;
+            font-size: 11px;
+            color: var(--link);
+        }
+        .caller-chip.live {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .distance-label {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+        .map-jump-btn {
+            font-size: 11px;
+            color: var(--link);
+            cursor: pointer;
+            margin-left: 8px;
+            text-decoration: none;
+        }
+        .update-badge {
+            font-size: 10px;
+            color: var(--fav-color);
+            border: 1px solid var(--fav-color);
+            border-radius: 10px;
+            padding: 1px 7px;
+            margin-left: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .update-badge:hover {
+            background: var(--fav-color);
+            color: var(--bg);
+        }
+        @keyframes card-flash {
+            0%, 100% { box-shadow: none; }
+            50%      { box-shadow: 0 0 0 2px var(--link); }
+        }
+        .hotspot-card.map-highlight {
+            animation: card-flash 0.6s ease-in-out 2;
+        }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div class="dashboard-title">{{ settings.dashboard_name }}</div>
+    <div style="display:flex;align-items:center;gap:16px">
+        <div id="wx-card" style="display:none;cursor:pointer;padding:4px 8px;border-radius:7px;transition:background .15s"
+             onclick="openForecast()" title="Click for 7-day forecast"
+             onmouseover="this.style.background='var(--card-bg)'"
+             onmouseout="this.style.background='transparent'">
+            <div style="display:flex;align-items:center;gap:8px">
+                <span id="wx-icon" style="font-size:22px;line-height:1"></span>
+                <div>
+                    <div style="display:flex;align-items:baseline;gap:5px">
+                        <span id="wx-temp" style="font-size:16px;font-weight:500"></span>
+                        <span id="wx-desc" style="font-size:11px;color:var(--text-muted)"></span>
+                    </div>
+                    <div id="wx-loc" style="font-size:10px;color:var(--text-dim);margin-top:1px"></div>
+                </div>
+            </div>
+        </div>
+        <div class="clocks">
+            <div class="clock-local" id="clock-local"></div>
+            <div class="clock-utc"   id="clock-utc"></div>
+        </div>
+    </div>
+</div>
+
+<div class="toolbar">
+    {% for link in settings.links %}
+    <a class="toolbar-btn" href="{{ link.url }}" target="_blank" rel="noopener">
+        {{ link.label }}
+    </a>
+    {% endfor %}
+    <span class="toolbar-sep"></span>
+    <a class="settings-link" href="/setup">⚙ Settings</a>
+</div>
+
+<div class="sysbar" id="sysbar" style="display:none">
+    <div class="sysbar-item">
+        <span class="sysbar-label">Host CPU</span>
+        <div class="sysbar-bar"><div class="sysbar-fill cpu" id="sb-cpu-bar" style="width:0%"></div></div>
+        <span class="sysbar-val" id="sb-cpu-val">—</span>
+    </div>
+    <div class="sysbar-item">
+        <span class="sysbar-label">Memory</span>
+        <div class="sysbar-bar"><div class="sysbar-fill mem" id="sb-mem-bar" style="width:0%"></div></div>
+        <span class="sysbar-val" id="sb-mem-val">—</span>
+        <span style="color:var(--text-dim);font-size:10px" id="sb-mem-detail"></span>
+    </div>
+    <span class="sysbar-host" id="sb-host"></span>
+</div>
+
+<div class="tab-bar">
+    <div class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard', this)">Dashboard</div>
+    <div class="tab-btn"       data-tab="map"       onclick="switchTab('map', this)">Live map</div>
+</div>
+
+<!-- Dashboard tab -->
+<div id="panel-dashboard" class="tab-panel active">
+    <div class="cards-grid" id="cards"></div>
+</div>
+
+<!-- Live map tab -->
+<div id="panel-map" class="tab-panel">
+    <div class="map-legend">
+        <span><span class="legend-dot" style="background:#2ecc71"></span>Active caller</span>
+        <span><span class="legend-dot" style="background:#5bc0de"></span>Recent (last 5 per node)</span>
+        <span><span class="legend-square" style="background:#9b59b6"></span>Your hotspot</span>
+        <select id="map-style-select" onchange="setMapStyle(this.value)"
+                style="margin-left:auto;background:var(--card-bg);color:var(--text);
+                       border:1px solid var(--card-border);border-radius:5px;
+                       padding:3px 8px;font-size:12px;cursor:pointer">
+            <option value="standard">Standard</option>
+            <option value="dark">Dark</option>
+            <option value="satellite">Satellite</option>
+        </select>
+    </div>
+    <div id="map"></div>
+    <div class="callers-list" id="callers-list"></div>
+</div>
+
+<!-- Weather slide-down panel -->
+<div class="wx-panel-backdrop" id="wx-backdrop" onclick="closeForecastModal()"></div>
+<div class="wx-panel" id="forecast-panel">
+    <div class="wx-panel-header">
+        <div>
+            <div class="wx-panel-title" id="fc-title">7-day forecast</div>
+            <div class="wx-panel-sub"   id="fc-updated"></div>
+        </div>
+        <button class="wx-close-btn" onclick="closeForecastModal()">×</button>
+    </div>
+    <!-- Current conditions -->
+    <div id="fc-current" style="background:var(--bg);border-radius:8px;padding:12px;
+                                 margin-bottom:12px;display:flex;align-items:flex-start;gap:12px">
+        <span id="fc-icon" style="font-size:32px;line-height:1"></span>
+        <div style="flex:1">
+            <div style="display:flex;align-items:baseline;gap:8px">
+                <span id="fc-temp" style="font-size:26px;font-weight:500"></span>
+                <span id="fc-desc" style="font-size:13px;color:var(--text-muted)"></span>
+            </div>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:1px" id="fc-feel"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;
+                        font-size:11px;color:var(--text-muted);margin-top:8px" id="fc-stats"></div>
+        </div>
+    </div>
+    <!-- 7-day strip -->
+    <div id="fc-days" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div>
+</div>
+
+<!-- Photo modal -->
+<div class="modal-backdrop" id="photo-modal" onclick="closeModal(event)">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-title"></span>
+            <button class="modal-close" onclick="closePhotoModal()">×</button>
+        </div>
+        <img class="modal-img" id="modal-img" src="" alt="">
+        <div class="modal-footer">
+            <a id="modal-qrz-link" href="" target="_blank" rel="noopener">View on QRZ.com</a>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+const POLL_MS = 3000;
+let leafletMap = null;
+let mapInitialized = false;
+// Browser-local timer state — keyed by ip
+// { type: 'tx'|'lh', browserStart: Date.now() when the event was first seen }
+// We store browser-local timestamps so timers run independently of the
+// server clock and the 3-second render cycle.
+let timerState = {};
+let prevTxStart   = {};  // ip -> last seen tx_start from server
+let prevLastHeard = {};  // ip -> last seen last_heard from server
+
+
+// --- weather ---
+const WX_POLL_MS = 10 * 60 * 1000;  // refresh every 10 minutes
+let wxData = null;
+
+function fetchWeather() {
+    fetch('/api/weather')
+        .then(r => { if (!r.ok) throw new Error('unavailable'); return r.json(); })
+        .then(data => {
+            wxData = data;
+            renderWeatherCard(data);
+        })
+        .catch(() => {
+            document.getElementById('wx-card').style.display = 'none';
+        });
+}
+
+function renderWeatherCard(data) {
+    document.getElementById('wx-card').style.display = '';
+    document.getElementById('wx-icon').textContent  = data.icon;
+    document.getElementById('wx-temp').textContent  = data.temp;
+    document.getElementById('wx-desc').textContent  = data.description;
+    document.getElementById('wx-loc').textContent   = data.location;
+}
+
+function openForecast() {
+    if (!wxData) return;
+    const d = wxData;
+    document.getElementById('fc-title').textContent   = '7-day forecast · ' + d.location;
+    document.getElementById('fc-updated').textContent = 'Updates every 10 minutes';
+    document.getElementById('fc-icon').textContent    = d.icon;
+    document.getElementById('fc-temp').textContent    = d.temp;
+    document.getElementById('fc-desc').textContent    = d.description;
+    document.getElementById('fc-feel').textContent    = 'Feels like ' + d.feels_like;
+    document.getElementById('fc-stats').innerHTML     =
+        `<div>Humidity: <span style="color:var(--text)">${d.humidity}</span></div>
+         <div>Wind: <span style="color:var(--text)">${d.wind}</span></div>
+         <div>Visibility: <span style="color:var(--text)">${d.visibility}</span></div>`;
+    document.getElementById('fc-days').innerHTML = d.days.map(day => `
+        <div style="background:${day.today ? 'var(--card-active-bg)' : 'var(--bg)'};
+                    border:1px solid ${day.today ? 'var(--card-active-border)' : 'var(--card-border)'};
+                    border-radius:6px;padding:6px 4px;text-align:center">
+            <div style="font-size:10px;color:${day.today ? 'var(--accent)' : 'var(--text-dim)'};margin-bottom:3px">${day.name}</div>
+            <div style="font-size:16px;margin-bottom:3px">${day.icon}</div>
+            <div style="font-size:12px;font-weight:500">${day.hi}</div>
+            <div style="font-size:10px;color:var(--text-dim)">${day.lo}</div>
+        </div>`).join('');
+    document.getElementById('wx-backdrop').classList.add('open');
+    document.getElementById('forecast-panel').classList.add('open');
+}
+
+function closeForecastModal() {
+    document.getElementById('wx-backdrop').classList.remove('open');
+    document.getElementById('forecast-panel').classList.remove('open');
+}
+
+fetchWeather();
+setInterval(fetchWeather, WX_POLL_MS);
+
+// --- host stats (CPU + memory) ---
+const HOST_STATS_MS      = 5000;
+const SHOW_HOST_STATS    = {{ 'true' if settings.get('show_host_stats', True) else 'false' }};
+const DISTANCE_UNIT      = "{{ settings.get('weather_unit', 'F') }}";  // "F" -> miles, "C" -> km
+const DARK_MODE          = {{ 'true' if settings.dark_mode else 'false' }};
+
+function updateSysbar(data) {
+    if (!SHOW_HOST_STATS) return;
+    if (data.cpu === 'N/A' && data.mem_pct === 'N/A') return;
+    document.getElementById('sysbar').style.display = 'flex';
+
+    const cpuNum = parseFloat(data.cpu);
+    if (!isNaN(cpuNum)) {
+        document.getElementById('sb-cpu-bar').style.width = Math.min(cpuNum, 100) + '%';
+        document.getElementById('sb-cpu-val').textContent = data.cpu;
+    }
+
+    const memNum = parseFloat(data.mem_pct);
+    if (!isNaN(memNum)) {
+        document.getElementById('sb-mem-bar').style.width = Math.min(memNum, 100) + '%';
+        document.getElementById('sb-mem-val').textContent = data.mem_pct;
+        if (data.mem_used && data.mem_total) {
+            document.getElementById('sb-mem-detail').textContent =
+                `${data.mem_used} / ${data.mem_total}`;
+        }
+    }
+}
+
+function fetchHostStats() {
+    fetch('/api/host_stats')
+        .then(r => r.json())
+        .then(updateSysbar)
+        .catch(() => {});
+}
+
+fetchHostStats();
+setInterval(fetchHostStats, HOST_STATS_MS);
+
+// --- clock ---
+function updateClocks() {
+    const now = new Date();
+    const h   = now.getHours() % 12 || 12;
+    const m   = String(now.getMinutes()).padStart(2,'0');
+    const s   = String(now.getSeconds()).padStart(2,'0');
+    const ap  = now.getHours() < 12 ? 'AM' : 'PM';
+    document.getElementById('clock-local').textContent =
+        `${h}:${m}:${s} ${ap}`;
+    const uh = String(now.getUTCHours()).padStart(2,'0');
+    const um = String(now.getUTCMinutes()).padStart(2,'0');
+    const us = String(now.getUTCSeconds()).padStart(2,'0');
+    document.getElementById('clock-utc').textContent =
+        `${uh}:${um}:${us} UTC`;
+}
+setInterval(updateClocks, 1000);
+updateClocks();
+
+// --- tabs ---
+function switchTab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    btn.classList.add('active');
+    if (name === 'map') {
+        initMap();
+        // Leaflet can mis-measure its container if it was hidden (display:none
+        // via the inactive tab-panel) at any point -- invalidateSize() forces
+        // it to recheck, cheap enough to call on every switch to this tab.
+        if (leafletMap) {
+            setTimeout(() => leafletMap.invalidateSize(), 0);
+            refreshMap();
+        }
+    }
+}
+
+function goToTab(name) {
+    const btn = document.querySelector(`.tab-btn[data-tab="${name}"]`);
+    if (btn) switchTab(name, btn);
+}
+
+// --- TX timer ---
+function fmtTx(txStart) {
+    if (!txStart) return '';
+    const elapsed = Math.max(0, Math.floor(Date.now() / 1000 - txStart));
+    const m = Math.floor(elapsed / 60);
+    const s = String(elapsed % 60).padStart(2,'0');
+    return `⏱ ${m}:${s}`;
+}
+
+// --- Last heard timer ---
+function fmtAgo(ts) {
+    if (!ts) return '';
+    const elapsed = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+    const m = Math.floor(elapsed / 60);
+    const s = String(elapsed % 60).padStart(2,'0');
+    return `⏱ ${m}:${s} ago`;
+}
+
+// --- photo modal ---
+function openPhoto(call, name, location, imageUrl) {
+    document.getElementById('modal-title').textContent =
+        name ? `${call} — ${name}` : call;
+    document.getElementById('modal-img').src    = imageUrl;
+    document.getElementById('modal-img').alt    = call;
+    document.getElementById('modal-qrz-link').href = `https://www.qrz.com/db/${call}`;
+    document.getElementById('photo-modal').classList.add('open');
+}
+function closePhotoModal() {
+    document.getElementById('photo-modal').classList.remove('open');
+}
+function closeModal(e) {
+    if (e.target === document.getElementById('photo-modal')) closePhotoModal();
+}
+
+// --- browser notifications for favorites ---
+let notifPermission = ('Notification' in window) ? Notification.permission : 'unsupported';
+let notifiedCalls   = {};  // ip -> last notified callsign, avoids repeat alerts
+
+
+function maybeNotify(hs) {
+    if (!hs.is_favorite || !hs.is_active || !hs.active_call) return;
+    if (Notification.permission !== 'granted') return;
+    if (notifiedCalls[hs.ip] === hs.active_call) return;  // already fired for this call
+    notifiedCalls[hs.ip] = hs.active_call;
+    const label    = hs.favorite_label ? ` · ${hs.favorite_label}` : '';
+    const location = hs.caller_location ? ` · ${hs.caller_location}` : '';
+    new Notification(`⭐ ${hs.active_call} is on the air${label}`, {
+        body: `${hs.name}${location}${hs.talkgroup ? ' · ' + hs.talkgroup : ''}`,
+        icon: hs.caller_image || undefined,
+        tag:  `fav-${hs.ip}`,  // replaces any prior notif for the same node
+    });
+}
+
+function clearStaleNotifs(data) {
+    // Reset tracking when a call ends so the next call fires a fresh notif
+    data.forEach(hs => {
+        if (!hs.is_active && notifiedCalls[hs.ip]) delete notifiedCalls[hs.ip];
+    });
+}
+
+// --- render cards ---
+function renderCards(data) {
+    const container = document.getElementById('cards');
+    // data is an array — order guaranteed, no Object.values() needed
+    container.innerHTML = data.map(hs => {
+        const isFav     = hs.is_favorite && hs.is_active;
+        const cardClass = hs.is_active ? (isFav ? 'favorite' : 'active') : '';  // last-heard = no tint
+
+        const chipHtml = hs.is_active
+            ? (isFav ? `<span class="friend-chip">⭐ FRIEND</span>`
+                     : `<span class="live-chip">LIVE</span>`)
+            : '';  // no chip for last-heard or idle
+
+        const activeColor = isFav ? 'style="color:var(--fav-color)"' : '';
+        const friendLabel = isFav && hs.favorite_label
+            ? `<span class="friend-label-inline">${hs.favorite_label}</span>` : '';
+
+        const outdatedList = (hs.dashboard_outdated_repos && hs.dashboard_outdated_repos.length)
+            ? hs.dashboard_outdated_repos.join(', ') : 'unknown component';
+        const updateBadge = hs.dashboard_update_available
+            ? `<a class="update-badge" href="http://${hs.ip}/admin/update.php" target="_blank" rel="noopener"
+                  title="Update available: ${outdatedList} — WebCode installed: ${hs.dashboard_version || '?'} (${hs.dashboard_version_date || 'unknown date'}) — click to open the update page">⬆ update</a>`
+            : '';
+        const mapPin = (hs.lat !== undefined && hs.lat !== null)
+            ? `<a class="map-jump-btn" onclick="event.preventDefault(); jumpToNodeOnMap('${hs.ip}')" href="#">📍 map</a>`
+            : '';
+
+        // Three card states:
+        //   active    — is_active true
+        //   lastHeard — is_active false, active_call set, last_heard within TTL
+        //   idle      — active_call null
+        const isLastHeard = !hs.is_active && hs.active_call !== null && hs.active_call !== undefined;
+
+        const photoBlock = (hs.is_active || isLastHeard) && hs.caller_image
+            ? `<div>
+                 <img class="caller-photo" src="${hs.caller_image}"
+                      alt="${hs.active_call}"
+                      onerror="this.parentNode.remove()"
+                      onclick="openPhoto('${hs.active_call}','${hs.caller_name || ''}','${hs.caller_location || ''}','${hs.caller_image}')">
+                 <div class="photo-hint">tap to enlarge</div>
+               </div>`
+            : '';
+
+        let infoBlock;
+        if (hs.is_active) {
+            infoBlock = `<div class="active-label" ${activeColor}>📡 ACTIVE:
+                 <a class="active-call-link" href="https://www.qrz.com/db/${hs.active_call}"
+                    target="_blank" rel="noopener" ${activeColor}>${hs.active_call}</a>${friendLabel}
+               </div>
+               ${(hs.caller_name || hs.caller_location)
+                   ? `<div class="caller-info">${[hs.caller_name, hs.caller_location].filter(Boolean).join(' — ')}</div>`
+                   : ''}
+               <div class="tx-time" id="tx-${hs.ip}">${fmtTx(hs.tx_start)}</div>`;
+        } else if (isLastHeard) {
+            infoBlock = `<div class="listening">Last heard:
+                 <a class="recent-call" href="https://www.qrz.com/db/${hs.active_call}"
+                    target="_blank" rel="noopener">${hs.active_call}</a>
+               </div>
+               ${(hs.caller_name || hs.caller_location)
+                   ? `<div class="caller-info">${[hs.caller_name, hs.caller_location].filter(Boolean).join(' — ')}</div>`
+                   : ''}
+               <div class="tx-time" id="lh-${hs.ip}">${fmtAgo(hs.last_heard)}</div>`;
+        } else {
+            infoBlock = `<div class="listening">Listening...</div>`;
+        }
+
+        const recentBlock = hs.history.length > 0
+            ? `<div class="recent-row">Recent:
+                 ${hs.history.map(h =>
+                     `<a class="recent-call" href="https://www.qrz.com/db/${h.call}"
+                         target="_blank" rel="noopener"
+                         title="${[h.name, h.location].filter(Boolean).join(' — ')}">${h.call}</a>`
+                 ).join('')}
+               </div>`
+            : '';
+
+        return `
+        <div class="hotspot-card ${cardClass}" id="card-${hs.ip}">
+          <div class="card-header">
+            <a class="card-name" href="http://${hs.ip}" target="_blank" rel="noopener">${hs.name}${chipHtml}</a>
+            ${updateBadge}${mapPin}
+          </div>
+          <div class="card-inner">
+            <div class="card-info" style="flex:1;min-width:0">
+              <div style="display:flex;gap:12px;align-items:flex-start">
+                <div style="flex:1;min-width:0">
+                  ${infoBlock}
+                </div>
+                ${photoBlock}
+              </div>
+              ${hs.talkgroup ? `<div class="card-tg">Linked: <span>${hs.talkgroup}</span></div>` : ''}
+              <div class="stats-grid">
+                <div>Mode: <span class="stat-val">${hs.mode}</span></div>
+                <div>RSSI: <span class="stat-val">${hs.rssi}</span></div>
+                <div>BER:  <span class="stat-val">${hs.ber}</span></div>
+                <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
+                <div>CPU:  <span class="stat-val">${hs.cpu}</span></div>
+                ${hs.color_code ? `<div>Color Code: <span class="stat-val">${hs.color_code}</span></div>` : ''}
+                ${hs.is_active && hs.timeslot ? `<div>Time Slot: <span class="stat-val">${hs.timeslot}</span></div>` : ''}
+                ${hs.bm_status_text
+                    ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
+              </div>
+              ${hs.bm_static_tgs && hs.bm_static_tgs.length
+                  ? `<div class="card-tg">BM static: <span>${hs.bm_static_tgs.map(t => t.talkgroup + (t.slot ? ` (TS${t.slot})` : '')).join(', ')}</span></div>`
+                  : ''}
+              ${recentBlock}
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    // Update browser-local timer state — only reset browserStart when the
+    // server reports a genuinely new event (tx_start or last_heard changed).
+    // This keeps each card's timer running smoothly across render cycles.
+    data.forEach(hs => {
+        const ip = hs.ip;
+        if (hs.is_active) {
+            // Card is active. Detect re-key by checking if we were previously
+            // in last-heard state (prevLastHeard set) OR if tx_start changed.
+            const wasLastHeard = prevLastHeard[ip] != null;
+            if (hs.tx_start) {
+                const txChanged = !prevTxStart[ip] ||
+                                  wasLastHeard ||
+                                  timerState[ip]?.type !== 'tx' ||
+                                  Math.abs(prevTxStart[ip] - hs.tx_start) > 0.001;
+                if (txChanged) {
+                    const serverElapsed = Math.max(0, Date.now() / 1000 - hs.tx_start);
+                    timerState[ip]    = { type: 'tx', browserStart: Date.now() - serverElapsed * 1000 };
+                    prevTxStart[ip]   = hs.tx_start;
+                    prevLastHeard[ip] = null;
+                }
+            } else if (!timerState[ip] || timerState[ip].type !== 'tx' || wasLastHeard) {
+                // tx_start not yet available, or re-keyed from last-heard — start fresh
+                timerState[ip]    = { type: 'tx', browserStart: Date.now() };
+                prevTxStart[ip]   = null;
+                prevLastHeard[ip] = null;
+            }
+        } else if (hs.last_heard) {
+            // Last-heard state — anchor to when the call ended
+            const lhChanged = !prevLastHeard[ip] ||
+                              timerState[ip]?.type !== 'lh' ||
+                              Math.abs(prevLastHeard[ip] - hs.last_heard) > 0.001;
+            if (lhChanged) {
+                const serverElapsed = Math.max(0, Date.now() / 1000 - hs.last_heard);
+                timerState[ip]    = { type: 'lh', browserStart: Date.now() - serverElapsed * 1000 };
+                prevLastHeard[ip] = hs.last_heard;
+                prevTxStart[ip]   = null;
+            }
+        } else {
+            // Idle — clear timer state for this card
+            timerState[ip]    = null;
+            prevTxStart[ip]   = null;
+            prevLastHeard[ip] = null;
+        }
+        maybeNotify(hs);
+    });
+    clearStaleNotifs(data);
+}
+
+// Tick all timers every second — uses browser-local start times so each
+// card counts independently and smoothly across render cycles.
+setInterval(() => {
+    const now = Date.now();
+    Object.entries(timerState).forEach(([ip, t]) => {
+        if (!t) return;
+        const elapsed = Math.max(0, Math.floor((now - t.browserStart) / 1000));
+        const m = Math.floor(elapsed / 60);
+        const s = String(elapsed % 60).padStart(2, '0');
+        if (t.type === 'tx') {
+            const el = document.getElementById('tx-' + ip);
+            if (el) el.textContent = `⏱ ${m}:${s}`;
+        } else {
+            const el = document.getElementById('lh-' + ip);
+            if (el) el.textContent = `⏱ ${m}:${s} ago`;
+        }
+    });
+}, 1000);
+
+// --- map ---
+let nodeMarkers    = [];
+let distanceLines  = [];
+let callerCluster  = null;
+let osmLayer       = null;
+let darkLayer      = null;
+let satLayer       = null;
+let currentMapStyle = null;
+let hasFittedBounds = false;
+
+function initMap() {
+    if (mapInitialized) return;
+    mapInitialized = true;
+
+    if (typeof L === 'undefined') {
+        // Leaflet itself failed to load (CDN blocked, offline, ad-blocker,
+        // etc.) -- show a clear message instead of throwing, which would
+        // otherwise strand this tab in a broken state for the rest of the
+        // session (mapInitialized is already true, so initMap() would
+        // never be retried).
+        document.getElementById('map').innerHTML =
+            '<div style="padding:20px;text-align:center;color:var(--text-muted)">' +
+            'Map failed to load — this page couldn\'t reach cdn.jsdelivr.net. ' +
+            'Check your network/firewall or any ad-blocker, then reload the page.</div>';
+        return;
+    }
+
+    // maxZoom set explicitly here (not just on the tile layers) because
+    // leaflet.markercluster's MarkerClusterGroup requires the map itself to
+    // know its maxZoom -- it's added to the map before any tile layer
+    // (see below), so without this it throws "Map has no maxZoom
+    // specified" on every single refresh cycle, which is what was causing
+    // the freeze.
+    leafletMap = L.map('map', { maxZoom: 19 }).setView([39.5, -98.35], 4);
+
+    osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 18
+    });
+    darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
+    });
+    satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles © Esri',
+        maxZoom: 18
+    });
+
+    // leaflet.markercluster is a separate CDN script from Leaflet itself --
+    // if it failed to load while Leaflet succeeded, fall back to a plain
+    // (non-clustering) layer group rather than throwing on every refresh.
+    callerCluster = (typeof L.markerClusterGroup === 'function')
+        ? L.markerClusterGroup({ maxClusterRadius: 40 })
+        : L.layerGroup();
+    leafletMap.addLayer(callerCluster);
+
+    // Default to the dark tile set when the dashboard itself is in dark
+    // mode -- matches the rest of the UI instead of a jarring light map
+    // sitting inside an otherwise dark page. Still overridable below.
+    const initialStyle = DARK_MODE ? 'dark' : 'standard';
+    document.getElementById('map-style-select').value = initialStyle;
+    setMapStyle(initialStyle);
+
+    refreshMap();
+}
+
+function setMapStyle(style) {
+    if (!leafletMap) return;
+    const layers = { standard: osmLayer, dark: darkLayer, satellite: satLayer };
+    if (currentMapStyle && layers[currentMapStyle]) {
+        leafletMap.removeLayer(layers[currentMapStyle]);
+    }
+    leafletMap.addLayer(layers[style]);
+    currentMapStyle = style;
+}
+
+// Haversine distance in km between two lat/lon points.
+function distanceKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+              Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function fmtDistance(km) {
+    if (DISTANCE_UNIT === 'F') return `${Math.round(km * 0.621371)} mi`;
+    return `${Math.round(km)} km`;
+}
+
+function jumpToNodeOnMap(ip) {
+    goToTab('map');
+    const node = nodeMarkers.find(n => n.ip === ip);
+    if (node) {
+        leafletMap.setView(node.marker.getLatLng(), Math.max(leafletMap.getZoom(), 9));
+        node.marker.openPopup();
+    }
+}
+
+function showHotspotCard(ip) {
+    goToTab('dashboard');
+    const card = document.getElementById('card-' + ip);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('map-highlight');
+    setTimeout(() => card.classList.remove('map-highlight'), 1300);
+}
+
+function refreshMap() {
+    if (!mapInitialized) return;
+    // Only do the (relatively expensive) marker/line rebuild while the map
+    // tab is actually visible -- previously this ran on every 3-second
+    // dashboard poll forever, even after switching back to the Dashboard
+    // tab, tearing down and rebuilding every marker/line/tooltip for no
+    // visible benefit.
+    const panel = document.getElementById('panel-map');
+    if (!panel || !panel.classList.contains('active')) return;
+    fetch('/api/map_data')
+        .then(r => r.json())
+        .then(({ nodes, callers }) => {
+            nodeMarkers.forEach(n => n.marker.remove());
+            nodeMarkers = [];
+            distanceLines.forEach(l => l.remove());
+            distanceLines = [];
+            callerCluster.clearLayers();
+
+            const chipList = document.getElementById('callers-list');
+            chipList.innerHTML = '';
+
+            const nodeByName = {};
+            nodes.forEach(node => {
+                const icon = L.divIcon({
+                    className: '',
+                    html: `<div style="width:14px;height:14px;background:#9b59b6;border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.4)"></div>`,
+                    iconSize: [14,14],
+                    iconAnchor: [7,7],
+                });
+                const marker = L.marker([node.lat, node.lon], {icon, zIndexOffset: 1000})
+                    .bindPopup(`<b>${node.name}</b><br><small>${node.ip}</small>`)
+                    .addTo(leafletMap);
+                nodeMarkers.push({ ip: node.ip, marker });
+                nodeByName[node.name] = node;
+            });
+
+            callers.forEach(entry => {
+                const color = entry.is_active ? '#2ecc71' : '#5bc0de';
+                const icon  = L.divIcon({
+                    className: '',
+                    html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.4)"></div>`,
+                    iconSize: [12,12],
+                    iconAnchor: [6,6],
+                });
+                const sourceNote = entry.source === 'aprs' ? '<br><small>📍 live APRS position</small>' : '';
+                const popup = `<b>${entry.call}</b>${entry.name ? `<br>${entry.name}` : ''}${entry.location ? `<br>${entry.location}` : ''}<br><small>via ${entry.node}</small>${sourceNote}<br><a href="#" onclick="event.preventDefault(); showHotspotCard('${entry.node_ip}')">Go to card →</a>`;
+                const marker = L.marker([entry.lat, entry.lon], {icon}).bindPopup(popup);
+                callerCluster.addLayer(marker);
+
+                // Distance/bearing line — only for active calls, and only
+                // when we know where the receiving node physically is.
+                if (entry.is_active) {
+                    const node = nodeByName[entry.node];
+                    if (node) {
+                        const km   = distanceKm(node.lat, node.lon, entry.lat, entry.lon);
+                        const line = L.polyline([[node.lat, node.lon], [entry.lat, entry.lon]], {
+                            color: '#2ecc71', weight: 1.5, dashArray: '4,4', opacity: 0.7,
+                        }).bindTooltip(fmtDistance(km), { permanent: true, className: 'distance-label', direction: 'center' })
+                          .addTo(leafletMap);
+                        distanceLines.push(line);
+                    }
+                }
+
+                const chip = document.createElement('a');
+                chip.className    = 'caller-chip' + (entry.is_active ? ' live' : '');
+                chip.href         = `https://www.qrz.com/db/${entry.call}`;
+                chip.target       = '_blank';
+                chip.rel          = 'noopener';
+                chip.textContent  = entry.call;
+                chip.title        = [entry.name, entry.location, entry.node].filter(Boolean).join(' · ');
+                chipList.appendChild(chip);
+            });
+
+            // Auto-fit bounds once, the first time there's anything to show.
+            // Only once -- refitting on every 3-second poll would fight
+            // anyone who's manually panned or zoomed the map.
+            if (!hasFittedBounds) {
+                const allPoints = [
+                    ...nodes.map(n => [n.lat, n.lon]),
+                    ...callers.map(c => [c.lat, c.lon]),
+                ];
+                if (allPoints.length > 0) {
+                    leafletMap.fitBounds(allPoints, { padding: [30, 30], maxZoom: 10 });
+                    hasFittedBounds = true;
+                }
+            }
+        })
+        .catch(err => console.error('Map refresh failed:', err));
+}
+
+// --- main poll loop ---
+function refresh() {
+    fetch('/api/data')
+        .then(r => r.json())
+        .then(data => {
+            renderCards(data);
+            refreshMap();
+        });
+}
+refresh();
+setInterval(refresh, POLL_MS);
+</script>
+</body>
+</html>

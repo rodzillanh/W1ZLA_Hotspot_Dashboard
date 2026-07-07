@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>hotspot-dashboard</Name>
+  <Repository>hotspot-dashboard:latest</Repository>
+  <Registry/>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support/>
+  <Project/>
+  <Overview>Live status dashboard for a fleet of Pi-Star / WPSD ham radio hotspots, polled over SSH every few seconds for uptime, temperature, signal, and active-call info.</Overview>
+  <Category>Network:Other</Category>
+  <WebUI>http://[IP]:[PORT:5000]/</WebUI>
+  <TemplateURL/>
+  <Icon/>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="WebUI Port" Target="5000" Default="5000" Mode="tcp" Description="Port for the dashboard web interface" Type="Port" Display="always" Required="true" Mask="false">5000</Config>
+  <Config Name="App Data" Target="/app/data" Default="/mnt/user/appdata/hotspot-dashboard" Mode="rw" Description="Persistent storage for hotspots.json" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/hotspot-dashboard</Config>
+  <Config Name="Poll Interval" Target="POLL_INTERVAL" Default="5" Mode="" Description="Seconds between fleet polling sweeps" Type="Variable" Display="always" Required="false" Mask="false">5</Config>
+  <Config Name="SSH Timeout" Target="SSH_TIMEOUT" Default="5" Mode="" Description="SSH connection timeout in seconds" Type="Variable" Display="always" Required="false" Mask="false">5</Config>
+  <Config Name="Failure Threshold" Target="FAILURE_THRESHOLD" Default="2" Mode="" Description="Consecutive failed polls before a hotspot is marked Offline" Type="Variable" Display="always" Required="false" Mask="false">2</Config>
+  <Config Name="Max Workers" Target="MAX_WORKERS" Default="5" Mode="" Description="Parallel SSH checks per polling sweep" Type="Variable" Display="advanced" Required="false" Mask="false">5</Config>
+  <Config Name="Active Timeout" Target="ACTIVE_TIMEOUT" Default="30" Mode="" Description="Seconds of log silence before a node is forced back to idle. Set to 0 to disable." Type="Variable" Display="advanced" Required="false" Mask="false">30</Config>
+  <Config Name="QRZ Username" Target="QRZ_USERNAME" Default="" Mode="" Description="QRZ.com username, for looking up active caller name/city/state. Leave blank to disable." Type="Variable" Display="always" Required="false" Mask="false"></Config>
+  <Config Name="QRZ Password" Target="QRZ_PASSWORD" Default="" Mode="" Description="QRZ.com password (requires an active XML subscription to see other callsigns' info)" Type="Variable" Display="always" Required="false" Mask="true"></Config>
+</Container>

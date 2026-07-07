@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html data-theme="{{ 'dark' if settings.dark_mode else 'light' }}">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>README — {{ settings.dashboard_name }}</title>
+    <style>
+        :root {
+            --bg: #121212; --card-bg: #1e1e1e; --card-border: #2d2d2d;
+            --text: #e0e0e0; --text-muted: #888; --text-dim: #555;
+            --accent: #2ecc71; --link: #5bc0de; --amber: #f39c12;
+        }
+        [data-theme="light"] {
+            --bg: #f0f2f5; --card-bg: #fff; --card-border: #dde1e7;
+            --text: #1a1a1a; --text-muted: #666; --text-dim: #aaa;
+            --accent: #27ae60; --link: #2980b9; --amber: #e67e22;
+        }
+        * { box-sizing: border-box; }
+        body { background: var(--bg); color: var(--text);
+               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+               font-size: 14px; padding: 20px; max-width: 860px; margin: 0 auto; }
+        a.back-link { color: var(--link); text-decoration: none; font-size: 13px; }
+        a.back-link:hover { text-decoration: underline; }
+        .card { background: var(--card-bg); border: 1px solid var(--card-border);
+                border-radius: 8px; padding: 24px; margin-top: 14px; }
+
+        /* Rendered markdown styling */
+        #readme-content h1 { font-size: 22px; margin: 0 0 16px; padding-bottom: 10px;
+                              border-bottom: 1px solid var(--card-border); }
+        #readme-content h2 { font-size: 18px; margin: 28px 0 12px; padding-bottom: 8px;
+                              border-bottom: 1px solid var(--card-border); }
+        #readme-content h3 { font-size: 15px; margin: 20px 0 8px; color: var(--accent); }
+        #readme-content p  { margin: 0 0 12px; line-height: 1.6; }
+        #readme-content ul, #readme-content ol { margin: 0 0 12px 22px; line-height: 1.6; }
+        #readme-content li { margin-bottom: 4px; }
+        #readme-content a  { color: var(--link); }
+        #readme-content code { background: var(--bg); border-radius: 3px; padding: 1px 5px;
+                                font-size: 12.5px; }
+        #readme-content pre { background: var(--bg); border-radius: 6px; padding: 12px;
+                               overflow-x: auto; margin: 0 0 14px; }
+        #readme-content pre code { background: none; padding: 0; }
+        #readme-content blockquote { border-left: 3px solid var(--card-border); margin: 0 0 12px;
+                                      padding: 2px 14px; color: var(--text-muted); }
+        #readme-content table { border-collapse: collapse; margin: 0 0 14px; width: 100%; font-size: 13px; }
+        #readme-content th, #readme-content td { border: 1px solid var(--card-border); padding: 6px 10px; text-align: left; }
+        #readme-content th { background: var(--bg); }
+        #readme-content hr { border: none; border-top: 1px solid var(--card-border); margin: 20px 0; }
+        #readme-content img { max-width: 100%; }
+    </style>
+</head>
+<body>
+    <a class="back-link" href="/version">← Back to Version info</a>
+    <div class="card">
+        <div id="readme-content">Loading…</div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    const readmeSource = {{ readme_text | tojson }};
+    const target = document.getElementById('readme-content');
+    if (typeof marked !== 'undefined') {
+        target.innerHTML = marked.parse(readmeSource);
+    } else {
+        // Marked failed to load (network block, offline, etc.) -- fall back
+        // to plain preformatted text rather than showing nothing.
+        const pre = document.createElement('pre');
+        pre.style.whiteSpace = 'pre-wrap';
+        pre.textContent = readmeSource;
+        target.innerHTML = '';
+        target.appendChild(pre);
+    }
+</script>
+</body>
+</html>
