@@ -391,6 +391,15 @@ an ASL3 card — and the WPSD-specific git update check is skipped for
 this node type entirely, rather than running a check that could never
 apply.
 
+**Brief keyups can be missed between polls.** Unlike the WPSD path (which
+tails a log with a short rolling history buffer), each ASL3 poll only
+sees the *instant* it connects — there's no history. A keyup shorter than
+the poll interval (`POLL_INTERVAL`, default 5s) can start and end
+entirely between two polls and never get captured. Confirmed against a
+real node: a brief test keyup was missed, but a sustained one (5-10+
+seconds) showed up correctly. This is an inherent tradeoff of polling
+point-in-time state rather than a log, not a bug to chase.
+
 ## Home Assistant (MQTT)
 
 Optional — set a broker host in Settings → Integrations to publish every
