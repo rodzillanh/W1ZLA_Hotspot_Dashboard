@@ -411,10 +411,12 @@ Settings:
   *and* the cooldown has elapsed
 
 The message itself is short (APRS messages cap around 67 characters) —
-e.g. `"W1ZLA active on Garage Hotspot"` — and there's no delivery
-confirmation; sending is fire-and-forget, matching how simple APRS bots
-generally behave. It uses the caller's actual callsign rather than their
-optional friendly name/label, to read as a proper APRS message.
+e.g. `"W1ZLA active on Garage Hotspot"`, or
+`"N1IWP active on Garage Hotspot - TGIF 603"` when a talkgroup/reflector is
+linked — and there's no delivery confirmation; sending is fire-and-forget,
+matching how simple APRS bots generally behave. It uses the caller's
+actual callsign rather than their optional friendly name/label, to read as
+a proper APRS message.
 
 ## Transmission timer
 

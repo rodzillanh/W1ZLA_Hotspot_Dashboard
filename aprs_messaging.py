@@ -86,9 +86,15 @@ class AprsMessenger:
 
     @staticmethod
     def _format_message(hotspot_status: dict) -> str:
-        call = hotspot_status.get("active_call") or hotspot_status.get("favorite_label") or "Unknown"
-        node = hotspot_status.get("name") or "hotspot"
-        text = f"{call} active on {node}"
+        call      = hotspot_status.get("active_call") or hotspot_status.get("favorite_label") or "Unknown"
+        node      = hotspot_status.get("name") or "hotspot"
+        talkgroup = hotspot_status.get("talkgroup")
+        # Plain ASCII separator, not a Unicode dot -- APRS messages are meant
+        # to be readable on old TNCs/handheld radio displays that assume
+        # 7-bit ASCII, and aprslib encodes this as UTF-8 rather than erroring,
+        # so a fancy character would silently reach the air as mangled bytes
+        # instead of failing loudly.
+        text = f"{call} active on {node} - {talkgroup}" if talkgroup else f"{call} active on {node}"
         return text[:MAX_MSG_LEN]
 
     def _send(self, text: str) -> None:
