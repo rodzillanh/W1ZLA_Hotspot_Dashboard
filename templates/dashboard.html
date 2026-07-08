@@ -1443,7 +1443,11 @@ function renderFleetChart(buckets) {
     if (fleetChart) {
         fleetChart.data.labels   = labels;
         fleetChart.data.datasets = datasets;
-        fleetChart.update();
+        // 'none' skips the draw-in animation -- this runs every 3 seconds
+        // (same cadence as the main poll loop), and replaying a full
+        // animated redraw that often caused a visible flash and kept
+        // interrupting hover/tooltip state.
+        fleetChart.update('none');
     } else {
         fleetChart = new Chart(canvas.getContext('2d'), {
             type: 'line',
@@ -1451,6 +1455,7 @@ function renderFleetChart(buckets) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false,
                 scales: {
                     x: {
                         ticks: { autoSkip: true, maxTicksLimit: 8, color: cssVar('--text-muted') },
