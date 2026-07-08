@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.1</span>
+                <span class="release-version">v3.2</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Bugfix — Host power control didn't actually reboot/power off</span> — the standalone install's systemd unit runs with <code>NoNewPrivileges=yes</code>, which blocks <code>sudo</code>/setuid entirely regardless of sudoers config, and the original implementation never checked whether the command actually succeeded, so the API silently reported success either way. Now uses <code>systemctl reboot</code>/<code>systemctl poweroff</code> (D-Bus, not setuid) plus a polkit rule granting the service user permission — <code>install.sh</code> and <code>update.sh</code> both provision this automatically, so existing installs pick it up by just running <code>update.sh</code> again</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.1</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Host power control</span> — optional "🔄 Reboot Pi" / "⏻ Power off Pi" buttons in Settings → General, controlling the device running the dashboard itself (not a monitored hotspot). Autodetected at startup and only shown on a standalone install running directly on real Raspberry Pi hardware — never in Docker/Unraid, since "reboot the host" can't actually reboot the underlying box from inside a container. Both actions require confirming a browser dialog first</li>

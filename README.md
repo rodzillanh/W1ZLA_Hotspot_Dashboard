@@ -407,10 +407,19 @@ point-in-time state rather than a log, not a bug to chase.
 
 Optional "🔄 Reboot Pi" / "⏻ Power off Pi" buttons in Settings → General —
 controls the device *running the dashboard itself*, not a monitored
-hotspot. Runs `sudo reboot` / `sudo shutdown -h now` locally (no SSH
-involved, since it's the same machine), so it needs passwordless `sudo`
-for whichever user runs the dashboard service — the same assumption this
-app already makes for the ASL3 integration's `sudo asterisk -rx` command.
+hotspot. Runs `systemctl reboot` / `systemctl poweroff` locally (no SSH
+involved, since it's the same machine) rather than `sudo` — the systemd
+service runs with `NoNewPrivileges=yes`, which blocks `sudo`/setuid
+entirely no matter how sudoers is configured, so `systemctl` (talking to
+systemd over D-Bus) is used instead, keeping that hardening intact.
+
+This needs one small polkit rule granting the service user permission for
+the `org.freedesktop.login1.reboot`/`power-off` actions — a headless
+systemd service has no active login session, so polkit denies these by
+default otherwise. `install.sh` writes this rule automatically on a fresh
+install, and `update.sh` (re-)writes it on every update, so **existing
+installs pick it up just by running `sudo bash update.sh` again** — no
+separate manual step needed once you're on this version.
 
 **Only shown on a standalone install running directly on real Raspberry
 Pi hardware**, detected automatically at startup by checking for

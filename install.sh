@@ -62,6 +62,30 @@ else
     success "User ${SERVICE_USER} already exists"
 fi
 
+# --- grant reboot/power-off permission (Settings -> General "Host power
+# control" buttons) via polkit, since the service runs with
+# NoNewPrivileges=yes -- sudo/setuid is blocked entirely regardless of
+# sudoers config, but a polkit rule lets systemctl reboot/poweroff work via
+# D-Bus instead. A headless service account has no active session, so
+# default polkit policy would otherwise deny these actions. ---
+header "Configuring reboot/power-off permission"
+mkdir -p /etc/polkit-1/rules.d
+cat > /etc/polkit-1/rules.d/49-hotspot-dashboard-power.rules << POLKIT
+// Allows the ${SERVICE_USER} service user to reboot/power off this device
+// via Settings -> General -- see README.md "Host power control".
+polkit.addRule(function(action, subject) {
+    if ((action.id == "org.freedesktop.login1.reboot" ||
+         action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
+         action.id == "org.freedesktop.login1.power-off" ||
+         action.id == "org.freedesktop.login1.power-off-multiple-sessions") &&
+        subject.user == "${SERVICE_USER}") {
+        return polkit.Result.YES;
+    }
+});
+POLKIT
+systemctl try-restart polkit 2>/dev/null || true
+success "Reboot/power-off permission configured"
+
 # --- stop existing service if running ---
 if systemctl is-active --quiet "$APP_NAME" 2>/dev/null; then
     info "Stopping existing service..."

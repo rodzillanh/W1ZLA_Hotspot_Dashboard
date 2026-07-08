@@ -313,32 +313,48 @@ def setup():
 def api_host_stats():
     return jsonify(host_stats.snapshot())
 
+def _run_power_command(cmd: list[str]) -> tuple[bool, str]:
+    """Run a reboot/poweroff command, waiting briefly to catch an immediate
+    failure (e.g. polkit denial) without blocking on a real reboot -- which
+    takes several seconds and kills this process anyway, so a successful
+    call never actually finishes communicate() within the timeout."""
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            _, stderr = proc.communicate(timeout=2)
+            if proc.returncode not in (0, None):
+                return False, (stderr or "").strip() or f"{cmd[0]} exited with code {proc.returncode}"
+        except subprocess.TimeoutExpired:
+            pass  # still running after 2s -- the system is very likely actually going down
+        return True, "OK"
+    except Exception as e:
+        return False, str(e)
+
 @app.route("/api/host_reboot", methods=["POST"])
 def host_reboot():
     """Reboot the machine running the dashboard itself -- only enabled on a
     standalone install on real Raspberry Pi hardware (HOST_CAN_POWER_CONTROL).
-    Assumes passwordless sudo for the SSH/service user, same assumption this
-    app already makes elsewhere (e.g. the ASL3 `sudo asterisk -rx` command)."""
+    Uses `systemctl reboot` (talks to systemd over D-Bus) rather than `sudo`,
+    since the service runs with NoNewPrivileges=yes, which blocks sudo/setuid
+    entirely regardless of sudoers config. Needs a polkit rule granting the
+    service user the org.freedesktop.login1.reboot action (see install.sh/
+    update.sh and README.md's "Host power control" section) -- a headless
+    systemd service has no active session, so default polkit policy would
+    otherwise deny it."""
     if not HOST_CAN_POWER_CONTROL:
         return jsonify({"success": False, "message": "Not available on this deployment"}), 403
-    try:
-        subprocess.Popen(["sudo", "reboot"])
-        return jsonify({"success": True, "message": "Rebooting now"})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
+    ok, message = _run_power_command(["systemctl", "reboot"])
+    return jsonify({"success": ok, "message": "Rebooting now" if ok else message})
 
 @app.route("/api/host_poweroff", methods=["POST"])
 def host_poweroff():
-    """Power off the machine running the dashboard itself -- same gating and
-    sudo assumption as host_reboot(). One-way: stays off until someone
-    physically restores power."""
+    """Power off the machine running the dashboard itself -- same mechanism
+    and polkit requirement as host_reboot(). One-way: stays off until
+    someone physically restores power."""
     if not HOST_CAN_POWER_CONTROL:
         return jsonify({"success": False, "message": "Not available on this deployment"}), 403
-    try:
-        subprocess.Popen(["sudo", "shutdown", "-h", "now"])
-        return jsonify({"success": True, "message": "Powering off now"})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
+    ok, message = _run_power_command(["systemctl", "poweroff"])
+    return jsonify({"success": ok, "message": "Powering off now" if ok else message})
 
 @app.route("/api/activity")
 def api_activity():

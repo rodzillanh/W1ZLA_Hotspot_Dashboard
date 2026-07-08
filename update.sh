@@ -106,6 +106,30 @@ else
     info "Dependencies unchanged — skipping pip install"
 fi
 
+# --- ensure reboot/power-off polkit permission (added in v3.1/v3.2) ---
+# Idempotent -- always (re)written so existing installs pick this up on
+# their next update, not just fresh installs. The service runs with
+# NoNewPrivileges=yes, which blocks sudo/setuid entirely, so this grants
+# reboot/poweroff via polkit + systemctl instead. See install.sh and
+# README.md's "Host power control" section for the full explanation.
+header "Ensuring reboot/power-off permission"
+mkdir -p /etc/polkit-1/rules.d
+cat > /etc/polkit-1/rules.d/49-hotspot-dashboard-power.rules << 'POLKIT'
+// Allows the hotspot service user to reboot/power off this device via
+// Settings -> General -- see README.md "Host power control".
+polkit.addRule(function(action, subject) {
+    if ((action.id == "org.freedesktop.login1.reboot" ||
+         action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
+         action.id == "org.freedesktop.login1.power-off" ||
+         action.id == "org.freedesktop.login1.power-off-multiple-sessions") &&
+        subject.user == "hotspot") {
+        return polkit.Result.YES;
+    }
+});
+POLKIT
+systemctl try-restart polkit 2>/dev/null || true
+success "Reboot/power-off permission ensured"
+
 # --- restart and verify ---
 header "Restarting service"
 systemctl start "$APP_NAME"

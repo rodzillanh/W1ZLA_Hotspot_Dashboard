@@ -178,6 +178,26 @@ config for per-integration credentials; put it in
   connection routing (`node=radio@host:port/node,host`) — use
   `aslstats.py`'s `stats.allstarlink.org` lookup instead.
 
+- **`NoNewPrivileges=yes` in the systemd unit blocks `sudo`/setuid
+  entirely, regardless of sudoers config.** The Host power control
+  feature (v3.1) originally shipped calling `sudo reboot`/`sudo shutdown
+  -h now` via `subprocess.Popen` — this failed silently in production
+  (Popen never checks the exit code, so the API claimed success
+  regardless) because the standalone install's systemd unit has
+  `NoNewPrivileges=yes` (`install.sh`), which prevents the process from
+  ever gaining privileges via a setuid binary like `sudo`, independent of
+  whether the service user is even in sudoers. Fixed in v3.2 by switching
+  to `systemctl reboot`/`systemctl poweroff` (talks to systemd over
+  D-Bus, not setuid) plus a polkit rule
+  (`/etc/polkit-1/rules.d/49-hotspot-dashboard-power.rules`, written by
+  both `install.sh` and `update.sh`) granting the service user the
+  `org.freedesktop.login1.reboot`/`power-off` actions — a headless
+  service account has no active session, so default polkit policy would
+  otherwise deny it too. If you add another feature needing elevated
+  privileges from within the app, use this same D-Bus/polkit pattern
+  rather than `sudo`, and actually check the subprocess result (see
+  `app._run_power_command`) rather than assuming `Popen` succeeded.
+
 ## Testing patterns used throughout this project
 
 No test suite/framework is set up — verification has been done ad hoc but
