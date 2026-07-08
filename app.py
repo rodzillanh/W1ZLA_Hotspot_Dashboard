@@ -179,6 +179,13 @@ def api_settings_post():
             settings["fleet_activity_position"] = max(0, int(data["fleet_activity_position"]))
         except (TypeError, ValueError):
             pass
+    if "fleet_activity_hours" in data:
+        try:
+            hours = int(data["fleet_activity_hours"])
+            if hours in config.FLEET_ACTIVITY_HOUR_OPTIONS:
+                settings["fleet_activity_hours"] = hours
+        except (TypeError, ValueError):
+            pass
     if "qrz_username" in data:
         settings["qrz_username"] = data["qrz_username"].strip().upper()
     if "qrz_password" in data:
@@ -280,8 +287,10 @@ def api_host_stats():
 
 @app.route("/api/activity")
 def api_activity():
-    hours            = request.args.get("hours", default=12, type=int)
-    interval_minutes = request.args.get("interval_minutes", default=15, type=int)
+    default_hours    = load_settings().get("fleet_activity_hours", 12)
+    default_interval = config.FLEET_ACTIVITY_HOUR_OPTIONS.get(default_hours, 15)
+    hours            = request.args.get("hours", default=default_hours, type=int)
+    interval_minutes = request.args.get("interval_minutes", default=default_interval, type=int)
     result   = storage_activity.query_activity(hours=hours, interval_minutes=interval_minutes)
     hotspots = load_hotspots()
     snap     = monitor.snapshot()

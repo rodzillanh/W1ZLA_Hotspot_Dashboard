@@ -656,7 +656,7 @@
             <div class="fleet-mode-legend" id="fleet-mode-legend"></div>
             <div class="fleet-chart-wrap">
                 <canvas id="fleet-chart-canvas"></canvas>
-                <div class="fleet-chart-empty" id="fleet-chart-empty">No activity in the last 12 hours</div>
+                <div class="fleet-chart-empty" id="fleet-chart-empty">No activity in the last {{ settings.get('fleet_activity_hours', 12) }} hours</div>
             </div>
         </div>
         {% endif %}
@@ -805,6 +805,7 @@ const DISTANCE_UNIT      = "{{ settings.get('weather_unit', 'F') }}";  // "F" ->
 const DARK_MODE          = {{ 'true' if settings.dark_mode else 'false' }};
 const SHOW_FLEET_ACTIVITY    = {{ 'true' if settings.get('show_fleet_activity', False) else 'false' }};
 const FLEET_ACTIVITY_POSITION = {{ settings.get('fleet_activity_position', 0) }};
+const FLEET_ACTIVITY_HOURS    = {{ settings.get('fleet_activity_hours', 12) }};
 
 function updateSysbar(data) {
     if (!SHOW_HOST_STATS) return;
@@ -1351,7 +1352,10 @@ function cssVar(name) {
 }
 
 function fetchFleetActivity() {
-    fetch('/api/activity')
+    // interval_minutes is intentionally omitted -- the server picks a bucket
+    // width scaled to `hours` (config.FLEET_ACTIVITY_HOUR_OPTIONS) so the
+    // chart always renders roughly the same number of points.
+    fetch(`/api/activity?hours=${FLEET_ACTIVITY_HOURS}`)
         .then(r => r.json())
         .then(renderFleetActivity)
         .catch(err => console.error('Fleet activity refresh failed:', err));

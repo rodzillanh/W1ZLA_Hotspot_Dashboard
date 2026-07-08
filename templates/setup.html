@@ -105,7 +105,8 @@
         label { font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px; }
         input[type="text"],
         input[type="password"],
-        input[type="url"] {
+        input[type="url"],
+        select {
             width: 100%;
             background: var(--input-bg);
             border: 1px solid var(--card-border);
@@ -114,7 +115,8 @@
             color: var(--text);
             font-size: 13px;
         }
-        input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+        input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+        .toggle-row select { width: auto; flex-shrink: 0; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .form-grid.one { grid-template-columns: 1fr; }
 
@@ -277,6 +279,17 @@
                 </span>
                 <div class="toggle {{ 'on' if settings.get('show_fleet_activity', False) else '' }}"
                      id="fleet-activity-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Fleet activity time span</span>
+                <select id="fleet-activity-hours">
+                    {% set current_hours = settings.get('fleet_activity_hours', 12) %}
+                    <option value="3"  {{ 'selected' if current_hours == 3  else '' }}>Last 3 hours</option>
+                    <option value="6"  {{ 'selected' if current_hours == 6  else '' }}>Last 6 hours</option>
+                    <option value="12" {{ 'selected' if current_hours == 12 else '' }}>Last 12 hours</option>
+                    <option value="24" {{ 'selected' if current_hours == 24 else '' }}>Last 24 hours</option>
+                    <option value="48" {{ 'selected' if current_hours == 48 else '' }}>Last 48 hours</option>
+                </select>
             </div>
         </div>
         <button class="btn btn-primary" onclick="saveAppearance()">Save appearance</button>
@@ -736,6 +749,7 @@ function saveAppearance() {
             show_host_stats: document.getElementById('host-stats-toggle').classList.contains('on'),
             show_toolbar:    document.getElementById('toolbar-toggle').classList.contains('on'),
             show_fleet_activity: document.getElementById('fleet-activity-toggle').classList.contains('on'),
+            fleet_activity_hours: parseInt(document.getElementById('fleet-activity-hours').value, 10),
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');

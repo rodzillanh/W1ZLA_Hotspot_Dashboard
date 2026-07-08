@@ -15,9 +15,12 @@ import config
 
 DB_PATH = os.path.join(config.CONFIG_DIR, "activity.db")
 
-# Keep a 1h buffer past the 12h window the dashboard queries by default, so
-# a slightly longer lookback (e.g. someone requesting 13h) still has data.
-RETENTION_SECONDS = 13 * 3600
+# Sized off the longest selectable span (Settings -> General -> Fleet
+# activity time span), plus a 1h buffer -- not just the default 12h window.
+# If this only covered the default, switching to a longer span in Settings
+# would silently show nothing for the extra hours, since the rows behind
+# them would already have been pruned.
+RETENTION_SECONDS = (max(config.FLEET_ACTIVITY_HOUR_OPTIONS) + 1) * 3600
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS activity_log (

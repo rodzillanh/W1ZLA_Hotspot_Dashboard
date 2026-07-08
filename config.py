@@ -149,6 +149,11 @@ DEFAULT_SETTINGS = {
     # N = after the Nth hotspot card. Set from the Card order drag list
     # (Settings -> Hotspots) alongside the hotspot order itself.
     "fleet_activity_position": 0,
+    # How far back the fleet activity chart/mode-breakdown look -- one of
+    # FLEET_ACTIVITY_HOUR_OPTIONS. storage_activity.py's retention window is
+    # sized off the largest option here, so switching to a longer span never
+    # comes up empty because old rows were already pruned.
+    "fleet_activity_hours": 12,
     # QRZ credentials — stored here so the Settings page works on all platforms.
     # Env vars QRZ_USERNAME / QRZ_PASSWORD are still read as a fallback so
     # existing Unraid installs with env vars keep working without reconfiguring.
@@ -171,6 +176,18 @@ DEFAULT_SETTINGS = {
     "aprs_msg_callsign": "",
     "aprs_msg_to_callsign": "",
     "aprs_msg_cooldown_min": 10,
+}
+
+# --- Fleet activity ---
+# Bucket width (minutes) per selectable time span, chosen so every option
+# renders roughly the same number of chart points (~36-48) regardless of
+# how far back it looks.
+FLEET_ACTIVITY_HOUR_OPTIONS = {
+    3:  5,
+    6:  10,
+    12: 15,
+    24: 30,
+    48: 60,
 }
 
 # --- Weather ---

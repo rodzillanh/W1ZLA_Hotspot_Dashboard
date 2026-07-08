@@ -468,20 +468,26 @@ dashboard showing:
 - **Last activity** — how long ago and which hotspot last had a call,
   live-updating the same way the per-card "last heard" timers do.
 - **Mode breakdown** — a stacked bar + legend showing the share of
-  transmissions by mode (DMR/D-Star/YSF/P25/NXDN) over the last 12 hours.
-- **Activity chart** — a line chart of transmission counts over the last
-  12 hours in 15-minute buckets, toggleable between **Per-hotspot** (one
-  line per hotspot that had any activity in the window) and **Aggregate**
-  (summed across the fleet).
+  transmissions by mode (DMR/D-Star/YSF/P25/NXDN) over the selected time span.
+- **Activity chart** — a line chart of transmission counts over the selected
+  time span, toggleable between **Per-hotspot** (one line per hotspot that
+  had any activity in the window) and **Aggregate** (summed across the fleet).
 
 By default the card appears first, before any hotspot cards. Its position
 is part of the same drag-and-drop **Card order** list as the hotspot cards
 (Settings → Hotspots) — drag it anywhere in that list to move it.
 
+**Time span** — Settings → General → "Fleet activity time span" — 3, 6, 12
+(default), 24, or 48 hours. The chart's bucket width scales with the
+selected span (5 to 60 minutes) so it always renders roughly the same
+number of points rather than getting denser or sparser as the span changes.
+
 One row is logged per completed transmission (not per poll), and rows
-older than 13 hours are pruned automatically on each write — the table
-doesn't grow unbounded. Turning the toggle off stops new writes but
-doesn't delete the existing `activity.db` file.
+older than 49 hours (one hour past the longest selectable span) are pruned
+automatically on each write — the table doesn't grow unbounded, and
+switching to a longer span never comes up empty because older rows were
+already pruned for the previous, shorter default. Turning the toggle off
+stops new writes but doesn't delete the existing `activity.db` file.
 
 ## Talkgroup / reflector display
 
