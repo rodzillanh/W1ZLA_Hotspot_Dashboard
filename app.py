@@ -5,6 +5,7 @@ import inspect
 import datetime
 import os
 import re
+import subprocess
 import time
 
 import paramiko
@@ -34,6 +35,11 @@ monitor    = FleetMonitor()
 wx         = WeatherClient()
 host_stats = HostStats()
 host_stats.start()
+
+# Gates the Settings "Host power control" buttons -- only true on a
+# standalone install running directly on real Raspberry Pi hardware (see
+# host_stats.is_pi_standalone). Computed once at startup, not per-request.
+HOST_CAN_POWER_CONTROL = host_stats_mod.is_pi_standalone()
 
 START_TIME = time.time()  # for /api/activity's dashboard_uptime_seconds
 
@@ -300,11 +306,39 @@ def setup():
             mqtt_pub.set_hotspots(hotspots)
         return redirect("/setup")
     return render_template("setup.html", hotspots=load_hotspots(),
-                           settings=load_settings(), favorites=load_favorites())
+                           settings=load_settings(), favorites=load_favorites(),
+                           can_power_control=HOST_CAN_POWER_CONTROL)
 
 @app.route("/api/host_stats")
 def api_host_stats():
     return jsonify(host_stats.snapshot())
+
+@app.route("/api/host_reboot", methods=["POST"])
+def host_reboot():
+    """Reboot the machine running the dashboard itself -- only enabled on a
+    standalone install on real Raspberry Pi hardware (HOST_CAN_POWER_CONTROL).
+    Assumes passwordless sudo for the SSH/service user, same assumption this
+    app already makes elsewhere (e.g. the ASL3 `sudo asterisk -rx` command)."""
+    if not HOST_CAN_POWER_CONTROL:
+        return jsonify({"success": False, "message": "Not available on this deployment"}), 403
+    try:
+        subprocess.Popen(["sudo", "reboot"])
+        return jsonify({"success": True, "message": "Rebooting now"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+
+@app.route("/api/host_poweroff", methods=["POST"])
+def host_poweroff():
+    """Power off the machine running the dashboard itself -- same gating and
+    sudo assumption as host_reboot(). One-way: stays off until someone
+    physically restores power."""
+    if not HOST_CAN_POWER_CONTROL:
+        return jsonify({"success": False, "message": "Not available on this deployment"}), 403
+    try:
+        subprocess.Popen(["sudo", "shutdown", "-h", "now"])
+        return jsonify({"success": True, "message": "Powering off now"})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
 
 @app.route("/api/activity")
 def api_activity():

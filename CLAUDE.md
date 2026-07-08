@@ -40,7 +40,11 @@ mqtt_publisher.py, aprs_messaging.py
                    rebuild-on-settings-save pattern in app.py
 
 host_stats.py, weather.py
-                   Small standalone pollers (host CPU/mem, Open-Meteo)
+                   Small standalone pollers (host CPU/mem, Open-Meteo).
+                   host_stats.py also has is_pi_standalone() (checks
+                   /proc/device-tree/model + absence of /.dockerenv),
+                   computed once at app.py startup as HOST_CAN_POWER_CONTROL
+                   -- gates the Settings "reboot/power off this Pi" buttons
 
 templates/dashboard.html   Main UI: cards + live map (Leaflet). One big
                            inline <script> block, no build step, no

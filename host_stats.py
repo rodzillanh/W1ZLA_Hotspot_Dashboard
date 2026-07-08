@@ -9,9 +9,36 @@ Flask request handler returns instantly with no blocking I/O.
 Falls back gracefully to N/A on non-Linux hosts (Docker dev environment on
 a Mac, Windows, etc.) so this never breaks the app.
 """
+import os
 import time
 import threading
 from typing import Optional
+
+
+def is_docker() -> bool:
+    """Standard container-detection heuristic -- Docker always creates this
+    marker file inside every container, so its absence means bare metal."""
+    return os.path.exists("/.dockerenv")
+
+
+def is_raspberry_pi() -> bool:
+    """True on real Raspberry Pi hardware, via the device-tree model string
+    the kernel exposes -- not present on other Linux boards/servers, and
+    not present in most containers unless specifically bind-mounted."""
+    try:
+        with open("/proc/device-tree/model", "rb") as f:
+            return b"Raspberry Pi" in f.read()
+    except OSError:
+        return False
+
+
+def is_pi_standalone() -> bool:
+    """True only when running directly on Raspberry Pi hardware, not inside
+    a container -- gates the Settings 'Host power control' buttons. Rebooting
+    or powering off only makes sense for a bare-metal standalone install (see
+    install.sh); inside a Docker/Unraid container, "reboot the host" can't
+    actually reboot the underlying box from in here."""
+    return is_raspberry_pi() and not is_docker()
 
 
 class HostStats:

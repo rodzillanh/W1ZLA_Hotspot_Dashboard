@@ -98,9 +98,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.0</span>
+                <span class="release-version">v3.1</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Host power control</span> — optional "🔄 Reboot Pi" / "⏻ Power off Pi" buttons in Settings → General, controlling the device running the dashboard itself (not a monitored hotspot). Autodetected at startup and only shown on a standalone install running directly on real Raspberry Pi hardware — never in Docker/Unraid, since "reboot the host" can't actually reboot the underlying box from inside a container. Both actions require confirming a browser dialog first</li>
+                <li><span>Bugfix — deleting a hotspot could leave its card stuck on the dashboard</span> — an in-flight poll worker's <code>_ensure_entry()</code> could resurrect a just-deleted hotspot's entry right after it was removed; <code>/api/data</code> no longer falls back to "whatever's in the snapshot," and a new <code>prune_stale()</code> safety net runs at the top of every poll cycle</li>
+                <li><span>Bugfix — a blank hotspot submission could get permanently stuck</span> — saving with an empty name/IP created a dead entry with no way to delete it (the delete button posts to a URL built from the IP, which 404s when it's blank); blank/whitespace-only submissions are now rejected outright</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.0</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>AllStarLink (ASL3) node support</span> — a second node type alongside WPSD/Pi-Star (Settings → Hotspots → Node type). Polled over the same SSH connection via <code>asterisk -rx "rpt xnode &lt;node&gt;"</code>, which exposes real per-linked-node keyed state (confirmed against a real node) rather than just an aggregate "something is active" flag. Linked node numbers are resolved to callsigns via AllStarLink's free public stats API, then get the same QRZ/RadioID enrichment and favorites/APRS-alert treatment as any DMR caller</li>
@@ -481,7 +493,7 @@
         <div class="feature-group">
             <div class="feature-group-title">Settings</div>
             <ul class="feature-list">
-                <li><span>General tab</span> — dashboard name, dark/light mode toggle, toolbar links, host stats and fleet activity card toggles</li>
+                <li><span>General tab</span> — dashboard name, dark/light mode toggle, toolbar links, host stats and fleet activity card toggles, and (Raspberry Pi standalone installs only) host reboot/power-off buttons</li>
                 <li><span>Weather tab</span> — location and °F/°C unit toggle</li>
                 <li><span>Integrations tab</span> — QRZ.com, RadioID.net, APRS.fi, Home Assistant MQTT, and APRS favorite alert credentials/toggles with connection tests</li>
                 <li>Hotspots tab — card order, add/edit/delete hotspots with SSH connection test, optional lat/lon and Brandmeister ID per hotspot</li>

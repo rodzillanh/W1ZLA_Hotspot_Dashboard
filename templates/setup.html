@@ -346,6 +346,22 @@
         <span class="status-txt" id="appearance-status"></span>
     </div>
 
+    {% if can_power_control %}
+    <div class="section">
+        <div class="section-title">Host power control</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            Controls this device — the Raspberry Pi running the dashboard itself,
+            not one of your monitored hotspots.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn" style="color:var(--amber);border-color:var(--amber)"
+                    onclick="hostReboot()">🔄 Reboot Pi</button>
+            <button class="btn btn-danger" onclick="hostPoweroff()">⏻ Power off Pi</button>
+            <span class="status-txt" id="power-status"></span>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="section">
         <div class="section-title">Toolbar links</div>
         <div id="links-list">
@@ -833,6 +849,34 @@ function saveAppearance() {
         el.textContent = '✓ Saved';
         setTimeout(() => el.textContent = '', 2000);
     });
+}
+
+// --- host power control (General tab) ---
+function hostReboot() {
+    if (!confirm(
+        'Reboot this Pi?\n\n' +
+        'This restarts the Raspberry Pi running the dashboard itself — not a hotspot. ' +
+        'The dashboard will be unreachable for about a minute while it comes back up.'
+    )) return;
+    const status = document.getElementById('power-status');
+    status.textContent = 'Rebooting...';
+    fetch('/api/host_reboot', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => { status.textContent = data.success ? data.message : '✕ ' + data.message; });
+}
+
+function hostPoweroff() {
+    if (!confirm(
+        'Power off this Pi?\n\n' +
+        'This shuts down the Raspberry Pi running the dashboard itself — not a hotspot. ' +
+        'It will stay off until you physically unplug and replug power — there is no way ' +
+        'to turn it back on remotely. The dashboard (and every card on it) will go dark until then.'
+    )) return;
+    const status = document.getElementById('power-status');
+    status.textContent = 'Powering off...';
+    fetch('/api/host_poweroff', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => { status.textContent = data.success ? data.message : '✕ ' + data.message; });
 }
 
 // --- save weather (Weather tab) ---

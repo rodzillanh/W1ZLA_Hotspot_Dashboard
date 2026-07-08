@@ -247,6 +247,9 @@ and **Version info**.
   hotspot on the Hotspots tab's add/edit form. Switches which fields show
   (ASL node number instead of Brandmeister ID) and how that hotspot is
   polled — see "AllStarLink (ASL3) nodes" below.
+- **Host power control** — General tab, only shown on a standalone install
+  running directly on real Raspberry Pi hardware; see "Host power control"
+  below.
 
 ## QRZ caller lookup
 
@@ -399,6 +402,35 @@ entirely between two polls and never get captured. Confirmed against a
 real node: a brief test keyup was missed, but a sustained one (5-10+
 seconds) showed up correctly. This is an inherent tradeoff of polling
 point-in-time state rather than a log, not a bug to chase.
+
+## Host power control
+
+Optional "🔄 Reboot Pi" / "⏻ Power off Pi" buttons in Settings → General —
+controls the device *running the dashboard itself*, not a monitored
+hotspot. Runs `sudo reboot` / `sudo shutdown -h now` locally (no SSH
+involved, since it's the same machine), so it needs passwordless `sudo`
+for whichever user runs the dashboard service — the same assumption this
+app already makes for the ASL3 integration's `sudo asterisk -rx` command.
+
+**Only shown on a standalone install running directly on real Raspberry
+Pi hardware**, detected automatically at startup by checking for
+`/proc/device-tree/model` (genuine Pi hardware) and the absence of
+`/.dockerenv` (not inside a container). This is deliberate: inside a
+Docker/Unraid container, "reboot the host" can't actually reboot the
+underlying box from in here, so the buttons are hidden entirely rather
+than doing something misleading. There's no environment variable or
+Settings toggle to force this on — it's autodetected only.
+
+**Power off is one-way** — the Pi stays off until someone physically
+restores power; there's no remote way to turn it back on. Both actions
+require confirming a browser dialog first.
+
+**Security note:** like every other write in this app, these routes have
+no authentication (see "Known tradeoffs" below) — anyone who can reach
+the dashboard on your network can trigger them. That's a materially
+bigger consequence than editing a hotspot's config, so if this dashboard
+is reachable beyond a trusted LAN, put it behind a reverse proxy with
+auth, or don't enable this feature's host access, before relying on it.
 
 ## Home Assistant (MQTT)
 
@@ -566,7 +598,10 @@ same way mode/RSSI/BER are. A couple of behavior notes:
 ## Known tradeoffs (intentionally left as-is for now)
 
 - No authentication on `/setup` — anyone who can reach the dashboard can
-  add/edit/delete hotspots.
+  add/edit/delete hotspots. This also covers the "Host power control"
+  buttons (reboot/power off the dashboard's own device) when that feature
+  is active — a materially bigger consequence than editing a config, worth
+  weighing before exposing this dashboard beyond a trusted LAN.
 - Hotspot passwords are stored in plaintext in `hotspots.json` and are
   re-sent to the browser to pre-fill the Edit form (so editing a hotspot
   doesn't force you to retype the password). Both are fine for a private
