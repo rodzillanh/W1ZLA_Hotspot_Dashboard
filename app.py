@@ -260,10 +260,17 @@ def api_favorites_post():
 @app.route("/setup", methods=["GET", "POST"])
 def setup():
     if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        ip   = request.form.get("ip", "").strip()
+        # A blank name/ip previously saved a dead entry with no way to
+        # delete it -- the delete button posts to /api/delete_hotspot/<ip>,
+        # which 404s on an empty ip, permanently stranding the row.
+        if not name or not ip:
+            return redirect("/setup")
         hotspots    = load_hotspots()
         new_hotspot = {
-            "name": request.form.get("name"),
-            "ip":   request.form.get("ip"),
+            "name": name,
+            "ip":   ip,
             "user": request.form.get("user"),
             "pass": request.form.get("pass"),
         }
