@@ -259,6 +259,8 @@
         .active-call-link {
             color: var(--accent);
             text-decoration: none;
+            font-size: 17px;
+            font-weight: 600;
         }
         .active-call-link:hover { text-decoration: underline; }
         .caller-info {
@@ -272,6 +274,12 @@
             margin-bottom: 10px;
         }
         .listening { color: var(--text-dim); font-size: 13px; margin-bottom: 10px; }
+        /* Scoped to .listening so only the "Last heard" callsign is enlarged,
+           not the shared .recent-call class used in the history row below. */
+        .listening .recent-call {
+            font-size: 16px;
+            font-weight: 600;
+        }
 
         .stats-grid {
             display: grid;
