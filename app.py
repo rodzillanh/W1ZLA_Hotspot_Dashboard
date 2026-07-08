@@ -174,6 +174,11 @@ def api_settings_post():
         settings["show_toolbar"] = bool(data["show_toolbar"])
     if "show_fleet_activity" in data:
         settings["show_fleet_activity"] = bool(data["show_fleet_activity"])
+    if "fleet_activity_position" in data:
+        try:
+            settings["fleet_activity_position"] = max(0, int(data["fleet_activity_position"]))
+        except (TypeError, ValueError):
+            pass
     if "qrz_username" in data:
         settings["qrz_username"] = data["qrz_username"].strip().upper()
     if "qrz_password" in data:

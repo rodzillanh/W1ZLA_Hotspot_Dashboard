@@ -226,8 +226,9 @@ and **Version info**.
   (General tab) hides the whole row if you'd rather not show it; the ⚙
   Settings link itself always stays visible either way.
 - **Card order** — drag hotspot cards into whatever order you want them
-  to appear on the dashboard, from the same drag-and-drop list used for
-  toolbar links.
+  to appear on the dashboard (Hotspots tab). If the Fleet activity card is
+  enabled, it appears in the same drag list and can be moved to any
+  position among the hotspot cards, not just first.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.
@@ -472,6 +473,10 @@ dashboard showing:
   12 hours in 15-minute buckets, toggleable between **Per-hotspot** (one
   line per hotspot that had any activity in the window) and **Aggregate**
   (summed across the fleet).
+
+By default the card appears first, before any hotspot cards. Its position
+is part of the same drag-and-drop **Card order** list as the hotspot cards
+(Settings → Hotspots) — drag it anywhere in that list to move it.
 
 One row is logged per completed transmission (not per poll), and rows
 older than 13 hours are pruned automatically on each write — the table

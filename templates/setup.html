@@ -201,6 +201,7 @@
         .link-row input[type="url"] { width: auto; flex: 1; }
         .node-name { flex: 1; font-size: 13px; }
         .node-meta { font-size: 11px; color: var(--text-dim); }
+        .fleet-activity-row { border-left: 2px solid var(--accent); }
 
         /* --- hotspot form --- */
         #test-result { font-size: 12px; margin-top: 8px; min-height: 18px; }
@@ -518,7 +519,15 @@
     <div class="section">
         <div class="section-title">Card order — drag to reorder</div>
         <div id="card-order-list">
+            {% set fleet_pos = settings.get('fleet_activity_position', 0) if settings.get('show_fleet_activity', False) else -1 %}
             {% for hs in hotspots %}
+                {% if loop.index0 == fleet_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📊 Fleet activity</span>
+                    <span class="node-meta">metrics card</span>
+                </div>
+                {% endif %}
             <div class="drag-row" draggable="true" data-ip="{{ hs.ip }}">
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">{{ hs.name }}</span>
@@ -533,6 +542,13 @@
                 </form>
             </div>
             {% endfor %}
+            {% if fleet_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">📊 Fleet activity</span>
+                <span class="node-meta">metrics card</span>
+            </div>
+            {% endif %}
         </div>
         <div style="margin-top:10px">
             <button class="btn btn-primary" onclick="saveCardOrder()">Save card order</button>
@@ -776,13 +792,29 @@ function saveLinks() {
 
 // --- card order ---
 function saveCardOrder() {
-    const rows = document.querySelectorAll('#card-order-list .drag-row[data-ip]');
-    const ips  = Array.from(rows).map(r => r.dataset.ip);
-    fetch('/api/reorder_hotspots', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(ips)
-    }).then(() => {
+    const rows    = document.querySelectorAll('#card-order-list .drag-row[data-ip]');
+    const allIds  = Array.from(rows).map(r => r.dataset.ip);
+    const fleetIdx = allIds.indexOf('__fleet_activity__');
+    const ips      = allIds.filter(id => id !== '__fleet_activity__');
+
+    const saves = [
+        fetch('/api/reorder_hotspots', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(ips)
+        }),
+    ];
+    // Only present (and only saved) when the Fleet activity card is enabled --
+    // its drag row only renders in that case, so a -1 here just means "not on
+    // this page", not "move it to position -1".
+    if (fleetIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ fleet_activity_position: fleetIdx })
+        }));
+    }
+    Promise.all(saves).then(() => {
         document.getElementById('order-status').textContent = '✓ Saved';
         setTimeout(() => document.getElementById('order-status').textContent = '', 2000);
     });

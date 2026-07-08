@@ -636,7 +636,8 @@
 <div id="panel-dashboard" class="tab-panel active">
     <div class="cards-grid" id="cards-outer">
         {% if settings.get('show_fleet_activity', False) %}
-        <div class="metrics-card" id="fleet-activity-card">
+        <div class="metrics-card" id="fleet-activity-card"
+             style="order:{{ settings.get('fleet_activity_position', 0) }}">
             <div class="metrics-header">
                 <div class="card-name">Fleet activity</div>
                 <div class="fleet-mode-toggle">
@@ -802,7 +803,8 @@ const HOST_STATS_MS      = 5000;
 const SHOW_HOST_STATS    = {{ 'true' if settings.get('show_host_stats', True) else 'false' }};
 const DISTANCE_UNIT      = "{{ settings.get('weather_unit', 'F') }}";  // "F" -> miles, "C" -> km
 const DARK_MODE          = {{ 'true' if settings.dark_mode else 'false' }};
-const SHOW_FLEET_ACTIVITY = {{ 'true' if settings.get('show_fleet_activity', False) else 'false' }};
+const SHOW_FLEET_ACTIVITY    = {{ 'true' if settings.get('show_fleet_activity', False) else 'false' }};
+const FLEET_ACTIVITY_POSITION = {{ settings.get('fleet_activity_position', 0) }};
 
 function updateSysbar(data) {
     if (!SHOW_HOST_STATS) return;
@@ -940,8 +942,20 @@ function clearStaleNotifs(data) {
 // --- render cards ---
 function renderCards(data) {
     const container = document.getElementById('cards');
+    // Fleet activity card sits at a saved position among the hotspot cards
+    // (Settings -> Hotspots -> Card order). Position is clamped to the
+    // current hotspot count in case hotspots were added/removed since it
+    // was saved. CSS `order` reflows it without touching the DOM node the
+    // fleet card owns (its chart/timers survive across polls).
+    let fleetPos = -1;
+    if (SHOW_FLEET_ACTIVITY) {
+        fleetPos = Math.max(0, Math.min(FLEET_ACTIVITY_POSITION, data.length));
+        const fleetCard = document.getElementById('fleet-activity-card');
+        if (fleetCard) fleetCard.style.order = fleetPos;
+    }
     // data is an array — order guaranteed, no Object.values() needed
-    container.innerHTML = data.map(hs => {
+    container.innerHTML = data.map((hs, i) => {
+        const cardOrder = fleetPos === -1 ? i : (i < fleetPos ? i : i + 1);
         const isFav     = hs.is_favorite && hs.is_active;
         const cardClass = hs.is_active ? (isFav ? 'favorite' : 'active') : '';  // last-heard = no tint
 
@@ -1014,7 +1028,7 @@ function renderCards(data) {
             : '';
 
         return `
-        <div class="hotspot-card ${cardClass}" id="card-${hs.ip}">
+        <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}">
           <div class="card-header">
             <a class="card-name" href="http://${hs.ip}" target="_blank" rel="noopener">${hs.name}${chipHtml}</a>
             ${updateBadge}${mapPin}

@@ -145,6 +145,10 @@ DEFAULT_SETTINGS = {
     # Fleet activity metrics card — off by default since it adds a new SQLite
     # table and a background write on every completed transmission.
     "show_fleet_activity": False,
+    # Where the fleet activity card sits among the hotspot cards -- 0 = first,
+    # N = after the Nth hotspot card. Set from the Card order drag list
+    # (Settings -> Hotspots) alongside the hotspot order itself.
+    "fleet_activity_position": 0,
     # QRZ credentials — stored here so the Settings page works on all platforms.
     # Env vars QRZ_USERNAME / QRZ_PASSWORD are still read as a fallback so
     # existing Unraid installs with env vars keep working without reconfiguring.
