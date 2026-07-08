@@ -96,9 +96,23 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v2.12</span>
+                <span class="release-version">v2.13</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fleet activity card</span> — optional metrics card (Settings → General, off by default): a small SQLite log of completed transmissions powers a fleet online/uptime summary, a live-updating "last activity" timer, a mode-share breakdown bar, and a Per-hotspot/Aggregate activity chart over the last 12 hours</li>
+                <li><span>Toolbar links toggle</span> — hide the whole row of custom toolbar link buttons from Settings → General; the ⚙ Settings link itself always stays visible so there's still a way back into Settings</li>
+                <li><span>Direct README link</span> — Settings → Version info tab now links straight to the README viewer instead of only via the changelog page's header link</li>
+                <li><span>APRS favorite alerts now use the caller's callsign</span> — the alert message leads with the actual callsign (e.g. "W1ZLA active on Garage Hotspot") instead of the optional friendly label, to read as a proper APRS message</li>
+                <li><span>Bugfix — fleet activity chart legend</span> — the per-hotspot chart lines had no legend and reused the mode-breakdown color palette, making them look like they were plotting by mode instead of by hotspot; the chart now has its own labeled legend and a separate color palette</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v2.12</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>README viewer</span> — "📄 View README" link on the Version info tab renders this project's README.md in-app (Settings → Version info), matching the dashboard's dark/light theme</li>
@@ -353,7 +367,7 @@
                 <li>Local time (12-hour) and UTC time, live in top-right corner</li>
                 <li>Customizable dashboard title</li>
                 <li>Dark mode and light mode with toggle</li>
-                <li>Customizable toolbar link buttons</li>
+                <li>Customizable toolbar link buttons, with a toggle to hide the whole row</li>
                 <li>Card stats: mode, RSSI, BER, temperature, uptime</li>
                 <li><span>Color code</span> — shown permanently on every DMR card (CC1, CC15, etc.)</li>
                 <li><span>Live weather</span> — current temp, condition, and location beside the clock; click for 7-day forecast popup</li>
@@ -372,6 +386,18 @@
         </div>
 
         <div class="feature-group">
+            <div class="feature-group-title">Fleet activity</div>
+            <ul class="feature-list">
+                <li>Optional metrics card <span style="color:var(--text-dim)">(off by default — Settings → General)</span>, backed by a small SQLite log of completed transmissions</li>
+                <li>Fleet online/total count and dashboard process uptime</li>
+                <li>Live-updating "last activity" — how long ago and which hotspot, ticking the same way per-card timers do</li>
+                <li>Mode-share breakdown — stacked bar + legend for DMR/D-Star/YSF/P25/NXDN activity over the last 12 hours</li>
+                <li>Per-hotspot / Aggregate activity chart — 15-minute buckets over the last 12 hours, toggle between one line per hotspot or a summed total</li>
+                <li>Rows older than 13 hours are pruned automatically; no manual cleanup needed</li>
+            </ul>
+        </div>
+
+        <div class="feature-group">
             <div class="feature-group-title">Integrations</div>
             <ul class="feature-list">
                 <li><span>QRZ.com</span> — active caller name, city/state, photo, and map coordinates <span style="color:var(--text-dim)">(XML subscription required)</span></li>
@@ -380,7 +406,7 @@
                 <li><span>Brandmeister</span> — per-hotspot repeater status text and static talkgroup subscriptions, via Brandmeister's current v2 device API <span style="color:var(--text-dim)">(needs your hotspot's Brandmeister/CCS7 ID)</span></li>
                 <li><span>WPSD/Pi-Star update check</span> — flags hotspots running a git-based dashboard checkout that's behind its upstream remote</li>
                 <li><span>Home Assistant (MQTT)</span> — publishes each hotspot as an HA device via MQTT auto-discovery: online/active/favorite-active/update-available binary sensors, plus mode/call/talkgroup/temperature/CPU/RSSI/Brandmeister-status sensors <span style="color:var(--text-dim)">(needs an MQTT broker)</span></li>
-                <li><span>APRS favorite alerts</span> — sends yourself an APRS-IS text message when a favorite becomes active, with a per-favorite cooldown <span style="color:var(--text-dim)">(needs your amateur radio callsign)</span></li>
+                <li><span>APRS favorite alerts</span> — sends yourself an APRS-IS text message (led by the caller's actual callsign) when a favorite becomes active, with a per-favorite cooldown <span style="color:var(--text-dim)">(needs your amateur radio callsign)</span></li>
             </ul>
         </div>
 
@@ -411,12 +437,12 @@
         <div class="feature-group">
             <div class="feature-group-title">Settings</div>
             <ul class="feature-list">
-                <li><span>General tab</span> — dashboard name, dark/light mode toggle, toolbar links</li>
+                <li><span>General tab</span> — dashboard name, dark/light mode toggle, toolbar links, host stats and fleet activity card toggles</li>
                 <li><span>Weather tab</span> — location and °F/°C unit toggle</li>
-                <li><span>Integrations tab</span> — QRZ.com, RadioID.net, and APRS.fi credentials/toggles with connection tests</li>
+                <li><span>Integrations tab</span> — QRZ.com, RadioID.net, APRS.fi, Home Assistant MQTT, and APRS favorite alert credentials/toggles with connection tests</li>
                 <li>Hotspots tab — card order, add/edit/delete hotspots with SSH connection test, optional lat/lon and Brandmeister ID per hotspot</li>
                 <li>Favorites tab — callsign + optional label, add/remove, browser alerts</li>
-                <li>Version info tab — module hashes, uptime, changelog, and feature list</li>
+                <li>Version info tab — module hashes, uptime, changelog, feature list, and a direct README link</li>
             </ul>
         </div>
 
