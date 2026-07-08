@@ -28,7 +28,9 @@ ACTIVE_TIMEOUT = int(os.environ.get("ACTIVE_TIMEOUT", 30))
 # Set to 0 to disable — cards go straight to idle on end of transmission.
 LAST_HEARD_TTL = int(os.environ.get("LAST_HEARD_TTL", 300))  # 5 minutes
 
-SSH_STATUS_CMD = (
+# Shared by both node types -- generic Linux temp/uptime/CPU, nothing
+# WPSD- or ASL3-specific about it.
+_LINUX_HOST_STATS_CMD = (
     'cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo "N/A"; '
     "uptime -p; "
     # CPU: pipe two /proc/stat samples 200ms apart into awk as separate lines.
@@ -39,9 +41,28 @@ SSH_STATUS_CMD = (
     "NR==2{for(i=2;i<=NF;i++)t2+=$i; idle2=$5; "
     "if(t2-t1>0) printf \"%.1f\\n\",(1-(idle2-idle1)/(t2-t1))*100; "
     "else print \"N/A\"}'; "
+)
+
+SSH_STATUS_CMD = (
+    _LINUX_HOST_STATS_CMD +
     "L=$(ls -1tr /var/log/pi-star/MMDVM-*.log /var/log/wpsd/MMDVM-*.log 2>/dev/null | tail -1); "
     f'tail -n {LOG_TAIL_LINES} "$L" 2>/dev/null'
 )
+
+
+def build_asl_status_cmd(node: str) -> str:
+    """SSH command for an ASL3 (AllStarLink) hotspot: same generic Linux
+    temp/uptime/CPU as WPSD, plus `rpt xnode` -- which dumps app_rpt's
+    dialplan variables, including RPT_ALINKS (per-linked-node keyed state,
+    confirmed against a real ASL3 node -- see monitor.py's ASL3 parsing).
+
+    `node` is interpolated into a shell string executed on the remote host,
+    so the caller MUST validate it's digits-only first (see app.py's /setup
+    handler) -- this re-validates defensively since /setup has no auth.
+    """
+    if not node.isdigit():
+        raise ValueError(f"invalid ASL node number: {node!r}")
+    return _LINUX_HOST_STATS_CMD + f'asterisk -rx "rpt xnode {node}"'
 
 # --- Log line parsing ---
 BER_PATTERN        = r"BER: (\d+\.?\d*)%"
@@ -51,6 +72,13 @@ RSSI_PATTERN       = r"RSSI: (-?\d+)"
 MODE_PATTERN       = r"DMR|D-Star|YSF|P25|NXDN"
 COLOR_CODE_PATTERN = r"Colo(?:u)?r Code:\s*(\d+)"   # matches "Color Code: 15" and "Colour Code: 15"
 SLOT_PATTERN       = r"DMR Slot (\d+)"               # matches "DMR Slot 2"
+
+# ASL3 (AllStarLink): `rpt xnode <node>` prints this dialplan-variable line,
+# e.g. "RPT_ALINKS=3,1603TU,622630CU,600671TU" -- count, then one
+# <node><mode T/R/L/C><K keyed/U unkeyed> entry per linked node. Confirmed
+# against a real ASL3 node (source: apps/app_rpt/rpt_link.c's __mklinklist()).
+ASL_ALINKS_LINE_PATTERN = r"^RPT_ALINKS=(.*)$"
+ASL_ALINK_ENTRY_PATTERN = r"^(\d+)([TRLC])([KU])$"
 
 END_OF_TRANSMISSION_MARKERS = (
     "end of voice transmission",   # DMR network
@@ -82,6 +110,14 @@ RADIOID_CACHE_TTL = int(os.environ.get("RADIOID_CACHE_TTL", 3600))
 # --- APRS.fi lookup (live position, overrides QRZ's static coordinates) ---
 APRS_TIMEOUT   = int(os.environ.get("APRS_TIMEOUT", 5))
 APRS_CACHE_TTL = int(os.environ.get("APRS_CACHE_TTL", 120))  # positions can move -- short TTL
+
+# --- AllStarLink stats.allstarlink.org lookup (free, no auth) ---
+# Resolves an ASL3 node's currently-linked nodes to callsigns in one call --
+# querying a node's own stats returns its linkedNodes array pre-resolved,
+# rather than needing one lookup per linked node.
+ASLSTATS_AGENT     = os.environ.get("ASLSTATS_AGENT", "hotspot-dashboard/1.0")
+ASLSTATS_TIMEOUT   = int(os.environ.get("ASLSTATS_TIMEOUT", 5))
+ASLSTATS_CACHE_TTL = int(os.environ.get("ASLSTATS_CACHE_TTL", 120))  # link topology changes -- short TTL
 
 # --- Brandmeister repeater profile lookup ---
 BRANDMEISTER_AGENT     = os.environ.get("BRANDMEISTER_AGENT", "hotspot-dashboard/1.0 (+https://github.com/)")

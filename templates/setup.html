@@ -594,9 +594,9 @@
             <div class="drag-row" draggable="true" data-ip="{{ hs.ip }}">
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">{{ hs.name }}</span>
-                <span class="node-meta">{{ hs.ip }}</span>
+                <span class="node-meta">{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else '' }}</span>
                 <button class="btn btn-info btn-sm"
-                        onclick="editHotspot('{{ hs.name }}','{{ hs.ip }}','{{ hs.user }}','{{ hs.pass }}','{{ hs.lat }}','{{ hs.lon }}','{{ hs.brandmeister_id }}')">
+                        onclick="editHotspot('{{ hs.name }}','{{ hs.ip }}','{{ hs.user }}','{{ hs.pass }}','{{ hs.lat }}','{{ hs.lon }}','{{ hs.brandmeister_id }}','{{ hs.get('type', 'wpsd') }}','{{ hs.get('asl_node', '') }}')">
                     Edit
                 </button>
                 <form action="/api/delete_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
@@ -622,30 +622,44 @@
     <div class="section">
         <div class="section-title" id="hotspot-form-title">Add hotspot</div>
         <div class="form-grid" style="margin-bottom:10px">
+            <div><label>Node type</label>
+                 <select id="hs-type" onchange="onHotspotTypeChange()">
+                     <option value="wpsd">WPSD / Pi-Star (DMR, D-Star, YSF, P25, NXDN)</option>
+                     <option value="asl3">AllStarLink (ASL3)</option>
+                 </select></div>
             <div><label>Name</label>
                  <input type="text" id="hs-name" placeholder="Name"></div>
             <div><label>IP address</label>
                  <input type="text" id="hs-ip" placeholder="192.168.1.x"></div>
             <div><label>SSH user</label>
                  <input type="text" id="hs-user" placeholder="pi"></div>
-            <div><label>SSH password</label>
-                 <input type="password" id="hs-pass" placeholder="••••••••"></div>
         </div>
         <div class="form-grid" style="margin-bottom:10px">
+            <div><label>SSH password</label>
+                 <input type="password" id="hs-pass" placeholder="••••••••"></div>
             <div><label>Latitude
                      <span style="font-size:10px;color:var(--text-dim)">(optional — shows this node on the live map)</span>
                  </label>
                  <input type="text" id="hs-lat" placeholder="e.g. 42.9956"></div>
             <div><label>Longitude</label>
                  <input type="text" id="hs-lon" placeholder="e.g. -71.4548"></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px" id="hs-wpsd-fields">
             <div><label>Brandmeister ID
                      <span style="font-size:10px;color:var(--text-dim)">(optional — your hotspot's CCS7/repeater ID)</span>
                  </label>
                  <input type="text" id="hs-bmid" placeholder="e.g. 3101234"></div>
         </div>
+        <div class="form-grid" style="margin-bottom:10px;display:none" id="hs-asl-fields">
+            <div><label>ASL node number
+                     <span style="font-size:10px;color:var(--text-dim)">(this node's own AllStarLink node number)</span>
+                 </label>
+                 <input type="text" id="hs-aslnode" placeholder="e.g. 59929"></div>
+        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <button class="btn btn-info" onclick="testConn()">Test connection</button>
-            <button class="btn btn-info" onclick="testBrandmeister()">Test Brandmeister ID</button>
+            <button class="btn btn-info" id="hs-test-bmid-btn" onclick="testBrandmeister()">Test Brandmeister ID</button>
+            <button class="btn btn-info" id="hs-test-aslnode-btn" style="display:none" onclick="testAslNode()">Test ASL node</button>
             <form method="POST" style="margin:0">
                 <input type="hidden" name="name" id="form-name">
                 <input type="hidden" name="ip"   id="form-ip">
@@ -654,6 +668,8 @@
                 <input type="hidden" name="lat"  id="form-lat">
                 <input type="hidden" name="lon"  id="form-lon">
                 <input type="hidden" name="brandmeister_id" id="form-bmid">
+                <input type="hidden" name="type" id="form-type">
+                <input type="hidden" name="asl_node" id="form-aslnode">
                 <button class="btn btn-primary" onclick="submitHotspot(event)">Save hotspot</button>
             </form>
             <button class="btn btn-danger btn-sm" onclick="clearHotspotForm()" style="margin-left:auto">Clear</button>
@@ -897,32 +913,48 @@ function saveCardOrder() {
 
 // --- hotspot form ---
 function submitHotspot(e) {
-    document.getElementById('form-name').value = document.getElementById('hs-name').value;
-    document.getElementById('form-ip').value   = document.getElementById('hs-ip').value;
-    document.getElementById('form-user').value = document.getElementById('hs-user').value;
-    document.getElementById('form-pass').value = document.getElementById('hs-pass').value;
-    document.getElementById('form-lat').value  = document.getElementById('hs-lat').value;
-    document.getElementById('form-lon').value  = document.getElementById('hs-lon').value;
-    document.getElementById('form-bmid').value = document.getElementById('hs-bmid').value;
+    document.getElementById('form-name').value    = document.getElementById('hs-name').value;
+    document.getElementById('form-ip').value      = document.getElementById('hs-ip').value;
+    document.getElementById('form-user').value    = document.getElementById('hs-user').value;
+    document.getElementById('form-pass').value    = document.getElementById('hs-pass').value;
+    document.getElementById('form-lat').value     = document.getElementById('hs-lat').value;
+    document.getElementById('form-lon').value     = document.getElementById('hs-lon').value;
+    document.getElementById('form-bmid').value    = document.getElementById('hs-bmid').value;
+    document.getElementById('form-type').value    = document.getElementById('hs-type').value;
+    document.getElementById('form-aslnode').value = document.getElementById('hs-aslnode').value;
 }
 
-function editHotspot(name, ip, user, pass, lat, lon, bmid) {
-    document.getElementById('hs-name').value  = name;
-    document.getElementById('hs-ip').value    = ip;
-    document.getElementById('hs-user').value  = user;
-    document.getElementById('hs-pass').value  = pass;
-    document.getElementById('hs-lat').value   = (lat  && lat  !== 'None') ? lat  : '';
-    document.getElementById('hs-lon').value   = (lon  && lon  !== 'None') ? lon  : '';
-    document.getElementById('hs-bmid').value  = (bmid && bmid !== 'None') ? bmid : '';
+function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode) {
+    document.getElementById('hs-name').value    = name;
+    document.getElementById('hs-ip').value      = ip;
+    document.getElementById('hs-user').value    = user;
+    document.getElementById('hs-pass').value    = pass;
+    document.getElementById('hs-lat').value     = (lat     && lat     !== 'None') ? lat     : '';
+    document.getElementById('hs-lon').value     = (lon     && lon     !== 'None') ? lon     : '';
+    document.getElementById('hs-bmid').value    = (bmid    && bmid    !== 'None') ? bmid    : '';
+    document.getElementById('hs-type').value    = (type    && type    !== 'None') ? type    : 'wpsd';
+    document.getElementById('hs-aslnode').value = (aslNode && aslNode !== 'None') ? aslNode : '';
+    onHotspotTypeChange();
     document.getElementById('hotspot-form-title').textContent = 'Edit hotspot';
     document.getElementById('hs-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
     document.getElementById('hs-name').focus();
 }
 
 function clearHotspotForm() {
-    ['hs-name','hs-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid'].forEach(id => document.getElementById(id).value = '');
+    ['hs-name','hs-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('hs-type').value = 'wpsd';
+    onHotspotTypeChange();
     document.getElementById('hotspot-form-title').textContent = 'Add hotspot';
     document.getElementById('test-result').textContent = '';
+}
+
+// --- node type toggle (WPSD vs ASL3 fields) ---
+function onHotspotTypeChange() {
+    const isAsl = document.getElementById('hs-type').value === 'asl3';
+    document.getElementById('hs-wpsd-fields').style.display     = isAsl ? 'none' : '';
+    document.getElementById('hs-asl-fields').style.display      = isAsl ? '' : 'none';
+    document.getElementById('hs-test-bmid-btn').style.display    = isAsl ? 'none' : '';
+    document.getElementById('hs-test-aslnode-btn').style.display = isAsl ? '' : 'none';
 }
 
 // --- connection test ---
@@ -954,6 +986,27 @@ async function testBrandmeister() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ repeater_id: id })
+    });
+    const data = await r.json();
+    res.textContent = data.success ? '✓ ' + data.message : '✕ Failed: ' + data.message;
+    res.className   = data.success ? 'ok' : 'err';
+}
+
+async function testAslNode() {
+    const res  = document.getElementById('test-result');
+    const node = document.getElementById('hs-aslnode').value.trim();
+    if (!node) { res.textContent = 'Enter the ASL node number first'; res.className = 'err'; return; }
+    res.textContent = 'Testing...';
+    res.className   = '';
+    const r = await fetch('/api/test_asl_node', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            ip:       document.getElementById('hs-ip').value,
+            user:     document.getElementById('hs-user').value,
+            pass:     document.getElementById('hs-pass').value,
+            asl_node: node,
+        })
     });
     const data = await r.json();
     res.textContent = data.success ? '✓ ' + data.message : '✕ Failed: ' + data.message;

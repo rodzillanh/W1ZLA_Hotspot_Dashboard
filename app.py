@@ -4,6 +4,7 @@ import hashlib
 import inspect
 import datetime
 import os
+import re
 import time
 
 import paramiko
@@ -136,8 +137,9 @@ def api_data():
     by_ip     = {h["ip"]: h for h in hotspots}
     for ip, entry in snap.items():
         hs = by_ip.get(ip, {})
-        entry["lat"] = hs.get("lat")
-        entry["lon"] = hs.get("lon")
+        entry["lat"]  = hs.get("lat")
+        entry["lon"]  = hs.get("lon")
+        entry["type"] = hs.get("type", "wpsd")
     ordered_ips = [h["ip"] for h in hotspots]
     # Return as an ARRAY so the browser preserves order — JS objects keyed by
     # IP strings get silently re-sorted by some engines (especially for
@@ -272,6 +274,14 @@ def setup():
         bm_id = request.form.get("brandmeister_id", "").strip()
         if bm_id:
             new_hotspot["brandmeister_id"] = bm_id
+        node_type = request.form.get("type", "wpsd").strip()
+        if node_type == "asl3":
+            new_hotspot["type"] = "asl3"
+            asl_node = request.form.get("asl_node", "").strip()
+            # Interpolated into a shell string over SSH (config.build_asl_status_cmd)
+            # -- validate digits-only here too, since /setup has no auth.
+            if asl_node.isdigit():
+                new_hotspot["asl_node"] = asl_node
         hotspots = [h for h in hotspots if h["ip"] != new_hotspot["ip"]]
         hotspots.append(new_hotspot)
         save_hotspots(hotspots)
@@ -350,6 +360,48 @@ def test_ssh():
         return jsonify({"success": False, "message": str(e)})
     finally:
         client.close()
+
+@app.route("/api/test_asl_node", methods=["POST"])
+def test_asl_node():
+    """Test an ASL3 hotspot's SSH connectivity and node number for the
+    Settings 'Test' button -- connects, runs the same `rpt xnode` command
+    check_one will use, and reports what it found. Doubles as a live smoke
+    test for the RPT_ALINKS parser."""
+    data     = request.json or {}
+    ip       = data.get("ip", "").strip()
+    user     = data.get("user", "").strip()
+    password = data.get("pass", "")
+    node     = data.get("asl_node", "").strip()
+    if not node.isdigit():
+        return jsonify({"success": False, "message": "Node number must be digits only"})
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(ip, username=user, password=password, timeout=config.SSH_TIMEOUT)
+        cmd = config.build_asl_status_cmd(node)
+        _, stdout, _ = client.exec_command(cmd, timeout=config.SSH_TIMEOUT)
+        output = stdout.read().decode("utf-8", errors="ignore").splitlines()
+        alinks_raw = None
+        for line in output[3:]:
+            m = re.match(config.ASL_ALINKS_LINE_PATTERN, line.strip())
+            if m:
+                alinks_raw = m.group(1)
+                break
+        if alinks_raw is None:
+            return jsonify({
+                "success": False,
+                "message": f"Connected, but node {node} didn't return link status — check the node number",
+            })
+        count = len(alinks_raw.split(",")[1:])
+        return jsonify({
+            "success": True,
+            "message": f"Connected — node {node} found, {count} linked node{'s' if count != 1 else ''}",
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+    finally:
+        client.close()
+
 
 @app.route("/api/test_qrz", methods=["POST"])
 def test_qrz():

@@ -1,10 +1,11 @@
 # CLAUDE.md
 
 Context for Claude Code working in this repo. This is a self-hosted Flask
-dashboard for monitoring a fleet of WPSD/Pi-Star amateur radio hotspots —
-live status, active-call info, and a map, polled over SSH, with optional
-QRZ/RadioID/APRS/Brandmeister/Home Assistant/APRS-messaging integrations.
-Runs as Docker (Unraid) or standalone via systemd on a Pi/Linux box.
+dashboard for monitoring a fleet of WPSD/Pi-Star amateur radio hotspots and
+AllStarLink (ASL3) nodes — live status, active-call info, and a map, polled
+over SSH, with optional QRZ/RadioID/APRS/Brandmeister/AllStarLink-stats/Home
+Assistant/APRS-messaging integrations. Runs as Docker (Unraid) or standalone
+via systemd on a Pi/Linux box.
 
 For end-user-facing docs (install, features, config), see `README.md` —
 this file is oriented at making changes to the code, not using the app.
@@ -16,7 +17,11 @@ app.py            Flask routes, wires everything together, owns the
                    global monitor/mqtt_pub/aprs_msg instances and the
                    background thread loops
 monitor.py         FleetMonitor class: SSH polling (paramiko), MMDVM log
-                   parsing, caller lookup composition, map data assembly
+                   parsing (WPSD) / `rpt xnode` parsing (ASL3), caller
+                   lookup composition, map data assembly. `check_one()`
+                   dispatches on `hotspot.get("type", "wpsd")` to
+                   `_check_one_wpsd()` / `_check_one_asl3()` -- this is
+                   the pattern for any future node type
 models.py          HotspotStatus dataclass -- the shape returned by
                    /api/data. Adding a field here + setting it in
                    monitor.py is how new per-hotspot data reaches the UI
@@ -26,7 +31,7 @@ config.py          All tunables (env vars with defaults) + DEFAULT_SETTINGS
 storage.py          hotspots.json / settings.json / favorites.json --
                    flat JSON files in CONFIG_DIR (the mounted volume)
 
-qrz.py, radioid.py, aprs.py, brandmeister.py,
+qrz.py, radioid.py, aprs.py, brandmeister.py, aslstats.py,
 mqtt_publisher.py, aprs_messaging.py
                    One self-contained client class per integration.
                    Each: caches results, NEVER raises out of its public
@@ -154,6 +159,21 @@ config for per-integration credentials; put it in
   don't let a new client raise out of `monitor.py` or the background
   loops in `app.py`.
 
+- **ASL3's per-linked-node keyed state is NOT in `rpt lstats`/`rpt stats`
+  output** — both only expose connection state (`ESTABLISHED`/
+  `CONNECTING`) per link, and a local-node-aggregate keyed flag ("Signal
+  on input"). The real signal is `asterisk -rx "rpt xnode <node>"`'s
+  dialplan-variable dump, specifically the `RPT_ALINKS=<count>,<node><mode
+  T/R/L/C><K keyed/U unkeyed>,...` line — confirmed against a real node
+  (W1ZLA, node 59929), not assumed from `app_rpt` source alone. If you're
+  touching `config.ASL_ALINKS_LINE_PATTERN`/`ASL_ALINK_ENTRY_PATTERN` or
+  `monitor._parse_asl_output`, re-verify against real output rather than
+  reasoning from the CLI docs, which don't mention this field at all.
+  Node→callsign resolution has the same trap: `/var/lib/asterisk/
+  rpt_extnodes` looks like it should have callsigns but is purely IAX2
+  connection routing (`node=radio@host:port/node,host`) — use
+  `aslstats.py`'s `stats.allstarlink.org` lookup instead.
+
 ## Testing patterns used throughout this project
 
 No test suite/framework is set up — verification has been done ad hoc but
@@ -228,6 +248,19 @@ Always clean up `__pycache__` before zipping/packaging a build.
 - New per-hotspot fields go on `HotspotStatus` in `models.py` with a
   sensible default, so old `hotspots.json`/`settings.json` files from
   before the field existed still load fine.
+- **One shared `HotspotStatus`, not a per-node-type dataclass.** ASL3
+  support (v3.0) reused this same dataclass rather than introducing a
+  second one, even though it's a structurally different node type --
+  every cross-cutting consumer (`/api/data`, `mqtt_publisher.py`,
+  `aprs_messaging.py`, favorites matching, `storage_activity.py`, the
+  dashboard's timer-tick JS) only cares about a handful of shared field
+  names (`ip`, `is_active`, `active_call`, `tx_start`, `last_heard`,
+  `name`, `mode`, `is_favorite`, `favorite_label`) and needed zero changes
+  as a result. A hotspot's `type` ("wpsd"/"asl3") lives only in
+  `hotspots.json` as a plain dict key, attached to `/api/data` entries in
+  `app.py` the same way `lat`/`lon` already are -- not on the dataclass
+  itself, since it's static config, not live status. Follow this pattern
+  for any future node type rather than forking the data model.
 - Version bumps + changelog entries live in `templates/version.html`
   (`<div class="release">` blocks) — bump for real app-behavior changes,
   not for deployment-script-only edits like `docker-update.sh`.

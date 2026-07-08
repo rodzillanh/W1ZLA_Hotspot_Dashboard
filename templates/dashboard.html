@@ -957,6 +957,7 @@ function renderCards(data) {
     // data is an array — order guaranteed, no Object.values() needed
     container.innerHTML = data.map((hs, i) => {
         const cardOrder = fleetPos === -1 ? i : (i < fleetPos ? i : i + 1);
+        const isAsl     = hs.type === 'asl3';
         const isFav     = hs.is_favorite && hs.is_active;
         const cardClass = hs.is_active ? (isFav ? 'favorite' : 'active') : '';  // last-heard = no tint
 
@@ -1028,6 +1029,41 @@ function renderCards(data) {
                </div>`
             : '';
 
+        // ASL3 has no talkgroup/mode/RSSI/BER/color-code/timeslot/Brandmeister
+        // concepts -- link topology (asl_linked_nodes) is its equivalent of
+        // the "Linked:" line, and its stats-grid is just node number + temp/cpu.
+        const linkedLine = isAsl
+            ? ((hs.asl_linked_nodes && hs.asl_linked_nodes.length)
+                ? `<div class="card-tg">Linked:
+                     ${hs.asl_linked_nodes.map(n => {
+                         const label = n.callsign || n.node;
+                         const keyedDot = n.keyed ? ' <span style="color:var(--accent)">●</span>' : '';
+                         return n.callsign
+                             ? `<a class="recent-call" href="https://www.qrz.com/db/${n.callsign}" target="_blank" rel="noopener" title="Node ${n.node}">${label}</a>${keyedDot}`
+                             : `<span class="recent-call" title="Node ${n.node}">${label}</span>${keyedDot}`;
+                     }).join('')}
+                   </div>`
+                : '')
+            : (hs.talkgroup ? `<div class="card-tg">Linked: <span>${hs.talkgroup}</span></div>` : '');
+
+        const statsGrid = isAsl
+            ? `<div class="stats-grid">
+                 <div>Node: <span class="stat-val">${hs.asl_node || '—'}</span></div>
+                 <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
+                 <div>CPU:  <span class="stat-val">${hs.cpu}</span></div>
+               </div>`
+            : `<div class="stats-grid">
+                 <div>Mode: <span class="stat-val">${hs.mode}</span></div>
+                 <div>RSSI: <span class="stat-val">${hs.rssi}</span></div>
+                 <div>BER:  <span class="stat-val">${hs.ber}</span></div>
+                 <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
+                 <div>CPU:  <span class="stat-val">${hs.cpu}</span></div>
+                 ${hs.color_code ? `<div>Color Code: <span class="stat-val">${hs.color_code}</span></div>` : ''}
+                 ${hs.is_active && hs.timeslot ? `<div>Time Slot: <span class="stat-val">${hs.timeslot}</span></div>` : ''}
+                 ${hs.bm_status_text
+                     ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
+               </div>`;
+
         return `
         <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}">
           <div class="card-header">
@@ -1042,18 +1078,8 @@ function renderCards(data) {
                 </div>
                 ${photoBlock}
               </div>
-              ${hs.talkgroup ? `<div class="card-tg">Linked: <span>${hs.talkgroup}</span></div>` : ''}
-              <div class="stats-grid">
-                <div>Mode: <span class="stat-val">${hs.mode}</span></div>
-                <div>RSSI: <span class="stat-val">${hs.rssi}</span></div>
-                <div>BER:  <span class="stat-val">${hs.ber}</span></div>
-                <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
-                <div>CPU:  <span class="stat-val">${hs.cpu}</span></div>
-                ${hs.color_code ? `<div>Color Code: <span class="stat-val">${hs.color_code}</span></div>` : ''}
-                ${hs.is_active && hs.timeslot ? `<div>Time Slot: <span class="stat-val">${hs.timeslot}</span></div>` : ''}
-                ${hs.bm_status_text
-                    ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
-              </div>
+              ${linkedLine}
+              ${statsGrid}
               ${hs.bm_static_tgs && hs.bm_static_tgs.length
                   ? `<div class="card-tg">BM static: <span>${hs.bm_static_tgs.map(t => t.talkgroup + (t.slot ? ` (TS${t.slot})` : '')).join(', ')}</span></div>`
                   : ''}

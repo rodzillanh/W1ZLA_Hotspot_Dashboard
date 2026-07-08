@@ -98,9 +98,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v2.14</span>
+                <span class="release-version">v3.0</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>AllStarLink (ASL3) node support</span> — a second node type alongside WPSD/Pi-Star (Settings → Hotspots → Node type). Polled over the same SSH connection via <code>asterisk -rx "rpt xnode &lt;node&gt;"</code>, which exposes real per-linked-node keyed state (confirmed against a real node) rather than just an aggregate "something is active" flag. Linked node numbers are resolved to callsigns via AllStarLink's free public stats API, then get the same QRZ/RadioID enrichment and favorites/APRS-alert treatment as any DMR caller</li>
+                <li><span>ASL3 card</span> — node number, temperature/CPU, the same live active/last-heard timers as every other card, and a "Linked:" row listing every currently connected node with a marker on whichever one is keyed. No mode/RSSI/BER/color-code/timeslot/Brandmeister fields, since ASL3 has no equivalent concepts, and the WPSD-only git update check is skipped entirely for this node type</li>
+                <li><span>Fleet activity, Home Assistant MQTT, favorites, and APRS favorite alerts</span> all work with ASL3 nodes with no changes needed — they were already generic over any node type</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v2.14</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>APRS favorite alerts now include the talkgroup/reflector</span> — e.g. "N1IWP active on Garage Hotspot - TGIF 603" when one is linked, falling back to the hotspot-only message when it isn't; uses a plain ASCII separator since APRS messages are meant to be readable on ASCII-only radio displays</li>
@@ -417,13 +429,26 @@
         </div>
 
         <div class="feature-group">
+            <div class="feature-group-title">AllStarLink (ASL3) nodes</div>
+            <ul class="feature-list">
+                <li>Second node type alongside WPSD/Pi-Star — Settings → Hotspots → Node type</li>
+                <li>Polled via <code>rpt xnode</code> over the same SSH connection, no separate credentials needed</li>
+                <li>Real per-linked-node keyed state (not just an aggregate "something is active" flag)</li>
+                <li>Linked node numbers resolved to callsigns via AllStarLink's free public stats API</li>
+                <li>Resolved callsigns get the same QRZ/RadioID enrichment, favorites, and APRS-alert treatment as any DMR caller</li>
+                <li>Card shows node number, temp/CPU, active/last-heard timers, and a live "Linked:" node list</li>
+            </ul>
+        </div>
+
+        <div class="feature-group">
             <div class="feature-group-title">Integrations</div>
             <ul class="feature-list">
                 <li><span>QRZ.com</span> — active caller name, city/state, photo, and map coordinates <span style="color:var(--text-dim)">(XML subscription required)</span></li>
                 <li><span>RadioID.net</span> — free fallback for caller name/location when QRZ has no subscription or doesn't have the callsign</li>
                 <li><span>APRS.fi</span> — live beacon position for a caller, used on the map instead of QRZ's static home-station coordinates <span style="color:var(--text-dim)">(free API key required)</span></li>
                 <li><span>Brandmeister</span> — per-hotspot repeater status text and static talkgroup subscriptions, via Brandmeister's current v2 device API <span style="color:var(--text-dim)">(needs your hotspot's Brandmeister/CCS7 ID)</span></li>
-                <li><span>WPSD/Pi-Star update check</span> — flags hotspots running a git-based dashboard checkout that's behind its upstream remote</li>
+                <li><span>WPSD/Pi-Star update check</span> — flags hotspots running a git-based dashboard checkout that's behind its upstream remote (WPSD/Pi-Star nodes only)</li>
+                <li><span>AllStarLink stats.allstarlink.org</span> — free node-to-callsign resolution for ASL3 linked nodes, no API key</li>
                 <li><span>Home Assistant (MQTT)</span> — publishes each hotspot as an HA device via MQTT auto-discovery: online/active/favorite-active/update-available binary sensors, plus mode/call/talkgroup/temperature/CPU/RSSI/Brandmeister-status sensors <span style="color:var(--text-dim)">(needs an MQTT broker)</span></li>
                 <li><span>APRS favorite alerts</span> — sends yourself an APRS-IS text message (led by the caller's actual callsign, plus the linked talkgroup/reflector if one is known) when a favorite becomes active, with a per-favorite cooldown <span style="color:var(--text-dim)">(needs your amateur radio callsign)</span></li>
             </ul>

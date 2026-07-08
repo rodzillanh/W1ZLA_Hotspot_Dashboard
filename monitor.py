@@ -14,6 +14,7 @@ from qrz import QrzClient
 from radioid import RadioIdClient
 from aprs import AprsClient
 from brandmeister import BrandmeisterClient
+from aslstats import AslStatsClient
 import storage_activity
 
 
@@ -31,6 +32,7 @@ class FleetMonitor:
         self._radioid_on    = True
         self._aprs          = AprsClient("")
         self._brandmeister  = BrandmeisterClient()
+        self._aslstats      = AslStatsClient()
 
     # --- public API ---
 
@@ -141,15 +143,16 @@ class FleetMonitor:
                         self._data[ip].bm_status_text = bm_info["status_text"]
                         self._data[ip].bm_static_tgs   = bm_info["static_talkgroups"]
 
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # WPSD/Pi-Star-specific -- ASL3 nodes have no git-based dashboard
+        # checkout to compare against a remote, so this whole check would
+        # just be a wasted SSH round-trip (and could print meaningless
+        # check_repo output if those hardcoded paths happen to exist for
+        # unrelated reasons on an ASL3 image).
+        if hotspot.get("type", "wpsd") != "wpsd":
+            return
+
         try:
-            client.connect(
-                ip, username=hotspot["user"], password=hotspot["pass"],
-                timeout=config.SSH_TIMEOUT,
-            )
-            _, stdout, _ = client.exec_command(config.VERSION_CHECK_CMD, timeout=config.SSH_TIMEOUT * 3)
-            output = stdout.read().decode("utf-8", errors="ignore").strip()
+            output = self._ssh_exec(hotspot, config.VERSION_CHECK_CMD, config.SSH_TIMEOUT * 3).strip()
             if output:
                 webcode_version = webcode_date = None
                 any_update      = False
@@ -174,27 +177,24 @@ class FleetMonitor:
                         status.dashboard_outdated_repos   = outdated
         except Exception:
             pass  # slow checks are best-effort -- never affect the main poll loop
-        finally:
-            client.close()
 
     # --- per-hotspot check ---
 
     def check_one(self, hotspot: dict) -> None:
-        ip = hotspot["ip"]
+        """Dispatch to the right poll/parse path for this hotspot's type --
+        "wpsd" (MMDVM log tail, default for backward compat with existing
+        hotspots.json entries that predate this field) or "asl3"
+        (AllStarLink, `rpt xnode`)."""
         self._ensure_entry(hotspot)
+        if hotspot.get("type", "wpsd") == "asl3":
+            self._check_one_asl3(hotspot)
+        else:
+            self._check_one_wpsd(hotspot)
 
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    def _check_one_wpsd(self, hotspot: dict) -> None:
+        ip = hotspot["ip"]
         try:
-            client.connect(
-                ip,
-                username=hotspot["user"],
-                password=hotspot["pass"],
-                timeout=config.SSH_TIMEOUT,
-            )
-            _, stdout, _ = client.exec_command(config.SSH_STATUS_CMD, timeout=config.SSH_TIMEOUT)
-            output = stdout.read().decode("utf-8", errors="ignore").splitlines()
-
+            output = self._ssh_exec(hotspot, config.SSH_STATUS_CMD, config.SSH_TIMEOUT).splitlines()
             updates = self._parse_output(ip, output)
             with self._lock:
                 status = self._data[ip]
@@ -202,12 +202,43 @@ class FleetMonitor:
                     setattr(status, field_name, value)
                 self._failures[ip] = 0
         except Exception:
+            self._record_failure(ip)
+
+    def _check_one_asl3(self, hotspot: dict) -> None:
+        ip   = hotspot["ip"]
+        node = hotspot.get("asl_node", "")
+        try:
+            cmd = config.build_asl_status_cmd(node)
+            output = self._ssh_exec(hotspot, cmd, config.SSH_TIMEOUT).splitlines()
+            updates = self._parse_asl_output(ip, node, output)
             with self._lock:
-                self._failures[ip] += 1
-                if self._failures[ip] >= config.FAILURE_THRESHOLD:
-                    self._data[ip].status = "Offline"
+                status = self._data[ip]
+                for field_name, value in updates.items():
+                    setattr(status, field_name, value)
+                self._failures[ip] = 0
+        except Exception:
+            self._record_failure(ip)
+
+    def _ssh_exec(self, hotspot: dict, cmd: str, timeout: int) -> str:
+        """Connect, run one command, return its decoded stdout. Raises on
+        any connection/exec failure -- callers handle via _record_failure()."""
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            client.connect(
+                hotspot["ip"], username=hotspot["user"], password=hotspot["pass"],
+                timeout=config.SSH_TIMEOUT,
+            )
+            _, stdout, _ = client.exec_command(cmd, timeout=timeout)
+            return stdout.read().decode("utf-8", errors="ignore")
         finally:
             client.close()
+
+    def _record_failure(self, ip: str) -> None:
+        with self._lock:
+            self._failures[ip] += 1
+            if self._failures[ip] >= config.FAILURE_THRESHOLD:
+                self._data[ip].status = "Offline"
 
     def _ensure_entry(self, hotspot: dict) -> None:
         ip = hotspot["ip"]
@@ -266,6 +297,38 @@ class FleetMonitor:
         return {"name": name, "location": location, "image_url": image,
                 "lat": lat, "lon": lon, "source": source}
 
+    @staticmethod
+    def _apply_favorite_match(call: str) -> tuple[bool, str | None]:
+        """Shared by both the WPSD and ASL3 parse paths -- pure lookup
+        against the configured favorites list, nothing WPSD-specific."""
+        favs      = favorites_set()
+        fav_entry = next((f for f in load_favorites() if f["call"].upper() == call), None)
+        return call in favs, (fav_entry["label"] if fav_entry else None)
+
+    def _apply_last_heard_ttl(self, ip: str, updates: dict) -> None:
+        """If a previous call is sitting in "last heard" state and has aged
+        past LAST_HEARD_TTL, wipe caller info so the card returns to true
+        idle. Pure state-based logic (no log parsing involved), shared by
+        both the WPSD and ASL3 paths."""
+        if config.LAST_HEARD_TTL <= 0:
+            return
+        with self._lock:
+            lh = self._data[ip].last_heard
+        if lh is not None and (time.time() - lh) > config.LAST_HEARD_TTL:
+            updates.update({
+                "active_call":     None,
+                "caller_name":     None,
+                "caller_location": None,
+                "caller_image":    None,
+                "caller_lat":      None,
+                "caller_lon":      None,
+                "caller_source":   None,
+                "timeslot":        None,
+                "is_favorite":     False,
+                "favorite_label":  None,
+                "last_heard":      None,
+            })
+
     # --- log parsing ---
 
     def _parse_output(self, ip: str, output: list[str]) -> dict:
@@ -293,26 +356,9 @@ class FleetMonitor:
         if cc:
             updates["color_code"] = cc
 
-        # Last-heard TTL: if a previous call is sitting in "last heard" state
-        # and has aged past LAST_HEARD_TTL, wipe caller info now so the card
-        # returns to true idle before we even parse the log lines.
-        if config.LAST_HEARD_TTL > 0:
-            with self._lock:
-                lh = self._data[ip].last_heard
-            if lh is not None and (time.time() - lh) > config.LAST_HEARD_TTL:
-                updates.update({
-                    "active_call":     None,
-                    "caller_name":     None,
-                    "caller_location": None,
-                    "caller_image":    None,
-                    "caller_lat":      None,
-                    "caller_lon":      None,
-                    "caller_source":   None,
-                    "timeslot":        None,
-                    "is_favorite":     False,
-                    "favorite_label":  None,
-                    "last_heard":      None,
-                })
+        # Last-heard TTL: wipe caller info now so the card returns to true
+        # idle before we even parse the log lines, if it's aged out.
+        self._apply_last_heard_ttl(ip, updates)
 
         # The old top-level staleness check looked at the timestamp of ANY log
         # line -- including MMDVM's periodic keepalive / network-status lines that
@@ -375,8 +421,7 @@ class FleetMonitor:
 
                 if prev_call != call:
                     caller_info = self._lookup_caller(call)
-                    favs      = favorites_set()
-                    fav_entry = next((f for f in load_favorites() if f["call"].upper() == call), None)
+                    is_favorite, favorite_label = self._apply_favorite_match(call)
                     updates.update({
                         "is_active":       True,
                         "active_call":     call,
@@ -388,8 +433,8 @@ class FleetMonitor:
                         "caller_source":   caller_info["source"],
                         "tx_start":        time.time(),
                         "last_heard":      None,
-                        "is_favorite":     call in favs,
-                        "favorite_label":  fav_entry["label"] if fav_entry else None,
+                        "is_favorite":     is_favorite,
+                        "favorite_label":  favorite_label,
                         "timeslot":        self._extract_slot(line),
                     })
                     destination = self._extract_destination(line)
@@ -445,6 +490,123 @@ class FleetMonitor:
         # Fall-through: no transmission start or end found in the log window
         # (covers long calls where the header scrolled out of the tail AND
         # no RSSI/BER lines were found). Enter last-heard state once.
+        with self._lock:
+            existing_lh = self._data[ip].last_heard
+        updates["is_active"] = False
+        updates["tx_start"]  = None
+        if prev_call and existing_lh is None:
+            updates["last_heard"] = time.time()
+            self._log_activity(ip)
+        return updates
+
+    def _parse_asl_output(self, ip: str, node: str, output: list[str]) -> dict:
+        """Parse an ASL3 (AllStarLink) hotspot's SSH output: the same
+        generic Linux temp/uptime/CPU one-liners as WPSD, plus `rpt xnode`'s
+        dialplan-variable dump -- RPT_ALINKS gives real per-linked-node
+        keyed state (confirmed against a real node; see
+        config.build_asl_status_cmd). Unlike the WPSD log tail, each poll
+        is a complete, current snapshot of link state rather than a rolling
+        window, so this only needs to compare against the previous poll's
+        result -- no "header scrolled out of the tail" case to handle."""
+        if len(output) < 2:
+            return {}
+
+        updates = {
+            "status":      "Online",
+            "temperature": self._parse_temp(output[0]),
+            "uptime":      output[1].replace("up ", ""),
+            "cpu":         self._parse_cpu(output[2]) if len(output) > 2 else "N/A",
+            "asl_node":    node,
+            "mode":        "ASL",
+        }
+
+        self._apply_last_heard_ttl(ip, updates)
+
+        with self._lock:
+            current   = self._data[ip]
+            prev_call = current.active_call
+            history   = list(current.history)
+
+        alinks_raw = None
+        for line in output[3:]:
+            m = re.match(config.ASL_ALINKS_LINE_PATTERN, line.strip())
+            if m:
+                alinks_raw = m.group(1)
+                break
+
+        linked_nodes = []
+        keyed_entry  = None
+        if alinks_raw:
+            callsigns = self._aslstats.linked_callsigns(node)
+            for entry in alinks_raw.split(",")[1:]:  # first field is the count
+                em = re.match(config.ASL_ALINK_ENTRY_PATTERN, entry.strip())
+                if not em:
+                    continue
+                link_node, mode_char, key_char = em.groups()
+                entry_dict = {
+                    "node":     link_node,
+                    "callsign": callsigns.get(link_node),
+                    "mode":     mode_char,
+                    "keyed":    key_char == "K",
+                }
+                linked_nodes.append(entry_dict)
+                if entry_dict["keyed"] and keyed_entry is None:
+                    keyed_entry = entry_dict
+        updates["asl_linked_nodes"] = linked_nodes
+
+        if keyed_entry:
+            call              = keyed_entry["callsign"] or keyed_entry["node"]
+            has_real_callsign = keyed_entry["callsign"] is not None
+
+            if prev_call != call:
+                # Only run the QRZ/RadioID/APRS enrichment lookups when we
+                # actually resolved a callsign -- a bare node number isn't
+                # one, and looking it up would just waste an API call.
+                caller_info = self._lookup_caller(call) if has_real_callsign else {
+                    "name": None, "location": None, "image_url": None,
+                    "lat": None, "lon": None, "source": None,
+                }
+                is_favorite, favorite_label = self._apply_favorite_match(call)
+                updates.update({
+                    "is_active":       True,
+                    "active_call":     call,
+                    "caller_name":     caller_info["name"],
+                    "caller_location": caller_info["location"],
+                    "caller_image":    caller_info["image_url"],
+                    "caller_lat":      caller_info["lat"],
+                    "caller_lon":      caller_info["lon"],
+                    "caller_source":   caller_info["source"],
+                    "tx_start":        time.time(),
+                    "last_heard":      None,
+                    "is_favorite":     is_favorite,
+                    "favorite_label":  favorite_label,
+                })
+                if not any(h.get("call") == call for h in history):
+                    history.insert(0, {
+                        "call":     call,
+                        "name":     caller_info["name"],
+                        "location": caller_info["location"],
+                        "lat":      caller_info["lat"],
+                        "lon":      caller_info["lon"],
+                        "source":   caller_info["source"],
+                    })
+                    updates["history"] = history[:config.MAX_HISTORY]
+            else:
+                # Same node still keyed -- mirrors the WPSD "same caller"
+                # branch: only reset tx_start if we were previously idle
+                # or in last-heard state (i.e. this is a re-key).
+                updates["is_active"] = True
+                with self._lock:
+                    current_tx = self._data[ip].tx_start
+                    current_lh = self._data[ip].last_heard
+                if current_tx is None or current_lh is not None:
+                    updates["tx_start"]   = time.time()
+                    updates["last_heard"] = None
+            return updates
+
+        # Nobody keyed right now -- enter last-heard state once (same guard
+        # as the WPSD path: only set last_heard and log activity the first
+        # time this transition is seen).
         with self._lock:
             existing_lh = self._data[ip].last_heard
         updates["is_active"] = False

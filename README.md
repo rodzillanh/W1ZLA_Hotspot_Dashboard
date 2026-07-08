@@ -1,6 +1,7 @@
 # W1ZLA WPSD Hotspot Dashboard
 
-Live status dashboard for a fleet of Pi-Star / WPSD hotspots, polled over SSH.
+Live status dashboard for a fleet of Pi-Star / WPSD hotspots and AllStarLink
+(ASL3) nodes, polled over SSH.
 
 ## Project layout
 
@@ -10,8 +11,9 @@ config.py       all the tunables (timeouts, thresholds, regex patterns)
 models.py       HotspotStatus dataclass — the shape of each dashboard card
 storage.py      load/save hotspots.json and settings.json
 storage_activity.py  SQLite log for the optional Fleet activity card
-monitor.py      FleetMonitor: SSH polling + MMDVM log parsing
+monitor.py      FleetMonitor: SSH polling + MMDVM log parsing (WPSD) / rpt xnode parsing (ASL3)
 qrz.py          optional QRZ.com lookup for the active caller's name/city/state/photo/coords
+aslstats.py     optional AllStarLink node-to-callsign lookup for ASL3 nodes
 templates/
     dashboard.html
     setup.html
@@ -241,6 +243,10 @@ and **Version info**.
   Your hotspot's Brandmeister/CCS7 ID — the same ID shown under Brandmeister
   SelfCare → My hotspots. Enables the Brandmeister repeater profile lookup
   (see "Brandmeister repeater profile" below).
+- **Node type** — WPSD/Pi-Star (default) or AllStarLink (ASL3), set per
+  hotspot on the Hotspots tab's add/edit form. Switches which fields show
+  (ASL node number instead of Brandmeister ID) and how that hotspot is
+  polled — see "AllStarLink (ASL3) nodes" below.
 
 ## QRZ caller lookup
 
@@ -345,6 +351,37 @@ while SSH logs in as a different user — modern git otherwise refuses to
 run against a repo it doesn't recognize as owned by the current user, and
 fails silently under this check's error suppression. This flag doesn't
 modify the hotspot's own git config; it only applies to this one command.
+
+## AllStarLink (ASL3) nodes
+
+A second node type alongside WPSD/Pi-Star, added in v3.0 — Settings →
+Hotspots → **Node type** → "AllStarLink (ASL3)" instead of the default
+WPSD/Pi-Star. Same SSH credentials as any other hotspot; add the node's
+own **ASL node number** in the field that appears.
+
+Rather than tailing an MMDVM log, an ASL3 hotspot is polled by running
+`asterisk -rx "rpt xnode <node>"` over the same SSH connection, which
+dumps `app_rpt`'s dialplan variables — including `RPT_ALINKS`, which
+gives real per-linked-node keyed state (`<node><mode><K or U>` per link),
+confirmed against a real node rather than assumed. This is what lets the
+card show which specific linked node is currently transmitting, not just
+"something is active."
+
+Linked node numbers are resolved to callsigns via AllStarLink's free,
+public stats API (`stats.allstarlink.org`) — not every linked node has a
+callsign on file (private/unregistered nodes just show their bare
+number). Once resolved, a callsign gets the same QRZ/RadioID enrichment
+and favorites/APRS-alert treatment as a DMR caller does.
+
+The card shows: node number, temperature/CPU (same generic Linux
+commands as WPSD), the active/last-heard state (same live timers as
+every other card), and a **Linked:** row listing every currently
+connected node (callsign or bare number), with a green dot next to
+whichever one is currently keyed. There's no WPSD-equivalent concept for
+mode/RSSI/BER/color-code/timeslot/Brandmeister, so those don't appear on
+an ASL3 card — and the WPSD-specific git update check is skipped for
+this node type entirely, rather than running a check that could never
+apply.
 
 ## Home Assistant (MQTT)
 

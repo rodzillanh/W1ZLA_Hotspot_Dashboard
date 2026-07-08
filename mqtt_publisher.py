@@ -85,6 +85,11 @@ def _entity_list(hotspot: dict) -> list:
             "name": "Brandmeister Status",
             "value_template": "{{ value_json.bm_status_text }}",
         }))
+    if hotspot.get("type") == "asl3":
+        entities.append(("sensor", "linked_nodes_count", {
+            "name": "Linked Nodes", "state_class": "measurement",
+            "value_template": "{{ value_json.linked_nodes_count }}",
+        }))
     return entities
 
 
@@ -217,6 +222,7 @@ class MqttPublisher:
             "rssi_dbm":        _extract_float(hotspot_status.get("rssi")),
             "bm_status_text":  hotspot_status.get("bm_status_text") or "N/A",
             "dashboard_update_available": bool(hotspot_status.get("dashboard_update_available")),
+            "linked_nodes_count": len(hotspot_status.get("asl_linked_nodes") or []),
         }
         try:
             self._client.publish(f"{STATE_PREFIX}/{node}/state", json.dumps(payload))

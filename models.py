@@ -58,6 +58,18 @@ class HotspotStatus:
     dashboard_version_date: Optional[str] = None  # date of that commit
     dashboard_update_available: Optional[bool] = None  # None = unknown / not a git checkout
     dashboard_outdated_repos: List[str] = field(default_factory=list)  # e.g. ["WPSD-Scripts"]
+    # AllStarLink (ASL3) nodes -- only populated for hotspots configured with
+    # type "asl3" (see monitor.py's _check_one_asl3). active_call/is_active/
+    # tx_start/last_heard/mode above are reused as-is: active_call is the
+    # resolved callsign (or bare node number) of whichever linked node is
+    # currently keyed, is_active is true if any link is keyed.
+    asl_node: Optional[str] = None  # this node's own ASL node number
+    # Link topology -- who's connected to this node right now, from
+    # `asterisk -rx "rpt xnode <node>"`'s RPT_ALINKS variable. Distinct from
+    # `history` (the talker log), which WPSD/Pi-Star also has -- this has no
+    # WPSD equivalent at all.
+    # Keys: node, callsign (None if not resolved), mode ("T"/"R"/"L"/"C"), keyed (bool)
+    asl_linked_nodes: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)
