@@ -56,13 +56,22 @@ def build_asl_status_cmd(node: str) -> str:
     dialplan variables, including RPT_ALINKS (per-linked-node keyed state,
     confirmed against a real ASL3 node -- see monitor.py's ASL3 parsing).
 
+    Needs `sudo` -- the Asterisk control socket (asterisk.ctl) is normally
+    root/asterisk-group only, and a permission error there goes to stderr,
+    which this app doesn't capture, so it silently looks like "no output"
+    rather than an obvious permission error. Confirmed against a real ASL3
+    node, which needed `sudo asterisk -rx ...` for the same command run
+    manually to produce any output at all. Assumes passwordless sudo for
+    the SSH user, same assumption this app already makes for WPSD (no
+    sudo password is ever supplied anywhere in this codebase).
+
     `node` is interpolated into a shell string executed on the remote host,
     so the caller MUST validate it's digits-only first (see app.py's /setup
     handler) -- this re-validates defensively since /setup has no auth.
     """
     if not node.isdigit():
         raise ValueError(f"invalid ASL node number: {node!r}")
-    return _LINUX_HOST_STATS_CMD + f'asterisk -rx "rpt xnode {node}"'
+    return _LINUX_HOST_STATS_CMD + f'sudo asterisk -rx "rpt xnode {node}"'
 
 # --- Log line parsing ---
 BER_PATTERN        = r"BER: (\d+\.?\d*)%"

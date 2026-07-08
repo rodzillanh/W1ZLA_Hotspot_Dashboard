@@ -359,6 +359,14 @@ Hotspots → **Node type** → "AllStarLink (ASL3)" instead of the default
 WPSD/Pi-Star. Same SSH credentials as any other hotspot; add the node's
 own **ASL node number** in the field that appears.
 
+**Requires passwordless `sudo` for the SSH user.** The Asterisk control
+socket (`asterisk.ctl`) is normally root/`asterisk`-group only — this
+dashboard runs `sudo asterisk -rx "rpt xnode <node>"`, the same way you'd
+run it by hand at a shell prompt. If that SSH user would be prompted for
+a sudo password interactively, the poll (and the Settings "Test ASL node"
+button) will fail silently rather than hang, since there's no way to
+supply a password non-interactively.
+
 Rather than tailing an MMDVM log, an ASL3 hotspot is polled by running
 `asterisk -rx "rpt xnode <node>"` over the same SSH connection, which
 dumps `app_rpt`'s dialplan variables — including `RPT_ALINKS`, which
