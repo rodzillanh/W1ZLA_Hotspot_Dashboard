@@ -144,8 +144,12 @@ def api_data():
     # Return as an ARRAY so the browser preserves order — JS objects keyed by
     # IP strings get silently re-sorted by some engines (especially for
     # keys that look numeric), so a dict is not reliable here.
+    # Only ever return entries for IPs currently in load_hotspots() -- never
+    # fall back to "whatever is in the snapshot," since an in-flight poll
+    # thread can resurrect a just-deleted hotspot's entry in monitor._data
+    # (check_one -> _ensure_entry recreates it before the SSH call
+    # finishes), which would otherwise make a deleted card reappear.
     ordered = [snap[ip] for ip in ordered_ips if ip in snap]
-    ordered += [v for ip, v in snap.items() if ip not in set(ordered_ips)]
     return jsonify(ordered)
 
 @app.route("/api/map_data")

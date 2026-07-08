@@ -59,6 +59,18 @@ class FleetMonitor:
             self._data.pop(ip, None)
             self._failures.pop(ip, None)
 
+    def prune_stale(self, current_ips: set) -> None:
+        """Drop any monitor entries for IPs no longer in the hotspot
+        config. Called at the top of each poll cycle as a safety net --
+        an in-flight check_one/check_one_slow worker thread for a
+        just-deleted hotspot can call _ensure_entry() and recreate its
+        entry in self._data right after remove() ran for it."""
+        with self._lock:
+            stale = [ip for ip in self._data if ip not in current_ips]
+            for ip in stale:
+                self._data.pop(ip, None)
+                self._failures.pop(ip, None)
+
     def map_data(self) -> dict:
         """Location data for the live map: your own hotspots (if lat/lon is
         configured for them) plus active callers + recent history.
@@ -117,7 +129,9 @@ class FleetMonitor:
     def run_forever(self) -> None:
         with concurrent.futures.ThreadPoolExecutor(max_workers=config.MAX_WORKERS) as executor:
             while True:
-                list(executor.map(self.check_one, load_hotspots()))
+                hotspots = load_hotspots()
+                self.prune_stale({h["ip"] for h in hotspots})
+                list(executor.map(self.check_one, hotspots))
                 time.sleep(config.POLL_INTERVAL)
 
     def run_slow_checks_forever(self) -> None:
@@ -127,7 +141,9 @@ class FleetMonitor:
         main 5-second poll loop -- see config.VERSION_CHECK_INTERVAL."""
         with concurrent.futures.ThreadPoolExecutor(max_workers=config.MAX_WORKERS) as executor:
             while True:
-                list(executor.map(self.check_one_slow, load_hotspots()))
+                hotspots = load_hotspots()
+                self.prune_stale({h["ip"] for h in hotspots})
+                list(executor.map(self.check_one_slow, hotspots))
                 time.sleep(config.VERSION_CHECK_INTERVAL)
 
     def check_one_slow(self, hotspot: dict) -> None:
