@@ -317,7 +317,8 @@ def api_weather():
 
 @app.route("/version")
 def version_page():
-    return render_template("version.html", settings=load_settings())
+    embed = request.args.get("embed") == "1"
+    return render_template("version.html", settings=load_settings(), embed=embed)
 
 
 @app.route("/readme")
@@ -328,7 +329,8 @@ def readme_page():
             readme_text = f.read()
     except FileNotFoundError:
         readme_text = "README.md not found in the container -- check your image build."
-    return render_template("readme.html", settings=load_settings(), readme_text=readme_text)
+    embed = request.args.get("embed") == "1"
+    return render_template("readme.html", settings=load_settings(), readme_text=readme_text, embed=embed)
 
 
 # --- hotspot management ---

@@ -210,6 +210,56 @@
         .ok  { color: var(--accent); }
         .err { color: var(--danger); }
 
+        /* --- doc modal (changelog / README) --- */
+        .doc-modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.6);
+            z-index: 300;
+            align-items: center;
+            justify-content: center;
+            padding: 30px 16px;
+        }
+        .doc-modal-backdrop.open { display: flex; }
+        .doc-modal-box {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            width: min(760px, 100%);
+            height: 100%;
+            max-height: 820px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 12px 40px rgba(0,0,0,.4);
+        }
+        .doc-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--card-border);
+            flex-shrink: 0;
+        }
+        .doc-modal-title { font-size: 14px; font-weight: 500; }
+        .doc-modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            padding: 2px 6px;
+        }
+        .doc-modal-close:hover { color: var(--text); }
+        .doc-modal-box iframe {
+            flex: 1;
+            width: 100%;
+            border: none;
+            background: var(--bg);
+        }
+
         /* --- version tab --- */
         .version-row {
             display: flex;
@@ -699,8 +749,8 @@
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
             Full release history and complete feature list for this version.
         </p>
-        <a href="/version" target="_blank" class="btn btn-info"
-           style="display:inline-block;text-decoration:none">
+        <a href="/version" class="btn btn-info" style="display:inline-block;text-decoration:none"
+           onclick="openDocModal('/version','Changelog &amp; feature list'); return false;">
             View changelog &amp; feature list →
         </a>
     </div>
@@ -710,12 +760,23 @@
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
             Install instructions, configuration options, and feature details.
         </p>
-        <a href="/readme" target="_blank" class="btn btn-info"
-           style="display:inline-block;text-decoration:none">
+        <a href="/readme" class="btn btn-info" style="display:inline-block;text-decoration:none"
+           onclick="openDocModal('/readme','README'); return false;">
             📄 View README →
         </a>
     </div>
 
+</div>
+
+<!-- Changelog / README modal -->
+<div class="doc-modal-backdrop" id="doc-modal-backdrop" onclick="closeDocModalOnBackdrop(event)">
+    <div class="doc-modal-box">
+        <div class="doc-modal-header">
+            <span class="doc-modal-title" id="doc-modal-title"></span>
+            <button class="doc-modal-close" onclick="closeDocModal()">×</button>
+        </div>
+        <iframe id="doc-modal-frame" src="" title="Document viewer"></iframe>
+    </div>
 </div>
 
 <script>
@@ -1187,6 +1248,23 @@ function initDrag(el) {
     el.addEventListener('drop',      e  => { e.preventDefault(); el.classList.remove('drag-over'); });
 }
 document.querySelectorAll('.drag-row').forEach(initDrag);
+
+// --- changelog / README modal ---
+// Loads the existing standalone /version or /readme page inside an iframe
+// rather than opening a new tab -- ?embed=1 tells that page to hide its own
+// "back" nav links, since the modal's own title bar/close button replace them.
+function openDocModal(url, title) {
+    document.getElementById('doc-modal-title').textContent = title;
+    document.getElementById('doc-modal-frame').src = url + (url.includes('?') ? '&' : '?') + 'embed=1';
+    document.getElementById('doc-modal-backdrop').classList.add('open');
+}
+function closeDocModal() {
+    document.getElementById('doc-modal-backdrop').classList.remove('open');
+    document.getElementById('doc-modal-frame').src = '';  // stop any in-flight load, free the iframe
+}
+function closeDocModalOnBackdrop(e) {
+    if (e.target === document.getElementById('doc-modal-backdrop')) closeDocModal();
+}
 
 // --- notification status on load ---
 (function() {

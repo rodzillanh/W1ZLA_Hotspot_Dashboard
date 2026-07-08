@@ -64,8 +64,10 @@
     </style>
 </head>
 <body>
+    {% if not embed %}
     <a href="/">← Back to dashboard</a>
     <a href="/readme" style="margin-left:16px">📄 View README</a>
+    {% endif %}
     <h1>🔍 Version info</h1>
 
     <!-- Container info -->

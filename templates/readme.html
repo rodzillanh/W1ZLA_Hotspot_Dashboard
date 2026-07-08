@@ -48,7 +48,9 @@
     </style>
 </head>
 <body>
+    {% if not embed %}
     <a class="back-link" href="/version">← Back to Version info</a>
+    {% endif %}
     <div class="card">
         <div id="readme-content">Loading…</div>
     </div>
