@@ -1337,6 +1337,11 @@ let fleetChart        = null;
 let fleetChartMode     = 'per-hotspot';
 let fleetActivityData  = null;  // last /api/activity response, reused when the toggle switches modes
 let fleetLastActivity  = null;  // {hotspot, ts}, ticked client-side same as tx/last-heard timers
+// Parallel to fleetChart.data.labels -- true where a bucket lands on the
+// hour. Read by the x-axis tick callback (set once, at chart creation) so
+// it always reflects the latest render even though the callback itself
+// isn't recreated on every poll.
+let fleetHourMarks    = [];
 
 const FLEET_LINE_DASHES  = [[], [6, 3], [2, 2], [8, 3, 2, 3], [1, 3]];
 // Mode-breakdown bar/legend and per-hotspot chart lines use separate
@@ -1346,6 +1351,9 @@ const FLEET_LINE_DASHES  = [[], [6, 3], [2, 2], [8, 3, 2, 3], [1, 3]];
 // hidden, leaving only the mode legend visible as a color key).
 const FLEET_MODE_COLOR_VARS     = ['--accent', '--link', '--tx-color', '--fav-color', '--text-dim'];
 const FLEET_HOTSPOT_COLOR_VARS  = ['--link', '--fav-color', '--accent', '--text-dim', '--tx-color'];
+// Past this many individual lines, the 5-color x 5-dash palette repeats and
+// the legend gets hard to scan -- the rest get folded into one "Other" line.
+const FLEET_MAX_LINES = 6;
 
 function cssVar(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -1410,10 +1418,13 @@ function renderFleetChart(buckets) {
     canvas.style.display  = 'block';
     emptyEl.style.display = 'none';
 
-    const labels = buckets.map(b => {
-        const d = new Date(b.t + 'Z');  // 't' is a naive UTC ISO string from the server
-        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    });
+    const bucketDates = buckets.map(b => new Date(b.t + 'Z'));  // 't' is a naive UTC ISO string from the server
+    const labels      = bucketDates.map(d => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    // Only hour-boundary buckets get an x-axis label (see the ticks.callback
+    // below) -- with up to 48 buckets, labeling every one read as noise
+    // rather than a timeline. The in-between buckets still get an unlabeled
+    // tick mark, and hovering still shows the exact bucket time via tooltip.
+    fleetHourMarks = bucketDates.map(d => d.getMinutes() === 0);
     const hotspotNames = buckets.length ? Object.keys(buckets[0].by_hotspot) : [];
 
     let datasets;
@@ -1429,7 +1440,17 @@ function renderFleetChart(buckets) {
             pointRadius:     0,
         }];
     } else {
-        datasets = hotspotNames.map((name, i) => ({
+        // Cap plotted lines at FLEET_MAX_LINES -- past that many, the 5-color
+        // x 5-dash palette starts repeating (making lines indistinguishable)
+        // and the legend gets too long to scan. Rank by activity in the
+        // window and fold everyone past the cap into a single "Other" line.
+        const ranked = hotspotNames
+            .map(name => ({ name, total: buckets.reduce((sum, b) => sum + (b.by_hotspot[name] || 0), 0) }))
+            .sort((a, b) => b.total - a.total);
+        const topNames   = ranked.slice(0, FLEET_MAX_LINES).map(r => r.name);
+        const otherNames = ranked.slice(FLEET_MAX_LINES).map(r => r.name);
+
+        datasets = topNames.map((name, i) => ({
             label:       name,
             data:        buckets.map(b => b.by_hotspot[name] || 0),
             borderColor: cssVar(FLEET_HOTSPOT_COLOR_VARS[i % FLEET_HOTSPOT_COLOR_VARS.length]),
@@ -1438,6 +1459,18 @@ function renderFleetChart(buckets) {
             tension:     0.25,
             pointRadius: 0,
         }));
+
+        if (otherNames.length > 0) {
+            datasets.push({
+                label:       `Other (${otherNames.length} hotspot${otherNames.length === 1 ? '' : 's'})`,
+                data:        buckets.map(b => otherNames.reduce((sum, name) => sum + (b.by_hotspot[name] || 0), 0)),
+                borderColor: cssVar('--text-dim'),
+                borderDash:  [1, 3],
+                fill:        false,
+                tension:     0.25,
+                pointRadius: 0,
+            });
+        }
     }
 
     if (fleetChart) {
@@ -1458,7 +1491,19 @@ function renderFleetChart(buckets) {
                 animation: false,
                 scales: {
                     x: {
-                        ticks: { autoSkip: true, maxTicksLimit: 8, color: cssVar('--text-muted') },
+                        ticks: {
+                            autoSkip: false,
+                            maxRotation: 0,
+                            color: cssVar('--text-muted'),
+                            // Only label hour-boundary buckets (fleetHourMarks,
+                            // recomputed every render) -- every other bucket
+                            // still gets a tick mark, just no text, so the
+                            // axis reads as a clean timeline instead of a
+                            // wall of HH:MM labels.
+                            callback: function(value, index) {
+                                return fleetHourMarks[index] ? this.getLabelForValue(value) : '';
+                            },
+                        },
                         grid:  { color: cssVar('--card-border') },
                     },
                     y: {
