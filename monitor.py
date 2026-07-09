@@ -553,17 +553,20 @@ class FleetMonitor:
         linked_nodes = []
         keyed_entry  = None
         if alinks_raw:
-            callsigns = self._aslstats.linked_callsigns(node)
+            node_info = self._aslstats.linked_node_info(node)
             for entry in alinks_raw.split(",")[1:]:  # first field is the count
                 em = re.match(config.ASL_ALINK_ENTRY_PATTERN, entry.strip())
                 if not em:
                     continue
                 link_node, mode_char, key_char = em.groups()
+                info = node_info.get(link_node) or {}
                 entry_dict = {
-                    "node":     link_node,
-                    "callsign": callsigns.get(link_node),
-                    "mode":     mode_char,
-                    "keyed":    key_char == "K",
+                    "node":        link_node,
+                    "callsign":    info.get("callsign"),
+                    "description": info.get("description"),
+                    "location":    info.get("location"),
+                    "mode":        mode_char,
+                    "keyed":       key_char == "K",
                 }
                 linked_nodes.append(entry_dict)
                 if entry_dict["keyed"] and keyed_entry is None:

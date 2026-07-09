@@ -306,6 +306,33 @@
         }
         .recent-call:hover { text-decoration: underline; }
 
+        /* --- ASL3 card: stats-left / linked-nodes-right split layout --- */
+        .card-split { display: flex; gap: 16px; align-items: flex-start; margin-top: 8px; }
+        .split-stats {
+            flex: 0 0 84px;
+            display: flex; flex-direction: column; gap: 6px;
+            font-size: 13px; color: var(--text-muted);
+            padding-right: 14px; border-right: 1px solid var(--card-border);
+        }
+        .split-stats .stat-val { color: var(--text); display: block; }
+        .split-linked { flex: 1; min-width: 0; }
+        .split-linked .card-tg { margin: 0 0 4px; }
+        .linked-item {
+            display: flex; align-items: baseline; gap: 8px;
+            padding: 5px 0; font-size: 12.5px;
+            border-bottom: 1px solid var(--card-border);
+        }
+        .linked-item:last-child { border-bottom: none; }
+        .linked-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+        .linked-item.keyed .dot     { background: var(--accent); animation: pulse 1.4s infinite; }
+        .linked-item.idle-link .dot { background: var(--text-dim); }
+        .linked-item .info { flex: 1; min-width: 0; }
+        .linked-item .node-num {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 10.5px; color: var(--text-dim);
+        }
+        .linked-item .desc { display: block; font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
         /* --- fleet activity metrics card --- */
         .metrics-card {
             background: var(--card-bg);
@@ -1111,28 +1138,16 @@ function renderCards(data) {
             : '';
 
         // ASL3 has no talkgroup/mode/RSSI/BER/color-code/timeslot/Brandmeister
-        // concepts -- link topology (asl_linked_nodes) is its equivalent of
-        // the "Linked:" line, and its stats-grid is just node number + temp/cpu.
+        // concepts. Its equivalent of both the "Linked:" line and the
+        // stats-grid live together in aslCardSplit below (stats in a narrow
+        // left column, linked-node list on the right) so a growing list of
+        // linked nodes makes the card wider, not taller.
         const linkedLine = isAsl
-            ? ((hs.asl_linked_nodes && hs.asl_linked_nodes.length)
-                ? `<div class="card-tg">Linked:
-                     ${hs.asl_linked_nodes.map(n => {
-                         const label = n.callsign || n.node;
-                         const keyedDot = n.keyed ? ' <span style="color:var(--accent)">●</span>' : '';
-                         return n.callsign
-                             ? `<a class="recent-call" href="https://www.qrz.com/db/${n.callsign}" target="_blank" rel="noopener" title="Node ${n.node}">${label}</a>${keyedDot}`
-                             : `<span class="recent-call" title="Node ${n.node}">${label}</span>${keyedDot}`;
-                     }).join('')}
-                   </div>`
-                : '')
+            ? ''
             : (hs.talkgroup ? `<div class="card-tg">Linked: <span>${hs.talkgroup}</span></div>` : '');
 
         const statsGrid = isAsl
-            ? `<div class="stats-grid">
-                 <div>Node: <span class="stat-val">${hs.asl_node || '—'}</span></div>
-                 <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
-                 <div>CPU:  <span class="stat-val">${hs.cpu}</span></div>
-               </div>`
+            ? ''
             : `<div class="stats-grid">
                  <div>Mode: <span class="stat-val">${hs.mode}</span></div>
                  <div>RSSI: <span class="stat-val">${hs.rssi}</span></div>
@@ -1144,6 +1159,32 @@ function renderCards(data) {
                  ${hs.bm_status_text
                      ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
                </div>`;
+
+        const aslCardSplit = isAsl
+            ? `<div class="card-split">
+                 <div class="split-stats">
+                   <div>Node<span class="stat-val">${hs.asl_node || '—'}</span></div>
+                   <div>Temp<span class="stat-val">${hs.temperature}</span></div>
+                   <div>CPU<span class="stat-val">${hs.cpu}</span></div>
+                 </div>
+                 <div class="split-linked">
+                   ${(hs.asl_linked_nodes && hs.asl_linked_nodes.length)
+                       ? `<div class="card-tg">Linked:</div>` + hs.asl_linked_nodes.map(n => {
+                           const dotClass = n.keyed ? 'keyed' : 'idle-link';
+                           const nameHtml = n.callsign
+                               ? `<a class="recent-call" href="https://www.qrz.com/db/${n.callsign}" target="_blank" rel="noopener"${n.keyed ? ' style="color:var(--accent)"' : ''}>${n.callsign}</a> <span class="node-num">${n.node}</span>`
+                               : `<span class="recent-call" style="color:var(--text-dim)">Node ${n.node}</span>`;
+                           const descText = [n.description, n.location].filter(Boolean).join(' · ') || (!n.callsign ? 'Node not in database' : '');
+                           const descHtml = descText ? `<span class="desc">${descText}</span>` : '';
+                           return `<div class="linked-item ${dotClass}">
+                                     <span class="dot"></span>
+                                     <span class="info">${nameHtml}${descHtml}</span>
+                                   </div>`;
+                       }).join('')
+                       : ''}
+                 </div>
+               </div>`
+            : '';
 
         return `
         <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}">
@@ -1161,6 +1202,7 @@ function renderCards(data) {
               </div>
               ${linkedLine}
               ${statsGrid}
+              ${aslCardSplit}
               ${hs.bm_static_tgs && hs.bm_static_tgs.length
                   ? `<div class="card-tg">BM static: <span>${hs.bm_static_tgs.map(t => t.talkgroup + (t.slot ? ` (TS${t.slot})` : '')).join(', ')}</span></div>`
                   : ''}

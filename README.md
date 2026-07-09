@@ -386,11 +386,16 @@ callsign on file (private/unregistered nodes just show their bare
 number). Once resolved, a callsign gets the same QRZ/RadioID enrichment
 and favorites/APRS-alert treatment as a DMR caller does.
 
-The card shows: node number, temperature/CPU (same generic Linux
-commands as WPSD), the active/last-heard state (same live timers as
-every other card), and a **Linked:** row listing every currently
-connected node (callsign or bare number), with a green dot next to
-whichever one is currently keyed. There's no WPSD-equivalent concept for
+The card uses a side-by-side layout: node number/temperature/CPU (same
+generic Linux commands as WPSD) sit in a narrow left column, and a
+**Linked:** list on the right shows every currently connected node —
+callsign (or bare node number if it has none on file), plus its
+frequency/description and location where AllStarLink has that data,
+with a pulsing dot next to whichever one is currently keyed. Putting
+the linked-node list on the right rather than stacking it below keeps
+the card from growing taller as more nodes link in. The active/
+last-heard state above it uses the same live timers as every other
+card. There's no WPSD-equivalent concept for
 mode/RSSI/BER/color-code/timeslot/Brandmeister, so those don't appear on
 an ASL3 card — and the WPSD-specific git update check is skipped for
 this node type entirely, rather than running a check that could never

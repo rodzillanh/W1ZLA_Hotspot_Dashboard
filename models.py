@@ -68,7 +68,8 @@ class HotspotStatus:
     # `asterisk -rx "rpt xnode <node>"`'s RPT_ALINKS variable. Distinct from
     # `history` (the talker log), which WPSD/Pi-Star also has -- this has no
     # WPSD equivalent at all.
-    # Keys: node, callsign (None if not resolved), mode ("T"/"R"/"L"/"C"), keyed (bool)
+    # Keys: node, callsign/description/location (None if not resolved via
+    # aslstats.py), mode ("T"/"R"/"L"/"C"), keyed (bool)
     asl_linked_nodes: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
