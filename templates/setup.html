@@ -608,12 +608,20 @@
         <div class="section-title">Card order — drag to reorder</div>
         <div id="card-order-list">
             {% set fleet_pos = settings.get('fleet_activity_position', 0) if settings.get('show_fleet_activity', False) else -1 %}
+            {% set asl_fav_pos = settings.get('asl_favorites_position', 0) if settings.get('show_asl_favorites', False) else -1 %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
                 <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">📊 Fleet activity</span>
                     <span class="node-meta">metrics card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == asl_fav_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__asl_favorites__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📻 ASL Favorites</span>
+                    <span class="node-meta">control card</span>
                 </div>
                 {% endif %}
             <div class="drag-row" draggable="true" data-ip="{{ hs.ip }}">
@@ -635,6 +643,13 @@
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">📊 Fleet activity</span>
                 <span class="node-meta">metrics card</span>
+            </div>
+            {% endif %}
+            {% if asl_fav_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__asl_favorites__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">📻 ASL Favorites</span>
+                <span class="node-meta">control card</span>
             </div>
             {% endif %}
         </div>
@@ -937,10 +952,20 @@ function saveLinks() {
 
 // --- card order ---
 function saveCardOrder() {
-    const rows    = document.querySelectorAll('#card-order-list .drag-row[data-ip]');
-    const allIds  = Array.from(rows).map(r => r.dataset.ip);
-    const fleetIdx = allIds.indexOf('__fleet_activity__');
-    const ips      = allIds.filter(id => id !== '__fleet_activity__');
+    const rows   = document.querySelectorAll('#card-order-list .drag-row[data-ip]');
+    const allIds = Array.from(rows).map(r => r.dataset.ip);
+    const isSentinel = id => id === '__fleet_activity__' || id === '__asl_favorites__';
+    const ips = allIds.filter(id => !isSentinel(id));
+
+    // Each sentinel's position is "how many hotspot rows precede it" --
+    // filter out every OTHER sentinel first so a second special card
+    // elsewhere in the list doesn't throw off this one's count.
+    function sentinelIndex(key) {
+        const filtered = allIds.filter(id => id === key || !isSentinel(id));
+        return filtered.indexOf(key);
+    }
+    const fleetIdx  = sentinelIndex('__fleet_activity__');
+    const aslFavIdx = sentinelIndex('__asl_favorites__');
 
     const saves = [
         fetch('/api/reorder_hotspots', {
@@ -949,14 +974,21 @@ function saveCardOrder() {
             body: JSON.stringify(ips)
         }),
     ];
-    // Only present (and only saved) when the Fleet activity card is enabled --
-    // its drag row only renders in that case, so a -1 here just means "not on
-    // this page", not "move it to position -1".
+    // Only present (and only saved) when the respective card is enabled --
+    // its drag row only renders in that case, so a -1 here just means "not
+    // on this page", not "move it to position -1".
     if (fleetIdx !== -1) {
         saves.push(fetch('/api/settings', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ fleet_activity_position: fleetIdx })
+        }));
+    }
+    if (aslFavIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ asl_favorites_position: aslFavIdx })
         }));
     }
     Promise.all(saves).then(() => {

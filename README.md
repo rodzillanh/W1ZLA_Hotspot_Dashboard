@@ -228,9 +228,10 @@ and **Version info**.
   (General tab) hides the whole row if you'd rather not show it; the ⚙
   Settings link itself always stays visible either way.
 - **Card order** — drag hotspot cards into whatever order you want them
-  to appear on the dashboard (Hotspots tab). If the Fleet activity card is
-  enabled, it appears in the same drag list and can be moved to any
-  position among the hotspot cards, not just first.
+  to appear on the dashboard (Hotspots tab). If the Fleet activity or
+  ASL Favorites & Control card is enabled, it appears in the same drag
+  list and can be moved to any position among the hotspot cards, not
+  just first.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.
@@ -480,6 +481,10 @@ disconnect them from one of your ASL3 hotspots with one click.
 - Connects are temporary (transceive), not permanent — there's no
   "connect permanently" option in this card. Use WPSD/AllStarLink's own
   admin tools for permanent link changes.
+
+By default the card appears first, before any hotspot cards. Its position
+is part of the same drag-and-drop **Card order** list as the hotspot cards
+(Settings → Hotspots) — drag it anywhere in that list to move it.
 
 ## Home Assistant (MQTT)
 

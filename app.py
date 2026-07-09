@@ -200,6 +200,11 @@ def api_settings_post():
             pass
     if "show_asl_favorites" in data:
         settings["show_asl_favorites"] = bool(data["show_asl_favorites"])
+    if "asl_favorites_position" in data:
+        try:
+            settings["asl_favorites_position"] = max(0, int(data["asl_favorites_position"]))
+        except (TypeError, ValueError):
+            pass
     if "qrz_username" in data:
         settings["qrz_username"] = data["qrz_username"].strip().upper()
     if "qrz_password" in data:

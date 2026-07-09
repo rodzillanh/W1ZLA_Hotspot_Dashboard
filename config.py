@@ -230,6 +230,10 @@ DEFAULT_SETTINGS = {
     # fleet activity (adds a new persisted list + a write-capable feature,
     # opt-in rather than on by default).
     "show_asl_favorites": False,
+    # Where the ASL favorites card sits among the hotspot cards -- same
+    # scheme as fleet_activity_position (0 = first, N = after the Nth
+    # hotspot card), set from the Card order drag list.
+    "asl_favorites_position": 0,
     # QRZ credentials — stored here so the Settings page works on all platforms.
     # Env vars QRZ_USERNAME / QRZ_PASSWORD are still read as a fallback so
     # existing Unraid installs with env vars keep working without reconfiguring.

@@ -742,7 +742,8 @@
         </div>
         {% endif %}
         {% if settings.get('show_asl_favorites', False) %}
-        <div class="metrics-card" id="asl-favorites-card">
+        <div class="metrics-card" id="asl-favorites-card"
+             style="order:{{ settings.get('asl_favorites_position', 0) }}">
             <div class="metrics-header">
                 <div class="card-name">📡 ASL Favorites</div>
                 <div class="asl-fav-source">
@@ -914,6 +915,7 @@ const SHOW_FLEET_ACTIVITY    = {{ 'true' if settings.get('show_fleet_activity', 
 const FLEET_ACTIVITY_POSITION = {{ settings.get('fleet_activity_position', 0) }};
 const FLEET_ACTIVITY_HOURS    = {{ settings.get('fleet_activity_hours', 12) }};
 const SHOW_ASL_FAVORITES = {{ 'true' if settings.get('show_asl_favorites', False) else 'false' }};
+const ASL_FAVORITES_POSITION = {{ settings.get('asl_favorites_position', 0) }};
 
 function updateSysbar(data) {
     if (!SHOW_HOST_STATS) return;
@@ -1048,23 +1050,52 @@ function clearStaleNotifs(data) {
     });
 }
 
+// Sentinel (non-hotspot) cards -- Fleet activity, ASL Favorites, any future
+// ones -- each sit at a saved position among the hotspot cards (Settings ->
+// Hotspots -> Card order). This slots each sentinel's `order` in among the
+// hotspot cards' orders so CSS `order` alone reflows the whole grid, without
+// touching the DOM nodes the sentinel cards own (their charts/timers survive
+// across polls).
+function computeCardOrders(hotspotCount, sentinels) {
+    const sorted = sentinels.slice().sort((a, b) => a.pos - b.pos || a.key.localeCompare(b.key));
+    let sIdx = 0;
+    let orderCounter = 0;
+    const sentinelOrders = {};
+    const hotspotOrders = [];
+    for (let i = 0; i <= hotspotCount; i++) {
+        while (sIdx < sorted.length && sorted[sIdx].pos === i) {
+            sentinelOrders[sorted[sIdx].key] = orderCounter++;
+            sIdx++;
+        }
+        if (i < hotspotCount) {
+            hotspotOrders.push(orderCounter++);
+        }
+    }
+    return { sentinelOrders, hotspotOrders };
+}
+
 // --- render cards ---
 function renderCards(data) {
     const container = document.getElementById('cards');
-    // Fleet activity card sits at a saved position among the hotspot cards
-    // (Settings -> Hotspots -> Card order). Position is clamped to the
-    // current hotspot count in case hotspots were added/removed since it
-    // was saved. CSS `order` reflows it without touching the DOM node the
-    // fleet card owns (its chart/timers survive across polls).
-    let fleetPos = -1;
+    // Position is clamped to the current hotspot count in case hotspots
+    // were added/removed since it was saved.
+    const sentinels = [];
     if (SHOW_FLEET_ACTIVITY) {
-        fleetPos = Math.max(0, Math.min(FLEET_ACTIVITY_POSITION, data.length));
-        const fleetCard = document.getElementById('fleet-activity-card');
-        if (fleetCard) fleetCard.style.order = fleetPos;
+        sentinels.push({ key: 'fleet', pos: Math.max(0, Math.min(FLEET_ACTIVITY_POSITION, data.length)) });
     }
+    if (SHOW_ASL_FAVORITES) {
+        sentinels.push({ key: 'aslfav', pos: Math.max(0, Math.min(ASL_FAVORITES_POSITION, data.length)) });
+    }
+    const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);
+
+    const fleetCard = document.getElementById('fleet-activity-card');
+    if (fleetCard && 'fleet' in sentinelOrders) fleetCard.style.order = sentinelOrders.fleet;
+    const aslFavCard = document.getElementById('asl-favorites-card');
+    if (aslFavCard && 'aslfav' in sentinelOrders) aslFavCard.style.order = sentinelOrders.aslfav;
+
     // data is an array — order guaranteed, no Object.values() needed
     container.innerHTML = data.map((hs, i) => {
-        const cardOrder = fleetPos === -1 ? i : (i < fleetPos ? i : i + 1);
+        const cardOrder = hotspotOrders[i];
         const isAsl     = hs.type === 'asl3';
         const isFav     = hs.is_favorite && hs.is_active;
         const cardClass = hs.is_active ? (isFav ? 'favorite' : 'active') : '';  // last-heard = no tint
