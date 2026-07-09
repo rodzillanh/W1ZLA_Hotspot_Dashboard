@@ -420,11 +420,10 @@
         }
         .asl-fav-mode-row input[type="checkbox"] { accent-color: var(--accent); width: 13px; height: 13px; margin: 0; }
         .asl-fav-mode-row label { cursor: pointer; }
-        .asl-fav-mode-hint { margin-left: auto; font-size: 10.5px; color: var(--text-dim); }
         /* Caps the card's height once favorites pile up -- rows scroll
            internally instead of the card growing taller indefinitely. */
         .asl-fav-scroll {
-            max-height: 168px; overflow-y: auto; margin: 10px -4px; padding: 0 4px;
+            max-height: 118px; overflow-y: auto; margin: 10px -4px; padding: 0 4px;
             scrollbar-width: thin; scrollbar-color: var(--toolbar-border) transparent;
         }
         .asl-fav-scroll::-webkit-scrollbar { width: 7px; }
@@ -435,7 +434,7 @@
         }
         .asl-fav-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
         .asl-fav-table { width: 100%; border-collapse: collapse; }
-        .asl-fav-row td { padding: 5px 6px; font-size: 13px; vertical-align: middle; }
+        .asl-fav-row td { padding: 4px 6px; font-size: 13px; vertical-align: middle; }
         .asl-fav-row td:first-child { border-radius: 8px 0 0 8px; }
         .asl-fav-row td:last-child  { border-radius: 0 8px 8px 0; }
         .asl-fav-row.keyed     { background: rgba(192,57,43,.14); }
@@ -781,8 +780,7 @@
             </div>
             <div class="asl-fav-mode-row">
                 <input type="checkbox" id="asl-fav-keep-connections">
-                <label for="asl-fav-keep-connections">Keep existing connections when connecting</label>
-                <span class="asl-fav-mode-hint">off = auto-disconnect first</span>
+                <label for="asl-fav-keep-connections">Keep existing connections</label>
             </div>
             <div class="asl-fav-scroll">
                 <table class="asl-fav-table"><tbody id="asl-fav-tbody"></tbody></table>
