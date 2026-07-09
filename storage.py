@@ -70,3 +70,22 @@ def save_favorites(favorites: list) -> None:
 def favorites_set() -> set:
     """Return a set of uppercased callsigns for fast O(1) lookup."""
     return {f["call"].upper() for f in load_favorites()}
+
+
+# --- ASL favorites (node numbers, distinct from the callsign favorites above) ---
+
+def load_asl_favorites() -> list:
+    """Return list of dicts: [{node, label}, ...]"""
+    if not os.path.exists(config.ASL_FAVORITES_FILE):
+        return []
+    try:
+        with _file_lock, open(config.ASL_FAVORITES_FILE, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_asl_favorites(favorites: list) -> None:
+    os.makedirs(config.CONFIG_DIR, exist_ok=True)
+    with _file_lock, open(config.ASL_FAVORITES_FILE, "w") as f:
+        json.dump(favorites, f, indent=4)

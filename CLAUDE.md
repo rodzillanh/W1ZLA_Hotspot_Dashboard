@@ -198,6 +198,23 @@ config for per-integration credentials; put it in
   rather than `sudo`, and actually check the subprocess result (see
   `app._run_power_command`) rather than assuming `Popen` succeeded.
 
+- **ASL3 connect/disconnect uses `rpt cmd <node> ilink <code>
+  <remotenode>`, NOT `rpt fun <node> *3<remotenode>`.** The DTMF-simulated
+  `rpt fun` form (`macro_append()` in `rpt_utils.c`, feeding the same
+  digit-collection state machine real DTMF uses) looked plausible from
+  `app_rpt`'s docs and even its own comment header, but two different
+  live-tested variants (concatenated `*11603`, comma-paced `*1,1603`)
+  both silently no-op'd against a real node with no error output at all.
+  `rpt cmd` (used by `config.build_asl_ilink_cmd`) bypasses that state
+  machine entirely, takes the function code and node as plain separate
+  arguments, and is confirmed working both against a real node and by
+  reading how [AllScan](https://github.com/davidgsd/AllScan) (a mature,
+  widely-deployed tool) does the identical thing in its `astapi/
+  connect.php`. If you ever need another `ilink`-family action, check
+  AllScan's `connect.php` for the exact `ilink` code before guessing from
+  `app_rpt` source/docs alone — the DTMF-string form is a trap that looks
+  authoritative but doesn't behave as documented in practice.
+
 ## Testing patterns used throughout this project
 
 No test suite/framework is set up — verification has been done ad hoc but

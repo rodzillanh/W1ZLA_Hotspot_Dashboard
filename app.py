@@ -18,7 +18,7 @@ import monitor as monitor_mod
 import qrz as qrz_mod
 from monitor import FleetMonitor
 from storage import load_hotspots, save_hotspots, load_settings, save_settings, \
-                   load_favorites, save_favorites
+                   load_favorites, save_favorites, load_asl_favorites, save_asl_favorites
 from weather import WeatherClient
 from qrz import QrzClient
 from aprs import AprsClient
@@ -198,6 +198,8 @@ def api_settings_post():
                 settings["fleet_activity_hours"] = hours
         except (TypeError, ValueError):
             pass
+    if "show_asl_favorites" in data:
+        settings["show_asl_favorites"] = bool(data["show_asl_favorites"])
     if "qrz_username" in data:
         settings["qrz_username"] = data["qrz_username"].strip().upper()
     if "qrz_password" in data:
@@ -261,6 +263,22 @@ def api_favorites_post():
         for f in data if f.get("call", "").strip()
     ]
     save_favorites(cleaned)
+    return jsonify({"ok": True})
+
+@app.route("/api/asl_favorites", methods=["GET"])
+def api_asl_favorites_get():
+    return jsonify(load_asl_favorites())
+
+@app.route("/api/asl_favorites", methods=["POST"])
+def api_asl_favorites_post():
+    """Accept full list of ASL favorite node numbers and overwrite --
+    distinct from the callsign favorites above."""
+    data = request.json or []
+    cleaned = [
+        {"node": f["node"].strip(), "label": f.get("label", "").strip()}
+        for f in data if f.get("node", "").strip().isdigit()
+    ]
+    save_asl_favorites(cleaned)
     return jsonify({"ok": True})
 
 @app.route("/setup", methods=["GET", "POST"])
@@ -458,6 +476,47 @@ def test_asl_node():
             "success": True,
             "message": f"Connected — node {node} found, {count} linked node{'s' if count != 1 else ''}",
         })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)})
+    finally:
+        client.close()
+
+
+@app.route("/api/asl_connect", methods=["POST"])
+def api_asl_connect():
+    """Connect or disconnect a link on an ASL3 hotspot -- the dashboard's
+    "ASL Favorites & Control" card. Uses `rpt cmd <node> ilink <code>
+    <remotenode>` (confirmed against a real node, and matches how AllScan
+    -- https://github.com/davidgsd/AllScan -- does the same thing), NOT the
+    DTMF-simulated `rpt fun <node> *3<remotenode>` form, which requires
+    replicating app_rpt's digit-collection state machine and proved
+    unreliable in practice."""
+    data   = request.json or {}
+    ip     = data.get("ip", "").strip()
+    node   = data.get("node", "").strip()
+    action = data.get("action", "").strip()
+
+    hotspot = next((h for h in load_hotspots() if h["ip"] == ip), None)
+    if hotspot is None or hotspot.get("type") != "asl3":
+        return jsonify({"success": False, "message": "Not an ASL3 hotspot"}), 400
+    local_node = hotspot.get("asl_node", "")
+    if not local_node.isdigit() or not node.isdigit():
+        return jsonify({"success": False, "message": "Invalid node number"}), 400
+    ilink_code = {
+        "connect":    config.ASL_ILINK_CONNECT,
+        "disconnect": config.ASL_ILINK_DISCONNECT,
+    }.get(action)
+    if ilink_code is None:
+        return jsonify({"success": False, "message": "Invalid action"}), 400
+
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(ip, username=hotspot["user"], password=hotspot["pass"], timeout=config.SSH_TIMEOUT)
+        cmd = config.build_asl_ilink_cmd(local_node, ilink_code, node)
+        _, stdout, _ = client.exec_command(cmd, timeout=config.SSH_TIMEOUT)
+        output = stdout.read().decode("utf-8", errors="ignore").strip()
+        return jsonify({"success": True, "message": output or f"{action.capitalize()}ed {node}"})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
     finally:

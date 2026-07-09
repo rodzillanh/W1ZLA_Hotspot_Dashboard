@@ -34,6 +34,7 @@
             --fav-border:          #3d3010;
             --fav-chip-bg:         #1f1500;
             --fav-color:           #f39c12;
+            --danger:              #c0392b;
         }
         [data-theme="light"] {
             --bg:          #f0f2f5;
@@ -58,6 +59,7 @@
             --fav-border:          #e8c97a;
             --fav-chip-bg:         #faecd0;
             --fav-color:           #b8860b;
+            --danger:              #e74c3c;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -373,6 +375,58 @@
             text-align: center;
         }
 
+        /* --- ASL favorites & control card --- */
+        .asl-fav-source {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; color: var(--text-muted); flex-shrink: 0;
+        }
+        .asl-fav-source select {
+            background: var(--input-bg); border: 1px solid var(--toolbar-border);
+            color: var(--text); border-radius: 5px; padding: 4px 8px; font-size: 12px;
+        }
+        .asl-fav-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .asl-fav-row td { padding: 8px 6px; font-size: 13px; vertical-align: middle; }
+        .asl-fav-row td:first-child { border-radius: 8px 0 0 8px; }
+        .asl-fav-row td:last-child  { border-radius: 0 8px 8px 0; }
+        .asl-fav-row.keyed     { background: rgba(192,57,43,.14); }
+        .asl-fav-row.connected { background: var(--accent-dim); }
+        .asl-fav-callsign { font-weight: 500; }
+        .asl-fav-desc { display: block; font-size: 11px; color: var(--text-muted); }
+        .asl-status-chip {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 10.5px; font-weight: 500; padding: 2px 8px; border-radius: 10px;
+            white-space: nowrap;
+        }
+        .asl-status-chip.keyed     { background: rgba(192,57,43,.18); color: var(--danger); animation: pulse 1.4s infinite; }
+        .asl-status-chip.connected { background: var(--accent-dim); color: var(--accent); }
+        .asl-status-chip.idle      { background: var(--toolbar-bg); color: var(--text-dim); }
+        .asl-fav-actions { text-align: right; white-space: nowrap; }
+        .asl-btn-connect, .asl-btn-disconnect, .asl-btn-remove {
+            font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+            border: 1px solid; background: none;
+        }
+        .asl-btn-connect { color: var(--accent); border-color: var(--accent); }
+        .asl-btn-connect:hover { background: var(--accent-dim); }
+        .asl-btn-disconnect, .asl-btn-remove { color: var(--text-muted); border-color: var(--toolbar-border); }
+        .asl-btn-disconnect:hover, .asl-btn-remove:hover { background: var(--toolbar-bg); }
+        .asl-fav-add-row {
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+            padding-top: 10px; border-top: 1px solid var(--card-border);
+        }
+        .asl-fav-add-row input {
+            background: var(--input-bg); border: 1px solid var(--toolbar-border); color: var(--text);
+            border-radius: 6px; padding: 6px 9px; font-size: 12px;
+        }
+        .asl-fav-add-row input.asl-node-input  { width: 80px; }
+        .asl-fav-add-row input.asl-label-input { flex: 1; min-width: 100px; }
+        .asl-btn-add {
+            font-size: 12px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+            border: 1px solid var(--link); color: var(--link); background: none;
+        }
+        .asl-btn-add:hover { background: rgba(91,192,222,.08); }
+        .asl-fav-empty { color: var(--text-dim); font-size: 12.5px; padding: 6px 0 10px; }
+        .asl-fav-status-txt { font-size: 11px; color: var(--text-muted); margin-left: 8px; }
+
         /* profile photo */
         .caller-photo {
             width: 80px;
@@ -660,6 +714,32 @@
             </div>
         </div>
         {% endif %}
+        {% if settings.get('show_asl_favorites', False) %}
+        <div class="metrics-card" id="asl-favorites-card">
+            <div class="metrics-header">
+                <div class="card-name">📡 ASL Favorites</div>
+                <div class="asl-fav-source">
+                    <label for="asl-fav-hotspot-select">Control from:</label>
+                    <select id="asl-fav-hotspot-select" onchange="renderAslFavorites()"></select>
+                </div>
+            </div>
+            <div class="fleet-stats-grid">
+                <div>Favorites: <span class="stat-val" id="asl-fav-count">—</span></div>
+                <div>Keyed: <span class="stat-val" id="asl-fav-keyed">—</span></div>
+                <div>Connected: <span class="stat-val" id="asl-fav-connected">—</span></div>
+            </div>
+            <table class="asl-fav-table"><tbody id="asl-fav-tbody"></tbody></table>
+            <div class="asl-fav-empty" id="asl-fav-empty" style="display:none">
+                No ASL3 hotspots configured yet — add one in Settings → Hotspots.
+            </div>
+            <div class="asl-fav-add-row">
+                <input class="asl-node-input" type="text" id="asl-fav-node-input" placeholder="Node #">
+                <input class="asl-label-input" type="text" id="asl-fav-label-input" placeholder="Label (optional)">
+                <button class="asl-btn-add" onclick="addAslFavorite()">+ Add favorite</button>
+                <span class="asl-fav-status-txt" id="asl-fav-status"></span>
+            </div>
+        </div>
+        {% endif %}
         <div id="cards" style="display:contents"></div>
     </div>
 </div>
@@ -806,6 +886,7 @@ const DARK_MODE          = {{ 'true' if settings.dark_mode else 'false' }};
 const SHOW_FLEET_ACTIVITY    = {{ 'true' if settings.get('show_fleet_activity', False) else 'false' }};
 const FLEET_ACTIVITY_POSITION = {{ settings.get('fleet_activity_position', 0) }};
 const FLEET_ACTIVITY_HOURS    = {{ settings.get('fleet_activity_hours', 12) }};
+const SHOW_ASL_FAVORITES = {{ 'true' if settings.get('show_asl_favorites', False) else 'false' }};
 
 function updateSysbar(data) {
     if (!SHOW_HOST_STATS) return;
@@ -1574,6 +1655,147 @@ function renderFleetActivity(data) {
     renderFleetChart(data.buckets);
 }
 
+// --- ASL favorites & control ---
+let aslFavorites          = [];    // [{node, label}, ...] from /api/asl_favorites
+let lastApiData           = null;  // most recent /api/data response, reused for status lookup
+let aslSelectedHotspotIp   = null; // which ASL3 hotspot the "Control from" select is on
+
+function fetchAslFavorites() {
+    fetch('/api/asl_favorites')
+        .then(r => r.json())
+        .then(data => {
+            aslFavorites = data;
+            renderAslFavorites();
+        });
+}
+
+function renderAslFavorites() {
+    const select   = document.getElementById('asl-fav-hotspot-select');
+    const tbody    = document.getElementById('asl-fav-tbody');
+    const emptyEl  = document.getElementById('asl-fav-empty');
+    if (!select || !tbody) return;
+
+    const aslHotspots = (lastApiData || []).filter(hs => hs.type === 'asl3');
+
+    // Populate the hotspot selector, preserving the current selection if
+    // it's still valid, since this rebuilds on every poll.
+    const prevSelection = select.value || aslSelectedHotspotIp;
+    select.innerHTML = aslHotspots.map(hs =>
+        `<option value="${hs.ip}">${hs.name} (${hs.asl_node || '?'})</option>`
+    ).join('');
+    if (aslHotspots.some(hs => hs.ip === prevSelection)) {
+        select.value = prevSelection;
+    }
+    aslSelectedHotspotIp = select.value || null;
+
+    if (aslHotspots.length === 0) {
+        tbody.innerHTML = '';
+        emptyEl.style.display = 'block';
+        document.getElementById('asl-fav-count').textContent      = aslFavorites.length;
+        document.getElementById('asl-fav-keyed').textContent      = '—';
+        document.getElementById('asl-fav-connected').textContent  = '—';
+        return;
+    }
+    emptyEl.style.display = 'none';
+
+    const controlHotspot = aslHotspots.find(hs => hs.ip === aslSelectedHotspotIp) || aslHotspots[0];
+    // Live status comes from the already-polled asl_linked_nodes on whichever
+    // hotspot is selected -- no separate status API needed. A favorite not
+    // currently linked to this hotspot has no live status to show, since
+    // keyed/connected state is only knowable from our own link table.
+    const linkedByNode = {};
+    (controlHotspot.asl_linked_nodes || []).forEach(link => { linkedByNode[link.node] = link; });
+
+    let keyedCount = 0, connectedCount = 0;
+    tbody.innerHTML = aslFavorites.map(fav => {
+        const link      = linkedByNode[fav.node];
+        const isKeyed   = !!(link && link.keyed);
+        const isConn    = !!link;
+        if (isKeyed) keyedCount++;
+        if (isConn)  connectedCount++;
+
+        const rowClass  = isKeyed ? 'keyed' : (isConn ? 'connected' : '');
+        const chip      = isKeyed
+            ? `<span class="asl-status-chip keyed">🔴 KEYED</span>`
+            : (isConn
+                ? `<span class="asl-status-chip connected">🟢 Connected</span>`
+                : `<span class="asl-status-chip idle">Not connected</span>`);
+        const label     = fav.label || (link && link.callsign) || '';
+        const nameLine  = label
+            ? `<span class="asl-fav-callsign">${label}</span><span class="asl-fav-desc">Node ${fav.node}</span>`
+            : `<span class="asl-fav-callsign">Node ${fav.node}</span>`;
+        const actionBtn = isConn
+            ? `<button class="asl-btn-disconnect" onclick="aslConnect('${controlHotspot.ip}','${fav.node}','disconnect')">Disconnect</button>`
+            : `<button class="asl-btn-connect" onclick="aslConnect('${controlHotspot.ip}','${fav.node}','connect')">Connect</button>`;
+
+        return `
+        <tr class="asl-fav-row ${rowClass}">
+            <td>${nameLine}</td>
+            <td>${chip}</td>
+            <td class="asl-fav-actions">
+                ${actionBtn}
+                <button class="asl-btn-remove" onclick="removeAslFavorite('${fav.node}')" title="Remove favorite">✕</button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('asl-fav-count').textContent     = aslFavorites.length;
+    document.getElementById('asl-fav-keyed').textContent     = keyedCount;
+    document.getElementById('asl-fav-connected').textContent = connectedCount;
+}
+
+function saveAslFavorites(list) {
+    return fetch('/api/asl_favorites', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(list)
+    }).then(() => {
+        aslFavorites = list;
+        renderAslFavorites();
+    });
+}
+
+function addAslFavorite() {
+    const nodeInput  = document.getElementById('asl-fav-node-input');
+    const labelInput = document.getElementById('asl-fav-label-input');
+    const node  = nodeInput.value.trim();
+    const label = labelInput.value.trim();
+    if (!/^\d+$/.test(node)) {
+        const status = document.getElementById('asl-fav-status');
+        status.textContent = 'Node # must be digits only';
+        setTimeout(() => status.textContent = '', 2500);
+        return;
+    }
+    const updated = aslFavorites.filter(f => f.node !== node).concat([{ node, label }]);
+    saveAslFavorites(updated).then(() => {
+        nodeInput.value = '';
+        labelInput.value = '';
+    });
+}
+
+function removeAslFavorite(node) {
+    saveAslFavorites(aslFavorites.filter(f => f.node !== node));
+}
+
+function aslConnect(ip, node, action) {
+    const status = document.getElementById('asl-fav-status');
+    status.textContent = action === 'connect' ? 'Connecting...' : 'Disconnecting...';
+    fetch('/api/asl_connect', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ ip, node, action })
+    })
+        .then(r => r.json())
+        .then(data => {
+            status.textContent = data.success ? '✓ Done' : '✕ ' + data.message;
+            setTimeout(() => status.textContent = '', 3000);
+            // Next poll cycle (POLL_MS) will pick up the real new link state --
+            // connect/disconnect isn't instantaneous, so don't force a refetch here.
+        });
+}
+
+if (SHOW_ASL_FAVORITES) fetchAslFavorites();
+
 // --- main poll loop ---
 function refresh() {
     fetch('/api/data')
@@ -1581,6 +1803,10 @@ function refresh() {
         .then(data => {
             renderCards(data);
             refreshMap();
+            if (SHOW_ASL_FAVORITES) {
+                lastApiData = data;
+                renderAslFavorites();
+            }
         });
     if (SHOW_FLEET_ACTIVITY) fetchFleetActivity();
 }

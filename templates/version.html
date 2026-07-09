@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.2</span>
+                <span class="release-version">v3.3</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL Favorites &amp; Control card</span> — optional dashboard card (Settings → General, off by default), inspired by <a href="https://github.com/davidgsd/AllScan" target="_blank" rel="noopener">AllScan</a>. Keep a list of ASL node numbers, see live 🔴 Keyed / 🟢 Connected / Not connected status (derived from the already-polled link table of whichever ASL3 hotspot you pick to "control from" — no extra polling), and connect/disconnect with one click via <code>rpt cmd &lt;node&gt; ilink &lt;code&gt; &lt;remotenode&gt;</code>, confirmed against a real node rather than the DTMF-simulated <code>rpt fun</code> form that proved unreliable in testing</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.2</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Bugfix — Host power control didn't actually reboot/power off</span> — the standalone install's systemd unit runs with <code>NoNewPrivileges=yes</code>, which blocks <code>sudo</code>/setuid entirely regardless of sudoers config, and the original implementation never checked whether the command actually succeeded, so the API silently reported success either way. Now uses <code>systemctl reboot</code>/<code>systemctl poweroff</code> (D-Bus, not setuid) plus a polkit rule granting the service user permission — <code>install.sh</code> and <code>update.sh</code> both provision this automatically, so existing installs pick it up by just running <code>update.sh</code> again</li>
@@ -459,6 +469,17 @@
                 <li>Linked node numbers resolved to callsigns via AllStarLink's free public stats API</li>
                 <li>Resolved callsigns get the same QRZ/RadioID enrichment, favorites, and APRS-alert treatment as any DMR caller</li>
                 <li>Card shows node number, temp/CPU, active/last-heard timers, and a live "Linked:" node list</li>
+            </ul>
+        </div>
+
+        <div class="feature-group">
+            <div class="feature-group-title">ASL Favorites &amp; Control</div>
+            <ul class="feature-list">
+                <li>Optional card <span style="color:var(--text-dim)">(off by default — Settings → General)</span>, inspired by AllScan</li>
+                <li>Favorite ASL node numbers with optional labels, added directly from the card</li>
+                <li>"Control from" selector picks which ASL3 hotspot originates connect/disconnect, if you have more than one</li>
+                <li>Live 🔴 Keyed / 🟢 Connected / Not connected status, derived from the selected hotspot's already-polled link table — no extra API calls</li>
+                <li>Connect/disconnect with one click via <code>rpt cmd</code>, confirmed against a real node</li>
             </ul>
         </div>
 

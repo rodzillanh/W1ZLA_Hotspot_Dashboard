@@ -6,6 +6,7 @@ CONFIG_DIR   = os.environ.get("CONFIG_DIR", "/app/data")
 CONFIG_FILE  = os.path.join(CONFIG_DIR, "hotspots.json")
 SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 FAVORITES_FILE = os.path.join(CONFIG_DIR, "favorites.json")
+ASL_FAVORITES_FILE = os.path.join(CONFIG_DIR, "asl_favorites.json")
 
 # --- Server ---
 HOST = "0.0.0.0"
@@ -72,6 +73,32 @@ def build_asl_status_cmd(node: str) -> str:
     if not node.isdigit():
         raise ValueError(f"invalid ASL node number: {node!r}")
     return _LINUX_HOST_STATS_CMD + f'sudo asterisk -rx "rpt xnode {node}"'
+
+
+# ASL3 ilink function codes for `rpt cmd <node> ilink <code> <remotenode>` --
+# NOT the DTMF-simulated `rpt fun <node> *3<remotenode>` form, which requires
+# replicating app_rpt's DTMF digit-collection state machine and proved
+# unreliable in practice. `rpt cmd` takes the function code and remote node
+# as plain separate arguments -- confirmed both from AllScan
+# (https://github.com/davidgsd/AllScan, astapi/connect.php, a widely-used
+# production tool) and against a real node (W1ZLA, node 59929).
+ASL_ILINK_CONNECT    = 3   # connect specified link, transceive (temporary)
+ASL_ILINK_DISCONNECT = 11  # disconnect specified link
+
+
+def build_asl_ilink_cmd(local_node: str, ilink_code: int, remote_node: str) -> str:
+    """SSH command to connect/disconnect a link on an ASL3 hotspot.
+    Both node numbers are interpolated into a shell string executed on the
+    remote host, so callers MUST validate both are digits-only first (see
+    app.py's /api/asl_connect handler) -- this re-validates defensively
+    since /setup has no auth."""
+    if not local_node.isdigit():
+        raise ValueError(f"invalid ASL node number: {local_node!r}")
+    if not remote_node.isdigit():
+        raise ValueError(f"invalid ASL node number: {remote_node!r}")
+    if ilink_code not in (ASL_ILINK_CONNECT, ASL_ILINK_DISCONNECT):
+        raise ValueError(f"invalid ilink code: {ilink_code!r}")
+    return f'sudo asterisk -rx "rpt cmd {local_node} ilink {ilink_code} {remote_node}"'
 
 # --- Log line parsing ---
 BER_PATTERN        = r"BER: (\d+\.?\d*)%"
@@ -199,6 +226,10 @@ DEFAULT_SETTINGS = {
     # sized off the largest option here, so switching to a longer span never
     # comes up empty because old rows were already pruned.
     "fleet_activity_hours": 12,
+    # ASL favorites & control card -- off by default, same reasoning as
+    # fleet activity (adds a new persisted list + a write-capable feature,
+    # opt-in rather than on by default).
+    "show_asl_favorites": False,
     # QRZ credentials — stored here so the Settings page works on all platforms.
     # Env vars QRZ_USERNAME / QRZ_PASSWORD are still read as a fallback so
     # existing Unraid installs with env vars keep working without reconfiguring.

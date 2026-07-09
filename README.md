@@ -250,6 +250,8 @@ and **Version info**.
 - **Host power control** — General tab, only shown on a standalone install
   running directly on real Raspberry Pi hardware; see "Host power control"
   below.
+- **ASL favorites & control card** — off by default (General tab toggle);
+  see "ASL Favorites & Control" below.
 
 ## QRZ caller lookup
 
@@ -441,6 +443,39 @@ bigger consequence than editing a hotspot's config, so if this dashboard
 is reachable beyond a trusted LAN, put it behind a reverse proxy with
 auth, or don't enable this feature's host access, before relying on it.
 
+## ASL Favorites & Control
+
+Optional dashboard card (Settings → General → "Show ASL favorites &
+control card", off by default), inspired by
+[AllScan](https://github.com/davidgsd/AllScan)'s favorites/scan/connect
+model. Lets you keep a list of ASL node numbers you care about (a
+different list from the DMR callsign Favorites tab) and connect or
+disconnect them from one of your ASL3 hotspots with one click.
+
+- **Add a favorite** — node number + optional label, right on the card.
+  A resolved callsign (via the same `aslstats.py` lookup ASL3 cards
+  already use) is shown automatically if the label is left blank.
+- **Control from** — a dropdown picks which of your configured ASL3
+  hotspots originates the connect/disconnect command, if you have more
+  than one.
+- **Live status** — 🔴 **Keyed**, 🟢 **Connected**, or **Not connected**,
+  derived entirely from the selected hotspot's already-polled link table
+  (the same data its own card's "Linked:" row uses) — no extra polling or
+  external API calls for status. A favorite not currently linked to the
+  selected hotspot has no live status to show, since keyed/connected state
+  is only knowable from your own node's link table in the first place.
+- **Connect / Disconnect** — runs `asterisk -rx "rpt cmd <node> ilink
+  <code> <remotenode>"` over the same SSH connection already used for
+  polling. This is **not** the DTMF-simulated `rpt fun <node> *3<node>`
+  form (which requires replicating `app_rpt`'s digit-collection state
+  machine and proved unreliable in testing) — `rpt cmd` takes the
+  function code and node as plain separate arguments, confirmed both
+  against a real node and by checking how AllScan itself — a mature,
+  widely-used tool — does the same thing.
+- Connects are temporary (transceive), not permanent — there's no
+  "connect permanently" option in this card. Use WPSD/AllStarLink's own
+  admin tools for permanent link changes.
+
 ## Home Assistant (MQTT)
 
 Optional — set a broker host in Settings → Integrations to publish every
@@ -608,9 +643,11 @@ same way mode/RSSI/BER are. A couple of behavior notes:
 
 - No authentication on `/setup` — anyone who can reach the dashboard can
   add/edit/delete hotspots. This also covers the "Host power control"
-  buttons (reboot/power off the dashboard's own device) when that feature
-  is active — a materially bigger consequence than editing a config, worth
-  weighing before exposing this dashboard beyond a trusted LAN.
+  buttons (reboot/power off the dashboard's own device) and the "ASL
+  Favorites & Control" card's connect/disconnect buttons when those
+  features are active — a materially bigger consequence than editing a
+  config, worth weighing before exposing this dashboard beyond a trusted
+  LAN.
 - Hotspot passwords are stored in plaintext in `hotspots.json` and are
   re-sent to the browser to pre-fill the Edit form (so editing a hotspot
   doesn't force you to retype the password). Both are fine for a private

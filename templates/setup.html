@@ -341,6 +341,15 @@
                     <option value="48" {{ 'selected' if current_hours == 48 else '' }}>Last 48 hours</option>
                 </select>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show ASL favorites &amp; control card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (connect/disconnect ASL3 links from the dashboard)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_asl_favorites', False) else '' }}"
+                     id="asl-favorites-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveAppearance()">Save appearance</button>
         <span class="status-txt" id="appearance-status"></span>
@@ -843,6 +852,7 @@ function saveAppearance() {
             show_toolbar:    document.getElementById('toolbar-toggle').classList.contains('on'),
             show_fleet_activity: document.getElementById('fleet-activity-toggle').classList.contains('on'),
             fleet_activity_hours: parseInt(document.getElementById('fleet-activity-hours').value, 10),
+            show_asl_favorites: document.getElementById('asl-favorites-toggle').classList.contains('on'),
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');
