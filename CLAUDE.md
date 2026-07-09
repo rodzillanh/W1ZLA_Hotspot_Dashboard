@@ -193,6 +193,25 @@ config for per-integration credentials; put it in
   genuinely doesn't expose per-speaker identity for a linked node, only
   per-node keyed state (same limitation AllScan has).
 
+- **The grey line (day/night terminator) overlay uses a general
+  closed-form zenith-latitude solve, not the textbook `tan(lat) =
+  -cos(H)/tan(dec)` terminator formula directly** (`dashboard.html`'s
+  `latForZenith()`). That classic formula only holds at exactly Z=90°
+  (the true terminator); the twilight bands drawn on either side of it
+  (Z=82°/98°) need the general form `A*sin(lat)+B*cos(lat)=C` solved via
+  `R*sin(lat+phi)=C`. Verified numerically before shipping (not trusted
+  from memory): at Z=90 it reproduces the classic formula bit-for-bit,
+  and plugging any solved `lat` back into the zenith formula reproduces
+  the requested `Z`. Also checked that the solve has no "no crossing"
+  (polar day/night) case anywhere in the +-12° twilight band used here,
+  even at max declination (23.44°, solstice) — that only becomes
+  possible past roughly Z<66.5° or Z>113.5°, well outside this range, so
+  `latForZenith()`'s `null` return is reachable in principle but never
+  hit in practice by the three bands actually drawn. If the twilight
+  band width ever changes, re-verify this the same way (see prior
+  session's Python reference-point checks) rather than assuming it still
+  holds.
+
 - **`NoNewPrivileges=yes` in the systemd unit blocks `sudo`/setuid
   entirely, regardless of sudoers config.** The Host power control
   feature (v3.1) originally shipped calling `sudo reboot`/`sudo shutdown

@@ -620,6 +620,18 @@ with an optional satellite tile view, no API key required for either) with:
 Only callers with known coordinates (from QRZ, or a live APRS beacon)
 appear as pins — the QRZ subscription caveat above applies here too.
 
+- **Resizable** — drag the small handle just below the map to make it
+  taller or shorter. Saved per-browser via `localStorage`, not a shared
+  Settings value, since the right height on a phone and a desktop
+  monitor are very different and there's no per-user login here to key
+  a shared preference off of.
+- **Grey line overlay** — a "Grey line" checkbox in the map legend
+  toggles a day/night terminator overlay, useful for spotting greyline
+  propagation windows. It's computed from real solar-position math
+  (subsolar point + the sun's zenith angle at each point on the map),
+  not a static image, and recomputes once a minute. Also a per-browser
+  preference (`localStorage`), same reasoning as the map height.
+
 ## Fleet activity
 
 Optional — off by default (Settings → General → "Show fleet activity

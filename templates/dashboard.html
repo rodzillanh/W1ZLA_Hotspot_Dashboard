@@ -598,7 +598,28 @@
         .modal-footer a { color: var(--link); }
 
         /* --- map --- */
+        .map-resize-wrap { position: relative; }
         #map { height: 420px; border-radius: 8px; }
+        .map-resize-handle {
+            height: 14px; margin-top: -7px; position: relative; z-index: 2;
+            cursor: ns-resize; display: flex; align-items: center; justify-content: center;
+            touch-action: none;
+        }
+        .map-resize-grip {
+            width: 42px; height: 5px; border-radius: 3px;
+            background: var(--toolbar-border);
+            transition: background .15s, width .15s;
+        }
+        .map-resize-handle:hover .map-resize-grip,
+        .map-resize-handle.dragging .map-resize-grip { background: var(--accent); width: 60px; }
+        .map-resize-readout {
+            position: absolute; top: 10px; left: 10px; font-size: 11px;
+            font-variant-numeric: tabular-nums;
+            background: rgba(0,0,0,.55); color: #fff;
+            padding: 3px 8px; border-radius: 5px;
+            opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 1000;
+        }
+        .map-resize-readout.visible { opacity: 1; }
         .map-legend {
             display: flex;
             gap: 16px;
@@ -806,8 +827,12 @@
         <span><span class="legend-dot" style="background:#2ecc71"></span>Active caller</span>
         <span><span class="legend-dot" style="background:#5bc0de"></span>Recent (last 5 per node)</span>
         <span><span class="legend-square" style="background:#9b59b6"></span>Your hotspot</span>
+        <label style="margin-left:auto;display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="greyline-toggle" onchange="toggleGreyline()">
+            Grey line
+        </label>
         <select id="map-style-select" onchange="setMapStyle(this.value)"
-                style="margin-left:auto;background:var(--card-bg);color:var(--text);
+                style="background:var(--card-bg);color:var(--text);
                        border:1px solid var(--card-border);border-radius:5px;
                        padding:3px 8px;font-size:12px;cursor:pointer">
             <option value="standard">Standard</option>
@@ -815,7 +840,13 @@
             <option value="satellite">Satellite</option>
         </select>
     </div>
-    <div id="map"></div>
+    <div class="map-resize-wrap">
+        <div id="map"></div>
+        <div class="map-resize-readout" id="map-resize-readout">420px</div>
+        <div class="map-resize-handle" id="map-resize-handle">
+            <div class="map-resize-grip"></div>
+        </div>
+    </div>
     <div class="callers-list" id="callers-list"></div>
 </div>
 
@@ -1403,6 +1434,14 @@ function initMap() {
     document.getElementById('map-style-select').value = initialStyle;
     setMapStyle(initialStyle);
 
+    // Grey line default is on (localStorage unset) -- per-browser preference,
+    // same as map height, since there's no per-user login to key a shared
+    // setting off of.
+    const savedGreyline = localStorage.getItem(GREYLINE_KEY);
+    document.getElementById('greyline-toggle').checked = savedGreyline !== '0';
+    updateGreyline();
+    if (!greylineTimer) greylineTimer = setInterval(updateGreyline, 60000);
+
     refreshMap();
 }
 
@@ -1414,6 +1453,151 @@ function setMapStyle(style) {
     }
     leafletMap.addLayer(layers[style]);
     currentMapStyle = style;
+}
+
+// --- map: drag-to-resize height, persisted per-browser ---
+const MAP_HEIGHT_KEY = 'w1zla_map_height';
+const MAP_HEIGHT_MIN = 220, MAP_HEIGHT_MAX = 760;
+
+function initMapResize() {
+    const mapEl   = document.getElementById('map');
+    const handle  = document.getElementById('map-resize-handle');
+    const readout = document.getElementById('map-resize-readout');
+    if (!mapEl || !handle) return;
+
+    const saved = parseInt(localStorage.getItem(MAP_HEIGHT_KEY), 10);
+    if (!isNaN(saved)) {
+        mapEl.style.height = Math.max(MAP_HEIGHT_MIN, Math.min(MAP_HEIGHT_MAX, saved)) + 'px';
+    }
+
+    let dragging = false, startY = 0, startH = 0, hideTimer = null;
+
+    function setHeight(h) {
+        h = Math.max(MAP_HEIGHT_MIN, Math.min(MAP_HEIGHT_MAX, h));
+        mapEl.style.height = h + 'px';
+        if (readout) readout.textContent = Math.round(h) + 'px';
+    }
+    function start(clientY) {
+        dragging = true;
+        startY = clientY;
+        startH = mapEl.getBoundingClientRect().height;
+        handle.classList.add('dragging');
+        if (readout) readout.classList.add('visible');
+        clearTimeout(hideTimer);
+    }
+    function move(clientY) {
+        if (!dragging) return;
+        setHeight(startH + (clientY - startY));
+    }
+    function end() {
+        if (!dragging) return;
+        dragging = false;
+        handle.classList.remove('dragging');
+        localStorage.setItem(MAP_HEIGHT_KEY, Math.round(mapEl.getBoundingClientRect().height));
+        // Leaflet caches its container size at creation time -- needs to be
+        // told explicitly after a resize, same as the tab-switch case above.
+        if (leafletMap) leafletMap.invalidateSize();
+        hideTimer = setTimeout(() => { if (readout) readout.classList.remove('visible'); }, 900);
+    }
+
+    handle.addEventListener('mousedown', e => { start(e.clientY); e.preventDefault(); });
+    window.addEventListener('mousemove', e => move(e.clientY));
+    window.addEventListener('mouseup', end);
+    handle.addEventListener('touchstart', e => start(e.touches[0].clientY), {passive: true});
+    window.addEventListener('touchmove', e => move(e.touches[0].clientY), {passive: true});
+    window.addEventListener('touchend', end);
+}
+initMapResize();
+
+// --- map: grey line (day/night terminator) overlay ---
+// Solar-position math verified against known reference points before use:
+// at a solstice, the general zenith-latitude solve below reproduces the
+// classic tan(lat) = -cos(H)/tan(dec) terminator formula exactly at Z=90,
+// and correctly puts the Arctic/Antarctic circles just inside polar
+// day/night. See CLAUDE.md for the reference checks.
+const GREYLINE_KEY = 'w1zla_show_greyline';
+let greylineLayer = null;
+let greylineTimer = null;
+
+function gRad(d) { return d * Math.PI / 180; }
+function gDeg(r) { return r * 180 / Math.PI; }
+
+function solarParams(date) {
+    const yearStart = Date.UTC(date.getUTCFullYear(), 0, 0);
+    const dayOfYear = Math.floor((date.getTime() - yearStart) / 86400000);
+    const utcHours  = date.getUTCHours() + date.getUTCMinutes()/60 + date.getUTCSeconds()/3600;
+    const decl = 23.44 * Math.sin(gRad(360/365 * (dayOfYear - 81)));
+    const B    = gRad(360/365 * (dayOfYear - 81));
+    const eotMin = 9.87*Math.sin(2*B) - 7.53*Math.cos(B) - 1.53*Math.sin(B);
+    let lng0 = 15*(12 - utcHours) - 15*(eotMin/60);
+    lng0 = ((lng0 + 180) % 360 + 360) % 360 - 180;
+    return { decl, lng0 };
+}
+
+// General closed-form solve for the latitude at which the sun's zenith
+// angle equals Z, at a given longitude. Returns null if that whole
+// meridian never reaches Z at the current declination (polar day/night) --
+// verified this never happens for the +-12deg twilight band used below,
+// even at the solstice (max declination), so callers don't need to handle
+// it specially in practice.
+function latForZenith(lng, Z, decl, lng0) {
+    const H   = gRad(lng - lng0);
+    const dec = gRad(decl);
+    const A = Math.sin(dec);
+    const B = Math.cos(dec) * Math.cos(H);
+    const R = Math.hypot(A, B);
+    const C = Math.cos(gRad(Z));
+    if (Math.abs(C / R) > 1) return null;
+    const phi = Math.atan2(B, A);
+    return gDeg(Math.asin(C / R) - phi);
+}
+
+function buildGreylineRing(Z, decl, lng0, darkPole) {
+    const pts = [];
+    for (let lng = -180; lng <= 180; lng += 2) {
+        const lat = latForZenith(lng, Z, decl, lng0);
+        if (lat !== null) pts.push([lat, lng]);
+    }
+    // Close the ring around whichever pole is on the night side, so the
+    // filled polygon covers "everything past this zenith threshold".
+    pts.push([darkPole, 180]);
+    pts.push([darkPole, -180]);
+    return pts;
+}
+
+function updateGreyline() {
+    if (!leafletMap) return;
+    if (greylineLayer) { leafletMap.removeLayer(greylineLayer); greylineLayer = null; }
+
+    const { decl, lng0 } = solarParams(new Date());
+    const darkPole = decl >= 0 ? -90 : 90;
+
+    // Three nested bands (soft twilight edge -> full night) instead of one
+    // hard-edged polygon -- stacked semi-transparent fills blend into a
+    // gradient look without needing per-pixel canvas work.
+    const group = L.layerGroup();
+    [[82, 0.18], [90, 0.20], [98, 0.20]].forEach(([z, opacity]) => {
+        L.polygon(buildGreylineRing(z, decl, lng0, darkPole), {
+            stroke: false, fillColor: '#050814', fillOpacity: opacity, interactive: false,
+        }).addTo(group);
+    });
+
+    greylineLayer = group;
+    if (document.getElementById('greyline-toggle').checked) {
+        greylineLayer.addTo(leafletMap);
+    }
+}
+
+function toggleGreyline() {
+    const on = document.getElementById('greyline-toggle').checked;
+    localStorage.setItem(GREYLINE_KEY, on ? '1' : '0');
+    if (!leafletMap) return;
+    if (on) {
+        if (!greylineLayer) updateGreyline();
+        else greylineLayer.addTo(leafletMap);
+    } else if (greylineLayer) {
+        leafletMap.removeLayer(greylineLayer);
+    }
 }
 
 // Haversine distance in km between two lat/lon points.
