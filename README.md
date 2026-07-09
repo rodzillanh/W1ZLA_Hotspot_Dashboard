@@ -411,6 +411,17 @@ real node: a brief test keyup was missed, but a sustained one (5-10+
 seconds) showed up correctly. This is an inherent tradeoff of polling
 point-in-time state rather than a log, not a bug to chase.
 
+**"ACTIVE: &lt;callsign&gt;" identifies the linked node, not the individual
+operator talking through it.** `RPT_ALINKS` only reports which *node* is
+currently keyed — AllStarLink/`app_rpt` has no per-transmission caller ID
+equivalent to DMR's talker alias. If the keyed node is a shared hub/
+reflector, its registered callsign can stay pinned on the card (and
+`tx_start` won't reset) across several different people keying up one
+after another through that same node, since the dashboard has no way to
+tell them apart — it only sees "this node is keyed," same as any other
+ASL3 monitoring tool (AllScan included). Not something pollable/fixable
+via SSH; a protocol ceiling, not a bug.
+
 ## Host power control
 
 Optional "🔄 Reboot Pi" / "⏻ Power off Pi" buttons in Settings → General —

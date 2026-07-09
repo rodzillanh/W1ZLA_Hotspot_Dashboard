@@ -178,6 +178,21 @@ config for per-integration credentials; put it in
   connection routing (`node=radio@host:port/node,host`) — use
   `aslstats.py`'s `stats.allstarlink.org` lookup instead.
 
+- **`RPT_ALINKS`'s keyed state is per-*node*, not per-operator — there is
+  no ASL3 equivalent of DMR's talker alias/per-transmission caller ID.**
+  `monitor._parse_asl_output`'s `active_call` is the registered callsign
+  of whichever *linked node* is currently keyed (via `aslstats.py`), not
+  necessarily the specific human transmitting. If that node is a shared
+  hub/reflector, its callsign (and `tx_start`) can stay pinned across
+  several different operators keying up back-to-back through the same
+  node, since nothing in `rpt xnode`'s output distinguishes them — this
+  was reported as "the active call never changes even though multiple
+  people are clearly talking" and confirmed live (node 600672/W2ECR,
+  an East Coast hub) to be this ceiling, not a lookup bug. Don't try to
+  fix this by polling harder or adding more SSH commands — `app_rpt`
+  genuinely doesn't expose per-speaker identity for a linked node, only
+  per-node keyed state (same limitation AllScan has).
+
 - **`NoNewPrivileges=yes` in the systemd unit blocks `sudo`/setuid
   entirely, regardless of sudoers config.** The Host power control
   feature (v3.1) originally shipped calling `sudo reboot`/`sudo shutdown
