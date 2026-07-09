@@ -492,6 +492,18 @@ disconnect them from one of your ASL3 hotspots with one click.
 - Connects are temporary (transceive), not permanent — there's no
   "connect permanently" option in this card. Use WPSD/AllStarLink's own
   admin tools for permanent link changes.
+- **Auto-disconnect on connect** — by default, connecting to a favorite
+  first disconnects any *other* favorite currently connected/keyed on
+  that same hotspot, so you don't end up stacking links by accident.
+  Check "Keep existing connections when connecting" (above the list) to
+  skip that and just connect, same as before this existed. This only
+  ever touches favorites tracked in this card — it won't disconnect a
+  link made some other way (e.g. a permanent link configured directly on
+  the node).
+- **List stays compact** — the row list caps at ~4 visible rows and
+  scrolls internally once you have more favorites than that, so the card
+  doesn't keep growing taller. Whichever favorite is currently keyed or
+  connected always sorts to the top, so it's visible without scrolling.
 
 By default the card appears first, before any hotspot cards. Its position
 is part of the same drag-and-drop **Card order** list as the hotspot cards

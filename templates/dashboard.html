@@ -411,8 +411,21 @@
             background: var(--input-bg); border: 1px solid var(--toolbar-border);
             color: var(--text); border-radius: 5px; padding: 4px 8px; font-size: 12px;
         }
-        .asl-fav-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-        .asl-fav-row td { padding: 8px 6px; font-size: 13px; vertical-align: middle; }
+        .asl-fav-mode-row {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 11.5px; color: var(--text-muted);
+            padding: 7px 9px; margin-bottom: 8px;
+            background: var(--toolbar-bg); border: 1px solid var(--toolbar-border);
+            border-radius: 6px;
+        }
+        .asl-fav-mode-row input[type="checkbox"] { accent-color: var(--accent); width: 13px; height: 13px; margin: 0; }
+        .asl-fav-mode-row label { cursor: pointer; }
+        .asl-fav-mode-hint { margin-left: auto; font-size: 10.5px; color: var(--text-dim); }
+        /* Caps the card's height once favorites pile up -- rows scroll
+           internally instead of the card growing taller indefinitely. */
+        .asl-fav-scroll { max-height: 168px; overflow-y: auto; margin: 10px -4px; padding: 0 4px; }
+        .asl-fav-table { width: 100%; border-collapse: collapse; }
+        .asl-fav-row td { padding: 5px 6px; font-size: 13px; vertical-align: middle; }
         .asl-fav-row td:first-child { border-radius: 8px 0 0 8px; }
         .asl-fav-row td:last-child  { border-radius: 0 8px 8px 0; }
         .asl-fav-row.keyed     { background: rgba(192,57,43,.14); }
@@ -756,7 +769,14 @@
                 <div>Keyed: <span class="stat-val" id="asl-fav-keyed">—</span></div>
                 <div>Connected: <span class="stat-val" id="asl-fav-connected">—</span></div>
             </div>
-            <table class="asl-fav-table"><tbody id="asl-fav-tbody"></tbody></table>
+            <div class="asl-fav-mode-row">
+                <input type="checkbox" id="asl-fav-keep-connections">
+                <label for="asl-fav-keep-connections">Keep existing connections when connecting</label>
+                <span class="asl-fav-mode-hint">off = auto-disconnect first</span>
+            </div>
+            <div class="asl-fav-scroll">
+                <table class="asl-fav-table"><tbody id="asl-fav-tbody"></tbody></table>
+            </div>
             <div class="asl-fav-empty" id="asl-fav-empty" style="display:none">
                 No ASL3 hotspots configured yet — add one in Settings → Hotspots.
             </div>
@@ -1779,8 +1799,16 @@ function renderAslFavorites() {
     const linkedByNode = {};
     (controlHotspot.asl_linked_nodes || []).forEach(link => { linkedByNode[link.node] = link; });
 
+    // Keyed/connected favorites always sort to the top -- so whatever's
+    // live stays visible above the fold even once the list scrolls.
+    const rank = fav => {
+        const link = linkedByNode[fav.node];
+        return !link ? 2 : (link.keyed ? 0 : 1);
+    };
+    const sortedFavorites = aslFavorites.slice().sort((a, b) => rank(a) - rank(b));
+
     let keyedCount = 0, connectedCount = 0;
-    tbody.innerHTML = aslFavorites.map(fav => {
+    tbody.innerHTML = sortedFavorites.map(fav => {
         const link      = linkedByNode[fav.node];
         const isKeyed   = !!(link && link.keyed);
         const isConn    = !!link;
@@ -1852,6 +1880,35 @@ function removeAslFavorite(node) {
 
 function aslConnect(ip, node, action) {
     const status = document.getElementById('asl-fav-status');
+    const keepCb = document.getElementById('asl-fav-keep-connections');
+
+    // Default behavior: connecting to a favorite first disconnects any
+    // other favorite currently connected/keyed on this same controlling
+    // hotspot, so you don't end up stacking links by accident. Checking
+    // "Keep existing connections" skips this and just connects, same as
+    // before this feature existed.
+    if (action === 'connect' && !(keepCb && keepCb.checked)) {
+        const hs = (lastApiData || []).find(h => h.ip === ip);
+        const linkedByNode = {};
+        ((hs && hs.asl_linked_nodes) || []).forEach(link => { linkedByNode[link.node] = link; });
+        const others = aslFavorites
+            .map(f => f.node)
+            .filter(n => n !== node && linkedByNode[n]);
+
+        if (others.length > 0) {
+            status.textContent = 'Connecting...';
+            Promise.all(others.map(n => fetch('/api/asl_connect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ip, node: n, action: 'disconnect' })
+            }))).then(() => aslSendConnect(ip, node, action, status));
+            return;
+        }
+    }
+    aslSendConnect(ip, node, action, status);
+}
+
+function aslSendConnect(ip, node, action, status) {
     status.textContent = action === 'connect' ? 'Connecting...' : 'Disconnecting...';
     fetch('/api/asl_connect', {
         method: 'POST',
