@@ -120,9 +120,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.7</span>
+                <span class="release-version">v3.7.1</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Bugfix — Unraid Docker tab lost its "Edit" option</span> — a container created via <code>docker-update.sh</code>'s plain <code>docker run</code> (rather than Unraid's "Add Container" GUI) has no XML template registered with Unraid, so "Edit" silently doesn't appear in the menu at all. <code>docker-update.sh</code> now (re)installs <code>unraid-template.xml</code> into Unraid's <code>templates-user</code> directory on every run, so this keeps working across updates instead of only on a fresh GUI-driven install</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.7</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Self-update</span> — the Version page now checks this project's git repository for new commits (Settings → General → "Software updates" configures the repo/branch, on by default). On a standalone Pi/Linux install, an "Install update" button pulls the update and restarts the service via a privilege-separated systemd path unit — the main service stays unprivileged and never runs the pull itself. Docker/Unraid shows the exact <code>docker-update.sh</code> command to run instead, since a container can't safely rebuild itself from the inside</li>

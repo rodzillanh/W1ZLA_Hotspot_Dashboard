@@ -151,6 +151,21 @@ config for per-integration credentials; put it in
   `docker-update.sh` sets it explicitly for this reason — don't drop it
   if you touch that script.
 
+- **Unraid's Docker tab "Edit" option needs an XML template in
+  `/boot/config/plugins/dockerMan/templates-user/`**, matched to the
+  container by name — separate from the running container itself and
+  from anything `docker inspect` can tell you. A container created via
+  plain `docker run` (as `docker-update.sh` does) never gets one, so
+  "Edit" silently doesn't appear at all (not a broken/blank form — just
+  absent from the menu). Fixed in v3.7.1 by having `docker-update.sh`
+  (re)install this repo's `unraid-template.xml` into that directory on
+  every run, guarded on `/boot/config/plugins/dockerMan` existing (skips
+  cleanly on a non-Unraid Docker host). If `unraid-template.xml`'s
+  fields ever drift from what `docker-update.sh`'s `docker run` actually
+  sets (ports/volumes/env vars), fix both together — they're two
+  independent descriptions of the same container config, nothing keeps
+  them in sync automatically.
+
 - **This sandbox/dev environment has a restricted network egress
   allowlist.** Test failures against real external APIs (Brandmeister,
   APRS-IS, MQTT brokers) from a dev/CI sandbox may just be the sandbox's

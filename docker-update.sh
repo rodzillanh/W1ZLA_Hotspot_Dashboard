@@ -14,6 +14,12 @@
 # automatically the way Unraid's own "Add Container" GUI does, which is
 # why that link disappears otherwise.
 #
+# For the same reason, a container created this way has no XML template
+# registered with Unraid, so the Docker tab's "Edit" option doesn't
+# appear either -- this script (re)installs unraid-template.xml into
+# Unraid's templates-user directory every run so Edit keeps working, on
+# a fresh install and every subsequent update alike.
+#
 # Your appdata volume (hotspots.json, settings.json, etc.) is untouched --
 # only the container itself is replaced.
 #
@@ -23,6 +29,7 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE_NAME="hotspot-dashboard:latest"
 CONTAINER_NAME="hotspot-dashboard"
 
@@ -53,6 +60,21 @@ docker run -d \
   -e QRZ_PASSWORD="${QRZ_PASSWORD:-}" \
   -l net.unraid.docker.webui='http://[IP]:[PORT:5000]/' \
   "$IMAGE_NAME"
+
+# --- register the Unraid template so "Edit" works in the Docker tab ---
+# Idempotent -- (re)written every run, same reasoning as the standalone
+# install's polkit rule and self-update systemd units: whatever silently
+# went missing gets restored just by running this script again. Skipped
+# entirely (not an error) on a non-Unraid Docker host, where this
+# directory doesn't exist.
+UNRAID_TEMPLATES_DIR="/boot/config/plugins/dockerMan/templates-user"
+if [ -d "/boot/config/plugins/dockerMan" ]; then
+    echo "==> Registering Unraid template (enables the 'Edit' button)..."
+    mkdir -p "$UNRAID_TEMPLATES_DIR"
+    cp "${SCRIPT_DIR}/unraid-template.xml" "${UNRAID_TEMPLATES_DIR}/my-${CONTAINER_NAME}.xml"
+else
+    echo "==> Skipping Unraid template registration (not running on Unraid)"
+fi
 
 echo "==> Done. Tailing logs (Ctrl+C to stop watching, container keeps running):"
 docker logs -f "$CONTAINER_NAME"
