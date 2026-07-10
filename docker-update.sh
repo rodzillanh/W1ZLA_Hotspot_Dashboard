@@ -26,6 +26,9 @@ set -e
 IMAGE_NAME="hotspot-dashboard:latest"
 CONTAINER_NAME="hotspot-dashboard"
 
+echo "==> Recording build commit (read by the Version tab's update check)..."
+git rev-parse HEAD > BUILD_COMMIT 2>/dev/null || echo "unknown" > BUILD_COMMIT
+
 echo "==> Building image..."
 docker build -t "$IMAGE_NAME" .
 

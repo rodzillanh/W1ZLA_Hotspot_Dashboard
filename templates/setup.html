@@ -355,6 +355,35 @@
         <span class="status-txt" id="appearance-status"></span>
     </div>
 
+    <div class="section">
+        <div class="section-title">Software updates</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            Checks this project's git repository for new commits. Go to the
+            <a href="/version">Version page</a> to check now or install an update.
+        </p>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>Repository URL</label>
+                <input type="url" id="update-check-repo" placeholder="https://git.example.com/owner/repo"
+                       value="{{ settings.get('update_check_repo', '') }}">
+            </div>
+            <div>
+                <label>Branch</label>
+                <input type="text" id="update-check-branch" placeholder="main"
+                       value="{{ settings.get('update_check_branch', 'main') }}">
+            </div>
+        </div>
+        <div class="toggle-group">
+            <div class="toggle-row">
+                <span class="toggle-label">Check for updates</span>
+                <div class="toggle {{ 'on' if settings.get('update_check_enabled', True) else '' }}"
+                     id="update-check-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveUpdateCheck()">Save</button>
+        <span class="status-txt" id="update-check-status"></span>
+    </div>
+
     {% if can_power_control %}
     <div class="section">
         <div class="section-title">Host power control</div>
@@ -871,6 +900,23 @@ function saveAppearance() {
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');
+        el.textContent = '✓ Saved';
+        setTimeout(() => el.textContent = '', 2000);
+    });
+}
+
+// --- software updates (General tab) ---
+function saveUpdateCheck() {
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            update_check_enabled: document.getElementById('update-check-toggle').classList.contains('on'),
+            update_check_repo:    document.getElementById('update-check-repo').value.trim(),
+            update_check_branch:  document.getElementById('update-check-branch').value.trim(),
+        })
+    }).then(() => {
+        const el = document.getElementById('update-check-status');
         el.textContent = '✓ Saved';
         setTimeout(() => el.textContent = '', 2000);
     });

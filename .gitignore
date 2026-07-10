@@ -218,3 +218,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Hotspot Dashboard: per-deployment build artifact, written by install.sh/
+# update.sh/docker-update.sh, read by the Version tab's update check --
+# not source, shouldn't be committed.
+BUILD_COMMIT

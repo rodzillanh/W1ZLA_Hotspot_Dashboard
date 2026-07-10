@@ -32,19 +32,24 @@ storage.py          hotspots.json / settings.json / favorites.json --
                    flat JSON files in CONFIG_DIR (the mounted volume)
 
 qrz.py, radioid.py, aprs.py, brandmeister.py, aslstats.py,
-mqtt_publisher.py, aprs_messaging.py
+mqtt_publisher.py, aprs_messaging.py, update_check.py
                    One self-contained client class per integration.
                    Each: caches results, NEVER raises out of its public
                    methods (returns None/False on any failure), and is
                    independently hot-swappable via a `set_*_client()` /
-                   rebuild-on-settings-save pattern in app.py
+                   rebuild-on-settings-save pattern in app.py.
+                   update_check.py compares this deployment's BUILD_COMMIT
+                   file against the git host's REST API -- see the
+                   self-update gotcha below before touching it
 
 host_stats.py, weather.py
                    Small standalone pollers (host CPU/mem, Open-Meteo).
                    host_stats.py also has is_pi_standalone() (checks
                    /proc/device-tree/model + absence of /.dockerenv),
                    computed once at app.py startup as HOST_CAN_POWER_CONTROL
-                   -- gates the Settings "reboot/power off this Pi" buttons
+                   -- gates the Settings "reboot/power off this Pi" buttons.
+                   is_docker() alone (no Pi-hardware check) backs the
+                   broader HOST_IS_STANDALONE, gating self-update install
 
 templates/dashboard.html   Main UI: cards + live map (Leaflet). One big
                            inline <script> block, no build step, no
@@ -248,6 +253,36 @@ config for per-integration credentials; put it in
   AllScan's `connect.php` for the exact `ilink` code before guessing from
   `app_rpt` source/docs alone — the DTMF-string form is a trap that looks
   authoritative but doesn't behave as documented in practice.
+
+- **Self-update (v3.7) reuses the Host Power Control privilege-separation
+  pattern, scaled up, rather than weakening `ProtectSystem=strict`/
+  `NoNewPrivileges=yes` for the main service.** The main app process can
+  only write inside `CONFIG_DIR`; it can't `git pull` its own install dir
+  or restart itself. So `/api/install_update` just writes a trigger file
+  (`${CONFIG_DIR}/update_requested`), and a *separate* systemd unit pair
+  installed by `install.sh` (idempotently re-provisioned by `update.sh`,
+  same as the polkit rule) does the actual work as root:
+  `hotspot-dashboard-updater.path` (`PathExists=` the trigger file) fires
+  `hotspot-dashboard-updater.service` (oneshot, runs `run_update.sh`,
+  which does `git pull --ff-only` against the original install-time
+  `SCRIPT_DIR` then re-runs `update.sh`). If you touch this, keep the
+  privilege boundary intact — don't grant the main service broader
+  filesystem/D-Bus access just to make this simpler.
+- **There is no `.git` and no `git` binary at runtime for either
+  deployment type**, so `update_check.py` can't just run `git rev-parse
+  HEAD` against the running app's own directory — confirmed by reading
+  `install.sh`/`update.sh` (plain `cp`, not a git clone) and the
+  Dockerfile (`python:3.12-slim` doesn't ship `git`). Instead
+  `install.sh`/`update.sh`/`docker-update.sh` each capture
+  `git rev-parse HEAD` on the *source* checkout at install/build time
+  into a plain-text `BUILD_COMMIT` file the running app just reads —
+  don't reintroduce a runtime `git` dependency for this.
+- **The update-check API call is a Forgejo/Gitea REST endpoint
+  (`/api/v1/repos/{owner}/{repo}/branches/{branch}`), confirmed against
+  the real `git.trytheitguy.com` instance** (not GitHub's differently-
+  shaped API) before writing `update_check.py` — if the configured repo
+  ever needs to support GitHub too, that's a different endpoint shape
+  entirely, not a drop-in.
 
 ## Testing patterns used throughout this project
 

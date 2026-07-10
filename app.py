@@ -27,6 +27,7 @@ from mqtt_publisher import MqttPublisher
 from aprs_messaging import AprsMessenger
 from host_stats import HostStats
 import storage_activity
+from update_check import UpdateChecker
 
 import host_stats as host_stats_mod
 
@@ -35,11 +36,20 @@ monitor    = FleetMonitor()
 wx         = WeatherClient()
 host_stats = HostStats()
 host_stats.start()
+update_checker = UpdateChecker()
 
 # Gates the Settings "Host power control" buttons -- only true on a
 # standalone install running directly on real Raspberry Pi hardware (see
 # host_stats.is_pi_standalone). Computed once at startup, not per-request.
 HOST_CAN_POWER_CONTROL = host_stats_mod.is_pi_standalone()
+
+# Gates the Version tab's "Install update" button -- true for any
+# standalone (non-Docker) install, Pi or otherwise (install.sh also
+# supports plain Debian/Ubuntu, not just Pi hardware -- narrower than
+# HOST_CAN_POWER_CONTROL on purpose). A container can't safely rebuild
+# and replace itself from inside without Docker-socket access, so Docker/
+# Unraid always falls back to showing the manual update command instead.
+HOST_IS_STANDALONE = not host_stats_mod.is_docker()
 
 START_TIME = time.time()  # for /api/activity's dashboard_uptime_seconds
 
@@ -233,6 +243,12 @@ def api_settings_post():
             settings["aprs_msg_cooldown_min"] = float(data["aprs_msg_cooldown_min"])
         except (TypeError, ValueError):
             pass
+    if "update_check_enabled" in data:
+        settings["update_check_enabled"] = bool(data["update_check_enabled"])
+    if "update_check_repo" in data:
+        settings["update_check_repo"] = data["update_check_repo"].strip()
+    if "update_check_branch" in data:
+        settings["update_check_branch"] = data["update_check_branch"].strip()
     save_settings(settings)
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:
@@ -412,7 +428,46 @@ def api_weather():
 @app.route("/version")
 def version_page():
     embed = request.args.get("embed") == "1"
-    return render_template("version.html", settings=load_settings(), embed=embed)
+    return render_template("version.html", settings=load_settings(), embed=embed,
+                           host_is_standalone=HOST_IS_STANDALONE)
+
+@app.route("/api/check_for_updates")
+def api_check_for_updates():
+    """Passive check (cached, ~5min TTL) on page load, or a forced refresh
+    from the Version tab's "Check for updates" button (?force=1)."""
+    settings = load_settings()
+    if not settings.get("update_check_enabled", True):
+        return jsonify({"enabled": False})
+    result = update_checker.check(
+        settings.get("update_check_repo", ""),
+        settings.get("update_check_branch", "main"),
+        force=request.args.get("force") == "1",
+    )
+    if result is None:
+        return jsonify({"enabled": True, "error": "check_failed"})
+    result["enabled"] = True
+    result["host_is_standalone"] = HOST_IS_STANDALONE
+    return jsonify(result)
+
+@app.route("/api/install_update", methods=["POST"])
+def api_install_update():
+    """Triggers the standalone updater: writes a flag file that a systemd
+    .path unit (installed by install.sh/update.sh) watches for, running
+    `git pull` + update.sh as root -- see README.md "Self-update" and
+    install.sh's updater-service section. The web app itself never runs
+    the pull/restart directly: it's unprivileged (NoNewPrivileges=yes,
+    ProtectSystem=strict) and can only write inside CONFIG_DIR, same
+    privilege-separation pattern as Host power control's polkit rule."""
+    if not HOST_IS_STANDALONE:
+        return jsonify({"success": False, "message": "Not available on this deployment"}), 403
+    try:
+        trigger_path = os.path.join(config.CONFIG_DIR, "update_requested")
+        with open(trigger_path, "w") as f:
+            f.write(str(time.time()))
+        return jsonify({"success": True,
+                        "message": "Update started -- the dashboard will restart shortly"})
+    except OSError as e:
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 @app.route("/readme")

@@ -460,6 +460,52 @@ bigger consequence than editing a hotspot's config, so if this dashboard
 is reachable beyond a trusted LAN, put it behind a reverse proxy with
 auth, or don't enable this feature's host access, before relying on it.
 
+## Self-update
+
+The Version page (`/version`) checks this project's git repository for
+new commits and, on a standalone Pi/Linux install, can install them with
+one click.
+
+- **Check** — compares the commit this deployment was built from
+  (`BUILD_COMMIT`, written automatically by `install.sh`/`update.sh`/
+  `docker-update.sh`) against the latest commit on the configured
+  branch, via the git host's REST API (Forgejo/Gitea-compatible:
+  `GET /api/v1/repos/{owner}/{repo}/branches/{branch}`) — no git
+  installed inside the container/venv needed at runtime, just one HTTPS
+  GET. Cached for ~5 minutes; the Version page checks once on load, and
+  a "Check for updates" button forces a fresh check. Repo URL/branch and
+  an on/off toggle live in Settings → General ("Software updates") —
+  defaults to this project's own repo.
+- **Install (standalone Pi/Linux only)** — an "Install update" button
+  appears when an update is available. The dashboard's own process runs
+  unprivileged (`NoNewPrivileges=yes`, `ProtectSystem=strict` — it can
+  only write inside its data directory), so it can't pull new code or
+  restart itself directly. Clicking the button just writes a trigger
+  file into that data directory; a separate systemd `.path` unit
+  (installed by `install.sh`, re-provisioned idempotently by
+  `update.sh` — existing installs pick it up just by re-running
+  `update.sh`) notices the file and runs `git pull` + `update.sh` as
+  root, the same privilege-separation idea as Host power control's
+  polkit rule above, scaled up for a bigger action. Logs to
+  `/var/log/hotspot-dashboard-update.log`.
+- **Docker/Unraid** — install is not automatic. A container can't
+  safely rebuild and replace itself from the inside without mounting
+  the Docker socket in, which is close to giving it root on the host —
+  not done here. Instead, the Version page shows the exact command to
+  run yourself: `cd /mnt/user/appdata/hotspot-dashboard-src && git pull
+  && bash docker-update.sh`.
+- If this deployment has no `BUILD_COMMIT` yet (a manual/dev checkout,
+  or an install from before this feature existed), the check just shows
+  "unknown" and no update banner — re-run `update.sh`/`docker-update.sh`
+  once to start tracking it.
+
+**Security note:** same as Host power control — no authentication by
+default, and "install update" is a bigger consequence than most actions
+in this app (it runs `git pull` and restarts the service as root).
+Put this behind a reverse proxy with auth, or turn off "Check for
+updates" in Settings, if the dashboard is reachable beyond a trusted
+LAN.
+
 ## ASL Favorites & Control
 
 Optional dashboard card (Settings → General → "Show ASL favorites &

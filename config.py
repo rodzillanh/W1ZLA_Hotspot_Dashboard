@@ -256,6 +256,14 @@ DEFAULT_SETTINGS = {
     "aprs_msg_callsign": "",
     "aprs_msg_to_callsign": "",
     "aprs_msg_cooldown_min": 10,
+    # Self-update check (Version tab) -- compares the locally deployed
+    # build's commit (BUILD_COMMIT, written by install.sh/update.sh/
+    # docker-update.sh) against the latest commit on this branch via the
+    # git host's REST API (Forgejo/Gitea-compatible). Defaults point at
+    # this project's own repo; override if you run a fork.
+    "update_check_enabled": True,
+    "update_check_repo": "https://git.trytheitguy.com/rodney_berry/W1ZLAHotspot_Dashboard",
+    "update_check_branch": "main",
 }
 
 # --- Fleet activity ---

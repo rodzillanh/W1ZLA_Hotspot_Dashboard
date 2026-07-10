@@ -83,6 +83,28 @@
         </div>
     </div>
 
+    <!-- Self-update -->
+    <div class="card">
+        <div class="card-title">Updates</div>
+        <div class="info-row">
+            <span class="info-label">Current build</span>
+            <span class="info-val" id="update-local-commit">—</span>
+        </div>
+        <div id="update-status" style="font-size:13px;margin:10px 0;color:var(--text-muted)">Checking…</div>
+        <button id="check-updates-btn" onclick="checkForUpdates(true)"
+                style="background:none;border:1px solid var(--card-border);border-radius:5px;
+                       color:var(--link);font-size:12px;padding:4px 10px;cursor:pointer">
+            Check for updates
+        </button>
+        <button id="install-update-btn" onclick="installUpdate()" style="display:none;
+                background:none;border:1px solid var(--accent);border-radius:5px;
+                color:var(--accent);font-size:12px;padding:4px 10px;cursor:pointer;margin-left:8px">
+            Install update
+        </button>
+        <span id="update-action-status" style="font-size:11px;color:var(--accent);margin-left:8px"></span>
+        <pre id="update-manual-cmd" style="display:none"></pre>
+    </div>
+
     <!-- Module hashes -->
     <div class="card">
         <div class="card-title">Loaded modules <span class="badge">MD5 of file inside container</span></div>
@@ -98,9 +120,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.6</span>
+                <span class="release-version">v3.7</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Self-update</span> — the Version page now checks this project's git repository for new commits (Settings → General → "Software updates" configures the repo/branch, on by default). On a standalone Pi/Linux install, an "Install update" button pulls the update and restarts the service via a privilege-separated systemd path unit — the main service stays unprivileged and never runs the pull itself. Docker/Unraid shows the exact <code>docker-update.sh</code> command to run instead, since a container can't safely rebuild itself from the inside</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.6</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Resizable map</span> — drag the handle below the live map to make it taller or shorter. Saved per-browser (not a shared Settings value, since the right height on a phone and a desktop monitor are very different)</li>
@@ -582,6 +614,75 @@
     </div>
 
 <script>
+const HOST_IS_STANDALONE = {{ 'true' if host_is_standalone else 'false' }};
+
+function renderUpdateStatus(data) {
+    const statusEl   = document.getElementById('update-status');
+    const localEl    = document.getElementById('update-local-commit');
+    const installBtn = document.getElementById('install-update-btn');
+    const manualPre  = document.getElementById('update-manual-cmd');
+    installBtn.style.display = 'none';
+    manualPre.style.display  = 'none';
+
+    if (!data.enabled) {
+        statusEl.textContent = 'Update checking is disabled (Settings → General).';
+        return;
+    }
+    if (data.error) {
+        statusEl.textContent = "✕ Check failed — couldn't reach the git host.";
+        return;
+    }
+
+    localEl.textContent = data.local_commit_short ||
+        'unknown (dev checkout, or update.sh not yet re-run)';
+
+    if (!data.local_commit) {
+        statusEl.textContent =
+            'This deployment has no recorded build commit yet — re-run update.sh ' +
+            '(or docker-update.sh) once to enable update checks.';
+        return;
+    }
+
+    if (!data.update_available) {
+        statusEl.innerHTML = '<span style="color:var(--accent)">✓ Up to date</span>';
+        return;
+    }
+
+    statusEl.innerHTML = `<span style="color:var(--amber)">⬆ Update available</span> — ` +
+        `${data.latest_message} <span class="badge">${data.latest_commit_short}</span>`;
+
+    if (HOST_IS_STANDALONE) {
+        installBtn.style.display = 'inline-block';
+    } else {
+        manualPre.style.display = 'block';
+        manualPre.textContent =
+            'cd /mnt/user/appdata/hotspot-dashboard-src\ngit pull\nbash docker-update.sh';
+    }
+}
+
+function checkForUpdates(force) {
+    document.getElementById('update-status').textContent = 'Checking…';
+    fetch('/api/check_for_updates' + (force ? '?force=1' : ''))
+        .then(r => r.json())
+        .then(renderUpdateStatus)
+        .catch(() => { document.getElementById('update-status').textContent = '✕ Check failed'; });
+}
+checkForUpdates(false);
+
+function installUpdate() {
+    if (!confirm(
+        'Install the latest update?\n\n' +
+        'This pulls the latest code and restarts the dashboard service. It will be ' +
+        'unreachable for a short time while it restarts. Your hotspot config and ' +
+        'settings are untouched.'
+    )) return;
+    const status = document.getElementById('update-action-status');
+    status.textContent = 'Starting update...';
+    fetch('/api/install_update', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => { status.textContent = data.success ? data.message : '✕ ' + data.message; });
+}
+
 let startTime = null;
 
 function updateUptime() {
