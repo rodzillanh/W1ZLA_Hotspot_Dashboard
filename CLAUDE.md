@@ -151,20 +151,37 @@ config for per-integration credentials; put it in
   `docker-update.sh` sets it explicitly for this reason — don't drop it
   if you touch that script.
 
-- **Unraid's Docker tab "Edit" option needs an XML template in
-  `/boot/config/plugins/dockerMan/templates-user/`**, matched to the
-  container by name — separate from the running container itself and
-  from anything `docker inspect` can tell you. A container created via
-  plain `docker run` (as `docker-update.sh` does) never gets one, so
-  "Edit" silently doesn't appear at all (not a broken/blank form — just
-  absent from the menu). Fixed in v3.7.1 by having `docker-update.sh`
-  (re)install this repo's `unraid-template.xml` into that directory on
-  every run, guarded on `/boot/config/plugins/dockerMan` existing (skips
-  cleanly on a non-Unraid Docker host). If `unraid-template.xml`'s
-  fields ever drift from what `docker-update.sh`'s `docker run` actually
-  sets (ports/volumes/env vars), fix both together — they're two
-  independent descriptions of the same container config, nothing keeps
-  them in sync automatically.
+- **Unraid's Docker tab "Edit" option requires the
+  `net.unraid.docker.managed=dockerman` container label — an XML
+  template file in `templates-user/` alone is NOT sufficient.**
+  Confirmed directly from Unraid's own source, not guessed:
+  `dynamix.docker.manager/include/DockerClient.php` sets
+  `$c['Manager'] = $info['Config']['Labels']['net.unraid.docker.managed'] ?? false`,
+  and `DockerContainers.php`'s template lookup (`getUserTemplate()`,
+  which matches `templates-user/*.xml` by `<Name>`) only even runs when
+  `$ct['Manager'] === 'dockerman'` — otherwise `$tmp['template']` is
+  forced to `null` and the container name isn't rendered as a clickable
+  Edit link, full stop. A first attempt at fixing this (v3.7.1) only
+  copied `unraid-template.xml` into
+  `/boot/config/plugins/dockerMan/templates-user/` without setting this
+  label, and empirically did NOT restore Edit after a `docker-update.sh`
+  recreate, even though the template file was confirmed present with a
+  matching `<Name>` — proof that the file-matching path never even runs
+  without the label. Fixed for real in v3.7.2 by adding
+  `-l net.unraid.docker.managed=dockerman` to `docker-update.sh`'s
+  `docker run` (alongside the template-file copy, which is still needed
+  so `getUserTemplate()` has something to find once the label makes it
+  look). If you ever touch this again, verify against Unraid's actual
+  source (`grep` the relevant plugin directory, path found via
+  `find /usr/local/emhttp/plugins -maxdepth 1 -iname "*docker*"` — the
+  plugin is `dynamix.docker.manager`, not `dockerMan`; that name only
+  applies to the templates-user directory path) rather than guessing
+  from container-list behavior alone — one wrong guess already shipped
+  here before the label was found.
+  If `unraid-template.xml`'s fields ever drift from what
+  `docker-update.sh`'s `docker run` actually sets (ports/volumes/env
+  vars), fix both together — they're two independent descriptions of
+  the same container config, nothing keeps them in sync automatically.
 
 - **This sandbox/dev environment has a restricted network egress
   allowlist.** Test failures against real external APIs (Brandmeister,

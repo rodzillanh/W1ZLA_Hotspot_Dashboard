@@ -120,12 +120,22 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.7.1</span>
+                <span class="release-version">v3.7.2</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
             </div>
             <ul class="change-list">
-                <li><span>Bugfix — Unraid Docker tab lost its "Edit" option</span> — a container created via <code>docker-update.sh</code>'s plain <code>docker run</code> (rather than Unraid's "Add Container" GUI) has no XML template registered with Unraid, so "Edit" silently doesn't appear in the menu at all. <code>docker-update.sh</code> now (re)installs <code>unraid-template.xml</code> into Unraid's <code>templates-user</code> directory on every run, so this keeps working across updates instead of only on a fresh GUI-driven install</li>
+                <li><span>Bugfix — Unraid Docker tab lost its "Edit" option, for real this time</span> — v3.7.1's fix (copying <code>unraid-template.xml</code> into Unraid's <code>templates-user</code> directory) turned out not to be sufficient on its own: confirmed directly from Unraid's own source that it only looks for a matching template file at all when the container carries a <code>net.unraid.docker.managed=dockerman</code> label, which a plain <code>docker run</code> never sets. <code>docker-update.sh</code> now sets that label too</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.7.1</span>
+                <span class="release-date">July 2026</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Bugfix attempt — Unraid Docker tab lost its "Edit" option</span> — (re)installed <code>unraid-template.xml</code> into Unraid's <code>templates-user</code> directory on every <code>docker-update.sh</code> run. Incomplete — see v3.7.2</li>
             </ul>
         </div>
 

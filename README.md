@@ -153,14 +153,16 @@ in one command if you'd rather not go through the GUI each time — open it
 first to confirm the port/volume/env values match your setup, since it's
 built from one specific container's configuration as an example.
 
-`docker-update.sh` also (re)installs `unraid-template.xml` into
+`docker-update.sh` also sets the `net.unraid.docker.managed=dockerman`
+label and (re)installs `unraid-template.xml` into
 `/boot/config/plugins/dockerMan/templates-user/` on every run, so the
 Docker tab's **Edit** option keeps working even though the container
 itself is recreated via a plain `docker run` rather than through the
-GUI — a container created that way has no template Unraid can render an
-edit form from, so without this step **Edit silently doesn't appear at
-all** (not a broken form, just missing from the menu). This step is
-skipped harmlessly if you're not running on Unraid.
+GUI. Both are needed — Unraid only looks for a matching template file
+at all when that label is present; without it, **Edit silently doesn't
+appear at all** (not a broken form, just missing from the menu), no
+matter how correct the template file is. The template step is skipped
+harmlessly if you're not running on Unraid.
 
 ### Option B — Compose Manager plugin
 

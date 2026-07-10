@@ -14,10 +14,15 @@
 # automatically the way Unraid's own "Add Container" GUI does, which is
 # why that link disappears otherwise.
 #
-# For the same reason, a container created this way has no XML template
-# registered with Unraid, so the Docker tab's "Edit" option doesn't
-# appear either -- this script (re)installs unraid-template.xml into
-# Unraid's templates-user directory every run so Edit keeps working, on
+# For the same reason, a container created this way is invisible to
+# Unraid's "Edit" logic. Confirmed directly from Unraid's own source
+# (dynamix.docker.manager/include/DockerClient.php): it only attempts to
+# match a container to a template file at all when the container's
+# net.unraid.docker.managed label equals exactly "dockerman" --
+# otherwise the template lookup is skipped entirely regardless of
+# whether a matching template file exists in templates-user/. This
+# script sets that label AND (re)installs unraid-template.xml into
+# Unraid's templates-user directory every run, so Edit keeps working on
 # a fresh install and every subsequent update alike.
 #
 # Your appdata volume (hotspots.json, settings.json, etc.) is untouched --
@@ -59,6 +64,7 @@ docker run -d \
   -e QRZ_USERNAME="${QRZ_USERNAME:-}" \
   -e QRZ_PASSWORD="${QRZ_PASSWORD:-}" \
   -l net.unraid.docker.webui='http://[IP]:[PORT:5000]/' \
+  -l net.unraid.docker.managed='dockerman' \
   "$IMAGE_NAME"
 
 # --- register the Unraid template so "Edit" works in the Docker tab ---
