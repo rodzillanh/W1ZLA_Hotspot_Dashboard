@@ -2172,7 +2172,7 @@ function renderWsprActivity(data) {
 
     const badgeEl = document.getElementById('ba-badge');
     if (badgeEl && data.station_grid) {
-        badgeEl.textContent = `${data.station_grid} · ${data.radius_km}km`;
+        badgeEl.textContent = `${data.station_grid} · ${fmtDistance(data.radius_km)}`;
     }
 
     const groups = data.groups || [];
