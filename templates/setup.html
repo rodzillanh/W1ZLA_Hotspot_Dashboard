@@ -1712,10 +1712,66 @@ function installUpdate() {
         'settings are untouched.'
     )) return;
     const status = document.getElementById('v-update-action-status');
+    const installBtn = document.getElementById('v-install-update-btn');
     status.textContent = 'Starting update...';
+    installBtn.disabled = true;
     fetch('/api/install_update', { method: 'POST' })
         .then(r => r.json())
-        .then(data => { status.textContent = data.success ? data.message : '✕ ' + data.message; });
+        .then(data => {
+            if (!data.success) {
+                status.textContent = '✕ ' + data.message;
+                installBtn.disabled = false;
+                return;
+            }
+            waitForRestart();
+        })
+        .catch(() => {
+            status.textContent = '✕ Failed to start update';
+            installBtn.disabled = false;
+        });
+}
+
+// Polls /api/version until it sees a container_start different from the one
+// recorded when this tab loaded (proof the service actually restarted with
+// new code, not just that some server happened to answer -- the old process
+// can still be briefly reachable right after the button click, before
+// systemd actually stops it), then reloads the page automatically. Without
+// this, "Update started -- restarting shortly" was the last thing anyone
+// ever saw, with no visual cue of completion and no auto-refresh -- reported
+// after a real install on a Pi left the tab looking stuck even though the
+// update had actually finished.
+const UPDATE_WAIT_TIMEOUT_MS = 3 * 60 * 1000;
+function waitForRestart() {
+    const status   = document.getElementById('v-update-action-status');
+    const baseline = vStartTime;
+    const deadline = Date.now() + UPDATE_WAIT_TIMEOUT_MS;
+    let dots = 0;
+
+    const poll = () => {
+        if (Date.now() > deadline) {
+            status.textContent = '⚠ Still not back after 3 minutes — check the dashboard manually, or see: sudo journalctl -u hotspot-dashboard-updater -n 50';
+            return;
+        }
+        dots = (dots + 1) % 4;
+        fetch('/api/version', { cache: 'no-store' })
+            .then(r => r.json())
+            .then(data => {
+                const newStart = new Date(data.container_start.replace(' UTC', 'Z')).getTime();
+                if (baseline === null || newStart !== baseline) {
+                    status.textContent = '✓ Updated — reloading…';
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    status.textContent = 'Restarting' + '.'.repeat(dots);
+                    setTimeout(poll, 2000);
+                }
+            })
+            .catch(() => {
+                // Expected while the service is stopped/restarting -- keep polling.
+                status.textContent = 'Restarting' + '.'.repeat(dots);
+                setTimeout(poll, 2000);
+            });
+    };
+    setTimeout(poll, 2000);  // give systemd a moment before the first check
 }
 
 function updateUptime() {

@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.19</span>
+                <span class="release-version">v3.20</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Install update now auto-detects completion and reloads</span> — clicking "Install update" used to just say "restarting shortly" and leave it at that, with no way to tell when it was actually done short of manually refreshing. Now polls until the dashboard comes back up with a genuinely new process (compares container start time, not just "did something answer" — the old process can still briefly respond right after the click, before systemd actually stops it), then reloads automatically. Gives up with a message after 3 minutes if it never comes back</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.19</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Bugfix — "Version page" link in Settings → General → Software updates went to the wrong place</span> — it linked to <code>/version</code> (the public read-only changelog page), which has no "check for updates"/"install update" buttons at all; that functionality lives in Settings' own Version info tab, moved there back in v3.9. The link was never updated when that happened. Now switches to the Version info tab directly instead of navigating away</li>
