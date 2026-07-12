@@ -474,9 +474,11 @@ auth, or don't enable this feature's host access, before relying on it.
 
 ## Self-update
 
-The Version page (`/version`) checks this project's git repository for
-new commits and, on a standalone Pi/Linux install, can install them with
-one click.
+Settings → Version info checks this project's git repository for new
+commits and, on a standalone Pi/Linux install, can install them with
+one click. A flashing ⚡ next to the ⚙ Settings link on the dashboard
+itself shows up whenever an update is available and links straight
+there.
 
 - **Check** — compares the commit this deployment was built from
   (`BUILD_COMMIT`, written automatically by `install.sh`/`update.sh`/
@@ -484,8 +486,8 @@ one click.
   branch, via the git host's REST API (Forgejo/Gitea-compatible:
   `GET /api/v1/repos/{owner}/{repo}/branches/{branch}`) — no git
   installed inside the container/venv needed at runtime, just one HTTPS
-  GET. Cached for ~5 minutes; the Version page checks once on load, and
-  a "Check for updates" button forces a fresh check. Repo URL/branch and
+  GET. Cached for ~5 minutes; the Version info tab checks once on load,
+  and a "Check for updates" button forces a fresh check. Repo URL/branch and
   an on/off toggle live in Settings → General ("Software updates") —
   defaults to this project's own repo.
 - **Install (standalone Pi/Linux only)** — an "Install update" button
@@ -503,9 +505,9 @@ one click.
 - **Docker/Unraid** — install is not automatic. A container can't
   safely rebuild and replace itself from the inside without mounting
   the Docker socket in, which is close to giving it root on the host —
-  not done here. Instead, the Version page shows the exact command to
-  run yourself: `cd /mnt/user/appdata/hotspot-dashboard-src && git pull
-  && bash docker-update.sh`.
+  not done here. Instead, the Version info tab shows the exact command
+  to run yourself: `cd /mnt/user/appdata/hotspot-dashboard-src && git
+  pull && bash docker-update.sh`.
 - If this deployment has no `BUILD_COMMIT` yet (a manual/dev checkout,
   or an install from before this feature existed), the check just shows
   "unknown" and no update banner — re-run `update.sh`/`docker-update.sh`

@@ -176,6 +176,8 @@
         .btn-danger:hover { background: rgba(192,57,43,.08); }
         .btn-sm { padding: 3px 10px; font-size: 12px; }
         .status-txt { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
+        .badge { display: inline-block; background: var(--row-bg); border-radius: 4px;
+                 padding: 1px 7px; font-size: 11px; color: var(--text-muted); margin-left: 6px; }
 
         /* --- drag rows --- */
         .drag-row {
@@ -283,13 +285,13 @@
 </div>
 
 <div class="tab-bar">
-    <div class="tab-btn active" onclick="switchTab('general',      this)">General</div>
-    <div class="tab-btn"       onclick="switchTab('weather',      this)">Weather</div>
-    <div class="tab-btn"       onclick="switchTab('integrations', this)">Integrations</div>
-    <div class="tab-btn"       onclick="switchTab('hotspots',     this)">Hotspots</div>
-    <div class="tab-btn"       onclick="switchTab('cameras',      this)">Cameras</div>
-    <div class="tab-btn"       onclick="switchTab('favorites',    this)">Favorites</div>
-    <div class="tab-btn"       onclick="switchTab('version',      this)">Version info</div>
+    <div class="tab-btn active" id="tab-btn-general"      onclick="switchTab('general',      this)">General</div>
+    <div class="tab-btn"       id="tab-btn-weather"       onclick="switchTab('weather',      this)">Weather</div>
+    <div class="tab-btn"       id="tab-btn-integrations"  onclick="switchTab('integrations', this)">Integrations</div>
+    <div class="tab-btn"       id="tab-btn-hotspots"      onclick="switchTab('hotspots',     this)">Hotspots</div>
+    <div class="tab-btn"       id="tab-btn-cameras"       onclick="switchTab('cameras',      this)">Cameras</div>
+    <div class="tab-btn"       id="tab-btn-favorites"     onclick="switchTab('favorites',    this)">Favorites</div>
+    <div class="tab-btn"       id="tab-btn-version"       onclick="switchTab('version',      this)">Version info</div>
 </div>
 
 <!-- ═══════════════════════════════════════════════
@@ -900,6 +902,23 @@
 <div id="panel-version" class="tab-panel">
 
     <div class="section">
+        <div class="section-title">Updates</div>
+        <div class="version-row">
+            <span class="version-label">Current build</span>
+            <span class="version-val" id="v-update-local-commit">—</span>
+        </div>
+        <div id="v-update-status" style="font-size:13px;margin:10px 0;color:var(--text-muted)">Checking…</div>
+        <button class="btn btn-info" onclick="checkForUpdates(true)">Check for updates</button>
+        <button class="btn btn-primary" id="v-install-update-btn" onclick="installUpdate()"
+                style="display:none;margin-left:8px">
+            Install update
+        </button>
+        <span class="status-txt" id="v-update-action-status" style="margin-left:8px"></span>
+        <pre id="v-update-manual-cmd" style="display:none;margin-top:10px;background:var(--row-bg);
+             border-radius:5px;padding:10px;font-size:11px;overflow-x:auto;color:var(--text)"></pre>
+    </div>
+
+    <div class="section">
         <div class="section-title">Container</div>
         <div class="version-row">
             <span class="version-label">Started</span>
@@ -964,12 +983,21 @@
 </div>
 
 <script>
+const HOST_IS_STANDALONE = {{ 'true' if host_is_standalone else 'false' }};
+
 // --- tab switching ---
 function switchTab(name, btn) {
     document.querySelectorAll('.tab-btn,.tab-panel').forEach(el => el.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('panel-' + name).classList.add('active');
     if (name === 'version') loadVersion();
+}
+
+// Deep link from the dashboard's update-available indicator (/setup#version)
+// straight to the Version info tab instead of landing on General.
+if (location.hash === '#version') {
+    const btn = document.getElementById('tab-btn-version');
+    if (btn) switchTab('version', btn);
 }
 
 // --- theme toggle ---
@@ -1408,6 +1436,7 @@ let versionLoaded = false;
 let vStartTime    = null;
 
 function loadVersion() {
+    checkForUpdates(false);
     if (versionLoaded) return;
     versionLoaded = true;
     fetch('/api/version')
@@ -1428,6 +1457,73 @@ function loadVersion() {
                     </span>
                 </div>`).join('');
         });
+}
+
+// --- self-update ---
+function renderUpdateStatus(data) {
+    const statusEl   = document.getElementById('v-update-status');
+    const localEl    = document.getElementById('v-update-local-commit');
+    const installBtn = document.getElementById('v-install-update-btn');
+    const manualPre  = document.getElementById('v-update-manual-cmd');
+    installBtn.style.display = 'none';
+    manualPre.style.display  = 'none';
+
+    if (!data.enabled) {
+        statusEl.textContent = 'Update checking is disabled (Settings → General).';
+        return;
+    }
+    if (data.error) {
+        statusEl.textContent = "✕ Check failed — couldn't reach the git host.";
+        return;
+    }
+
+    localEl.textContent = data.local_commit_short ||
+        'unknown (dev checkout, or update.sh not yet re-run)';
+
+    if (!data.local_commit) {
+        statusEl.textContent =
+            'This deployment has no recorded build commit yet — re-run update.sh ' +
+            '(or docker-update.sh) once to enable update checks.';
+        return;
+    }
+
+    if (!data.update_available) {
+        statusEl.innerHTML = '<span style="color:var(--accent)">✓ Up to date</span>';
+        return;
+    }
+
+    statusEl.innerHTML = `<span style="color:var(--amber)">⬆ Update available</span> — ` +
+        `${data.latest_message} <span class="badge">${data.latest_commit_short}</span>`;
+
+    if (HOST_IS_STANDALONE) {
+        installBtn.style.display = 'inline-block';
+    } else {
+        manualPre.style.display = 'block';
+        manualPre.textContent =
+            'cd /mnt/user/appdata/hotspot-dashboard-src\ngit pull\nbash docker-update.sh';
+    }
+}
+
+function checkForUpdates(force) {
+    document.getElementById('v-update-status').textContent = 'Checking…';
+    fetch('/api/check_for_updates' + (force ? '?force=1' : ''))
+        .then(r => r.json())
+        .then(renderUpdateStatus)
+        .catch(() => { document.getElementById('v-update-status').textContent = '✕ Check failed'; });
+}
+
+function installUpdate() {
+    if (!confirm(
+        'Install the latest update?\n\n' +
+        'This pulls the latest code and restarts the dashboard service. It will be ' +
+        'unreachable for a short time while it restarts. Your hotspot config and ' +
+        'settings are untouched.'
+    )) return;
+    const status = document.getElementById('v-update-action-status');
+    status.textContent = 'Starting update...';
+    fetch('/api/install_update', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => { status.textContent = data.success ? data.message : '✕ ' + data.message; });
 }
 
 function updateUptime() {

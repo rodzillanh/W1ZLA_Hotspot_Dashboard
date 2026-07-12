@@ -83,28 +83,6 @@
         </div>
     </div>
 
-    <!-- Self-update -->
-    <div class="card">
-        <div class="card-title">Updates</div>
-        <div class="info-row">
-            <span class="info-label">Current build</span>
-            <span class="info-val" id="update-local-commit">—</span>
-        </div>
-        <div id="update-status" style="font-size:13px;margin:10px 0;color:var(--text-muted)">Checking…</div>
-        <button id="check-updates-btn" onclick="checkForUpdates(true)"
-                style="background:none;border:1px solid var(--card-border);border-radius:5px;
-                       color:var(--link);font-size:12px;padding:4px 10px;cursor:pointer">
-            Check for updates
-        </button>
-        <button id="install-update-btn" onclick="installUpdate()" style="display:none;
-                background:none;border:1px solid var(--accent);border-radius:5px;
-                color:var(--accent);font-size:12px;padding:4px 10px;cursor:pointer;margin-left:8px">
-            Install update
-        </button>
-        <span id="update-action-status" style="font-size:11px;color:var(--accent);margin-left:8px"></span>
-        <pre id="update-manual-cmd" style="display:none"></pre>
-    </div>
-
     <!-- Module hashes -->
     <div class="card">
         <div class="card-title">Loaded modules <span class="badge">MD5 of file inside container</span></div>
@@ -120,9 +98,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.8</span>
+                <span class="release-version">v3.9</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Update status moved into Settings</span> — the self-update card lived on the standalone Version/changelog page, a click away behind "View changelog & feature list." It's now directly in Settings → Version info, no extra navigation needed. That page goes back to being just the changelog/feature list/module hashes</li>
+                <li><span>Update-available indicator</span> — a flashing ⚡ appears next to the ⚙ Settings link on the dashboard itself whenever an update is available, linking straight to Settings → Version info</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.8</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Camera cards</span> — optional (Settings → Cameras, off by default). Each camera gets its own live-video dashboard card, positioned in the same Card order drag list as hotspot cards. Two types: generic RTSP (bridged to the browser via <code>ffmpeg</code>, transcoded to MJPEG since browsers can't play RTSP directly) and Bambu Labs A1 (via the <code>bambulabs_api</code> package — its camera feed uses a proprietary local protocol, not RTSP). Both converge on the same MJPEG stream server-side, so the frontend just uses a plain <code>&lt;img&gt;</code> tag either way. A camera's stream only runs while its card is actually being viewed, stopping itself shortly after the last viewer navigates away</li>
@@ -624,7 +613,7 @@
                 <li><span>Integrations tab</span> — QRZ.com, RadioID.net, APRS.fi, Home Assistant MQTT, and APRS favorite alert credentials/toggles with connection tests</li>
                 <li>Hotspots tab — card order, add/edit/delete hotspots with SSH connection test, optional lat/lon and Brandmeister ID per hotspot</li>
                 <li>Favorites tab — callsign + optional label, add/remove, browser alerts</li>
-                <li>Version info tab — module hashes, uptime, changelog, feature list, and a direct README link</li>
+                <li>Version info tab — self-update status/install, module hashes, uptime, changelog, feature list, and a direct README link</li>
             </ul>
         </div>
 
@@ -644,75 +633,6 @@
     </div>
 
 <script>
-const HOST_IS_STANDALONE = {{ 'true' if host_is_standalone else 'false' }};
-
-function renderUpdateStatus(data) {
-    const statusEl   = document.getElementById('update-status');
-    const localEl    = document.getElementById('update-local-commit');
-    const installBtn = document.getElementById('install-update-btn');
-    const manualPre  = document.getElementById('update-manual-cmd');
-    installBtn.style.display = 'none';
-    manualPre.style.display  = 'none';
-
-    if (!data.enabled) {
-        statusEl.textContent = 'Update checking is disabled (Settings → General).';
-        return;
-    }
-    if (data.error) {
-        statusEl.textContent = "✕ Check failed — couldn't reach the git host.";
-        return;
-    }
-
-    localEl.textContent = data.local_commit_short ||
-        'unknown (dev checkout, or update.sh not yet re-run)';
-
-    if (!data.local_commit) {
-        statusEl.textContent =
-            'This deployment has no recorded build commit yet — re-run update.sh ' +
-            '(or docker-update.sh) once to enable update checks.';
-        return;
-    }
-
-    if (!data.update_available) {
-        statusEl.innerHTML = '<span style="color:var(--accent)">✓ Up to date</span>';
-        return;
-    }
-
-    statusEl.innerHTML = `<span style="color:var(--amber)">⬆ Update available</span> — ` +
-        `${data.latest_message} <span class="badge">${data.latest_commit_short}</span>`;
-
-    if (HOST_IS_STANDALONE) {
-        installBtn.style.display = 'inline-block';
-    } else {
-        manualPre.style.display = 'block';
-        manualPre.textContent =
-            'cd /mnt/user/appdata/hotspot-dashboard-src\ngit pull\nbash docker-update.sh';
-    }
-}
-
-function checkForUpdates(force) {
-    document.getElementById('update-status').textContent = 'Checking…';
-    fetch('/api/check_for_updates' + (force ? '?force=1' : ''))
-        .then(r => r.json())
-        .then(renderUpdateStatus)
-        .catch(() => { document.getElementById('update-status').textContent = '✕ Check failed'; });
-}
-checkForUpdates(false);
-
-function installUpdate() {
-    if (!confirm(
-        'Install the latest update?\n\n' +
-        'This pulls the latest code and restarts the dashboard service. It will be ' +
-        'unreachable for a short time while it restarts. Your hotspot config and ' +
-        'settings are untouched.'
-    )) return;
-    const status = document.getElementById('update-action-status');
-    status.textContent = 'Starting update...';
-    fetch('/api/install_update', { method: 'POST' })
-        .then(r => r.json())
-        .then(data => { status.textContent = data.success ? data.message : '✕ ' + data.message; });
-}
-
 let startTime = null;
 
 function updateUptime() {

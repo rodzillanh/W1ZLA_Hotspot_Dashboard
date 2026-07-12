@@ -116,6 +116,15 @@
             align-self: center;
         }
         .settings-link:hover { color: var(--text); }
+        .update-indicator {
+            display: none;
+            align-self: center;
+            font-size: 14px;
+            text-decoration: none;
+            margin-right: 6px;
+            animation: update-flash 1.4s infinite;
+        }
+        @keyframes update-flash { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
         /* --- system bar (host CPU + memory) --- */
         .sysbar {
@@ -774,6 +783,7 @@
     {% endfor %}
     {% endif %}
     <span class="toolbar-sep"></span>
+    <a class="update-indicator" id="update-indicator" href="/setup#version" title="Update available">⚡</a>
     <a class="settings-link" href="/setup">⚙ Settings</a>
 </div>
 
@@ -1511,6 +1521,21 @@ if (SHOW_CAMERAS) {
     setInterval(fetchCameras, 30000);       // pick up cameras added/edited/removed in Settings
     setInterval(fetchCameraStatus, CAMERA_STATUS_POLL_MS);
 }
+
+// --- update-available indicator next to the Settings link ---
+// Hits the same cached (~5min TTL) endpoint the Settings > Version info
+// tab uses, so this doesn't add any new load on the git host itself.
+function checkDashboardUpdateIndicator() {
+    fetch('/api/check_for_updates')
+        .then(r => r.json())
+        .then(data => {
+            const el = document.getElementById('update-indicator');
+            if (el) el.style.display = (data.enabled && data.update_available) ? 'inline' : 'none';
+        })
+        .catch(() => {});
+}
+checkDashboardUpdateIndicator();
+setInterval(checkDashboardUpdateIndicator, 300000);
 
 // Tick all timers every second — uses browser-local start times so each
 // card counts independently and smoothly across render cycles.

@@ -353,7 +353,8 @@ def setup():
     return render_template("setup.html", hotspots=load_hotspots(),
                            settings=load_settings(), favorites=load_favorites(),
                            cameras=load_cameras(),
-                           can_power_control=HOST_CAN_POWER_CONTROL)
+                           can_power_control=HOST_CAN_POWER_CONTROL,
+                           host_is_standalone=HOST_IS_STANDALONE)
 
 @app.route("/api/host_stats")
 def api_host_stats():
@@ -435,8 +436,7 @@ def api_weather():
 @app.route("/version")
 def version_page():
     embed = request.args.get("embed") == "1"
-    return render_template("version.html", settings=load_settings(), embed=embed,
-                           host_is_standalone=HOST_IS_STANDALONE)
+    return render_template("version.html", settings=load_settings(), embed=embed)
 
 @app.route("/api/check_for_updates")
 def api_check_for_updates():
