@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.20</span>
+                <span class="release-version">v3.21</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Bugfix — update-available lightning bolt indicator showed the wrong color on some devices</span> — it was the ⚡ emoji character, whose bright yellow/black color only renders correctly if the viewing device has a color emoji font installed (Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji). Raspberry Pi OS often doesn't ship one, especially Lite/minimal images, so it silently fell back to a plain monochrome glyph colored by inherited link blue instead. Replaced with an inline SVG icon, which renders identically bright yellow everywhere regardless of installed fonts</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.20</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Install update now auto-detects completion and reloads</span> — clicking "Install update" used to just say "restarting shortly" and leave it at that, with no way to tell when it was actually done short of manually refreshing. Now polls until the dashboard comes back up with a genuinely new process (compares container start time, not just "did something answer" — the old process can still briefly respond right after the click, before systemd actually stops it), then reloads automatically. Gives up with a message after 3 minutes if it never comes back</li>

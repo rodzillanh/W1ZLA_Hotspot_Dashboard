@@ -119,11 +119,20 @@
         .update-indicator {
             display: none;
             align-self: center;
-            font-size: 14px;
             text-decoration: none;
             margin-right: 6px;
             animation: update-flash 1.4s infinite;
         }
+        /* Inline SVG, not the ⚡ emoji character -- the emoji's yellow/black
+           color only renders correctly if the viewing device has a color
+           emoji font installed (Segoe UI Emoji, Apple Color Emoji, Noto
+           Color Emoji). Raspberry Pi OS often doesn't ship one, especially
+           Lite/minimal images, so the glyph silently fell back to a plain
+           monochrome text character colored by whatever CSS `color` applied
+           (inherited link blue) instead of bright yellow. An SVG with an
+           explicit fill renders identically everywhere, regardless of what
+           fonts happen to be installed on the device viewing the dashboard. */
+        .update-indicator svg { display: block; width: 15px; height: 15px; }
         @keyframes update-flash { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
         /* --- system bar (host CPU + memory) --- */
@@ -967,7 +976,11 @@
     {% endfor %}
     {% endif %}
     <span class="toolbar-sep"></span>
-    <a class="update-indicator" id="update-indicator" href="/setup#version" title="Update available">⚡</a>
+    <a class="update-indicator" id="update-indicator" href="/setup#version" title="Update available">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M13 2 3 14h7l-1 8 11-14h-7l1-8z" fill="#FFCC4D" stroke="#664500" stroke-width="1" stroke-linejoin="round"/>
+        </svg>
+    </a>
     <a class="settings-link" href="/setup">⚙ Settings</a>
 </div>
 
