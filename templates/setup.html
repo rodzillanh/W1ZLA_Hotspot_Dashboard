@@ -1666,13 +1666,15 @@ function renderUpdateStatus(data) {
         return;
     }
 
-    localEl.textContent = data.local_commit_short ||
-        'unknown (dev checkout, or update.sh not yet re-run)';
+    localEl.textContent = data.local_commit_short || 'unknown';
 
     if (!data.local_commit) {
         statusEl.textContent =
-            'This deployment has no recorded build commit yet — re-run update.sh ' +
-            '(or docker-update.sh) once to enable update checks.';
+            'No build commit recorded — this usually means the app wasn\'t deployed from a ' +
+            'git clone (e.g. files were copied via SCP or a downloaded zip instead). Update ' +
+            'checks compare against the git remote, so they need a real git checkout to know ' +
+            'what commit is currently deployed. Re-deploy via "git clone" (see README.md) to ' +
+            'enable this — re-running update.sh from the same non-git copy won\'t fix it.';
         return;
     }
 

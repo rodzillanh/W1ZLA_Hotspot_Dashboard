@@ -42,6 +42,14 @@ Copy the project folder to your Pi (via SCP, USB, or git clone), then:
 sudo bash install.sh
 ```
 
+**Use `git clone` if you want the Settings → Version tab's update-check
+feature to work.** It compares your deployed commit against the git
+remote, so it needs a real `.git` checkout to know what's currently
+deployed — copying files via SCP or a downloaded zip has no commit
+history for it to read, and the Version tab will show "unknown" /
+"no recorded build commit" instead of checking for updates. `install.sh`
+warns about this at install time if it detects a non-git source folder.
+
 The installer will:
 1. Install Python dependencies into an isolated virtual environment
 2. Create a dedicated `hotspot` system user to run the service

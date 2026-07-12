@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.16</span>
+                <span class="release-version">v3.17</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Bugfix — misleading message when update checking has no build commit</span> — a standalone Pi install deployed by copying files (SCP/zip) instead of <code>git clone</code> has no <code>.git</code> history for <code>install.sh</code>/<code>update.sh</code> to read, so the Version tab correctly shows "unknown" — but the message used to say "re-run update.sh to enable update checks," which doesn't fix anything for a non-git deployment (it hits the identical failure and writes "unknown" again). Now says clearly that a real <code>git clone</code> is needed. <code>install.sh</code>/<code>update.sh</code> also now warn loudly at deploy time when no git info is found, instead of failing silently</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.16</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Wyze camera type</span> — Settings → Cameras now has a "Wyze (RTSP firmware)" option alongside Generic RTSP. Cosmetic only: Wyze cameras with Wyze's own official RTSP firmware flashed (Cam v2/v3, Pan v2/v3, and newer) already speak plain RTSP, so this uses the exact same ffmpeg bridge as Generic RTSP — the dedicated dropdown entry, badge label, and URL-format hint just make it discoverable for people who don't know their Wyze cam can do this at all</li>

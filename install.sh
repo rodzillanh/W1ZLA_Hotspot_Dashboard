@@ -114,8 +114,14 @@ success "Application files copied to ${INSTALL_DIR}"
 # --- record the deployed commit (Version tab's update check reads this;
 # the running app has no other way to know what it is, since these are
 # plain file copies, not a git clone) ---
-git -C "$SCRIPT_DIR" rev-parse HEAD > "${INSTALL_DIR}/BUILD_COMMIT" 2>/dev/null \
-    || echo "unknown" > "${INSTALL_DIR}/BUILD_COMMIT"
+if git -C "$SCRIPT_DIR" rev-parse HEAD > "${INSTALL_DIR}/BUILD_COMMIT" 2>/dev/null; then
+    success "Recorded build commit for update checks"
+else
+    echo "unknown" > "${INSTALL_DIR}/BUILD_COMMIT"
+    warn "No git info found in ${SCRIPT_DIR} -- update checks (Settings → Version) will show" \
+         "\"unknown\" and won't work. This is expected if you copied files via SCP/zip instead" \
+         "of 'git clone' -- re-deploy from a git clone to enable update checks."
+fi
 
 # --- create data directory ---
 mkdir -p "$DATA_DIR"

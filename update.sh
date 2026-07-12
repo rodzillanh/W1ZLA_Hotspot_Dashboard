@@ -102,8 +102,14 @@ cp "${SCRIPT_DIR}/templates/"*.html        "${INSTALL_DIR}/templates/"
 # update check. Blank/"unknown" if SCRIPT_DIR isn't a git clone (e.g. files
 # were copied in some other way), which the check just treats as "unknown,
 # can't tell if an update is available" rather than erroring.
-git -C "$SCRIPT_DIR" rev-parse HEAD > "${INSTALL_DIR}/BUILD_COMMIT" 2>/dev/null \
-    || echo "unknown" > "${INSTALL_DIR}/BUILD_COMMIT"
+if git -C "$SCRIPT_DIR" rev-parse HEAD > "${INSTALL_DIR}/BUILD_COMMIT" 2>/dev/null; then
+    success "Recorded build commit for update checks"
+else
+    echo "unknown" > "${INSTALL_DIR}/BUILD_COMMIT"
+    warn "No git info found in ${SCRIPT_DIR} -- update checks (Settings → Version) will show" \
+         "\"unknown\" and won't work. This is expected if you copied files via SCP/zip instead" \
+         "of 'git clone' -- re-deploy from a git clone to enable update checks."
+fi
 chown -R hotspot:hotspot "${INSTALL_DIR}"
 success "Files updated"
 

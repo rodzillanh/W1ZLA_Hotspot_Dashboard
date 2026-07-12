@@ -351,6 +351,29 @@ config for per-integration credentials; put it in
   shaped API) before writing `update_check.py` — if the configured repo
   ever needs to support GitHub too, that's a different endpoint shape
   entirely, not a drop-in.
+- **A standalone Pi install with no `.git` checkout (SCP/zip-copied
+  source instead of `git clone`) is a real, reported scenario, not a
+  hypothetical — the Version tab genuinely shows "unknown"/"no recorded
+  build commit" in that case, and there's no way to fix it after the
+  fact short of re-deploying from an actual git clone.** This is
+  `install.sh`/`update.sh`'s own `git -C "$SCRIPT_DIR" rev-parse HEAD`
+  failing (no `.git` directory at all -- a different failure than the
+  WPSD "dubious ownership" gotcha above, which is about *ownership* of
+  an existing `.git`, not its absence), silently swallowed by the
+  `|| echo "unknown"` fallback. The bug that shipped alongside this
+  (fixed at the same time this was diagnosed) was the *message* shown
+  for this case in `setup.html`'s `renderUpdateStatus()`: it used to
+  say "re-run update.sh (or docker-update.sh) once to enable update
+  checks" — actively misleading for a non-git deployment, since
+  re-running update.sh against the same non-git `$SCRIPT_DIR` hits the
+  identical `git rev-parse` failure and writes "unknown" again, forever.
+  Fixed by (a) `install.sh`/`update.sh` now `warn()`-ing loudly at
+  deploy time when no git info is found, instead of failing silently,
+  and (b) the Version tab message now correctly says to re-deploy via
+  `git clone`, not to re-run the update script. If you touch this
+  again, remember the two failure modes need different messages: "no
+  `.git` at all" (this one) vs. "`.git` exists but `git` refuses to
+  read it" (the dubious-ownership case) — don't conflate them.
 
 - **Camera cards (v3.8) — Bambu Labs A1's camera is NOT RTSP.** It's a
   proprietary TLS/port-6000 framed-JPEG protocol. A first instinct to
