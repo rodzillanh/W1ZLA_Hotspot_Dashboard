@@ -1013,9 +1013,9 @@
             <div class="metrics-header">
                 <div class="card-name">Fleet activity</div>
                 <div class="fleet-mode-toggle">
-                    <button class="fleet-mode-btn active" data-mode="per-hotspot"
+                    <button class="fleet-mode-btn" data-mode="per-hotspot"
                             onclick="setFleetChartMode('per-hotspot')">Per-hotspot</button>
-                    <button class="fleet-mode-btn" data-mode="aggregate"
+                    <button class="fleet-mode-btn active" data-mode="aggregate"
                             onclick="setFleetChartMode('aggregate')">Aggregate</button>
                 </div>
             </div>
@@ -2613,7 +2613,7 @@ function refreshMap() {
 
 // --- fleet activity metrics card ---
 let fleetChart        = null;
-let fleetChartMode     = 'per-hotspot';
+let fleetChartMode     = 'aggregate';
 let fleetActivityData  = null;  // last /api/activity response, reused when the toggle switches modes
 let fleetLastActivity  = null;  // {hotspot, ts}, ticked client-side same as tx/last-heard timers
 // Parallel to fleetChart.data.labels -- true where a bucket lands on the
