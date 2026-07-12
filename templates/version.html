@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.18</span>
+                <span class="release-version">v3.19</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Bugfix — "Version page" link in Settings → General → Software updates went to the wrong place</span> — it linked to <code>/version</code> (the public read-only changelog page), which has no "check for updates"/"install update" buttons at all; that functionality lives in Settings' own Version info tab, moved there back in v3.9. The link was never updated when that happened. Now switches to the Version info tab directly instead of navigating away</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.18</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Standalone Pi install/update now auto-clones a git source if needed</span> — deploying via SCP/zip instead of <code>git clone</code> used to permanently break update checks and the self-update button, with no fix short of manually re-deploying. <code>install.sh</code> now automatically sets up a persistent git checkout (<code>/opt/hotspot-dashboard-src</code>) and installs from that when it detects a non-git source folder (falling back to your copy as-is if it can't reach the git host); <code>update.sh</code> does the equivalent for the self-update button specifically, without touching whichever files it's actually copying from on that run</li>
