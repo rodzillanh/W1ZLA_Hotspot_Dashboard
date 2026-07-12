@@ -287,6 +287,7 @@
     <div class="tab-btn"       onclick="switchTab('weather',      this)">Weather</div>
     <div class="tab-btn"       onclick="switchTab('integrations', this)">Integrations</div>
     <div class="tab-btn"       onclick="switchTab('hotspots',     this)">Hotspots</div>
+    <div class="tab-btn"       onclick="switchTab('cameras',      this)">Cameras</div>
     <div class="tab-btn"       onclick="switchTab('favorites',    this)">Favorites</div>
     <div class="tab-btn"       onclick="switchTab('version',      this)">Version info</div>
 </div>
@@ -638,6 +639,7 @@
         <div id="card-order-list">
             {% set fleet_pos = settings.get('fleet_activity_position', 0) if settings.get('show_fleet_activity', False) else -1 %}
             {% set asl_fav_pos = settings.get('asl_favorites_position', 0) if settings.get('show_asl_favorites', False) else -1 %}
+            {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
                 <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
@@ -652,6 +654,15 @@
                     <span class="node-name">📻 ASL Favorites</span>
                     <span class="node-meta">control card</span>
                 </div>
+                {% endif %}
+                {% if show_cams %}
+                    {% for cam in cameras if cam.get('position', 0) == loop.index0 %}
+                    <div class="drag-row fleet-activity-row" draggable="true" data-ip="__camera__{{ cam.id }}">
+                        <span class="drag-handle">⠿</span>
+                        <span class="node-name">📷 {{ cam.name }}</span>
+                        <span class="node-meta">camera · {{ 'RTSP' if cam.type == 'rtsp' else 'Bambu A1' }}</span>
+                    </div>
+                    {% endfor %}
                 {% endif %}
             <div class="drag-row" draggable="true" data-ip="{{ hs.ip }}">
                 <span class="drag-handle">⠿</span>
@@ -680,6 +691,15 @@
                 <span class="node-name">📻 ASL Favorites</span>
                 <span class="node-meta">control card</span>
             </div>
+            {% endif %}
+            {% if show_cams %}
+                {% for cam in cameras if cam.get('position', 0) >= hotspots|length %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__camera__{{ cam.id }}">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📷 {{ cam.name }}</span>
+                    <span class="node-meta">camera · {{ 'RTSP' if cam.type == 'rtsp' else 'Bambu A1' }}</span>
+                </div>
+                {% endfor %}
             {% endif %}
         </div>
         <div style="margin-top:10px">
@@ -744,6 +764,85 @@
             <button class="btn btn-danger btn-sm" onclick="clearHotspotForm()" style="margin-left:auto">Clear</button>
         </div>
         <div id="test-result"></div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     CAMERAS TAB
+     RTSP / Bambu Labs A1 camera cards -- off by default
+═══════════════════════════════════════════════ -->
+<div id="panel-cameras" class="tab-panel">
+
+    <div class="section">
+        <div class="section-title">Show camera cards</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            Each camera gets its own card on the dashboard, positioned in the same
+            Card order list as hotspot cards (Hotspots tab). Off by default.
+        </p>
+        <div class="toggle-group">
+            <div class="toggle-row">
+                <span class="toggle-label">Enable camera cards on the dashboard</span>
+                <div class="toggle {{ 'on' if settings.get('show_cameras', False) else '' }}"
+                     id="cam-show-toggle" onclick="this.classList.toggle('on'); saveCameraToggle()"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title" id="camera-form-title">Add a camera</div>
+        <div class="form-grid one" style="margin-bottom:10px">
+            <div><label>Camera type</label>
+                 <select id="cam-type" onchange="onCameraTypeChange()">
+                     <option value="rtsp">Generic RTSP</option>
+                     <option value="bambu_a1">Bambu Labs A1</option>
+                 </select></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div><label>Camera name</label>
+                 <input type="text" id="cam-name" placeholder="Front Door"></div>
+        </div>
+        <div class="form-grid one" style="margin-bottom:10px" id="cam-rtsp-fields">
+            <div><label>RTSP URL</label>
+                 <input type="text" id="cam-rtsp-url" placeholder="rtsp://user:pass@192.168.1.50:554/stream1"></div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px;display:none" id="cam-bambu-fields">
+            <div><label>Printer IP</label>
+                 <input type="text" id="cam-bambu-ip" placeholder="192.168.1.60"></div>
+            <div><label>Serial number</label>
+                 <input type="text" id="cam-bambu-serial" placeholder="01P00A123456789"></div>
+            <div><label>Access code
+                     <span style="font-size:10px;color:var(--text-dim)">(printer: Settings → WLAN)</span>
+                 </label>
+                 <input type="password" id="cam-bambu-code" placeholder="••••••••"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-info" onclick="testCamera()">Test connection</button>
+            <input type="hidden" id="cam-id">
+            <button class="btn btn-primary" onclick="submitCamera()">Save camera</button>
+            <button class="btn btn-danger btn-sm" onclick="clearCameraForm()" style="margin-left:auto">Clear</button>
+        </div>
+        <div id="camera-test-result"></div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Cameras</div>
+        <div id="cameras-list">
+            {% for cam in cameras %}
+            <div class="drag-row" style="align-items:center">
+                <span style="flex-shrink:0">📷</span>
+                <span class="node-name">{{ cam.name }}</span>
+                <span class="node-meta">{{ 'RTSP' if cam.type == 'rtsp' else 'Bambu A1' }}</span>
+                <button class="btn btn-info btn-sm"
+                        onclick="editCamera('{{ cam.id }}','{{ cam.name }}','{{ cam.type }}','{{ cam.get('rtsp_url', '') }}','{{ cam.get('ip', '') }}','{{ cam.get('serial', '') }}','{{ cam.get('access_code', '') }}')">
+                    Edit
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="deleteCamera('{{ cam.id }}','{{ cam.name }}')">Delete</button>
+            </div>
+            {% else %}
+            <p style="font-size:13px;color:var(--text-dim)">No cameras added yet.</p>
+            {% endfor %}
+        </div>
     </div>
 
 </div>
@@ -1000,7 +1099,11 @@ function saveLinks() {
 function saveCardOrder() {
     const rows   = document.querySelectorAll('#card-order-list .drag-row[data-ip]');
     const allIds = Array.from(rows).map(r => r.dataset.ip);
-    const isSentinel = id => id === '__fleet_activity__' || id === '__asl_favorites__';
+    // Every sentinel (fleet activity, ASL favorites, one per camera) uses a
+    // "__"-prefixed data-ip -- real hotspot IPs never start with that, so
+    // this single check covers all of them, including an arbitrary number
+    // of camera rows, without listing each key by name.
+    const isSentinel = id => id.startsWith('__');
     const ips = allIds.filter(id => !isSentinel(id));
 
     // Each sentinel's position is "how many hotspot rows precede it" --
@@ -1012,6 +1115,10 @@ function saveCardOrder() {
     }
     const fleetIdx  = sentinelIndex('__fleet_activity__');
     const aslFavIdx = sentinelIndex('__asl_favorites__');
+    const cameraPositions = {};
+    allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
+        cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
+    });
 
     const saves = [
         fetch('/api/reorder_hotspots', {
@@ -1035,6 +1142,13 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ asl_favorites_position: aslFavIdx })
+        }));
+    }
+    if (Object.keys(cameraPositions).length > 0) {
+        saves.push(fetch('/api/reorder_cameras', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(cameraPositions)
         }));
     }
     Promise.all(saves).then(() => {
@@ -1143,6 +1257,86 @@ async function testAslNode() {
     const data = await r.json();
     res.textContent = data.success ? '✓ ' + data.message : '✕ Failed: ' + data.message;
     res.className   = data.success ? 'ok' : 'err';
+}
+
+// --- camera form (RTSP / Bambu Labs A1) ---
+function onCameraTypeChange() {
+    const isBambu = document.getElementById('cam-type').value === 'bambu_a1';
+    document.getElementById('cam-rtsp-fields').style.display  = isBambu ? 'none' : '';
+    document.getElementById('cam-bambu-fields').style.display = isBambu ? '' : 'none';
+}
+
+function collectCameraForm() {
+    return {
+        id:   document.getElementById('cam-id').value,
+        name: document.getElementById('cam-name').value.trim(),
+        type: document.getElementById('cam-type').value,
+        rtsp_url:    document.getElementById('cam-rtsp-url').value.trim(),
+        ip:          document.getElementById('cam-bambu-ip').value.trim(),
+        serial:      document.getElementById('cam-bambu-serial').value.trim(),
+        access_code: document.getElementById('cam-bambu-code').value.trim(),
+    };
+}
+
+function submitCamera() {
+    fetch('/api/cameras', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(collectCameraForm())
+    }).then(() => location.reload());
+}
+
+function editCamera(id, name, type, rtspUrl, ip, serial, accessCode) {
+    document.getElementById('cam-id').value          = id;
+    document.getElementById('cam-name').value        = name;
+    document.getElementById('cam-type').value        = type;
+    document.getElementById('cam-rtsp-url').value     = (rtspUrl    && rtspUrl    !== 'None') ? rtspUrl    : '';
+    document.getElementById('cam-bambu-ip').value     = (ip         && ip         !== 'None') ? ip         : '';
+    document.getElementById('cam-bambu-serial').value = (serial     && serial     !== 'None') ? serial     : '';
+    document.getElementById('cam-bambu-code').value   = (accessCode && accessCode !== 'None') ? accessCode : '';
+    onCameraTypeChange();
+    document.getElementById('camera-form-title').textContent = 'Edit camera';
+    document.getElementById('cam-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('cam-name').focus();
+}
+
+function clearCameraForm() {
+    ['cam-id','cam-name','cam-rtsp-url','cam-bambu-ip','cam-bambu-serial','cam-bambu-code'].forEach(
+        id => document.getElementById(id).value = ''
+    );
+    document.getElementById('cam-type').value = 'rtsp';
+    onCameraTypeChange();
+    document.getElementById('camera-form-title').textContent = 'Add a camera';
+    document.getElementById('camera-test-result').textContent = '';
+}
+
+function deleteCamera(id, name) {
+    if (!confirm(`Delete camera "${name}"?`)) return;
+    fetch(`/api/delete_camera/${id}`, { method: 'POST' }).then(() => location.reload());
+}
+
+async function testCamera() {
+    const res = document.getElementById('camera-test-result');
+    res.textContent = 'Testing... (may take a few seconds)';
+    res.className    = '';
+    const r = await fetch('/api/test_camera', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(collectCameraForm())
+    });
+    const data = await r.json();
+    res.textContent = data.success ? '✓ ' + data.message : '✕ Failed: ' + data.message;
+    res.className   = data.success ? 'ok' : 'err';
+}
+
+function saveCameraToggle() {
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            show_cameras: document.getElementById('cam-show-toggle').classList.contains('on')
+        })
+    });
 }
 
 // --- favorites ---

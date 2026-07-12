@@ -2,3 +2,4 @@ Flask>=3.0
 paramiko>=3.4
 paho-mqtt>=2.0
 aprslib>=0.7
+bambulabs_api>=2.6

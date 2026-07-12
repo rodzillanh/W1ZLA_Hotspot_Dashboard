@@ -7,6 +7,7 @@ CONFIG_FILE  = os.path.join(CONFIG_DIR, "hotspots.json")
 SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 FAVORITES_FILE = os.path.join(CONFIG_DIR, "favorites.json")
 ASL_FAVORITES_FILE = os.path.join(CONFIG_DIR, "asl_favorites.json")
+CAMERAS_FILE = os.path.join(CONFIG_DIR, "cameras.json")
 
 # --- Server ---
 HOST = "0.0.0.0"
@@ -160,6 +161,17 @@ BRANDMEISTER_AGENT     = os.environ.get("BRANDMEISTER_AGENT", "hotspot-dashboard
 BRANDMEISTER_TIMEOUT   = int(os.environ.get("BRANDMEISTER_TIMEOUT", 5))
 BRANDMEISTER_CACHE_TTL = int(os.environ.get("BRANDMEISTER_CACHE_TTL", 120))
 
+# --- Camera cards (RTSP via ffmpeg, Bambu Labs A1 via bambulabs_api) ---
+# Both camera types are bridged to a plain MJPEG multipart stream server-side
+# so the frontend only ever needs a plain <img> tag -- it doesn't know or
+# care which camera type it's looking at.
+CAMERA_RTSP_FPS          = int(os.environ.get("CAMERA_RTSP_FPS", 5))
+CAMERA_BAMBU_POLL_SEC    = float(os.environ.get("CAMERA_BAMBU_POLL_SEC", 1.5))
+CAMERA_FFMPEG_TIMEOUT    = int(os.environ.get("CAMERA_FFMPEG_TIMEOUT", 10))   # seconds of silence before treating ffmpeg as dead
+CAMERA_RECONNECT_BACKOFF = int(os.environ.get("CAMERA_RECONNECT_BACKOFF", 5))  # seconds between reconnect attempts
+CAMERA_IDLE_STOP_SEC     = int(os.environ.get("CAMERA_IDLE_STOP_SEC", 20))   # stop the worker this long after the last viewer disconnects
+CAMERA_TEST_TIMEOUT      = int(os.environ.get("CAMERA_TEST_TIMEOUT", 12))    # Settings "Test connection" button
+
 # --- Home Assistant MQTT auto-discovery ---
 MQTT_PUBLISH_INTERVAL = int(os.environ.get("MQTT_PUBLISH_INTERVAL", POLL_INTERVAL))
 # Runs on a much slower cadence than the main poll loop since it does a
@@ -264,6 +276,13 @@ DEFAULT_SETTINGS = {
     "update_check_enabled": True,
     "update_check_repo": "https://git.trytheitguy.com/rodney_berry/W1ZLAHotspot_Dashboard",
     "update_check_branch": "main",
+    # Camera cards -- off by default, since it's a new external process
+    # (ffmpeg) per RTSP camera and pulls in a new pip dependency
+    # (bambulabs_api) for Bambu Labs cameras. Individual cameras (and their
+    # position among the hotspot cards) live in cameras.json, same
+    # dynamic-list treatment as hotspots.json -- this is just the master
+    # on/off switch for the whole feature.
+    "show_cameras": False,
 }
 
 # --- Fleet activity ---

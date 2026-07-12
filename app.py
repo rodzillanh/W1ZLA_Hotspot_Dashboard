@@ -7,9 +7,10 @@ import os
 import re
 import subprocess
 import time
+import uuid
 
 import paramiko
-from flask import Flask, jsonify, render_template, request, redirect
+from flask import Flask, jsonify, render_template, request, redirect, Response
 
 import config
 import models
@@ -18,7 +19,8 @@ import monitor as monitor_mod
 import qrz as qrz_mod
 from monitor import FleetMonitor
 from storage import load_hotspots, save_hotspots, load_settings, save_settings, \
-                   load_favorites, save_favorites, load_asl_favorites, save_asl_favorites
+                   load_favorites, save_favorites, load_asl_favorites, save_asl_favorites, \
+                   load_cameras, save_cameras
 from weather import WeatherClient
 from qrz import QrzClient
 from aprs import AprsClient
@@ -28,6 +30,7 @@ from aprs_messaging import AprsMessenger
 from host_stats import HostStats
 import storage_activity
 from update_check import UpdateChecker
+from camera_stream import CameraStreamManager
 
 import host_stats as host_stats_mod
 
@@ -37,6 +40,7 @@ wx         = WeatherClient()
 host_stats = HostStats()
 host_stats.start()
 update_checker = UpdateChecker()
+camera_manager  = CameraStreamManager()
 
 # Gates the Settings "Host power control" buttons -- only true on a
 # standalone install running directly on real Raspberry Pi hardware (see
@@ -249,6 +253,8 @@ def api_settings_post():
         settings["update_check_repo"] = data["update_check_repo"].strip()
     if "update_check_branch" in data:
         settings["update_check_branch"] = data["update_check_branch"].strip()
+    if "show_cameras" in data:
+        settings["show_cameras"] = bool(data["show_cameras"])
     save_settings(settings)
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:
@@ -346,6 +352,7 @@ def setup():
         return redirect("/setup")
     return render_template("setup.html", hotspots=load_hotspots(),
                            settings=load_settings(), favorites=load_favorites(),
+                           cameras=load_cameras(),
                            can_power_control=HOST_CAN_POWER_CONTROL)
 
 @app.route("/api/host_stats")
@@ -685,6 +692,129 @@ def delete_hotspot(ip):
     save_hotspots([h for h in load_hotspots() if h["ip"] != ip])
     monitor.remove(ip)
     return redirect("/setup")
+
+
+# --- cameras (RTSP / Bambu Labs A1) ---
+# One card per camera on the dashboard, same as hotspot cards -- positioned
+# via the same Card order drag list, using the sentinel-position scheme
+# (camera.position = "after the Nth hotspot card") rather than hotspots.json's
+# own plain list-order scheme, since cameras need to interleave freely among
+# hotspot cards rather than only reordering relative to each other.
+
+@app.route("/api/cameras", methods=["GET"])
+def api_cameras_get():
+    return jsonify(load_cameras())
+
+@app.route("/api/cameras", methods=["POST"])
+def api_cameras_post():
+    """Add or update one camera. An existing camera (matched by id) has its
+    stream worker torn down after saving, so a config change (e.g. a
+    corrected RTSP URL or access code) takes effect on the next view
+    instead of the worker silently continuing to use stale settings."""
+    data     = request.json or {}
+    name     = data.get("name", "").strip()
+    cam_type = data.get("type", "").strip()
+    if not name or cam_type not in ("rtsp", "bambu_a1"):
+        return jsonify({"ok": False, "message": "Name and a valid camera type are required"}), 400
+
+    cameras   = load_cameras()
+    camera_id = data.get("id", "").strip()
+    existing  = next((c for c in cameras if c["id"] == camera_id), None) if camera_id else None
+
+    camera = dict(existing) if existing else {
+        "id": camera_id or f"cam-{uuid.uuid4().hex[:10]}",
+        "position": len(cameras),
+    }
+    camera["name"] = name
+    camera["type"] = cam_type
+    if cam_type == "rtsp":
+        camera["rtsp_url"] = data.get("rtsp_url", "").strip()
+        camera.pop("ip", None)
+        camera.pop("serial", None)
+        camera.pop("access_code", None)
+    else:
+        camera["ip"]          = data.get("ip", "").strip()
+        camera["serial"]      = data.get("serial", "").strip()
+        camera["access_code"] = data.get("access_code", "").strip()
+        camera.pop("rtsp_url", None)
+
+    cameras = [c for c in cameras if c["id"] != camera["id"]]
+    cameras.append(camera)
+    save_cameras(cameras)
+    camera_manager.remove(camera["id"])
+    return jsonify({"ok": True, "camera": camera})
+
+@app.route("/api/delete_camera/<camera_id>", methods=["POST"])
+def api_delete_camera(camera_id):
+    save_cameras([c for c in load_cameras() if c["id"] != camera_id])
+    camera_manager.remove(camera_id)
+    return jsonify({"ok": True})
+
+@app.route("/api/reorder_cameras", methods=["POST"])
+def api_reorder_cameras():
+    """Accepts {camera_id: position, ...} -- a numeric position among the
+    hotspot cards for each camera (see module note above), not an ordered
+    list of ids the way /api/reorder_hotspots works."""
+    positions = request.json or {}
+    cameras = load_cameras()
+    for camera in cameras:
+        if camera["id"] in positions:
+            try:
+                camera["position"] = max(0, int(positions[camera["id"]]))
+            except (TypeError, ValueError):
+                pass
+    save_cameras(cameras)
+    return jsonify({"ok": True})
+
+@app.route("/api/test_camera", methods=["POST"])
+def api_test_camera():
+    """Grabs one real frame with a hard timeout for the Settings 'Test
+    connection' button -- doubles as a smoke test for both the RTSP/ffmpeg
+    and Bambu/bambulabs_api paths, reusing the exact same worker code the
+    live dashboard card uses rather than a separate, possibly-divergent
+    test-only implementation."""
+    data     = request.json or {}
+    cam_type = data.get("type", "").strip()
+    test_id  = f"__test__{uuid.uuid4().hex[:8]}"
+    camera   = {**data, "id": test_id, "type": cam_type}
+
+    result = {"success": False, "message": "Unknown camera type"}
+    done   = threading.Event()
+
+    def worker():
+        nonlocal result
+        try:
+            gen = camera_manager.stream(camera)
+            for _chunk in gen:
+                result = {"success": True, "message": "Connected — frame received"}
+                gen.close()
+                break
+            else:
+                status = camera_manager.status(camera)
+                result = {"success": False, "message": status.get("detail") or "No frame received"}
+        except Exception as e:
+            result = {"success": False, "message": str(e)}
+        finally:
+            done.set()
+
+    threading.Thread(target=worker, daemon=True).start()
+    done.wait(config.CAMERA_TEST_TIMEOUT)
+    if not done.is_set():
+        result = {"success": False, "message": "Timed out waiting for a frame"}
+    camera_manager.remove(test_id)
+    return jsonify(result)
+
+@app.route("/api/camera_feed/<camera_id>")
+def api_camera_feed(camera_id):
+    camera = next((c for c in load_cameras() if c["id"] == camera_id), None)
+    if camera is None:
+        return jsonify({"error": "not found"}), 404
+    return Response(camera_manager.stream(camera),
+                    mimetype="multipart/x-mixed-replace; boundary=frame")
+
+@app.route("/api/camera_status")
+def api_camera_status():
+    return jsonify({c["id"]: camera_manager.status(c) for c in load_cameras()})
 
 
 def _mqtt_publish_loop():

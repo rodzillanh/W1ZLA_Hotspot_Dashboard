@@ -476,6 +476,47 @@
         .asl-fav-empty { color: var(--text-dim); font-size: 12.5px; padding: 6px 0 10px; }
         .asl-fav-status-txt { font-size: 11px; color: var(--text-muted); margin-left: 8px; }
 
+        /* --- camera cards (RTSP / Bambu Labs A1) --- */
+        .camera-card {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px;
+        }
+        .camera-header { display: flex; align-items: center; gap: 8px; }
+        .camera-name { font-weight: 600; font-size: 14.5px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .camera-type-badge {
+            font-size: 10px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase;
+            padding: 2px 7px; border-radius: 9px; background: var(--toolbar-bg); color: var(--text-muted);
+            border: 1px solid var(--toolbar-border); flex-shrink: 0;
+        }
+        .camera-type-badge.rtsp  { color: var(--link); border-color: var(--link); }
+        .camera-type-badge.bambu_a1 { color: var(--tx-color); border-color: var(--tx-color); }
+        .camera-video-wrap {
+            position: relative; border-radius: 8px; overflow: hidden;
+            aspect-ratio: 16 / 9; background: #05070a;
+        }
+        .camera-video-wrap img { width: 100%; height: 100%; display: block; object-fit: cover; }
+        .camera-live-dot {
+            position: absolute; top: 8px; left: 8px;
+            display: flex; align-items: center; gap: 5px;
+            background: rgba(0,0,0,.55); border-radius: 10px; padding: 3px 8px 3px 6px;
+            font-size: 10.5px; font-weight: 600; color: #fff; letter-spacing: .3px;
+        }
+        .camera-live-dot .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); animation: pulse 1.4s infinite; }
+        .camera-offline {
+            position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 6px; color: var(--text-dim); font-size: 12.5px;
+            background: var(--card-bg); text-align: center; padding: 10px;
+        }
+        .camera-footer { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-muted); }
+        .camera-status { display: flex; align-items: center; gap: 5px; }
+        .camera-status .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+        .camera-status.offline .status-dot { background: var(--text-dim); }
+        .camera-btn {
+            font-size: 11px; padding: 3px 9px; border-radius: 5px; cursor: pointer;
+            border: 1px solid var(--toolbar-border); background: none; color: var(--text-muted);
+        }
+        .camera-btn:hover { color: var(--link); border-color: var(--link); }
+
         /* profile photo */
         .caller-photo {
             width: 80px;
@@ -818,6 +859,7 @@
         </div>
         {% endif %}
         <div id="cards" style="display:contents"></div>
+        <div id="camera-cards" style="display:contents"></div>
     </div>
 </div>
 
@@ -975,6 +1017,8 @@ const FLEET_ACTIVITY_POSITION = {{ settings.get('fleet_activity_position', 0) }}
 const FLEET_ACTIVITY_HOURS    = {{ settings.get('fleet_activity_hours', 12) }};
 const SHOW_ASL_FAVORITES = {{ 'true' if settings.get('show_asl_favorites', False) else 'false' }};
 const ASL_FAVORITES_POSITION = {{ settings.get('asl_favorites_position', 0) }};
+const SHOW_CAMERAS = {{ 'true' if settings.get('show_cameras', False) else 'false' }};
+const CAMERA_STATUS_POLL_MS = 5000;
 
 function updateSysbar(data) {
     if (!SHOW_HOST_STATS) return;
@@ -1145,12 +1189,24 @@ function renderCards(data) {
     if (SHOW_ASL_FAVORITES) {
         sentinels.push({ key: 'aslfav', pos: Math.max(0, Math.min(ASL_FAVORITES_POSITION, data.length)) });
     }
+    if (SHOW_CAMERAS) {
+        cameras.forEach(cam => {
+            sentinels.push({ key: 'cam-' + cam.id, pos: Math.max(0, Math.min(cam.position || 0, data.length)) });
+        });
+    }
     const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);
 
     const fleetCard = document.getElementById('fleet-activity-card');
     if (fleetCard && 'fleet' in sentinelOrders) fleetCard.style.order = sentinelOrders.fleet;
     const aslFavCard = document.getElementById('asl-favorites-card');
     if (aslFavCard && 'aslfav' in sentinelOrders) aslFavCard.style.order = sentinelOrders.aslfav;
+    if (SHOW_CAMERAS) {
+        cameras.forEach(cam => {
+            const camCard = document.getElementById('camera-card-' + cam.id);
+            const key = 'cam-' + cam.id;
+            if (camCard && key in sentinelOrders) camCard.style.order = sentinelOrders[key];
+        });
+    }
 
     // data is an array — order guaranteed, no Object.values() needed
     container.innerHTML = data.map((hs, i) => {
@@ -1348,6 +1404,112 @@ function renderCards(data) {
         maybeNotify(hs);
     });
     clearStaleNotifs(data);
+}
+
+// --- camera cards (RTSP / Bambu Labs A1) ---
+// Card DOM nodes persist across polls, same reasoning as the Fleet Activity/
+// ASL Favorites sentinel cards -- each <img> is a live MJPEG stream, so
+// tearing it down and recreating it every poll would restart the stream
+// constantly instead of just reflowing position via CSS `order`.
+let cameras = [];
+
+function fetchCameras() {
+    if (!SHOW_CAMERAS) return;
+    fetch('/api/cameras')
+        .then(r => r.json())
+        .then(data => {
+            cameras = data;
+            renderCameraCards();
+        });
+}
+
+function renderCameraCards() {
+    const container  = document.getElementById('camera-cards');
+    const currentIds = new Set(cameras.map(c => c.id));
+
+    // Drop cards for cameras removed in Settings since the last fetch.
+    Array.from(container.children).forEach(el => {
+        if (!currentIds.has(el.dataset.cameraId)) el.remove();
+    });
+
+    cameras.forEach(cam => {
+        let card = document.getElementById('camera-card-' + cam.id);
+        if (!card) {
+            card = document.createElement('div');
+            card.className = 'camera-card';
+            card.id = 'camera-card-' + cam.id;
+            card.dataset.cameraId = cam.id;
+            card.innerHTML = `
+                <div class="camera-header">
+                    <span class="camera-name"></span>
+                    <span class="camera-type-badge"></span>
+                </div>
+                <div class="camera-video-wrap">
+                    <img loading="lazy">
+                    <div class="camera-live-dot"><span class="dot"></span>LIVE</div>
+                    <div class="camera-offline" style="display:none">
+                        <span style="font-size:20px">📷</span>
+                        <span class="camera-offline-text">Offline</span>
+                    </div>
+                </div>
+                <div class="camera-footer">
+                    <span class="camera-status">
+                        <span class="status-dot"></span><span class="camera-status-text">Connecting…</span>
+                    </span>
+                    <button class="camera-btn" onclick="cameraFullscreen('${cam.id}')">⛶ Fullscreen</button>
+                </div>`;
+            container.appendChild(card);
+        }
+        card.querySelector('.camera-name').textContent = cam.name;
+        const badge = card.querySelector('.camera-type-badge');
+        badge.textContent = cam.type === 'bambu_a1' ? 'Bambu A1' : 'RTSP';
+        badge.className = 'camera-type-badge ' + cam.type;
+        const img = card.querySelector('img');
+        const wantedSrc = `/api/camera_feed/${cam.id}`;
+        if (!img.getAttribute('src') || !img.getAttribute('src').includes(cam.id)) {
+            img.src = wantedSrc;
+        }
+    });
+}
+
+function cameraFullscreen(camId) {
+    const card = document.getElementById('camera-card-' + camId);
+    const wrap = card && card.querySelector('.camera-video-wrap');
+    if (wrap && wrap.requestFullscreen) wrap.requestFullscreen();
+}
+
+const CAMERA_STATE_LABELS = {
+    connected: 'Connected', connecting: 'Connecting…',
+    reconnecting: 'Reconnecting…', offline: 'Offline', stopped: 'Idle',
+};
+
+function fetchCameraStatus() {
+    if (!SHOW_CAMERAS || cameras.length === 0) return;
+    fetch('/api/camera_status')
+        .then(r => r.json())
+        .then(statusMap => {
+            cameras.forEach(cam => {
+                const card = document.getElementById('camera-card-' + cam.id);
+                if (!card) return;
+                const st    = statusMap[cam.id] || { state: 'stopped', detail: '' };
+                const isUp  = st.state === 'connected';
+                const label = CAMERA_STATE_LABELS[st.state] || st.state;
+
+                card.querySelector('.camera-offline').style.display  = isUp ? 'none' : 'flex';
+                card.querySelector('.camera-live-dot').style.display = isUp ? 'flex' : 'none';
+                card.querySelector('.camera-status').classList.toggle('offline', !isUp);
+                card.querySelector('.camera-status-text').textContent = label;
+                if (!isUp) {
+                    card.querySelector('.camera-offline-text').textContent = st.detail || label;
+                }
+            });
+        });
+}
+
+if (SHOW_CAMERAS) {
+    fetchCameras();
+    setInterval(fetchCameras, 30000);       // pick up cameras added/edited/removed in Settings
+    setInterval(fetchCameraStatus, CAMERA_STATUS_POLL_MS);
 }
 
 // Tick all timers every second — uses browser-local start times so each

@@ -2,6 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# ffmpeg bridges RTSP camera feeds to MJPEG for the optional camera cards
+# (camera_stream.py) -- not in the base python:slim image by default.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies first so this layer is cached unless requirements change
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

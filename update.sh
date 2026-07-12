@@ -112,6 +112,19 @@ else
     info "Dependencies unchanged — skipping pip install"
 fi
 
+# --- ensure ffmpeg (added in v3.8, for the optional camera cards) ---
+# A system/apt package, not a pip one, so the REQS_CHANGED diff above never
+# catches it -- existing installs need this explicit, idempotent check
+# rather than relying on requirements.txt reinstall to bring it in.
+if ! command -v ffmpeg &>/dev/null; then
+    header "Installing ffmpeg (camera cards)"
+    apt-get update -qq
+    apt-get install -y -qq ffmpeg
+    success "ffmpeg installed"
+else
+    info "ffmpeg already installed"
+fi
+
 # --- ensure reboot/power-off polkit permission (added in v3.1/v3.2) ---
 # Idempotent -- always (re)written so existing installs pick this up on
 # their next update, not just fresh installs. The service runs with

@@ -89,3 +89,21 @@ def save_asl_favorites(favorites: list) -> None:
     os.makedirs(config.CONFIG_DIR, exist_ok=True)
     with _file_lock, open(config.ASL_FAVORITES_FILE, "w") as f:
         json.dump(favorites, f, indent=4)
+
+
+# --- cameras (RTSP / Bambu Labs A1) ---
+
+def load_cameras() -> list:
+    if not os.path.exists(config.CAMERAS_FILE):
+        return []
+    try:
+        with _file_lock, open(config.CAMERAS_FILE, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_cameras(cameras: list) -> None:
+    os.makedirs(config.CONFIG_DIR, exist_ok=True)
+    with _file_lock, open(config.CAMERAS_FILE, "w") as f:
+        json.dump(cameras, f, indent=4)

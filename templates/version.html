@@ -120,9 +120,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.7.2</span>
+                <span class="release-version">v3.8</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Camera cards</span> — optional (Settings → Cameras, off by default). Each camera gets its own live-video dashboard card, positioned in the same Card order drag list as hotspot cards. Two types: generic RTSP (bridged to the browser via <code>ffmpeg</code>, transcoded to MJPEG since browsers can't play RTSP directly) and Bambu Labs A1 (via the <code>bambulabs_api</code> package — its camera feed uses a proprietary local protocol, not RTSP). Both converge on the same MJPEG stream server-side, so the frontend just uses a plain <code>&lt;img&gt;</code> tag either way. A camera's stream only runs while its card is actually being viewed, stopping itself shortly after the last viewer navigates away</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.7.2</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Bugfix — Unraid Docker tab lost its "Edit" option, for real this time</span> — v3.7.1's fix (copying <code>unraid-template.xml</code> into Unraid's <code>templates-user</code> directory) turned out not to be sufficient on its own: confirmed directly from Unraid's own source that it only looks for a matching template file at all when the container carries a <code>net.unraid.docker.managed=dockerman</code> label, which a plain <code>docker run</code> never sets. <code>docker-update.sh</code> now sets that label too</li>

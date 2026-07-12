@@ -51,11 +51,20 @@ host_stats.py, weather.py
                    is_docker() alone (no Pi-hardware check) backs the
                    broader HOST_IS_STANDALONE, gating self-update install
 
+camera_stream.py   CameraStreamManager: bridges RTSP (ffmpeg subprocess)
+                   and Bambu Labs A1 (bambulabs_api) camera feeds to plain
+                   MJPEG, one background worker per actively-viewed camera,
+                   shared across any number of browser tabs. Cameras
+                   themselves live in cameras.json (storage.py), a plain
+                   dict list like hotspots.json -- not part of the
+                   HotspotStatus/monitor.py world at all, since a camera
+                   isn't a hotspot and has no SSH-polled status
+
 templates/dashboard.html   Main UI: cards + live map (Leaflet). One big
                            inline <script> block, no build step, no
                            frontend framework
 templates/setup.html       Settings UI: General / Weather / Integrations /
-                           Hotspots / Favorites tabs
+                           Hotspots / Cameras / Favorites tabs
 templates/version.html     Changelog + feature list + module hash/version
                            info (shown at /version)
 templates/readme.html      Renders README.md client-side via marked.js
@@ -316,6 +325,52 @@ config for per-integration credentials; put it in
   ever needs to support GitHub too, that's a different endpoint shape
   entirely, not a drop-in.
 
+- **Camera cards (v3.8) — Bambu Labs A1's camera is NOT RTSP.** It's a
+  proprietary TLS/port-6000 framed-JPEG protocol. A first instinct to
+  hand-roll that framing from memory (the way `config.build_asl_ilink_cmd`
+  hand-rolls a *known, verified* AllStarLink command) was deliberately
+  rejected here — an incorrect guess at undocumented binary framing is a
+  much worse failure mode than an incorrect guess at a documented CLI
+  command, and would require live iterative debugging against real
+  hardware to even notice it's wrong. Used the `bambulabs_api` pip
+  package instead (confirmed on PyPI + its docs' "Get a Camera Frame"
+  example, `printer.get_camera_image()`, before committing to it) — same
+  reasoning as `paho-mqtt`/`aprslib` elsewhere in this project: a
+  focused, tested dependency beats a fragile reimplementation of a
+  reverse-engineered protocol.
+- **Both camera types converge on one MJPEG broadcaster
+  (`camera_stream.py`)** so the frontend never needs to know which type
+  it's looking at — just `<img src="/api/camera_feed/<id>">`. Workers
+  are lazy (start on first viewer) and self-stopping
+  (`CAMERA_IDLE_STOP_SEC` after the last viewer leaves) specifically so
+  an *enabled* camera that nobody is currently looking at the dashboard
+  doesn't hold an ffmpeg process or a printer connection open forever.
+  One real bug caught by testing before shipping, not by inspection: a
+  `threading.Condition.wait()`-based frame waiter that only checked
+  `frame_seq` (not `state`) missed the notify from an immediately-offline
+  misconfigured camera (the notify fires before the waiter starts
+  waiting — a Condition doesn't queue missed notifications), so it
+  stalled for the full timeout instead of failing fast. Fixed by also
+  checking `state` before deciding whether to wait at all
+  (`camera_stream.py`'s `wait_for_frame`) — if you touch that method,
+  re-verify with a misconfigured (blank URL / blank credentials) camera,
+  not just a working one, since the bug only showed up in the failure
+  path.
+- **Camera position reuses the Fleet Activity/ASL Favorites sentinel
+  scheme (`position` = index among hotspot cards), not hotspots.json's
+  own plain-list-order scheme** — even though cameras are a dynamic,
+  addable/removable/editable list like hotspots.json, they don't get
+  their own ordered list the way hotspots do. Each camera is one more
+  entry in `computeCardOrders()`'s `sentinels` array (`dashboard.html`)
+  and gets its own `data-ip="__camera__<id>"` row interleaved into the
+  same `#card-order-list` hotspots use (`setup.html`), saved via
+  `/api/reorder_cameras` (`{camera_id: position}`) rather than
+  `/api/reorder_hotspots`'s ordered-list-of-ids shape. This was a
+  deliberate choice, not an oversight — it reuses an already-tested
+  algorithm instead of merging hotspots.json and cameras.json into one
+  combined list, which would have been a much bigger refactor for the
+  same visible result (free interleaving in the drag list).
+
 ## Testing patterns used throughout this project
 
 No test suite/framework is set up — verification has been done ad hoc but
@@ -374,8 +429,13 @@ Always clean up `__pycache__` before zipping/packaging a build.
   container, not the template defaults.
 - **Pi/Linux standalone**: `install.sh`/`update.sh`/`uninstall.sh`,
   systemd service. `update.sh` diffs `requirements.txt` and reinstalls
-  automatically, so new pip dependencies (this project has two:
-  `paho-mqtt`, `aprslib`) don't need special handling there.
+  automatically, so new **pip** dependencies (this project has three:
+  `paho-mqtt`, `aprslib`, `bambulabs_api`) don't need special handling
+  there. A new **system/apt** package (only `ffmpeg` so far, for camera
+  cards) is NOT covered by that diff-and-reinstall logic — it needs its
+  own explicit, idempotent `command -v ffmpeg || apt-get install ...`
+  check in `update.sh` (see the "Ensure ffmpeg" block), same spirit as
+  the polkit-rule/self-update-unit re-provisioning already there.
 - `unraid-template.xml` defines the Unraid GUI's Add Container form
   fields — keep it in sync if you add a new env-var-based setting (rare;
   most new settings go in `config.DEFAULT_SETTINGS`/Settings UI instead,

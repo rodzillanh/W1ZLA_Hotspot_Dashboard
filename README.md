@@ -242,7 +242,8 @@ and **Version info**.
   to appear on the dashboard (Hotspots tab). If the Fleet activity or
   ASL Favorites & Control card is enabled, it appears in the same drag
   list and can be moved to any position among the hotspot cards, not
-  just first.
+  just first. Every enabled camera card (Settings → Cameras) gets its
+  own row in the same list too, one per camera.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.
@@ -566,6 +567,44 @@ By default the card appears first, before any hotspot cards. Its position
 is part of the same drag-and-drop **Card order** list as the hotspot cards
 (Settings → Hotspots) — drag it anywhere in that list to move it.
 
+## Camera cards
+
+Optional (Settings → Cameras → "Enable camera cards", off by default).
+Each camera you add gets its own card on the dashboard — a live MJPEG
+video feed, not a static snapshot — positioned in the same **Card
+order** drag list as hotspot cards (Settings → Hotspots), exactly like a
+hotspot card rather than a single fixed-position card the way Fleet
+Activity/ASL Favorites work.
+
+Two camera types, both configured in Settings → Cameras:
+
+- **Generic RTSP** — any camera exposing an RTSP stream URL
+  (`rtsp://user:pass@ip:554/...`). Bridged to the browser via `ffmpeg`
+  (transcoded to MJPEG server-side), since browsers can't play RTSP
+  directly. **Requires `ffmpeg`** — installed automatically by
+  `install.sh`/`update.sh` (standalone) and the Dockerfile; if a camera
+  shows "ffmpeg not found," your install predates this and needs
+  `update.sh`/a rebuild re-run once.
+- **Bambu Labs A1** — needs the printer's **IP**, **serial number**, and
+  **access code** (all in the printer's own Settings → WLAN screen).
+  Bambu's camera doesn't use RTSP at all — it's a proprietary local
+  protocol — handled via the
+  [`bambulabs_api`](https://pypi.org/project/bambulabs-api/) package
+  rather than anything hand-rolled here.
+
+Both camera types are bridged to the same plain MJPEG stream
+server-side, so from the browser's point of view a camera card is just
+an `<img>` tag either way — an offline/reconnecting camera shows a
+placeholder instead of a broken image, and a "⛶ Fullscreen" button on
+each card is the same regardless of camera type.
+
+**Resource use**: a camera's `ffmpeg` process (or Bambu connection)
+only starts once its card is actually being viewed, and stops itself
+~20 seconds after the last viewer navigates away — an enabled-but-
+unwatched camera doesn't run in the background indefinitely. Click
+"Test connection" in Settings before saving a camera to confirm it's
+reachable without needing to fully add it first.
+
 ## Home Assistant (MQTT)
 
 Optional — set a broker host in Settings → Integrations to publish every
@@ -745,17 +784,19 @@ same way mode/RSSI/BER are. A couple of behavior notes:
 
 - No authentication on `/setup` — anyone who can reach the dashboard can
   add/edit/delete hotspots. This also covers the "Host power control"
-  buttons (reboot/power off the dashboard's own device) and the "ASL
-  Favorites & Control" card's connect/disconnect buttons when those
-  features are active — a materially bigger consequence than editing a
-  config, worth weighing before exposing this dashboard beyond a trusted
-  LAN.
+  buttons (reboot/power off the dashboard's own device), the "ASL
+  Favorites & Control" card's connect/disconnect buttons, and camera
+  cards' live video feeds when those features are active — a materially
+  bigger consequence than editing a config, worth weighing before
+  exposing this dashboard beyond a trusted LAN.
 - Hotspot passwords are stored in plaintext in `hotspots.json` and are
   re-sent to the browser to pre-fill the Edit form (so editing a hotspot
   doesn't force you to retype the password). Both are fine for a private
   LAN; worth revisiting before exposing this anywhere public.
 - The QRZ password and APRS.fi API key are likewise stored in plaintext in
   `settings.json` and pre-filled into their Settings fields the same way.
-  The MQTT broker password (if set) is stored the same way too.
+  The MQTT broker password (if set) is stored the same way too. Camera
+  RTSP URLs (which often embed a username/password) and Bambu printer
+  access codes are stored the same way in `cameras.json`.
 - SSH host keys are auto-accepted (`AutoAddPolicy`) — convenient for a small
   fleet of devices you control, but it skips host key verification.

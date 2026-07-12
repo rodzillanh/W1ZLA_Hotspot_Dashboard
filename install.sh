@@ -50,7 +50,10 @@ success "Python ${PY_VER} found"
 # --- install system packages ---
 header "Installing system dependencies"
 apt-get update -qq
-apt-get install -y -qq python3-venv python3-pip
+# ffmpeg bridges RTSP camera feeds to MJPEG for the optional camera cards
+# (off by default, but installed unconditionally -- same treatment as the
+# paho-mqtt/aprslib pip deps for MQTT/APRS, both also off by default).
+apt-get install -y -qq python3-venv python3-pip ffmpeg
 success "System packages installed"
 
 # --- create service user ---
