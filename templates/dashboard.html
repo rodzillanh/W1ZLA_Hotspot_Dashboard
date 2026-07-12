@@ -690,19 +690,6 @@
             display: inline-block;
             margin-right: 4px;
         }
-        .radar-controls {
-            display: none; align-items: center; gap: 10px;
-            margin-bottom: 10px; font-size: 12px; color: var(--text-muted);
-        }
-        .radar-play-btn {
-            width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
-            border: 1px solid var(--toolbar-border); background: none; color: var(--text);
-            cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 10px;
-        }
-        .radar-play-btn:hover { border-color: var(--link); color: var(--link); }
-        .radar-scrubber { flex: 1; height: 4px; border-radius: 2px; background: var(--card-border); position: relative; }
-        .radar-scrubber-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 2px; background: var(--accent); width: 0%; }
-        .radar-time { font-variant-numeric: tabular-nums; min-width: 68px; text-align: right; flex-shrink: 0; }
         .callers-list {
             display: flex;
             flex-wrap: wrap;
@@ -896,10 +883,6 @@
             <input type="checkbox" id="greyline-toggle" onchange="toggleGreyline()">
             Grey line
         </label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-            <input type="checkbox" id="radar-toggle" onchange="toggleRadar()">
-            Radar
-        </label>
         <select id="map-style-select" onchange="setMapStyle(this.value)"
                 style="background:var(--card-bg);color:var(--text);
                        border:1px solid var(--card-border);border-radius:5px;
@@ -908,11 +891,6 @@
             <option value="dark">Dark</option>
             <option value="satellite">Satellite</option>
         </select>
-    </div>
-    <div class="radar-controls" id="radar-controls">
-        <button class="radar-play-btn" id="radar-play-btn" onclick="toggleRadarPlay()">⏸</button>
-        <div class="radar-scrubber"><div class="radar-scrubber-fill" id="radar-fill"></div></div>
-        <span class="radar-time" id="radar-time">now</span>
     </div>
     <div class="map-resize-wrap">
         <div id="map"></div>
@@ -1651,22 +1629,6 @@ function initMap() {
     updateGreyline();
     if (!greylineTimer) greylineTimer = setInterval(updateGreyline, 60000);
 
-    // Radar defaults off (unlike grey line) -- a more visually active overlay
-    // that also means recurring third-party (RainViewer) tile requests, so
-    // opt-in rather than on by default.
-    const savedRadar = localStorage.getItem(RADAR_KEY);
-    document.getElementById('radar-toggle').checked = savedRadar === '1';
-    document.getElementById('radar-controls').style.display =
-        document.getElementById('radar-toggle').checked ? 'flex' : 'none';
-    if (document.getElementById('radar-toggle').checked) {
-        fetchRadarFrames().then(() => { showRadarFrame(radarFrameIdx); startRadarAnim(); });
-    }
-    if (!radarRefreshTimer) radarRefreshTimer = setInterval(() => {
-        if (document.getElementById('radar-toggle').checked) {
-            fetchRadarFrames().then(() => showRadarFrame(radarFrameIdx));
-        }
-    }, 600000);
-
     refreshMap();
 }
 
@@ -1822,130 +1784,6 @@ function toggleGreyline() {
         else greylineLayer.addTo(leafletMap);
     } else if (greylineLayer) {
         leafletMap.removeLayer(greylineLayer);
-    }
-}
-
-// --- map: precipitation radar overlay (RainViewer, free, no API key) ---
-// Verified live before wiring this in: api.rainviewer.com/public/
-// weather-maps.json returns ~13 past frames at 10-minute intervals, tile
-// URL is {host}{frame.path}/256/{z}/{x}/{y}/{color}/{options}.png -- a
-// plain Leaflet tile layer, same shape as the existing base map layers.
-const RADAR_KEY = 'w1zla_show_radar';
-const RADAR_FRAME_MS = 700;
-let radarFrames        = [];
-let radarFrameIdx      = 0;
-let radarAnimTimer      = null;
-let radarRefreshTimer   = null;
-let radarPlaying       = true;
-let radarHost = 'https://tilecache.rainviewer.com';
-// Crossfade state: the frame currently fully visible, and (while a swap is
-// in flight) the next frame's layer, still transparent until its tiles have
-// actually finished loading. Swapping a live tile layer's URL in place
-// (the earlier approach) clears/reloads that same layer, so there's a real
-// gap with nothing rendered between the old tiles disappearing and the new
-// ones arriving -- visible as a flicker every 700ms. Keeping the old layer
-// fully visible until the new one's 'load' event fires (Leaflet's own
-// signal that every tile for the current view is in) avoids that gap
-// entirely, at the cost of briefly having two tile layers loaded at once.
-let radarActiveLayer  = null;
-let radarSwapPending  = null;
-
-function fetchRadarFrames() {
-    return fetch('https://api.rainviewer.com/public/weather-maps.json')
-        .then(r => r.json())
-        .then(data => {
-            radarHost   = data.host || radarHost;
-            radarFrames = (data.radar && data.radar.past) || [];
-            radarFrameIdx = Math.max(0, radarFrames.length - 1);  // start on "now"
-        })
-        .catch(() => { radarFrames = []; });
-}
-
-function radarTileUrl(frame) {
-    return `${radarHost}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
-}
-
-function updateRadarReadout(idx) {
-    const frame = radarFrames[idx];
-    if (!frame) return;
-    const timeEl = document.getElementById('radar-time');
-    if (timeEl) {
-        const minsAgo = Math.round((Date.now() / 1000 - frame.time) / 60);
-        timeEl.textContent = minsAgo <= 1 ? 'now' : `${minsAgo} min ago`;
-    }
-    const fillEl = document.getElementById('radar-fill');
-    if (fillEl) {
-        const pct = radarFrames.length > 1 ? (idx / (radarFrames.length - 1)) * 100 : 100;
-        fillEl.style.width = pct + '%';
-    }
-}
-
-function showRadarFrame(idx) {
-    if (!leafletMap || radarFrames.length === 0) return;
-    // A swap is already in flight -- skip this tick rather than starting a
-    // second overlapping one; the animation just holds on the current
-    // frame an extra beat until the pending tiles finish loading.
-    if (radarSwapPending) return;
-
-    const url  = radarTileUrl(radarFrames[idx]);
-    const next = L.tileLayer(url, { opacity: 0, attribution: 'Radar © RainViewer' });
-    const prev = radarActiveLayer;
-    radarSwapPending = next;
-    next.once('load', () => {
-        next.setOpacity(0.55);
-        if (prev && leafletMap.hasLayer(prev)) leafletMap.removeLayer(prev);
-        radarActiveLayer = next;
-        radarSwapPending = null;
-    });
-    next.addTo(leafletMap);
-    updateRadarReadout(idx);
-}
-
-function radarTick() {
-    if (radarFrames.length === 0) return;
-    // Same discipline as refreshMap(): don't churn network requests to a
-    // third party every 700ms while the Map tab isn't even visible.
-    const panel = document.getElementById('panel-map');
-    if (!panel || !panel.classList.contains('active')) return;
-    radarFrameIdx = (radarFrameIdx + 1) % radarFrames.length;
-    showRadarFrame(radarFrameIdx);
-}
-
-function startRadarAnim() {
-    clearInterval(radarAnimTimer);
-    radarAnimTimer = setInterval(radarTick, RADAR_FRAME_MS);
-}
-
-function toggleRadarPlay() {
-    radarPlaying = !radarPlaying;
-    document.getElementById('radar-play-btn').textContent = radarPlaying ? '⏸' : '▶';
-    if (radarPlaying) startRadarAnim();
-    else clearInterval(radarAnimTimer);
-}
-
-function removeRadarLayers() {
-    [radarActiveLayer, radarSwapPending].forEach(layer => {
-        if (layer && leafletMap.hasLayer(layer)) leafletMap.removeLayer(layer);
-    });
-    radarActiveLayer = null;
-    radarSwapPending = null;
-}
-
-function toggleRadar() {
-    const on = document.getElementById('radar-toggle').checked;
-    localStorage.setItem(RADAR_KEY, on ? '1' : '0');
-    document.getElementById('radar-controls').style.display = on ? 'flex' : 'none';
-    if (!leafletMap) return;
-    if (on) {
-        if (radarFrames.length === 0) {
-            fetchRadarFrames().then(() => { showRadarFrame(radarFrameIdx); startRadarAnim(); });
-        } else {
-            showRadarFrame(radarFrameIdx);
-            startRadarAnim();
-        }
-    } else {
-        clearInterval(radarAnimTimer);
-        removeRadarLayers();
     }
 }
 

@@ -371,32 +371,18 @@ config for per-integration credentials; put it in
   combined list, which would have been a much bigger refactor for the
   same visible result (free interleaving in the drag list).
 
-- **The map's precipitation radar overlay (RainViewer) animates via a
-  crossfade (`showRadarFrame()`), NOT by repeatedly calling `.setUrl()`
-  on one tile layer.** The first version did exactly that (swap one
-  layer's URL every 700ms) and it visibly flickered in production —
-  `.setUrl()` clears/reloads that same layer in place, so there's a real
-  gap with nothing rendered between the old tiles disappearing and the
-  new ones finishing their fetch. Fixed by creating a new, initially
-  transparent layer per frame, waiting for its Leaflet `'load'` event
-  (every tile for the current view has actually arrived) before fading
-  it in and removing the previous layer — never a moment with zero
-  fully-loaded radar tiles on screen. `radarSwapPending` guards against
-  starting a second overlapping swap if tiles haven't finished loading
-  before the next 700ms tick; that tick is just skipped rather than
-  queued. If you touch this again, don't reintroduce `setUrl()`-in-place
-  animation for any tile-based overlay — the flicker is the expected
-  result, not a rare edge case. `radarTick()` reuses the exact
-  tab-visibility gate `refreshMap()` already established
-  (`#panel-map.active` check) — without it, the 700ms timer would keep
-  hitting RainViewer's CDN forever even after navigating away from the
-  Map tab, the same class of bug the Fleet Activity marker-rebuild fix
-  was for. The tile URL format
-  (`{host}{frame.path}/256/{z}/{x}/{y}/2/1_1.png`) was confirmed against
-  a real, freshly-fetched frame (`curl`, not just RainViewer's docs)
-  before being wired into `radarTileUrl()` — if you touch the color/
-  options segment (`2/1_1`), re-verify the same way rather than trusting
-  the docs' example values still match the current API version.
+- **A precipitation radar overlay (RainViewer, animated) was built,
+  fixed for a flicker bug, then removed entirely in v3.11** — even the
+  flicker-free crossfade version still felt "choppy" (13 sparse
+  snapshots at 700ms apart just doesn't read as smooth motion, no matter
+  how cleanly each swap is handled), and the user preferred dropping the
+  feature over further tuning. If this gets revisited, the crossfade
+  technique (new transparent tile layer per frame, swap in only after
+  its Leaflet `'load'` event fires, never `.setUrl()` on a live layer)
+  is still the right way to avoid the flicker — but the "choppy" feel is
+  a separate, harder problem (real motion-interpolation between sparse
+  radar snapshots, which most weather apps don't attempt either) that
+  wasn't solved and shouldn't be assumed away.
 
 ## Testing patterns used throughout this project
 

@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.10.1</span>
+                <span class="release-version">v3.11</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Removed the precipitation radar overlay</span> — even after fixing the flicker (v3.10.1), the animation still felt too choppy to be worth keeping. The "Radar" checkbox and everything behind it are gone; the map's Grey line overlay and base tile styles are unaffected</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.10.1</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Bugfix — radar overlay flickered while animating</span> — swapping one tile layer's URL every 700ms cleared/reloaded it in place, leaving a real gap with nothing rendered between the old tiles disappearing and the new ones finishing their fetch. Now crossfades: a new (initially transparent) layer loads in the background and only swaps in once every tile has actually arrived, so there's never a moment with no radar tiles on screen</li>
