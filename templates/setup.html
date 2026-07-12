@@ -757,7 +757,7 @@
                     <div class="drag-row fleet-activity-row" draggable="true" data-ip="__camera__{{ cam.id }}">
                         <span class="drag-handle">⠿</span>
                         <span class="node-name">📷 {{ cam.name }}</span>
-                        <span class="node-meta">camera · {{ 'RTSP' if cam.type == 'rtsp' else 'Bambu A1' }}</span>
+                        <span class="node-meta">camera · {{ {'rtsp': 'RTSP', 'wyze': 'Wyze', 'bambu_a1': 'Bambu A1'}.get(cam.type, cam.type) }}</span>
                     </div>
                     {% endfor %}
                 {% endif %}
@@ -829,7 +829,7 @@
                 <div class="drag-row fleet-activity-row" draggable="true" data-ip="__camera__{{ cam.id }}">
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">📷 {{ cam.name }}</span>
-                    <span class="node-meta">camera · {{ 'RTSP' if cam.type == 'rtsp' else 'Bambu A1' }}</span>
+                    <span class="node-meta">camera · {{ {'rtsp': 'RTSP', 'wyze': 'Wyze', 'bambu_a1': 'Bambu A1'}.get(cam.type, cam.type) }}</span>
                 </div>
                 {% endfor %}
             {% endif %}
@@ -927,6 +927,7 @@
             <div><label>Camera type</label>
                  <select id="cam-type" onchange="onCameraTypeChange()">
                      <option value="rtsp">Generic RTSP</option>
+                     <option value="wyze">Wyze (RTSP firmware)</option>
                      <option value="bambu_a1">Bambu Labs A1</option>
                  </select></div>
         </div>
@@ -937,6 +938,11 @@
         <div class="form-grid one" style="margin-bottom:10px" id="cam-rtsp-fields">
             <div><label>RTSP URL</label>
                  <input type="text" id="cam-rtsp-url" placeholder="rtsp://user:pass@192.168.1.50:554/stream1"></div>
+                 <span id="cam-rtsp-hint" style="display:none;font-size:11px;color:var(--text-dim)">
+                     Needs Wyze's official RTSP firmware flashed first (Wyze Cam v2/v3, Pan v2/v3, and
+                     newer per Wyze's own firmware notes) — URL format is
+                     <code>rtsp://user:pass@&lt;camera-ip&gt;:554/stream0/</code>
+                 </span>
         </div>
         <div class="form-grid" style="margin-bottom:10px;display:none" id="cam-bambu-fields">
             <div><label>Printer IP</label>
@@ -964,7 +970,7 @@
             <div class="drag-row" style="align-items:center">
                 <span style="flex-shrink:0">📷</span>
                 <span class="node-name">{{ cam.name }}</span>
-                <span class="node-meta">{{ 'RTSP' if cam.type == 'rtsp' else 'Bambu A1' }}</span>
+                <span class="node-meta">{{ {'rtsp': 'RTSP', 'wyze': 'Wyze', 'bambu_a1': 'Bambu A1'}.get(cam.type, cam.type) }}</span>
                 <button class="btn btn-info btn-sm"
                         onclick="editCamera('{{ cam.id }}','{{ cam.name }}','{{ cam.type }}','{{ cam.get('rtsp_url', '') }}','{{ cam.get('ip', '') }}','{{ cam.get('serial', '') }}','{{ cam.get('access_code', '') }}')">
                     Edit
@@ -1463,11 +1469,18 @@ async function testAslNode() {
     res.className   = data.success ? 'ok' : 'err';
 }
 
-// --- camera form (RTSP / Bambu Labs A1) ---
+// --- camera form (RTSP / Wyze RTSP firmware / Bambu Labs A1) ---
 function onCameraTypeChange() {
-    const isBambu = document.getElementById('cam-type').value === 'bambu_a1';
+    const type = document.getElementById('cam-type').value;
+    const isBambu = type === 'bambu_a1';
+    const isWyze  = type === 'wyze';
     document.getElementById('cam-rtsp-fields').style.display  = isBambu ? 'none' : '';
     document.getElementById('cam-bambu-fields').style.display = isBambu ? '' : 'none';
+    document.getElementById('cam-rtsp-hint').style.display    = isWyze ? '' : 'none';
+    const urlInput = document.getElementById('cam-rtsp-url');
+    urlInput.placeholder = isWyze
+        ? 'rtsp://user:pass@192.168.1.50:554/stream0/'
+        : 'rtsp://user:pass@192.168.1.50:554/stream1';
 }
 
 function collectCameraForm() {

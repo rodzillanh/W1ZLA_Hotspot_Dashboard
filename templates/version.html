@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.15</span>
+                <span class="release-version">v3.16</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Wyze camera type</span> — Settings → Cameras now has a "Wyze (RTSP firmware)" option alongside Generic RTSP. Cosmetic only: Wyze cameras with Wyze's own official RTSP firmware flashed (Cam v2/v3, Pan v2/v3, and newer) already speak plain RTSP, so this uses the exact same ffmpeg bridge as Generic RTSP — the dedicated dropdown entry, badge label, and URL-format hint just make it discoverable for people who don't know their Wyze cam can do this at all</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.15</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Band Activity card</span> — optional (Settings → General, off by default; needs a station grid square set below the toggle). Live WSPR beacon-spot activity within 500km of your station, for the same six band groups HF Conditions uses (160m, 80-40m, 30-20m, 17-15m, 12-10m, 6m) — a 24h sparkline per group from <a href="https://wspr.live/" target="_blank">WSPR Live</a>'s free public API, a fundamentally different kind of data than HF Conditions' solar-index prediction (real observed spot counts, not a forecast). Cached ~30 minutes server-side</li>

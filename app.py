@@ -794,7 +794,14 @@ def delete_hotspot(ip):
     return redirect("/setup")
 
 
-# --- cameras (RTSP / Bambu Labs A1) ---
+# --- cameras (RTSP / Wyze RTSP firmware / Bambu Labs A1) ---
+# "wyze" is a cosmetic alias for "rtsp" -- same rtsp_url field, same
+# ffmpeg-based _RtspWorker in camera_stream.py (its dispatch already
+# treats anything other than "bambu_a1" as RTSP). Wyze cameras with
+# Wyze's own official RTSP firmware installed just speak plain RTSP;
+# this only exists so the Settings dropdown/badge says "Wyze" instead
+# of a generic "RTSP" for people who don't know their camera can do
+# this at all.
 # One card per camera on the dashboard, same as hotspot cards -- positioned
 # via the same Card order drag list, using the sentinel-position scheme
 # (camera.position = "after the Nth hotspot card") rather than hotspots.json's
@@ -814,7 +821,7 @@ def api_cameras_post():
     data     = request.json or {}
     name     = data.get("name", "").strip()
     cam_type = data.get("type", "").strip()
-    if not name or cam_type not in ("rtsp", "bambu_a1"):
+    if not name or cam_type not in ("rtsp", "wyze", "bambu_a1"):
         return jsonify({"ok": False, "message": "Name and a valid camera type are required"}), 400
 
     cameras   = load_cameras()
@@ -827,7 +834,7 @@ def api_cameras_post():
     }
     camera["name"] = name
     camera["type"] = cam_type
-    if cam_type == "rtsp":
+    if cam_type in ("rtsp", "wyze"):
         camera["rtsp_url"] = data.get("rtsp_url", "").strip()
         camera.pop("ip", None)
         camera.pop("serial", None)

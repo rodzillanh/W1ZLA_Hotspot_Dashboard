@@ -681,6 +681,7 @@
             border: 1px solid var(--toolbar-border); flex-shrink: 0;
         }
         .camera-type-badge.rtsp  { color: var(--link); border-color: var(--link); }
+        .camera-type-badge.wyze  { color: var(--accent); border-color: var(--accent); }
         .camera-type-badge.bambu_a1 { color: var(--tx-color); border-color: var(--tx-color); }
         .camera-video-wrap {
             position: relative; border-radius: 8px; overflow: hidden;
@@ -1871,7 +1872,7 @@ function renderCameraCards() {
         }
         card.querySelector('.camera-name').textContent = cam.name;
         const badge = card.querySelector('.camera-type-badge');
-        badge.textContent = cam.type === 'bambu_a1' ? 'Bambu A1' : 'RTSP';
+        badge.textContent = cam.type === 'bambu_a1' ? 'Bambu A1' : cam.type === 'wyze' ? 'Wyze' : 'RTSP';
         badge.className = 'camera-type-badge ' + cam.type;
         const img = card.querySelector('img');
         const wantedSrc = `/api/camera_feed/${cam.id}`;

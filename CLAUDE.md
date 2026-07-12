@@ -365,7 +365,7 @@ config for per-integration credentials; put it in
   reasoning as `paho-mqtt`/`aprslib` elsewhere in this project: a
   focused, tested dependency beats a fragile reimplementation of a
   reverse-engineered protocol.
-- **Both camera types converge on one MJPEG broadcaster
+- **All three camera types converge on one MJPEG broadcaster
   (`camera_stream.py`)** so the frontend never needs to know which type
   it's looking at — just `<img src="/api/camera_feed/<id>">`. Workers
   are lazy (start on first viewer) and self-stopping
@@ -397,6 +397,20 @@ config for per-integration credentials; put it in
   algorithm instead of merging hotspots.json and cameras.json into one
   combined list, which would have been a much bigger refactor for the
   same visible result (free interleaving in the drag list).
+- **Camera `type: "wyze"` (v3.16) is a cosmetic alias for `"rtsp"`, not a
+  real third camera implementation.** Wyze cameras with Wyze's own
+  official RTSP firmware (confirmed real, not a third-party hack —
+  Wyze publishes it themselves for Cam v2/v3, Pan v2/v3, and newer
+  models) just speak plain RTSP, so `camera_stream.py`'s dispatch
+  (`_BambuWorker if camera.get("type") == "bambu_a1" else _RtspWorker`)
+  already routes it correctly with zero changes there. The only places
+  that know about `"wyze"` at all are `app.py`'s `/api/cameras` type
+  validation/field-selection (`cam_type in ("rtsp", "wyze")`) and the
+  Settings dropdown/dashboard badge label. If you ever add a genuinely
+  different Wyze integration (e.g. via Wyze's cloud API for models
+  without RTSP firmware, like the unofficial `docker-wyze-bridge`
+  project does), that would need real branching in `camera_stream.py`
+  the way Bambu does — don't assume "wyze" already means that.
 
 - **A precipitation radar overlay (RainViewer, animated) was built,
   fixed for a flicker bug, then removed entirely in v3.11** — even the

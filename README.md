@@ -579,7 +579,7 @@ order** drag list as hotspot cards (Settings → Hotspots), exactly like a
 hotspot card rather than a single fixed-position card the way Fleet
 Activity/ASL Favorites work.
 
-Two camera types, both configured in Settings → Cameras:
+Three camera types, all configured in Settings → Cameras:
 
 - **Generic RTSP** — any camera exposing an RTSP stream URL
   (`rtsp://user:pass@ip:554/...`). Bridged to the browser via `ffmpeg`
@@ -588,6 +588,14 @@ Two camera types, both configured in Settings → Cameras:
   `install.sh`/`update.sh` (standalone) and the Dockerfile; if a camera
   shows "ffmpeg not found," your install predates this and needs
   `update.sh`/a rebuild re-run once.
+- **Wyze (RTSP firmware)** — a cosmetic alias for Generic RTSP, for
+  Wyze cameras with Wyze's own **official RTSP firmware** flashed
+  (Cam v2/v3, Pan v2/v3, and newer models per Wyze's firmware notes —
+  not a third-party hack). Once flashed, a Wyze cam speaks plain RTSP
+  at `rtsp://user:pass@<camera-ip>:554/stream0/`, so this uses the
+  exact same `ffmpeg` bridge as Generic RTSP — the separate dropdown
+  entry exists purely so it's discoverable, since most people don't
+  know a Wyze cam can do this at all.
 - **Bambu Labs A1** — needs the printer's **IP**, **serial number**, and
   **access code** (all in the printer's own Settings → WLAN screen).
   Bambu's camera doesn't use RTSP at all — it's a proprietary local
@@ -595,7 +603,7 @@ Two camera types, both configured in Settings → Cameras:
   [`bambulabs_api`](https://pypi.org/project/bambulabs-api/) package
   rather than anything hand-rolled here.
 
-Both camera types are bridged to the same plain MJPEG stream
+All three camera types are bridged to the same plain MJPEG stream
 server-side, so from the browser's point of view a camera card is just
 an `<img>` tag either way — an offline/reconnecting camera shows a
 placeholder instead of a broken image, and a "⛶ Fullscreen" button on
