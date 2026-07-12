@@ -371,14 +371,27 @@ config for per-integration credentials; put it in
   combined list, which would have been a much bigger refactor for the
   same visible result (free interleaving in the drag list).
 
-- **The map's precipitation radar overlay (RainViewer) is animated by
-  swapping one `L.tileLayer`'s URL via `.setUrl()` every 700ms, not by
-  creating/destroying 13 separate layers.** `radarTick()` reuses the
-  exact tab-visibility gate `refreshMap()` already established
+- **The map's precipitation radar overlay (RainViewer) animates via a
+  crossfade (`showRadarFrame()`), NOT by repeatedly calling `.setUrl()`
+  on one tile layer.** The first version did exactly that (swap one
+  layer's URL every 700ms) and it visibly flickered in production —
+  `.setUrl()` clears/reloads that same layer in place, so there's a real
+  gap with nothing rendered between the old tiles disappearing and the
+  new ones finishing their fetch. Fixed by creating a new, initially
+  transparent layer per frame, waiting for its Leaflet `'load'` event
+  (every tile for the current view has actually arrived) before fading
+  it in and removing the previous layer — never a moment with zero
+  fully-loaded radar tiles on screen. `radarSwapPending` guards against
+  starting a second overlapping swap if tiles haven't finished loading
+  before the next 700ms tick; that tick is just skipped rather than
+  queued. If you touch this again, don't reintroduce `setUrl()`-in-place
+  animation for any tile-based overlay — the flicker is the expected
+  result, not a rare edge case. `radarTick()` reuses the exact
+  tab-visibility gate `refreshMap()` already established
   (`#panel-map.active` check) — without it, the 700ms timer would keep
-  swapping tile URLs and hitting RainViewer's CDN forever even after
-  navigating away from the Map tab, the same class of bug the Fleet
-  Activity marker-rebuild fix was for. The tile URL format
+  hitting RainViewer's CDN forever even after navigating away from the
+  Map tab, the same class of bug the Fleet Activity marker-rebuild fix
+  was for. The tile URL format
   (`{host}{frame.path}/256/{z}/{x}/{y}/2/1_1.png`) was confirmed against
   a real, freshly-fetched frame (`curl`, not just RainViewer's docs)
   before being wired into `radarTileUrl()` — if you touch the color/

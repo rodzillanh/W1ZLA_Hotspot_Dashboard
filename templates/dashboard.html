@@ -1659,10 +1659,12 @@ function initMap() {
     document.getElementById('radar-controls').style.display =
         document.getElementById('radar-toggle').checked ? 'flex' : 'none';
     if (document.getElementById('radar-toggle').checked) {
-        fetchRadarFrames().then(() => { updateRadarLayer(); startRadarAnim(); });
+        fetchRadarFrames().then(() => { showRadarFrame(radarFrameIdx); startRadarAnim(); });
     }
     if (!radarRefreshTimer) radarRefreshTimer = setInterval(() => {
-        if (document.getElementById('radar-toggle').checked) fetchRadarFrames().then(updateRadarLayer);
+        if (document.getElementById('radar-toggle').checked) {
+            fetchRadarFrames().then(() => showRadarFrame(radarFrameIdx));
+        }
     }, 600000);
 
     refreshMap();
@@ -1830,13 +1832,23 @@ function toggleGreyline() {
 // plain Leaflet tile layer, same shape as the existing base map layers.
 const RADAR_KEY = 'w1zla_show_radar';
 const RADAR_FRAME_MS = 700;
-let radarLayer        = null;
 let radarFrames        = [];
 let radarFrameIdx      = 0;
 let radarAnimTimer      = null;
 let radarRefreshTimer   = null;
 let radarPlaying       = true;
 let radarHost = 'https://tilecache.rainviewer.com';
+// Crossfade state: the frame currently fully visible, and (while a swap is
+// in flight) the next frame's layer, still transparent until its tiles have
+// actually finished loading. Swapping a live tile layer's URL in place
+// (the earlier approach) clears/reloads that same layer, so there's a real
+// gap with nothing rendered between the old tiles disappearing and the new
+// ones arriving -- visible as a flicker every 700ms. Keeping the old layer
+// fully visible until the new one's 'load' event fires (Leaflet's own
+// signal that every tile for the current view is in) avoids that gap
+// entirely, at the cost of briefly having two tile layers loaded at once.
+let radarActiveLayer  = null;
+let radarSwapPending  = null;
 
 function fetchRadarFrames() {
     return fetch('https://api.rainviewer.com/public/weather-maps.json')
@@ -1853,16 +1865,9 @@ function radarTileUrl(frame) {
     return `${radarHost}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
 }
 
-function updateRadarLayer() {
-    if (!leafletMap || radarFrames.length === 0) return;
-    const frame = radarFrames[radarFrameIdx];
-    const url   = radarTileUrl(frame);
-    if (!radarLayer) {
-        radarLayer = L.tileLayer(url, { opacity: 0.55, attribution: 'Radar © RainViewer' });
-        if (document.getElementById('radar-toggle').checked) radarLayer.addTo(leafletMap);
-    } else {
-        radarLayer.setUrl(url);
-    }
+function updateRadarReadout(idx) {
+    const frame = radarFrames[idx];
+    if (!frame) return;
     const timeEl = document.getElementById('radar-time');
     if (timeEl) {
         const minsAgo = Math.round((Date.now() / 1000 - frame.time) / 60);
@@ -1870,9 +1875,30 @@ function updateRadarLayer() {
     }
     const fillEl = document.getElementById('radar-fill');
     if (fillEl) {
-        const pct = radarFrames.length > 1 ? (radarFrameIdx / (radarFrames.length - 1)) * 100 : 100;
+        const pct = radarFrames.length > 1 ? (idx / (radarFrames.length - 1)) * 100 : 100;
         fillEl.style.width = pct + '%';
     }
+}
+
+function showRadarFrame(idx) {
+    if (!leafletMap || radarFrames.length === 0) return;
+    // A swap is already in flight -- skip this tick rather than starting a
+    // second overlapping one; the animation just holds on the current
+    // frame an extra beat until the pending tiles finish loading.
+    if (radarSwapPending) return;
+
+    const url  = radarTileUrl(radarFrames[idx]);
+    const next = L.tileLayer(url, { opacity: 0, attribution: 'Radar © RainViewer' });
+    const prev = radarActiveLayer;
+    radarSwapPending = next;
+    next.once('load', () => {
+        next.setOpacity(0.55);
+        if (prev && leafletMap.hasLayer(prev)) leafletMap.removeLayer(prev);
+        radarActiveLayer = next;
+        radarSwapPending = null;
+    });
+    next.addTo(leafletMap);
+    updateRadarReadout(idx);
 }
 
 function radarTick() {
@@ -1882,7 +1908,7 @@ function radarTick() {
     const panel = document.getElementById('panel-map');
     if (!panel || !panel.classList.contains('active')) return;
     radarFrameIdx = (radarFrameIdx + 1) % radarFrames.length;
-    updateRadarLayer();
+    showRadarFrame(radarFrameIdx);
 }
 
 function startRadarAnim() {
@@ -1897,6 +1923,14 @@ function toggleRadarPlay() {
     else clearInterval(radarAnimTimer);
 }
 
+function removeRadarLayers() {
+    [radarActiveLayer, radarSwapPending].forEach(layer => {
+        if (layer && leafletMap.hasLayer(layer)) leafletMap.removeLayer(layer);
+    });
+    radarActiveLayer = null;
+    radarSwapPending = null;
+}
+
 function toggleRadar() {
     const on = document.getElementById('radar-toggle').checked;
     localStorage.setItem(RADAR_KEY, on ? '1' : '0');
@@ -1904,15 +1938,14 @@ function toggleRadar() {
     if (!leafletMap) return;
     if (on) {
         if (radarFrames.length === 0) {
-            fetchRadarFrames().then(() => { updateRadarLayer(); startRadarAnim(); });
+            fetchRadarFrames().then(() => { showRadarFrame(radarFrameIdx); startRadarAnim(); });
         } else {
-            updateRadarLayer();
-            if (radarLayer && !leafletMap.hasLayer(radarLayer)) radarLayer.addTo(leafletMap);
+            showRadarFrame(radarFrameIdx);
             startRadarAnim();
         }
     } else {
         clearInterval(radarAnimTimer);
-        if (radarLayer && leafletMap.hasLayer(radarLayer)) leafletMap.removeLayer(radarLayer);
+        removeRadarLayers();
     }
 }
 
