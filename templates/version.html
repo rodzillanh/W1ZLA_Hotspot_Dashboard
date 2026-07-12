@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.9</span>
+                <span class="release-version">v3.10</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Precipitation radar overlay</span> — a "Radar" checkbox in the live map's legend, off by default. Animates through the last ~2 hours of precipitation radar via RainViewer's free public API (no API key), with play/pause and a "N min ago" readout. Only runs while the Map tab is actually visible, so it doesn't keep polling RainViewer in the background</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.9</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Update status moved into Settings</span> — the self-update card lived on the standalone Version/changelog page, a click away behind "View changelog & feature list." It's now directly in Settings → Version info, no extra navigation needed. That page goes back to being just the changelog/feature list/module hashes</li>

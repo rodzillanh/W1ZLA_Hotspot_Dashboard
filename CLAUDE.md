@@ -371,6 +371,20 @@ config for per-integration credentials; put it in
   combined list, which would have been a much bigger refactor for the
   same visible result (free interleaving in the drag list).
 
+- **The map's precipitation radar overlay (RainViewer) is animated by
+  swapping one `L.tileLayer`'s URL via `.setUrl()` every 700ms, not by
+  creating/destroying 13 separate layers.** `radarTick()` reuses the
+  exact tab-visibility gate `refreshMap()` already established
+  (`#panel-map.active` check) — without it, the 700ms timer would keep
+  swapping tile URLs and hitting RainViewer's CDN forever even after
+  navigating away from the Map tab, the same class of bug the Fleet
+  Activity marker-rebuild fix was for. The tile URL format
+  (`{host}{frame.path}/256/{z}/{x}/{y}/2/1_1.png`) was confirmed against
+  a real, freshly-fetched frame (`curl`, not just RainViewer's docs)
+  before being wired into `radarTileUrl()` — if you touch the color/
+  options segment (`2/1_1`), re-verify the same way rather than trusting
+  the docs' example values still match the current API version.
+
 ## Testing patterns used throughout this project
 
 No test suite/framework is set up — verification has been done ad hoc but

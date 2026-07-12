@@ -729,6 +729,21 @@ appear as pins — the QRZ subscription caveat above applies here too.
   (subsolar point + the sun's zenith angle at each point on the map),
   not a static image, and recomputes once a minute. Also a per-browser
   preference (`localStorage`), same reasoning as the map height.
+- **Precipitation radar overlay** — a "Radar" checkbox in the map
+  legend, off by default. Animates through the last ~2 hours of
+  precipitation radar (13 frames at 10-minute intervals) via
+  [RainViewer](https://www.rainviewer.com/)'s free public API — no API
+  key needed. Play/pause button and a progress bar with a "N min ago" /
+  "now" readout sit below the map legend while it's on. The animation
+  loop only runs while the Map tab is actually visible (same discipline
+  as the live-map refresh itself), so it doesn't keep hitting
+  RainViewer's tile servers in the background. Radar tiles are fetched
+  directly by the browser from RainViewer's CDN — the dashboard's own
+  server is only involved in the one small JSON call that lists
+  available frames, same as the base map tiles already are. Precipitation
+  only — no temperature/wind/cloud layers (RainViewer's free tier
+  doesn't cover those; a different provider needing an API key would be
+  a separate feature).
 
 ## Fleet activity
 
