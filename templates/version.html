@@ -98,9 +98,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.13</span>
+                <span class="release-version">v3.14</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Band Plan card</span> — optional (Settings → General, off by default). Static FCC Part 97.301 HF frequency/mode reference, General and Extra class privileges shown together on one card: General's range is the primary numbers, with a small note under the 4 bands where Extra differs (80m/40m/20m/15m) marking where the wider Extra segment starts. No network client — the only card in the app with no Python module of its own</li>
+                <li><span>License Quiz card</span> — optional (Settings → General, off by default). One random Amateur Extra (Element 4) practice question at a time from the bundled 2024-2028 pool (572 questions, sourced from NCVEC's official public-domain release), auto-rotating every ~10 minutes or on demand. Click an answer to reveal correct/incorrect, plus a per-subelement (E0/E1-E9) accuracy tracker stored in the browser's own localStorage — this app has no user accounts, so progress is per-browser, not shared across devices</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.13</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>HF Conditions card</span> — optional (Settings → General, off by default). Solar/band propagation data from N0NBH's free public feed, no API key: a Good/Fair/Poor table for 80m through 10m (day and night), plus Solar Flux/A-index/K-index/sunspot count and secondary stats (X-ray class, aurora, geomagnetic field, signal/noise). Polled every ~15 minutes, cached an hour server-side to match the feed's own update cadence. One card, positioned in the same Card order drag list as the other extra cards</li>
@@ -660,7 +671,7 @@
         <div class="feature-group">
             <div class="feature-group-title">Settings</div>
             <ul class="feature-list">
-                <li><span>General tab</span> — dashboard name, dark/light mode toggle, toolbar links, host stats, fleet activity, ASL Favorites, APRS Messages, and HF Conditions card toggles, and (Raspberry Pi standalone installs only) host reboot/power-off buttons</li>
+                <li><span>General tab</span> — dashboard name, dark/light mode toggle, toolbar links, host stats, fleet activity, ASL Favorites, APRS Messages, HF Conditions, Band Plan, and License Quiz card toggles, and (Raspberry Pi standalone installs only) host reboot/power-off buttons</li>
                 <li><span>Weather tab</span> — location and °F/°C unit toggle</li>
                 <li><span>Integrations tab</span> — QRZ.com, RadioID.net, APRS.fi, Home Assistant MQTT, and APRS favorite alert credentials/toggles with connection tests</li>
                 <li>Hotspots tab — card order, add/edit/delete hotspots with SSH connection test, optional lat/lon and Brandmeister ID per hotspot</li>

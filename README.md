@@ -240,11 +240,11 @@ and **Version info**.
   Settings link itself always stays visible either way.
 - **Card order** — drag hotspot cards into whatever order you want them
   to appear on the dashboard (Hotspots tab). If the Fleet activity, ASL
-  Favorites & Control, APRS Messages, or HF Conditions card is enabled,
-  it appears in the same drag list and can be moved to any position
-  among the hotspot cards, not just first. Every enabled camera card
-  (Settings → Cameras) gets its own row in the same list too, one per
-  camera.
+  Favorites & Control, APRS Messages, HF Conditions, Band Plan, or
+  License Quiz card is enabled, it appears in the same drag list and can
+  be moved to any position among the hotspot cards, not just first.
+  Every enabled camera card (Settings → Cameras) gets its own row in the
+  same list too, one per camera.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.
@@ -729,6 +729,50 @@ list.
   — the feed itself only updates on a similar cadence, so anything
   faster is just extra load on someone else's free service for no
   fresher data.
+
+## Band Plan card
+
+Optional dashboard card (Settings → General → "Show Band Plan card", off
+by default) — a static FCC Part 97.301 frequency/mode reference for the
+HF bands, General and Extra class privileges shown together on one card.
+No network client at all — the only card in the app with no Python
+module of its own, just data baked into the template.
+
+- **General privileges** are the primary numbers shown per band; on the
+  4 bands where Extra gets more (80m/40m/20m/15m), a small purple
+  "↳ Extra: ..." note underneath marks where the wider Extra segment
+  starts. The other 6 bands are identical for both classes.
+- **Reference only** — a caveat line links to ARRL's own band chart.
+  This is regulatory data baked into the app rather than pulled live,
+  so it can go stale if the FCC amends Part 97.301 — check the linked
+  chart before operating, don't rely on this card alone.
+- Same drag-and-drop **Card order** placement as every other extra card.
+
+## License Quiz card
+
+Optional dashboard card (Settings → General → "Show License Quiz card",
+off by default) — one random Amateur Extra (Element 4) practice question
+at a time, auto-rotating to a new one every ~10 minutes, or on demand via
+"New Question". Pool data is bundled server-side (`license_quiz.py`,
+`data/extra_2024_2028.json`) and never sent to the browser in bulk —
+each poll fetches exactly one question.
+
+- **The current 2024-2028 pool** (572 questions, 27 diagram-based
+  questions excluded since the referenced figures aren't bundled),
+  sourced from a machine-readable export of
+  [NCVEC's official public-domain release](https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release)
+  — see `license_quiz.py`'s docstring for the exact source and license.
+- **Click an answer to reveal** correct (green) / wrong (red); the other
+  choices dim. Two-column layout keeps the card's height in line with
+  the others regardless of answer length.
+- **Per-section accuracy tracker** — a 9-pip row (E0 Safety, E1-E9) that
+  colors green/yellow/red per subelement group once you've answered at
+  least one question from it, with rollup "Answered"/"Accuracy" stats
+  and a reset button. This is stored in the browser's **localStorage**,
+  not on the server — this app has no user accounts, so "your" progress
+  can only mean "this browser's" progress. Different devices viewing
+  the same dashboard get independent stats.
+- Same drag-and-drop **Card order** placement as every other extra card.
 
 ## Transmission timer
 

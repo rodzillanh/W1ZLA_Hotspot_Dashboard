@@ -50,6 +50,14 @@ hf_conditions.py
                    connection can't be discarded and remade per-call the
                    way a QRZ/Brandmeister lookup client can
 
+license_quiz.py    The one module in this list that ISN'T a network
+                   client -- LicenseQuizPool loads data/extra_2024_2028.json
+                   (the bundled Extra/Element 4 question pool) once at
+                   startup and serves random questions from memory, no
+                   cache/TTL/fetch involved. See its docstring for the
+                   pool's source/license before ever touching the data
+                   file.
+
 host_stats.py, weather.py
                    Small standalone pollers (host CPU/mem, Open-Meteo).
                    host_stats.py also has is_pi_standalone() (checks
@@ -435,6 +443,38 @@ config for per-integration credentials; put it in
   nested under a per-band element, so day/night pairs for the same band
   have to be collected into a dict first, then re-ordered for display —
   don't assume the feed's own element order is what you want to render.
+
+- **The License Quiz card's `data/extra_2024_2028.json` was sourced from
+  a real, verifiable machine-readable export, not typed out from
+  memory.** Getting FCC-exam content wrong is a worse failure mode than
+  most other data-accuracy misses in this app (same caution level as the
+  Band Plan card's frequency tables, one notch more so since this is
+  literally exam prep). Source: NCVEC's official public-domain
+  2024-2028 Extra (Element 4) release, transcribed by
+  https://github.com/russolsen/ham_radio_question_pool (Apache-2.0) into
+  JSON/YAML/CSV. That export has 599 questions; NCVEC's own release
+  notes cite 603 for this cycle — a small, unreconciled discrepancy
+  between snapshots, called out rather than silently accepted. 27
+  questions referencing a circuit diagram figure were excluded (the
+  images aren't bundled), leaving the 572 in `data/extra_2024_2028.json`.
+  If this ever needs updating for the next pool cycle (2028), re-fetch
+  from one of those two sources — don't hand-edit or add questions from
+  training-data recall.
+- **`E0` is a real graded subelement in the current Extra pool** ("Safety"
+  — RF exposure, tower/climbing safety, grounding), not a bonus/appendix
+  section invented by the data export. Confirmed via a second, independent
+  web source before trusting the E0 entries in the bundled data — don't
+  assume subelement codes match older, more commonly-cited "E1-E9 only"
+  descriptions of the Extra pool structure.
+- **License Quiz per-section accuracy stats live in browser
+  `localStorage`, not `settings.json` or any other server-side store.**
+  This app has no user accounts/login (already a documented tradeoff),
+  so "your" progress can only mean "this browser's" progress — deliberately
+  scoped narrower than every other piece of app state, which all lives
+  server-side and is shared across every device viewing the dashboard.
+  Don't move this into settings.json if asked to "sync" it — that would
+  make one person's practice history overwrite another's on a shared
+  dashboard, which is worse than not syncing at all.
 
 ## Testing patterns used throughout this project
 

@@ -296,6 +296,18 @@ DEFAULT_SETTINGS = {
     # scheme as Fleet Activity/ASL Favorites/APRS Messages.
     "show_hf_conditions": False,
     "hf_conditions_position": 0,
+    # Band Plan card -- off by default. Purely static FCC Part 97.301
+    # reference data baked into dashboard.html, no backend client at all
+    # (the only card in the app with no Python module of its own).
+    "show_band_plan": False,
+    "band_plan_position": 0,
+    # License Quiz card -- off by default. One random question at a time
+    # from the bundled Extra (Element 4) pool (license_quiz.py), rotating
+    # every ~10 min. Per-section accuracy stats live in the browser's
+    # localStorage, not here -- this app has no user accounts, so "your"
+    # progress can only mean "this browser's" progress.
+    "show_license_quiz": False,
+    "license_quiz_position": 0,
 }
 
 # --- Fleet activity ---

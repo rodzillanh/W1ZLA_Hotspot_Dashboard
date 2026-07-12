@@ -371,6 +371,24 @@
                 <div class="toggle {{ 'on' if settings.get('show_hf_conditions', False) else '' }}"
                      id="hf-conditions-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show Band Plan card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (General/Extra HF privileges reference, static data, no API)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_band_plan', False) else '' }}"
+                     id="band-plan-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show License Quiz card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (one random Extra-class practice question, rotates every ~10 min)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_license_quiz', False) else '' }}"
+                     id="license-quiz-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveAppearance()">Save appearance</button>
         <span class="status-txt" id="appearance-status"></span>
@@ -661,6 +679,8 @@
             {% set asl_fav_pos = settings.get('asl_favorites_position', 0) if settings.get('show_asl_favorites', False) else -1 %}
             {% set aprs_inbox_pos = settings.get('aprs_inbox_position', 0) if settings.get('aprs_inbox_enabled', False) else -1 %}
             {% set hf_cond_pos = settings.get('hf_conditions_position', 0) if settings.get('show_hf_conditions', False) else -1 %}
+            {% set band_plan_pos = settings.get('band_plan_position', 0) if settings.get('show_band_plan', False) else -1 %}
+            {% set license_quiz_pos = settings.get('license_quiz_position', 0) if settings.get('show_license_quiz', False) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -689,6 +709,20 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">☀️ HF Conditions</span>
                     <span class="node-meta">propagation card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == band_plan_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__band_plan__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📻 Band Plan</span>
+                    <span class="node-meta">reference card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == license_quiz_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__license_quiz__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🎓 License Quiz</span>
+                    <span class="node-meta">practice card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -740,6 +774,20 @@
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">☀️ HF Conditions</span>
                 <span class="node-meta">propagation card</span>
+            </div>
+            {% endif %}
+            {% if band_plan_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__band_plan__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">📻 Band Plan</span>
+                <span class="node-meta">reference card</span>
+            </div>
+            {% endif %}
+            {% if license_quiz_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__license_quiz__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">🎓 License Quiz</span>
+                <span class="node-meta">practice card</span>
             </div>
             {% endif %}
             {% if show_cams %}
@@ -1074,6 +1122,8 @@ function saveAppearance() {
             show_asl_favorites: document.getElementById('asl-favorites-toggle').classList.contains('on'),
             aprs_inbox_enabled: document.getElementById('aprs-inbox-toggle').classList.contains('on'),
             show_hf_conditions: document.getElementById('hf-conditions-toggle').classList.contains('on'),
+            show_band_plan: document.getElementById('band-plan-toggle').classList.contains('on'),
+            show_license_quiz: document.getElementById('license-quiz-toggle').classList.contains('on'),
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');
@@ -1195,6 +1245,8 @@ function saveCardOrder() {
     const aslFavIdx    = sentinelIndex('__asl_favorites__');
     const aprsInboxIdx = sentinelIndex('__aprs_inbox__');
     const hfCondIdx    = sentinelIndex('__hf_conditions__');
+    const bandPlanIdx    = sentinelIndex('__band_plan__');
+    const licenseQuizIdx = sentinelIndex('__license_quiz__');
     const cameraPositions = {};
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
@@ -1236,6 +1288,20 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ hf_conditions_position: hfCondIdx })
+        }));
+    }
+    if (bandPlanIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ band_plan_position: bandPlanIdx })
+        }));
+    }
+    if (licenseQuizIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ license_quiz_position: licenseQuizIdx })
         }));
     }
     if (Object.keys(cameraPositions).length > 0) {

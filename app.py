@@ -33,6 +33,7 @@ import storage_activity
 from update_check import UpdateChecker
 from camera_stream import CameraStreamManager
 from hf_conditions import HfConditionsClient
+from license_quiz import LicenseQuizPool
 
 import host_stats as host_stats_mod
 
@@ -44,6 +45,7 @@ host_stats.start()
 update_checker = UpdateChecker()
 hf_conditions   = HfConditionsClient()
 camera_manager  = CameraStreamManager()
+license_quiz    = LicenseQuizPool()
 
 # Gates the Settings "Host power control" buttons -- only true on a
 # standalone install running directly on real Raspberry Pi hardware (see
@@ -286,6 +288,20 @@ def api_settings_post():
             settings["hf_conditions_position"] = max(0, int(data["hf_conditions_position"]))
         except (TypeError, ValueError):
             pass
+    if "show_band_plan" in data:
+        settings["show_band_plan"] = bool(data["show_band_plan"])
+    if "band_plan_position" in data:
+        try:
+            settings["band_plan_position"] = max(0, int(data["band_plan_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "show_license_quiz" in data:
+        settings["show_license_quiz"] = bool(data["show_license_quiz"])
+    if "license_quiz_position" in data:
+        try:
+            settings["license_quiz_position"] = max(0, int(data["license_quiz_position"]))
+        except (TypeError, ValueError):
+            pass
     save_settings(settings)
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:
@@ -472,6 +488,18 @@ def api_hf_conditions():
     if data is None:
         return jsonify({"error": "unavailable"}), 503
     return jsonify(data)
+
+@app.route("/api/quiz_question")
+def api_quiz_question():
+    """One random question from the bundled Extra pool (license_quiz.py)
+    -- picked server-side rather than shipping the whole ~570-question
+    pool to the browser, matching every other card's small-payload-per-
+    poll pattern. Per-section accuracy stats are tracked client-side in
+    localStorage, not here -- this app has no user accounts."""
+    q = license_quiz.random_question()
+    if q is None:
+        return jsonify({"error": "unavailable"}), 503
+    return jsonify(q)
 
 @app.route("/version")
 def version_page():
