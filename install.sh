@@ -53,7 +53,10 @@ apt-get update -qq
 # ffmpeg bridges RTSP camera feeds to MJPEG for the optional camera cards
 # (off by default, but installed unconditionally -- same treatment as the
 # paho-mqtt/aprslib pip deps for MQTT/APRS, both also off by default).
-apt-get install -y -qq python3-venv python3-pip ffmpeg
+# git is needed to set up the persistent source checkout below, which
+# update checks (Settings -> Version) and the "Install update" button
+# both depend on -- installed unconditionally for the same reason ffmpeg is.
+apt-get install -y -qq python3-venv python3-pip ffmpeg git
 success "System packages installed"
 
 # --- create service user ---
@@ -95,32 +98,60 @@ if systemctl is-active --quiet "$APP_NAME" 2>/dev/null; then
     systemctl stop "$APP_NAME"
 fi
 
+# --- establish a persistent git source checkout ---
+# Update checks (Settings -> Version) AND the "Install update" button's
+# automatic git pull (see run_update.sh below) both need a real .git
+# checkout to work at all -- not just at install time, but for the life
+# of this install, since run_update.sh's SOURCE_DIR gets baked in below.
+# If install.sh was run from a plain file copy (SCP/zip, no .git), set
+# up a proper clone in a persistent location instead of just warning and
+# leaving update checks permanently broken.
+header "Setting up application source"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_REPO_URL="https://git.trytheitguy.com/rodney_berry/W1ZLAHotspot_Dashboard"
+SOURCE_DIR="/opt/${APP_NAME}-src"
+
+if [[ -d "${SCRIPT_DIR}/.git" ]]; then
+    # Already a git clone -- use it directly, no separate copy needed.
+    SOURCE_DIR="$SCRIPT_DIR"
+    success "Using existing git checkout at ${SOURCE_DIR}"
+elif [[ -d "${SOURCE_DIR}/.git" ]]; then
+    # A previous install.sh run already set one up -- reuse it.
+    info "Found existing source checkout at ${SOURCE_DIR}, pulling latest"
+    git -C "$SOURCE_DIR" pull --ff-only --quiet 2>/dev/null \
+        || warn "Could not update ${SOURCE_DIR} -- continuing with what's already there"
+elif git clone --quiet "$DEFAULT_REPO_URL" "$SOURCE_DIR" 2>/dev/null; then
+    success "Cloned ${DEFAULT_REPO_URL} to ${SOURCE_DIR}"
+    warn "Installing from this fresh clone, not ${SCRIPT_DIR} -- any local changes there" \
+         "won't be included. Run install.sh again from a git clone if that's not what you want."
+else
+    warn "Couldn't set up a git checkout (no network, or ${DEFAULT_REPO_URL} unreachable) --" \
+         "continuing with the files in ${SCRIPT_DIR} as-is. Update checks (Settings -> Version)" \
+         "will show \"unknown\" until this is retried with network access."
+    SOURCE_DIR="$SCRIPT_DIR"
+fi
+
 # --- install application files ---
 header "Installing application"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
 mkdir -p "$INSTALL_DIR"
 # Copy all Python files and templates
-cp "${SCRIPT_DIR}"/*.py         "$INSTALL_DIR/"
-cp "${SCRIPT_DIR}/requirements.txt" "$INSTALL_DIR/"
+cp "${SOURCE_DIR}"/*.py         "$INSTALL_DIR/"
+cp "${SOURCE_DIR}/requirements.txt" "$INSTALL_DIR/"
 # Bundled License Quiz question pool -- a plain data file, not a .py
 # module, so it needs its own explicit copy line (same reason templates/
 # needs one) or it silently never reaches INSTALL_DIR.
-cp "${SCRIPT_DIR}/extra_2024_2028.json" "$INSTALL_DIR/"
+cp "${SOURCE_DIR}/extra_2024_2028.json" "$INSTALL_DIR/"
 mkdir -p "${INSTALL_DIR}/templates"
-cp "${SCRIPT_DIR}/templates/"*.html "${INSTALL_DIR}/templates/"
+cp "${SOURCE_DIR}/templates/"*.html "${INSTALL_DIR}/templates/"
 success "Application files copied to ${INSTALL_DIR}"
 
 # --- record the deployed commit (Version tab's update check reads this;
 # the running app has no other way to know what it is, since these are
 # plain file copies, not a git clone) ---
-if git -C "$SCRIPT_DIR" rev-parse HEAD > "${INSTALL_DIR}/BUILD_COMMIT" 2>/dev/null; then
+if git -C "$SOURCE_DIR" rev-parse HEAD > "${INSTALL_DIR}/BUILD_COMMIT" 2>/dev/null; then
     success "Recorded build commit for update checks"
 else
     echo "unknown" > "${INSTALL_DIR}/BUILD_COMMIT"
-    warn "No git info found in ${SCRIPT_DIR} -- update checks (Settings → Version) will show" \
-         "\"unknown\" and won't work. This is expected if you copied files via SCP/zip instead" \
-         "of 'git clone' -- re-deploy from a git clone to enable update checks."
 fi
 
 # --- create data directory ---
@@ -197,7 +228,7 @@ cat > "${INSTALL_DIR}/run_update.sh" << RUNUPDATE
 # systemd path unit whenever the dashboard's "Install update" button
 # writes ${DATA_DIR}/update_requested. Safe to re-run by hand too.
 set -uo pipefail
-SOURCE_DIR="${SCRIPT_DIR}"
+SOURCE_DIR="${SOURCE_DIR}"
 TRIGGER_FILE="${DATA_DIR}/update_requested"
 LOG_FILE="/var/log/${APP_NAME}-update.log"
 
@@ -257,4 +288,10 @@ echo -e "    ${BOLD}sudo journalctl -u ${APP_NAME} -f${NC}   — view logs"
 echo
 echo -e "  Config & data:  ${DATA_DIR}"
 echo -e "  App files:      ${INSTALL_DIR}"
+echo -e "  Source checkout: ${SOURCE_DIR}"
+if [[ "$SOURCE_DIR" != "$SCRIPT_DIR" ]]; then
+    echo
+    echo -e "  For future manual updates, run update.sh from the source checkout above"
+    echo -e "  (${BOLD}cd ${SOURCE_DIR} && git pull && sudo bash update.sh${NC}), not from ${SCRIPT_DIR}."
+fi
 echo

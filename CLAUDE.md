@@ -353,27 +353,51 @@ config for per-integration credentials; put it in
   entirely, not a drop-in.
 - **A standalone Pi install with no `.git` checkout (SCP/zip-copied
   source instead of `git clone`) is a real, reported scenario, not a
-  hypothetical — the Version tab genuinely shows "unknown"/"no recorded
-  build commit" in that case, and there's no way to fix it after the
-  fact short of re-deploying from an actual git clone.** This is
-  `install.sh`/`update.sh`'s own `git -C "$SCRIPT_DIR" rev-parse HEAD`
-  failing (no `.git` directory at all -- a different failure than the
-  WPSD "dubious ownership" gotcha above, which is about *ownership* of
-  an existing `.git`, not its absence), silently swallowed by the
-  `|| echo "unknown"` fallback. The bug that shipped alongside this
-  (fixed at the same time this was diagnosed) was the *message* shown
-  for this case in `setup.html`'s `renderUpdateStatus()`: it used to
-  say "re-run update.sh (or docker-update.sh) once to enable update
-  checks" — actively misleading for a non-git deployment, since
-  re-running update.sh against the same non-git `$SCRIPT_DIR` hits the
-  identical `git rev-parse` failure and writes "unknown" again, forever.
-  Fixed by (a) `install.sh`/`update.sh` now `warn()`-ing loudly at
-  deploy time when no git info is found, instead of failing silently,
-  and (b) the Version tab message now correctly says to re-deploy via
-  `git clone`, not to re-run the update script. If you touch this
-  again, remember the two failure modes need different messages: "no
-  `.git` at all" (this one) vs. "`.git` exists but `git` refuses to
-  read it" (the dubious-ownership case) — don't conflate them.
+  hypothetical.** This is `git -C "$SCRIPT_DIR" rev-parse HEAD` failing
+  (no `.git` directory at all — a different failure than the WPSD
+  "dubious ownership" gotcha above, which is about *ownership* of an
+  existing `.git`, not its absence). Fixed in two stages:
+  1. First pass: the *message* shown for this case in `setup.html`'s
+     `renderUpdateStatus()` used to say "re-run update.sh (or
+     docker-update.sh) once to enable update checks" — actively
+     misleading, since re-running update.sh against the same non-git
+     `$SCRIPT_DIR` hits the identical `git rev-parse` failure forever.
+     Fixed the message, and had `install.sh`/`update.sh` `warn()` loudly
+     at deploy time instead of failing silently.
+  2. Second pass (the real fix): `install.sh` now actively sets up a
+     **persistent git checkout** (`/opt/hotspot-dashboard-src`, cloned
+     from `DEFAULT_REPO_URL`) when `$SCRIPT_DIR` has no `.git`, and
+     installs from *that* instead of the non-git copy — so update
+     checks and the self-update button work even if the user never
+     touches git themselves. `update.sh` does the equivalent for the
+     self-update button specifically (`UPDATER_SOURCE_DIR`, resolved
+     separately from `$SCRIPT_DIR` — see next point) since it can't
+     retroactively fix `BUILD_COMMIT`/the just-installed files without
+     silently overriding whatever the user intentionally placed at
+     `$SCRIPT_DIR` for *this* run, which would be a correctness
+     regression for someone deliberately testing local changes via SCP.
+     Both scripts fall back to today's warn-and-continue behavior if
+     cloning fails (no network, git host unreachable) — never a hard
+     install failure over this.
+- **`install.sh`/`update.sh` distinguish "what got copied into
+  INSTALL_DIR" from "what the self-update button pulls from" — two
+  different variables, deliberately not unified.** `install.sh`
+  resolves one `SOURCE_DIR` and uses it for both (copying files AND
+  seeding `run_update.sh`), since at install time there's no
+  already-installed state to preserve. `update.sh` keeps `SCRIPT_DIR`
+  (wherever *this* update.sh run's files came from — respected as-is,
+  copied verbatim, whatever the user intended) separate from
+  `UPDATER_SOURCE_DIR` (what `run_update.sh` gets regenerated to pull
+  from next time the button is clicked — falls back to the persistent
+  `/opt/hotspot-dashboard-src` clone if `$SCRIPT_DIR` itself isn't git,
+  auto-cloning one if neither exists yet). Don't collapse these back
+  into one variable in `update.sh` — that reintroduces exactly the
+  "silently overrides local files with upstream" regression stage 2
+  above was written to avoid, and also reintroduces the older latent
+  bug where every manual `update.sh` run regenerated `run_update.sh`
+  with `SOURCE_DIR="$SCRIPT_DIR"` unconditionally, quietly breaking the
+  self-update button again if that particular run happened to be
+  invoked from a transient non-git location.
 
 - **Camera cards (v3.8) — Bambu Labs A1's camera is NOT RTSP.** It's a
   proprietary TLS/port-6000 framed-JPEG protocol. A first instinct to

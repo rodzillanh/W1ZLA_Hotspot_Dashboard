@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.17</span>
+                <span class="release-version">v3.18</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Standalone Pi install/update now auto-clones a git source if needed</span> — deploying via SCP/zip instead of <code>git clone</code> used to permanently break update checks and the self-update button, with no fix short of manually re-deploying. <code>install.sh</code> now automatically sets up a persistent git checkout (<code>/opt/hotspot-dashboard-src</code>) and installs from that when it detects a non-git source folder (falling back to your copy as-is if it can't reach the git host); <code>update.sh</code> does the equivalent for the self-update button specifically, without touching whichever files it's actually copying from on that run</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.17</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Bugfix — misleading message when update checking has no build commit</span> — a standalone Pi install deployed by copying files (SCP/zip) instead of <code>git clone</code> has no <code>.git</code> history for <code>install.sh</code>/<code>update.sh</code> to read, so the Version tab correctly shows "unknown" — but the message used to say "re-run update.sh to enable update checks," which doesn't fix anything for a non-git deployment (it hits the identical failure and writes "unknown" again). Now says clearly that a real <code>git clone</code> is needed. <code>install.sh</code>/<code>update.sh</code> also now warn loudly at deploy time when no git info is found, instead of failing silently</li>

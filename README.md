@@ -42,13 +42,17 @@ Copy the project folder to your Pi (via SCP, USB, or git clone), then:
 sudo bash install.sh
 ```
 
-**Use `git clone` if you want the Settings → Version tab's update-check
-feature to work.** It compares your deployed commit against the git
-remote, so it needs a real `.git` checkout to know what's currently
-deployed — copying files via SCP or a downloaded zip has no commit
-history for it to read, and the Version tab will show "unknown" /
-"no recorded build commit" instead of checking for updates. `install.sh`
-warns about this at install time if it detects a non-git source folder.
+**The Settings → Version tab's update-check feature needs a real `.git`
+checkout** to compare your deployed commit against the git remote — if
+you copy files via SCP or a downloaded zip instead of `git clone`,
+`install.sh` automatically sets one up for you at
+`/opt/hotspot-dashboard-src` (network access to the git host required)
+and installs from that instead. If it can't reach the git host, it
+falls back to installing from your copy as-is and update checks will
+show "unknown" until you retry with network access, or run `install.sh`
+again from an actual `git clone`. `update.sh` does the same thing for
+the self-update button specifically (separate from whatever files it
+installs from `update.sh`'s own location) if it's ever missing.
 
 The installer will:
 1. Install Python dependencies into an isolated virtual environment

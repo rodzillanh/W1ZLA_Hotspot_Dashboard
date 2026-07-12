@@ -99,19 +99,42 @@ cp "${SCRIPT_DIR}/extra_2024_2028.json"    "${INSTALL_DIR}/"
 mkdir -p "${INSTALL_DIR}/templates"
 cp "${SCRIPT_DIR}/templates/"*.html        "${INSTALL_DIR}/templates/"
 # Record the commit this install is now at -- read by the Version tab's
-# update check. Blank/"unknown" if SCRIPT_DIR isn't a git clone (e.g. files
-# were copied in some other way), which the check just treats as "unknown,
-# can't tell if an update is available" rather than erroring.
+# update check. Reflects SCRIPT_DIR specifically (not any fallback source
+# checkout below), since SCRIPT_DIR is where the files just copied above
+# actually came from -- reporting a different commit would be inaccurate.
+# Blank/"unknown" if SCRIPT_DIR isn't a git clone (e.g. files were copied
+# via SCP/zip), which the check just treats as "unknown, can't tell if an
+# update is available" rather than erroring.
 if git -C "$SCRIPT_DIR" rev-parse HEAD > "${INSTALL_DIR}/BUILD_COMMIT" 2>/dev/null; then
     success "Recorded build commit for update checks"
 else
     echo "unknown" > "${INSTALL_DIR}/BUILD_COMMIT"
-    warn "No git info found in ${SCRIPT_DIR} -- update checks (Settings → Version) will show" \
-         "\"unknown\" and won't work. This is expected if you copied files via SCP/zip instead" \
-         "of 'git clone' -- re-deploy from a git clone to enable update checks."
 fi
 chown -R hotspot:hotspot "${INSTALL_DIR}"
 success "Files updated"
+
+# --- resolve a source checkout for the self-update button (separate from
+# SCRIPT_DIR above, which is what actually got copied into INSTALL_DIR).
+# The "Install update" button's automatic git pull (run_update.sh below)
+# needs its own persistent git checkout to work, regardless of how THIS
+# particular update.sh run got its files -- so this doesn't touch the
+# files just installed, only where future automatic updates pull from. ---
+DEFAULT_REPO_URL="https://git.trytheitguy.com/rodney_berry/W1ZLAHotspot_Dashboard"
+PERSISTENT_SOURCE_DIR="/opt/${APP_NAME}-src"
+if [[ -d "${SCRIPT_DIR}/.git" ]]; then
+    UPDATER_SOURCE_DIR="$SCRIPT_DIR"
+elif [[ -d "${PERSISTENT_SOURCE_DIR}/.git" ]]; then
+    UPDATER_SOURCE_DIR="$PERSISTENT_SOURCE_DIR"
+    git -C "$UPDATER_SOURCE_DIR" pull --ff-only --quiet 2>/dev/null || true
+elif git clone --quiet "$DEFAULT_REPO_URL" "$PERSISTENT_SOURCE_DIR" 2>/dev/null; then
+    UPDATER_SOURCE_DIR="$PERSISTENT_SOURCE_DIR"
+    success "Cloned ${DEFAULT_REPO_URL} to ${UPDATER_SOURCE_DIR} for the self-update button"
+else
+    UPDATER_SOURCE_DIR="$SCRIPT_DIR"
+    warn "No git checkout available for the self-update button (Settings -> Version ->" \
+         "\"Install update\") -- it'll no-op until this is retried with network access, or" \
+         "you run update.sh from a git clone."
+fi
 
 # --- update dependencies if needed ---
 if [[ "$REQS_CHANGED" == "true" ]]; then
@@ -172,7 +195,7 @@ cat > "${INSTALL_DIR}/run_update.sh" << RUNUPDATE
 # ${APP_NAME}-updater systemd path unit whenever the dashboard's "Install
 # update" button writes ${DATA_DIR}/update_requested. Safe to re-run by hand.
 set -uo pipefail
-SOURCE_DIR="${SCRIPT_DIR}"
+SOURCE_DIR="${UPDATER_SOURCE_DIR}"
 TRIGGER_FILE="${DATA_DIR}/update_requested"
 LOG_FILE="/var/log/${APP_NAME}-update.log"
 
@@ -246,3 +269,9 @@ echo -e "    ${BOLD}sudo cp -r ${BACKUP_DIR}/templates ${INSTALL_DIR}/${NC}"
 echo -e "    ${BOLD}sudo cp ${BACKUP_DIR}/extra_2024_2028.json ${INSTALL_DIR}/${NC}"
 echo -e "    ${BOLD}sudo systemctl start ${APP_NAME}${NC}"
 echo
+if [[ "$UPDATER_SOURCE_DIR" != "$SCRIPT_DIR" ]]; then
+    echo -e "  Note: the self-update button now pulls from ${UPDATER_SOURCE_DIR}, not ${SCRIPT_DIR}"
+    echo -e "  (which has no .git). For manual updates going forward, run update.sh from there instead:"
+    echo -e "  ${BOLD}cd ${UPDATER_SOURCE_DIR} && git pull && sudo bash update.sh${NC}"
+    echo
+fi
