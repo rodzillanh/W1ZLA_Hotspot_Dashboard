@@ -631,6 +631,43 @@
         .lq-next-btn:hover { border-color: var(--link); }
         .lq-unavailable { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
 
+        /* --- Band Activity card --- */
+        .ba-badge {
+            font-size: 10px; font-weight: 600; letter-spacing: .3px;
+            padding: 2px 8px; border-radius: 9px; background: rgba(91,192,222,.16); color: var(--link);
+        }
+        .ba-caveat { font-size: 10.5px; color: var(--text-dim); margin-bottom: 10px; line-height: 1.35; }
+        .ba-table { width: 100%; border-collapse: collapse; }
+        .ba-table tr { border-bottom: 1px solid var(--card-border); }
+        .ba-table tr:last-child { border-bottom: none; }
+        .ba-table td { padding: 6px 0; vertical-align: middle; }
+        .ba-axis-row { border-bottom: none !important; }
+        .ba-axis-row th { padding: 0 0 3px; font-weight: 400; text-align: left; }
+        .ba-axis-label {
+            display: flex; justify-content: space-between; font-size: 9px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: .3px; color: var(--text-dim);
+            padding-right: 60px;
+        }
+        .ba-band {
+            font-size: 12px; font-weight: 600; color: var(--text); width: 34px;
+            white-space: nowrap; padding-right: 8px !important;
+        }
+        .ba-spark-wrap { display: flex; align-items: center; gap: 8px; cursor: default; }
+        .ba-spark { display: flex; align-items: flex-end; gap: 1px; height: 18px; flex: 1; min-width: 0; }
+        .ba-spark span { flex: 1; background: var(--link); opacity: .45; border-radius: 1px 1px 0 0; min-width: 1px; }
+        .ba-spark span:last-child { opacity: 1; }
+        .ba-spark-now {
+            font-size: 11px; font-weight: 600; color: var(--link); font-variant-numeric: tabular-nums;
+            white-space: nowrap; width: 52px; text-align: right; flex-shrink: 0;
+        }
+        .ba-spark-now small { font-size: 9px; font-weight: 500; color: var(--text-dim); }
+        .ba-footer {
+            margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--card-border);
+            font-size: 10px; color: var(--text-dim); text-align: right;
+        }
+        .ba-footer a { color: var(--text-dim); }
+        .ba-unavailable { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
+
         /* --- camera cards (RTSP / Bambu Labs A1) --- */
         .camera-card {
             background: var(--card-bg); border: 1px solid var(--card-border);
@@ -1170,6 +1207,27 @@
             <div class="lq-unavailable" id="lq-unavailable" style="display:none">Question pool unavailable right now.</div>
         </div>
         {% endif %}
+        {% if settings.get('show_wspr_activity', False) %}
+        <div class="metrics-card" id="wspr-activity-card"
+             style="order:{{ settings.get('wspr_activity_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">📶 Band Activity</div>
+                <span class="ba-badge" id="ba-badge">WSPR</span>
+            </div>
+            <div class="ba-caveat">Live spot activity near your station, not a propagation prediction -- see HF Conditions for that.</div>
+            <table class="ba-table">
+                <thead>
+                    <tr class="ba-axis-row">
+                        <th></th>
+                        <th><div class="ba-axis-label"><span>24h ago</span><span>now</span></div></th>
+                    </tr>
+                </thead>
+                <tbody id="ba-tbody"></tbody>
+            </table>
+            <div class="ba-footer">Data: <a href="https://wspr.live/" target="_blank" rel="noopener">WSPR Live</a> · refreshes ~30 min</div>
+            <div class="ba-unavailable" id="ba-unavailable" style="display:none">Set a station grid square in Settings → General to enable this card.</div>
+        </div>
+        {% endif %}
         <div id="cards" style="display:contents"></div>
         <div id="camera-cards" style="display:contents"></div>
     </div>
@@ -1342,6 +1400,9 @@ const BAND_PLAN_POSITION = {{ settings.get('band_plan_position', 0) }};
 const SHOW_LICENSE_QUIZ = {{ 'true' if settings.get('show_license_quiz', False) else 'false' }};
 const LICENSE_QUIZ_POSITION = {{ settings.get('license_quiz_position', 0) }};
 const LICENSE_QUIZ_POLL_MS = 10 * 60 * 1000;  // auto-rotate to a new random question every ~10 min
+const SHOW_WSPR_ACTIVITY = {{ 'true' if settings.get('show_wspr_activity', False) else 'false' }};
+const WSPR_ACTIVITY_POSITION = {{ settings.get('wspr_activity_position', 0) }};
+const WSPR_ACTIVITY_POLL_MS = 30 * 60 * 1000;  // matches wspr_activity.py's server-side cache TTL
 
 function updateSysbar(data) {
     if (!SHOW_HOST_STATS) return;
@@ -1529,6 +1590,9 @@ function renderCards(data) {
     if (SHOW_LICENSE_QUIZ) {
         sentinels.push({ key: 'licensequiz', pos: Math.max(0, Math.min(LICENSE_QUIZ_POSITION, data.length)) });
     }
+    if (SHOW_WSPR_ACTIVITY) {
+        sentinels.push({ key: 'wspractivity', pos: Math.max(0, Math.min(WSPR_ACTIVITY_POSITION, data.length)) });
+    }
     const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);
 
     const fleetCard = document.getElementById('fleet-activity-card');
@@ -1543,6 +1607,8 @@ function renderCards(data) {
     if (bandPlanCard && 'bandplan' in sentinelOrders) bandPlanCard.style.order = sentinelOrders.bandplan;
     const licenseQuizCard = document.getElementById('license-quiz-card');
     if (licenseQuizCard && 'licensequiz' in sentinelOrders) licenseQuizCard.style.order = sentinelOrders.licensequiz;
+    const wsprActivityCard = document.getElementById('wspr-activity-card');
+    if (wsprActivityCard && 'wspractivity' in sentinelOrders) wsprActivityCard.style.order = sentinelOrders.wspractivity;
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -2088,6 +2154,58 @@ if (SHOW_LICENSE_QUIZ) {
     lqRenderStats();
     fetchQuizQuestion();
     setInterval(fetchQuizQuestion, LICENSE_QUIZ_POLL_MS);
+}
+
+// --- Band Activity card ---
+// Live WSPR spot-count sparklines (wspr_activity.py, wspr.live) -- a
+// DIFFERENT kind of data than HF Conditions' N0NBH prediction (real
+// observed activity, not a solar-index forecast). Same band-name regex
+// as renderHfConditions() ("80m-40m" -> "80-40m") for a consistent look.
+function renderWsprActivity(data) {
+    const unavailableEl = document.getElementById('ba-unavailable');
+    if (!data || data.error) {
+        if (unavailableEl) unavailableEl.style.display = 'block';
+        return;
+    }
+    if (unavailableEl) unavailableEl.style.display = 'none';
+
+    const badgeEl = document.getElementById('ba-badge');
+    if (badgeEl && data.station_grid) {
+        badgeEl.textContent = `${data.station_grid} · ${data.radius_km}km`;
+    }
+
+    const groups = data.groups || [];
+    document.getElementById('ba-tbody').innerHTML = groups.map(g => {
+        const max = g.peak || 1;
+        const bars = (g.hourly || []).map(v =>
+            `<span style="height:${Math.max(6, Math.round(v / max * 100))}%"></span>`
+        ).join('');
+        const label = escapeHtml((g.label || '').replace(/^(\d+)m-(\d+)m$/, '$1–$2m'));
+        const peakLabel = g.peak_hour ? `peak ${g.peak.toLocaleString()} at ${escapeHtml(g.peak_hour)} UTC` : '';
+        return `
+        <tr>
+            <td class="ba-band">${label}</td>
+            <td>
+                <div class="ba-spark-wrap" title="WSPR spots/hour, last 24h -- ${peakLabel}">
+                    <div class="ba-spark">${bars}</div>
+                    <span class="ba-spark-now">${g.now.toLocaleString()}<small>/hr</small></span>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function fetchWsprActivity() {
+    if (!SHOW_WSPR_ACTIVITY) return;
+    fetch('/api/wspr_activity')
+        .then(r => r.json())
+        .then(renderWsprActivity)
+        .catch(() => renderWsprActivity({ error: true }));
+}
+
+if (SHOW_WSPR_ACTIVITY) {
+    fetchWsprActivity();
+    setInterval(fetchWsprActivity, WSPR_ACTIVITY_POLL_MS);
 }
 
 // --- update-available indicator next to the Settings link ---

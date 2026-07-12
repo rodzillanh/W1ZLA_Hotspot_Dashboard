@@ -58,6 +58,17 @@ license_quiz.py    The one module in this list that ISN'T a network
                    pool's source/license before ever touching the data
                    file.
 
+wspr_activity.py  WsprActivityClient: live WSPR beacon-spot counts from
+                   wspr.live, localized to within RADIUS_METERS of
+                   settings' station_grid (a Maidenhead locator,
+                   converted to lat/lon by this module's own
+                   grid_to_latlon()). Backs the Band Activity card --
+                   deliberately a DIFFERENT data source/kind of signal
+                   than hf_conditions.py (real observed spot activity,
+                   not a solar-index prediction), even though both
+                   cards group bands the same way. Cached per-grid-
+                   square, same pattern as hf_conditions.py otherwise.
+
 host_stats.py, weather.py
                    Small standalone pollers (host CPU/mem, Open-Meteo).
                    host_stats.py also has is_pi_standalone() (checks
@@ -503,6 +514,48 @@ config for per-integration credentials; put it in
   update.sh's backup block, copy block, and manual-rollback echo lines) —
   if you add another bundled non-`.py`/non-template file, add it in all
   of those same four places, not just one.
+- **`wspr_activity.py`'s WSPR band codes are NOT "the MHz digit of the
+  frequency" below 10 MHz — confirmed via a real query, not assumed
+  from the pattern that happens to work for 6m/10m/20m/etc.** 160m is
+  `band=1`, not `1.8`; other low bands are non-sequential too (2200m is
+  `-1`, 630m is `0`). `wspr.live`'s own docs describe the "first digit
+  of frequency" rule, which is actually true for the bands from 40m
+  (band=7) up through 6m (band=50), but breaks down below that — this
+  was checked against a real live query (`SELECT band, min(frequency),
+  max(frequency) ... GROUP BY band`) before committing to the codes in
+  `BAND_GROUPS`, the same discipline as `config.build_asl_status_cmd`'s
+  `rpt xnode` gotcha elsewhere in this file. If WSPR ever adds/changes a
+  band code, re-verify the same way rather than trusting the "first
+  digit" shorthand.
+- **`grid_to_latlon()`'s Maidenhead conversion was verified against a
+  real `wspr.live` row, not just the textbook formula.** A live query
+  returned a row with `tx_loc="JN58th"` and `tx_lat=48.312`,
+  `tx_lon=11.625`; running that same grid square through
+  `grid_to_latlon()` produces `(48.3125, 11.625)` -- an exact match
+  (to rounding). If this function is ever touched, re-verify the same
+  way (pull a real row, compare its own lat/lon to what the function
+  computes from its own grid square) rather than trusting the formula
+  alone.
+- **The Band Activity card (`wspr_activity.py`) is a deliberately
+  different kind of data than the HF Conditions card, even though they
+  share the same band groupings (160m, 80m-40m, 30m-20m, 17m-15m,
+  12m-10m, 6m).** HF Conditions is N0NBH's solar-index-based Good/Fair/
+  Poor *prediction*; Band Activity is a real WSPR spot-count *observation*
+  within `RADIUS_METERS` (500km) of `settings.station_grid`. Don't merge
+  these into one card or one data model -- higher WSPR spot counts mean
+  "more stations are actively watching this band," not strictly "better
+  propagation" (20m/30m are consistently busiest simply because they have
+  the most WSPR stations running, independent of conditions), and at a
+  500km radius the weaker bands (160m, 6m) can show a genuine zero for
+  several hours -- that's real sparse data, not a bug, and shouldn't be
+  "smoothed" or backfilled with an interpolated value.
+- **`wspr.live` is rate-limited to 20 requests/minute and restricted to
+  non-commercial use per its own terms** -- fine for this free
+  self-hosted dashboard (cached 30 min server-side, one shared client
+  instance), but don't lower `CACHE_TTL` significantly or add a second
+  caller of `WsprActivityClient._fetch()` without accounting for the
+  shared rate limit across however many dashboards happen to be running
+  this code.
 
 ## Testing patterns used throughout this project
 

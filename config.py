@@ -308,6 +308,15 @@ DEFAULT_SETTINGS = {
     # progress can only mean "this browser's" progress.
     "show_license_quiz": False,
     "license_quiz_position": 0,
+    # Band Activity card -- off by default. Live WSPR beacon-spot counts
+    # (wspr_activity.py, wspr.live) within RADIUS_METERS of station_grid,
+    # a fundamentally different kind of data than HF Conditions' N0NBH
+    # prediction (real observed activity, not a solar-index forecast).
+    # Blank station_grid disables it even if the toggle is on, since
+    # there's no location to filter by.
+    "show_wspr_activity": False,
+    "wspr_activity_position": 0,
+    "station_grid": "",
 }
 
 # --- Fleet activity ---

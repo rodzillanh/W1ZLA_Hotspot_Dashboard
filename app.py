@@ -34,6 +34,7 @@ from update_check import UpdateChecker
 from camera_stream import CameraStreamManager
 from hf_conditions import HfConditionsClient
 from license_quiz import LicenseQuizPool
+from wspr_activity import WsprActivityClient
 
 import host_stats as host_stats_mod
 
@@ -46,6 +47,7 @@ update_checker = UpdateChecker()
 hf_conditions   = HfConditionsClient()
 camera_manager  = CameraStreamManager()
 license_quiz    = LicenseQuizPool()
+wspr_activity   = WsprActivityClient()
 
 # Gates the Settings "Host power control" buttons -- only true on a
 # standalone install running directly on real Raspberry Pi hardware (see
@@ -302,6 +304,15 @@ def api_settings_post():
             settings["license_quiz_position"] = max(0, int(data["license_quiz_position"]))
         except (TypeError, ValueError):
             pass
+    if "show_wspr_activity" in data:
+        settings["show_wspr_activity"] = bool(data["show_wspr_activity"])
+    if "wspr_activity_position" in data:
+        try:
+            settings["wspr_activity_position"] = max(0, int(data["wspr_activity_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "station_grid" in data:
+        settings["station_grid"] = data["station_grid"].strip().upper()
     save_settings(settings)
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:
@@ -485,6 +496,18 @@ def api_weather():
 @app.route("/api/hf_conditions")
 def api_hf_conditions():
     data = hf_conditions.get()
+    if data is None:
+        return jsonify({"error": "unavailable"}), 503
+    return jsonify(data)
+
+@app.route("/api/wspr_activity")
+def api_wspr_activity():
+    """Live WSPR spot-count sparklines for the Band Activity card, within
+    RADIUS_METERS of settings' station_grid -- see wspr_activity.py.
+    503 covers both "no grid configured" and "fetch failed", same as
+    every other integration's degrade-gracefully pattern."""
+    station_grid = load_settings().get("station_grid", "")
+    data = wspr_activity.get(station_grid)
     if data is None:
         return jsonify({"error": "unavailable"}), 503
     return jsonify(data)

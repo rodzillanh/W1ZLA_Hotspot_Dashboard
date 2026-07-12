@@ -389,6 +389,25 @@
                 <div class="toggle {{ 'on' if settings.get('show_license_quiz', False) else '' }}"
                      id="license-quiz-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show Band Activity card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (live WSPR spot activity near your station, 160m-6m -- needs a station grid square below)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_wspr_activity', False) else '' }}"
+                     id="wspr-activity-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Station grid square
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (Maidenhead locator, e.g. FN42 -- centers the Band Activity card's 500km radius)
+                    </span>
+                </span>
+                <input type="text" id="station-grid-input" placeholder="FN42" maxlength="6"
+                       style="width:90px;text-transform:uppercase"
+                       value="{{ settings.get('station_grid', '') }}">
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveAppearance()">Save appearance</button>
         <span class="status-txt" id="appearance-status"></span>
@@ -681,6 +700,7 @@
             {% set hf_cond_pos = settings.get('hf_conditions_position', 0) if settings.get('show_hf_conditions', False) else -1 %}
             {% set band_plan_pos = settings.get('band_plan_position', 0) if settings.get('show_band_plan', False) else -1 %}
             {% set license_quiz_pos = settings.get('license_quiz_position', 0) if settings.get('show_license_quiz', False) else -1 %}
+            {% set wspr_activity_pos = settings.get('wspr_activity_position', 0) if settings.get('show_wspr_activity', False) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -723,6 +743,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🎓 License Quiz</span>
                     <span class="node-meta">practice card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == wspr_activity_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__wspr_activity__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📶 Band Activity</span>
+                    <span class="node-meta">WSPR activity card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -788,6 +815,13 @@
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">🎓 License Quiz</span>
                 <span class="node-meta">practice card</span>
+            </div>
+            {% endif %}
+            {% if wspr_activity_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__wspr_activity__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">📶 Band Activity</span>
+                <span class="node-meta">WSPR activity card</span>
             </div>
             {% endif %}
             {% if show_cams %}
@@ -1124,6 +1158,8 @@ function saveAppearance() {
             show_hf_conditions: document.getElementById('hf-conditions-toggle').classList.contains('on'),
             show_band_plan: document.getElementById('band-plan-toggle').classList.contains('on'),
             show_license_quiz: document.getElementById('license-quiz-toggle').classList.contains('on'),
+            show_wspr_activity: document.getElementById('wspr-activity-toggle').classList.contains('on'),
+            station_grid: document.getElementById('station-grid-input').value.trim(),
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');
@@ -1247,6 +1283,7 @@ function saveCardOrder() {
     const hfCondIdx    = sentinelIndex('__hf_conditions__');
     const bandPlanIdx    = sentinelIndex('__band_plan__');
     const licenseQuizIdx = sentinelIndex('__license_quiz__');
+    const wsprActivityIdx = sentinelIndex('__wspr_activity__');
     const cameraPositions = {};
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
@@ -1302,6 +1339,13 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ license_quiz_position: licenseQuizIdx })
+        }));
+    }
+    if (wsprActivityIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ wspr_activity_position: wsprActivityIdx })
         }));
     }
     if (Object.keys(cameraPositions).length > 0) {

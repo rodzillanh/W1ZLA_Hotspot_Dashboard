@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.14</span>
+                <span class="release-version">v3.15</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Band Activity card</span> — optional (Settings → General, off by default; needs a station grid square set below the toggle). Live WSPR beacon-spot activity within 500km of your station, for the same six band groups HF Conditions uses (160m, 80-40m, 30-20m, 17-15m, 12-10m, 6m) — a 24h sparkline per group from <a href="https://wspr.live/" target="_blank">WSPR Live</a>'s free public API, a fundamentally different kind of data than HF Conditions' solar-index prediction (real observed spot counts, not a forecast). Cached ~30 minutes server-side</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.14</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Band Plan card</span> — optional (Settings → General, off by default). Static FCC Part 97.301 HF frequency/mode reference, General and Extra class privileges shown together on one card: General's range is the primary numbers, with a small note under the 4 bands where Extra differs (80m/40m/20m/15m) marking where the wider Extra segment starts. No network client — the only card in the app with no Python module of its own</li>
@@ -671,7 +681,7 @@
         <div class="feature-group">
             <div class="feature-group-title">Settings</div>
             <ul class="feature-list">
-                <li><span>General tab</span> — dashboard name, dark/light mode toggle, toolbar links, host stats, fleet activity, ASL Favorites, APRS Messages, HF Conditions, Band Plan, and License Quiz card toggles, and (Raspberry Pi standalone installs only) host reboot/power-off buttons</li>
+                <li><span>General tab</span> — dashboard name, dark/light mode toggle, toolbar links, host stats, fleet activity, ASL Favorites, APRS Messages, HF Conditions, Band Plan, License Quiz, and Band Activity card toggles (plus a station grid square field for Band Activity), and (Raspberry Pi standalone installs only) host reboot/power-off buttons</li>
                 <li><span>Weather tab</span> — location and °F/°C unit toggle</li>
                 <li><span>Integrations tab</span> — QRZ.com, RadioID.net, APRS.fi, Home Assistant MQTT, and APRS favorite alert credentials/toggles with connection tests</li>
                 <li>Hotspots tab — card order, add/edit/delete hotspots with SSH connection test, optional lat/lon and Brandmeister ID per hotspot</li>

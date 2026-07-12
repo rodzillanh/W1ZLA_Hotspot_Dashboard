@@ -240,11 +240,11 @@ and **Version info**.
   Settings link itself always stays visible either way.
 - **Card order** — drag hotspot cards into whatever order you want them
   to appear on the dashboard (Hotspots tab). If the Fleet activity, ASL
-  Favorites & Control, APRS Messages, HF Conditions, Band Plan, or
-  License Quiz card is enabled, it appears in the same drag list and can
-  be moved to any position among the hotspot cards, not just first.
-  Every enabled camera card (Settings → Cameras) gets its own row in the
-  same list too, one per camera.
+  Favorites & Control, APRS Messages, HF Conditions, Band Plan, License
+  Quiz, or Band Activity card is enabled, it appears in the same drag
+  list and can be moved to any position among the hotspot cards, not
+  just first. Every enabled camera card (Settings → Cameras) gets its
+  own row in the same list too, one per camera.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.
@@ -772,6 +772,39 @@ each poll fetches exactly one question.
   not on the server — this app has no user accounts, so "your" progress
   can only mean "this browser's" progress. Different devices viewing
   the same dashboard get independent stats.
+- Same drag-and-drop **Card order** placement as every other extra card.
+
+## Band Activity card
+
+Optional dashboard card (Settings → General → "Show Band Activity card",
+off by default, needs a **station grid square** set below the toggle) —
+live WSPR beacon-spot activity within 500km of your station, for six
+band groups (160m, 80-40m, 30-20m, 17-15m, 12-10m, 6m — the same
+groupings HF Conditions uses). This is a fundamentally different kind of
+data than HF Conditions: real observed spot counts from
+[WSPR Live](https://wspr.live/), not a solar-index prediction.
+
+- **24h sparkline per band group**, not a single snapshot number — a
+  spot-count trend is far more informative than "N spots right now,"
+  which swings with whatever happened to transmit in the last few
+  minutes. Hover any sparkline for its peak value/hour.
+- **Localized to your station** — set a Maidenhead grid square (e.g.
+  `FN42`) in Settings → General; the dashboard converts it to lat/lon
+  server-side and filters WSPR Live's data to receivers within 500km.
+  Without a grid square set, the card shows an "unavailable" message
+  instead of guessing a location.
+- **Expect sparser data than HF Conditions** — localizing trades a
+  smooth global curve for a spikier, more personally-relevant one. On a
+  quiet band (160m and 6m especially) some hours may show a genuine
+  zero rather than a small nonzero number — that's real data, not a
+  rendering bug.
+- **Higher spot counts mean more activity, not necessarily better
+  conditions** — 20m/30m are consistently the busiest bands simply
+  because they have the most WSPR stations running, independent of
+  actual propagation quality.
+- Cached ~30 minutes server-side (`wspr_activity.py`) — an hourly-
+  bucketed chart doesn't need fresher data than that, and WSPR Live's
+  free API is rate-limited (20 requests/minute, non-commercial use).
 - Same drag-and-drop **Card order** placement as every other extra card.
 
 ## Transmission timer
