@@ -84,6 +84,7 @@ mkdir -p "$BACKUP_DIR"
 cp -r "${INSTALL_DIR}"/*.py          "$BACKUP_DIR/" 2>/dev/null || true
 cp -r "${INSTALL_DIR}/templates"     "$BACKUP_DIR/" 2>/dev/null || true
 cp    "${INSTALL_DIR}/requirements.txt" "$BACKUP_DIR/" 2>/dev/null || true
+cp    "${INSTALL_DIR}/extra_2024_2028.json" "$BACKUP_DIR/" 2>/dev/null || true
 success "Backup saved to ${BACKUP_DIR}"
 info  "Your data in ${DATA_DIR} is untouched"
 
@@ -91,6 +92,10 @@ info  "Your data in ${DATA_DIR} is untouched"
 header "Installing updates"
 cp "${SCRIPT_DIR}"/*.py                    "${INSTALL_DIR}/"
 cp "${SCRIPT_DIR}/requirements.txt"        "${INSTALL_DIR}/"
+# Bundled License Quiz question pool -- a plain data file, not a .py
+# module, so it needs its own explicit copy line or it's silently never
+# updated (same reasoning as install.sh's copy of it).
+cp "${SCRIPT_DIR}/extra_2024_2028.json"    "${INSTALL_DIR}/"
 mkdir -p "${INSTALL_DIR}/templates"
 cp "${SCRIPT_DIR}/templates/"*.html        "${INSTALL_DIR}/templates/"
 # Record the commit this install is now at -- read by the Version tab's
@@ -232,5 +237,6 @@ echo -e "  If anything looks wrong, restore the backup:"
 echo -e "    ${BOLD}sudo systemctl stop ${APP_NAME}${NC}"
 echo -e "    ${BOLD}sudo cp ${BACKUP_DIR}/*.py ${INSTALL_DIR}/${NC}"
 echo -e "    ${BOLD}sudo cp -r ${BACKUP_DIR}/templates ${INSTALL_DIR}/${NC}"
+echo -e "    ${BOLD}sudo cp ${BACKUP_DIR}/extra_2024_2028.json ${INSTALL_DIR}/${NC}"
 echo -e "    ${BOLD}sudo systemctl start ${APP_NAME}${NC}"
 echo

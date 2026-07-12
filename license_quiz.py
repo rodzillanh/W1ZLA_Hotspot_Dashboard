@@ -4,8 +4,12 @@ client. The pool only changes once every ~4 years when NCVEC republishes
 it, so it's loaded once from a static JSON file at startup rather than
 polled.
 
-data/extra_2024_2028.json is the current 2024-2028 pool (effective July 1,
-2024 - June 30, 2028), sourced from the machine-readable export at
+extra_2024_2028.json (repo root, alongside this file -- deliberately NOT
+in a data/ subdirectory, which would collide with CONFIG_DIR's default
+of /app/data and get shadowed by the Docker volume mount at runtime; see
+CLAUDE.md's "License Quiz pool file location" gotcha) is the current
+2024-2028 pool (effective July 1, 2024 - June 30, 2028), sourced from the
+machine-readable export at
 https://github.com/russolsen/ham_radio_question_pool (Apache-2.0), which
 itself transcribes NCVEC's official public-domain release
 (https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release).
@@ -21,7 +25,7 @@ import json
 import os
 import random
 
-_POOL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "extra_2024_2028.json")
+_POOL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "extra_2024_2028.json")
 
 # The pool's own subelement codes (first two characters of each question
 # id, e.g. "E5" from "E5A01") -- stable across pool cycles even though the

@@ -51,7 +51,7 @@ hf_conditions.py
                    way a QRZ/Brandmeister lookup client can
 
 license_quiz.py    The one module in this list that ISN'T a network
-                   client -- LicenseQuizPool loads data/extra_2024_2028.json
+                   client -- LicenseQuizPool loads extra_2024_2028.json
                    (the bundled Extra/Element 4 question pool) once at
                    startup and serves random questions from memory, no
                    cache/TTL/fetch involved. See its docstring for the
@@ -444,7 +444,7 @@ config for per-integration credentials; put it in
   have to be collected into a dict first, then re-ordered for display —
   don't assume the feed's own element order is what you want to render.
 
-- **The License Quiz card's `data/extra_2024_2028.json` was sourced from
+- **The License Quiz card's `extra_2024_2028.json` was sourced from
   a real, verifiable machine-readable export, not typed out from
   memory.** Getting FCC-exam content wrong is a worse failure mode than
   most other data-accuracy misses in this app (same caution level as the
@@ -456,7 +456,7 @@ config for per-integration credentials; put it in
   notes cite 603 for this cycle — a small, unreconciled discrepancy
   between snapshots, called out rather than silently accepted. 27
   questions referencing a circuit diagram figure were excluded (the
-  images aren't bundled), leaving the 572 in `data/extra_2024_2028.json`.
+  images aren't bundled), leaving the 572 in `extra_2024_2028.json`.
   If this ever needs updating for the next pool cycle (2028), re-fetch
   from one of those two sources — don't hand-edit or add questions from
   training-data recall.
@@ -475,6 +475,34 @@ config for per-integration credentials; put it in
   Don't move this into settings.json if asked to "sync" it — that would
   make one person's practice history overwrite another's on a shared
   dashboard, which is worse than not syncing at all.
+- **`extra_2024_2028.json` lives at the repo root, deliberately NOT in a
+  `data/` subdirectory — a `data/` directory there would collide with
+  `CONFIG_DIR`'s default of `/app/data` and get silently shadowed.** This
+  was a real bug, not a hypothetical: it originally shipped in `data/`,
+  which `Dockerfile`'s `COPY . .` puts at `/app/data/extra_2024_2028.json`
+  in the image — but `docker-compose.yml`/`docker-update.sh` bind-mount a
+  host directory over that exact path (`-v .../hotspot-dashboard:/app/data`,
+  the persistent hotspots.json/settings.json volume), which completely
+  replaces the image's `/app/data` contents at container start rather than
+  merging with them. The bundled question pool was invisible on every
+  Docker/Unraid deployment as a result (`/api/quiz_question` returning
+  503, surfaced as "Question pool unavailable right now." on the card) —
+  Docker's `COPY . .` made it *look* covered, but the volume mount silently
+  shadowed it at runtime. Confirmed and fixed by moving the file to the
+  repo root. If you ever add another bundled static data file, keep it
+  out of any path that collides with `config.CONFIG_DIR` (currently just
+  `/app/data`) for the same reason.
+- **`install.sh`/`update.sh` copy application files via an explicit list
+  (`*.py`, `templates/*.html`), not a full-directory copy — a bundled
+  data file needs its own explicit `cp` line in both scripts or it's
+  silently never copied to `$INSTALL_DIR` on a standalone Pi/Linux
+  install**, independent of the Docker `data/` collision above (this bug
+  applies even with the file at the repo root, since standalone installs
+  don't use `Dockerfile`'s `COPY . .` at all). `extra_2024_2028.json` has
+  its own `cp` line in both scripts now (install.sh's main copy block;
+  update.sh's backup block, copy block, and manual-rollback echo lines) —
+  if you add another bundled non-`.py`/non-template file, add it in all
+  of those same four places, not just one.
 
 ## Testing patterns used throughout this project
 

@@ -103,6 +103,10 @@ mkdir -p "$INSTALL_DIR"
 # Copy all Python files and templates
 cp "${SCRIPT_DIR}"/*.py         "$INSTALL_DIR/"
 cp "${SCRIPT_DIR}/requirements.txt" "$INSTALL_DIR/"
+# Bundled License Quiz question pool -- a plain data file, not a .py
+# module, so it needs its own explicit copy line (same reason templates/
+# needs one) or it silently never reaches INSTALL_DIR.
+cp "${SCRIPT_DIR}/extra_2024_2028.json" "$INSTALL_DIR/"
 mkdir -p "${INSTALL_DIR}/templates"
 cp "${SCRIPT_DIR}/templates/"*.html "${INSTALL_DIR}/templates/"
 success "Application files copied to ${INSTALL_DIR}"

@@ -754,7 +754,7 @@ Optional dashboard card (Settings → General → "Show License Quiz card",
 off by default) — one random Amateur Extra (Element 4) practice question
 at a time, auto-rotating to a new one every ~10 minutes, or on demand via
 "New Question". Pool data is bundled server-side (`license_quiz.py`,
-`data/extra_2024_2028.json`) and never sent to the browser in bulk —
+`extra_2024_2028.json`) and never sent to the browser in bulk —
 each poll fetches exactly one question.
 
 - **The current 2024-2028 pool** (572 questions, 27 diagram-based
