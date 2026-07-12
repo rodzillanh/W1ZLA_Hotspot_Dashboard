@@ -362,6 +362,15 @@
                 <div class="toggle {{ 'on' if settings.get('aprs_inbox_enabled', False) else '' }}"
                      id="aprs-inbox-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show HF Conditions card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (solar/band propagation data from N0NBH, no API key needed)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_hf_conditions', False) else '' }}"
+                     id="hf-conditions-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveAppearance()">Save appearance</button>
         <span class="status-txt" id="appearance-status"></span>
@@ -651,6 +660,7 @@
             {% set fleet_pos = settings.get('fleet_activity_position', 0) if settings.get('show_fleet_activity', False) else -1 %}
             {% set asl_fav_pos = settings.get('asl_favorites_position', 0) if settings.get('show_asl_favorites', False) else -1 %}
             {% set aprs_inbox_pos = settings.get('aprs_inbox_position', 0) if settings.get('aprs_inbox_enabled', False) else -1 %}
+            {% set hf_cond_pos = settings.get('hf_conditions_position', 0) if settings.get('show_hf_conditions', False) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -672,6 +682,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">📨 APRS Messages</span>
                     <span class="node-meta">message inbox card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == hf_cond_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__hf_conditions__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">☀️ HF Conditions</span>
+                    <span class="node-meta">propagation card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -716,6 +733,13 @@
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">📨 APRS Messages</span>
                 <span class="node-meta">message inbox card</span>
+            </div>
+            {% endif %}
+            {% if hf_cond_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__hf_conditions__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">☀️ HF Conditions</span>
+                <span class="node-meta">propagation card</span>
             </div>
             {% endif %}
             {% if show_cams %}
@@ -1049,6 +1073,7 @@ function saveAppearance() {
             fleet_activity_hours: parseInt(document.getElementById('fleet-activity-hours').value, 10),
             show_asl_favorites: document.getElementById('asl-favorites-toggle').classList.contains('on'),
             aprs_inbox_enabled: document.getElementById('aprs-inbox-toggle').classList.contains('on'),
+            show_hf_conditions: document.getElementById('hf-conditions-toggle').classList.contains('on'),
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');
@@ -1169,6 +1194,7 @@ function saveCardOrder() {
     const fleetIdx     = sentinelIndex('__fleet_activity__');
     const aslFavIdx    = sentinelIndex('__asl_favorites__');
     const aprsInboxIdx = sentinelIndex('__aprs_inbox__');
+    const hfCondIdx    = sentinelIndex('__hf_conditions__');
     const cameraPositions = {};
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
@@ -1203,6 +1229,13 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ aprs_inbox_position: aprsInboxIdx })
+        }));
+    }
+    if (hfCondIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ hf_conditions_position: hfCondIdx })
         }));
     }
     if (Object.keys(cameraPositions).length > 0) {

@@ -507,6 +507,27 @@
         .msg-ack { display: block; font-size: 10px; color: var(--accent); margin-top: 4px; }
         .msg-empty { color: var(--text-dim); font-size: 12.5px; padding: 16px 0; text-align: center; display: none; }
 
+        /* --- HF Conditions card --- */
+        .hf-updated { font-size: 10.5px; color: var(--text-dim); }
+        .hf-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+        .hf-stat { text-align: center; background: rgba(255,255,255,.03); border-radius: 7px; padding: 8px 4px; }
+        .hf-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 3px; }
+        .hf-stat-val { font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+        .hf-bands { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        .hf-bands th { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .3px; font-weight: 500; text-align: center; padding-bottom: 6px; }
+        .hf-bands th:first-child { text-align: left; }
+        .hf-bands td { padding: 5px 4px; text-align: center; }
+        .hf-bands td:first-child { text-align: left; font-size: 12.5px; color: var(--text); font-weight: 500; }
+        .hf-pill { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 9px; min-width: 44px; }
+        .hf-pill.good { background: var(--accent-dim); color: var(--accent); }
+        .hf-pill.fair { background: rgba(243,156,18,.16); color: var(--tx-color); }
+        .hf-pill.poor { background: rgba(192,57,43,.16); color: var(--danger); }
+        .hf-footer { display: flex; gap: 14px; font-size: 11.5px; color: var(--text-muted); flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--card-border); }
+        .hf-footer b { color: var(--text); font-weight: 500; }
+        .hf-source { font-size: 10px; color: var(--text-dim); margin-top: 8px; text-align: right; }
+        .hf-source a { color: var(--text-dim); }
+        .hf-unavailable { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
+
         /* --- camera cards (RTSP / Bambu Labs A1) --- */
         .camera-card {
             background: var(--card-bg); border: 1px solid var(--card-border);
@@ -906,6 +927,33 @@
             <div class="msg-empty" id="aprs-inbox-empty">No messages yet.</div>
         </div>
         {% endif %}
+        {% if settings.get('show_hf_conditions', False) %}
+        <div class="metrics-card" id="hf-conditions-card"
+             style="order:{{ settings.get('hf_conditions_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">☀️ HF Conditions</div>
+                <div class="hf-updated" id="hf-updated">—</div>
+            </div>
+            <div class="hf-stats-grid">
+                <div class="hf-stat"><div class="hf-stat-label">SFI</div><div class="hf-stat-val" id="hf-sfi">—</div></div>
+                <div class="hf-stat"><div class="hf-stat-label">A-idx</div><div class="hf-stat-val" id="hf-aidx">—</div></div>
+                <div class="hf-stat"><div class="hf-stat-label">K-idx</div><div class="hf-stat-val" id="hf-kidx">—</div></div>
+                <div class="hf-stat"><div class="hf-stat-label">Sunspots</div><div class="hf-stat-val" id="hf-sunspots">—</div></div>
+            </div>
+            <table class="hf-bands">
+                <thead><tr><th>Band</th><th>Day</th><th>Night</th></tr></thead>
+                <tbody id="hf-bands-tbody"></tbody>
+            </table>
+            <div class="hf-footer">
+                <span>X-ray: <b id="hf-xray">—</b></span>
+                <span>Aurora: <b id="hf-aurora">—</b></span>
+                <span>Geomag: <b id="hf-geomag">—</b></span>
+                <span>S/N: <b id="hf-sn">—</b></span>
+            </div>
+            <div class="hf-source">Data: <a href="https://www.hamqsl.com/solar.html" target="_blank" rel="noopener">N0NBH</a></div>
+            <div class="hf-unavailable" id="hf-unavailable" style="display:none">Conditions data unavailable right now.</div>
+        </div>
+        {% endif %}
         <div id="cards" style="display:contents"></div>
         <div id="camera-cards" style="display:contents"></div>
     </div>
@@ -1070,6 +1118,9 @@ const CAMERA_STATUS_POLL_MS = 5000;
 const SHOW_APRS_INBOX = {{ 'true' if settings.get('aprs_inbox_enabled', False) else 'false' }};
 const APRS_INBOX_POSITION = {{ settings.get('aprs_inbox_position', 0) }};
 const APRS_INBOX_POLL_MS = 10000;
+const SHOW_HF_CONDITIONS = {{ 'true' if settings.get('show_hf_conditions', False) else 'false' }};
+const HF_CONDITIONS_POSITION = {{ settings.get('hf_conditions_position', 0) }};
+const HF_CONDITIONS_POLL_MS = 15 * 60 * 1000;  // the feed itself only updates roughly hourly
 
 function updateSysbar(data) {
     if (!SHOW_HOST_STATS) return;
@@ -1248,6 +1299,9 @@ function renderCards(data) {
     if (SHOW_APRS_INBOX) {
         sentinels.push({ key: 'aprsinbox', pos: Math.max(0, Math.min(APRS_INBOX_POSITION, data.length)) });
     }
+    if (SHOW_HF_CONDITIONS) {
+        sentinels.push({ key: 'hfcond', pos: Math.max(0, Math.min(HF_CONDITIONS_POSITION, data.length)) });
+    }
     const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);
 
     const fleetCard = document.getElementById('fleet-activity-card');
@@ -1256,6 +1310,8 @@ function renderCards(data) {
     if (aslFavCard && 'aslfav' in sentinelOrders) aslFavCard.style.order = sentinelOrders.aslfav;
     const aprsInboxCard = document.getElementById('aprs-inbox-card');
     if (aprsInboxCard && 'aprsinbox' in sentinelOrders) aprsInboxCard.style.order = sentinelOrders.aprsinbox;
+    const hfCondCard = document.getElementById('hf-conditions-card');
+    if (hfCondCard && 'hfcond' in sentinelOrders) hfCondCard.style.order = sentinelOrders.hfcond;
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -1627,6 +1683,51 @@ function fetchAprsInbox() {
 if (SHOW_APRS_INBOX) {
     fetchAprsInbox();
     setInterval(fetchAprsInbox, APRS_INBOX_POLL_MS);
+}
+
+// --- HF Conditions card ---
+const HF_PILL_CLASS = { Good: 'good', Fair: 'fair', Poor: 'poor' };
+
+function renderHfConditions(data) {
+    const unavailableEl = document.getElementById('hf-unavailable');
+    if (!data || data.error) {
+        if (unavailableEl) unavailableEl.style.display = 'block';
+        return;
+    }
+    if (unavailableEl) unavailableEl.style.display = 'none';
+
+    document.getElementById('hf-updated').textContent = data.updated ? `Updated ${data.updated}` : '';
+    document.getElementById('hf-sfi').textContent      = data.solar_flux   ?? '—';
+    document.getElementById('hf-aidx').textContent     = data.a_index     ?? '—';
+    document.getElementById('hf-kidx').textContent     = data.k_index     ?? '—';
+    document.getElementById('hf-sunspots').textContent = data.sunspots    ?? '—';
+    document.getElementById('hf-xray').textContent     = data.xray        ?? '—';
+    document.getElementById('hf-aurora').textContent   = data.aurora      ?? '—';
+    document.getElementById('hf-geomag').textContent   = data.geomag_field ?? '—';
+    document.getElementById('hf-sn').textContent       = data.signal_noise ?? '—';
+
+    const pill = (label) => label
+        ? `<span class="hf-pill ${HF_PILL_CLASS[label] || ''}">${escapeHtml(label)}</span>`
+        : '—';
+    document.getElementById('hf-bands-tbody').innerHTML = (data.bands || []).map(b => `
+        <tr>
+            <td>${escapeHtml((b.name || '').replace(/^(\d+)m-(\d+)m$/, '$1–$2m'))}</td>
+            <td>${pill(b.day)}</td>
+            <td>${pill(b.night)}</td>
+        </tr>`).join('');
+}
+
+function fetchHfConditions() {
+    if (!SHOW_HF_CONDITIONS) return;
+    fetch('/api/hf_conditions')
+        .then(r => r.json())
+        .then(renderHfConditions)
+        .catch(() => renderHfConditions({ error: true }));
+}
+
+if (SHOW_HF_CONDITIONS) {
+    fetchHfConditions();
+    setInterval(fetchHfConditions, HF_CONDITIONS_POLL_MS);
 }
 
 // --- update-available indicator next to the Settings link ---

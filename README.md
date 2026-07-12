@@ -240,10 +240,11 @@ and **Version info**.
   Settings link itself always stays visible either way.
 - **Card order** — drag hotspot cards into whatever order you want them
   to appear on the dashboard (Hotspots tab). If the Fleet activity, ASL
-  Favorites & Control, or APRS Messages card is enabled, it appears in
-  the same drag list and can be moved to any position among the hotspot
-  cards, not just first. Every enabled camera card (Settings → Cameras)
-  gets its own row in the same list too, one per camera.
+  Favorites & Control, APRS Messages, or HF Conditions card is enabled,
+  it appears in the same drag list and can be moved to any position
+  among the hotspot cards, not just first. Every enabled camera card
+  (Settings → Cameras) gets its own row in the same list too, one per
+  camera.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.
@@ -704,6 +705,30 @@ Favorites/Camera cards — position it anywhere in the same drag-and-drop
 - This is a separate, independent on/off toggle from APRS favorite
   alerts — you can run either one alone, or both, sharing the one
   callsign setting.
+
+## HF Conditions card
+
+Optional dashboard card (Settings → General → "Show HF Conditions
+card", off by default) — solar and band propagation data from
+[N0NBH's free public feed](https://www.hamqsl.com/solar.html), no API
+key or signup needed. Same treatment as every other extra card: one
+card, position it anywhere in the same drag-and-drop **Card order**
+list.
+
+- **Band conditions table** (80–40m, 30–20m, 17–15m, 12–10m, Day and
+  Night) is the headline — N0NBH's own calculated Good/Fair/Poor
+  ratings, not something computed here, shown as color-coded pills.
+  This is the actually actionable part; the raw indices below it mean
+  little to most people at a glance.
+- **Key indices** — Solar Flux Index, A-index, K-index, and sunspot
+  count in a small stats row.
+- **Secondary stats** — X-ray flare class, aurora index, geomagnetic
+  field state, and signal/noise floor, in a quiet footer row rather
+  than competing with the band table for attention.
+- **Polled roughly every 15 minutes**, cached server-side for an hour
+  — the feed itself only updates on a similar cadence, so anything
+  faster is just extra load on someone else's free service for no
+  fresher data.
 
 ## Transmission timer
 

@@ -290,6 +290,12 @@ DEFAULT_SETTINGS = {
     # the same single-sentinel scheme as Fleet Activity/ASL Favorites.
     "aprs_inbox_enabled": False,
     "aprs_inbox_position": 0,
+    # HF Conditions card -- off by default. Solar/band propagation data
+    # from N0NBH's free public feed (hf_conditions.py), no API key.
+    # Position among the hotspot cards uses the same single-sentinel
+    # scheme as Fleet Activity/ASL Favorites/APRS Messages.
+    "show_hf_conditions": False,
+    "hf_conditions_position": 0,
 }
 
 # --- Fleet activity ---

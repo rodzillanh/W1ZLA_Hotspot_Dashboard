@@ -32,7 +32,8 @@ storage.py          hotspots.json / settings.json / favorites.json --
                    flat JSON files in CONFIG_DIR (the mounted volume)
 
 qrz.py, radioid.py, aprs.py, brandmeister.py, aslstats.py,
-mqtt_publisher.py, aprs_messaging.py, update_check.py, aprs_inbox.py
+mqtt_publisher.py, aprs_messaging.py, update_check.py, aprs_inbox.py,
+hf_conditions.py
                    One self-contained client class per integration.
                    Each: caches results, NEVER raises out of its public
                    methods (returns None/False on any failure), and is
@@ -425,6 +426,15 @@ config for per-integration credentials; put it in
   arrives to trigger the check — a lingering-connection risk on
   reconfiguration, not a correctness bug, since the stale callback still
   refuses to process/store/ack anything once it does check.
+
+- **`hf_conditions.py`'s `<band>` XML elements are re-sorted against a
+  hardcoded `BAND_ORDER` list rather than trusted to arrive in display
+  order.** Confirmed live against the real feed before writing the
+  parser (not just its docs) that each `<band>` carries `name`/`time`
+  attributes (e.g. `name="80m-40m" time="day"`) rather than being
+  nested under a per-band element, so day/night pairs for the same band
+  have to be collected into a dict first, then re-ordered for display —
+  don't assume the feed's own element order is what you want to render.
 
 ## Testing patterns used throughout this project
 

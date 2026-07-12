@@ -32,6 +32,7 @@ from host_stats import HostStats
 import storage_activity
 from update_check import UpdateChecker
 from camera_stream import CameraStreamManager
+from hf_conditions import HfConditionsClient
 
 import host_stats as host_stats_mod
 
@@ -41,6 +42,7 @@ wx         = WeatherClient()
 host_stats = HostStats()
 host_stats.start()
 update_checker = UpdateChecker()
+hf_conditions   = HfConditionsClient()
 camera_manager  = CameraStreamManager()
 
 # Gates the Settings "Host power control" buttons -- only true on a
@@ -277,6 +279,13 @@ def api_settings_post():
             settings["aprs_inbox_position"] = max(0, int(data["aprs_inbox_position"]))
         except (TypeError, ValueError):
             pass
+    if "show_hf_conditions" in data:
+        settings["show_hf_conditions"] = bool(data["show_hf_conditions"])
+    if "hf_conditions_position" in data:
+        try:
+            settings["hf_conditions_position"] = max(0, int(data["hf_conditions_position"]))
+        except (TypeError, ValueError):
+            pass
     save_settings(settings)
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:
@@ -453,6 +462,13 @@ def api_weather():
     settings = load_settings()
     data = wx.get(settings.get("weather_location", ""),
                   settings.get("weather_unit", "F"))
+    if data is None:
+        return jsonify({"error": "unavailable"}), 503
+    return jsonify(data)
+
+@app.route("/api/hf_conditions")
+def api_hf_conditions():
+    data = hf_conditions.get()
     if data is None:
         return jsonify({"error": "unavailable"}), 503
     return jsonify(data)
