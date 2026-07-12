@@ -27,6 +27,7 @@ from aprs import AprsClient
 from brandmeister import BrandmeisterClient
 from mqtt_publisher import MqttPublisher
 from aprs_messaging import AprsMessenger
+from aprs_inbox import AprsInbox
 from host_stats import HostStats
 import storage_activity
 from update_check import UpdateChecker
@@ -118,6 +119,20 @@ def _rebuild_aprs_messenger() -> None:
     )
 
 _rebuild_aprs_messenger()
+
+aprs_inbox = AprsInbox()
+
+def _rebuild_aprs_inbox() -> None:
+    """configure() itself is a no-op unless the callsign or enabled state
+    actually changed, so this is cheap to call on every settings save
+    regardless of which fields changed."""
+    settings = load_settings()
+    aprs_inbox.configure(
+        settings.get("aprs_msg_callsign", ""),
+        settings.get("aprs_inbox_enabled", False),
+    )
+
+_rebuild_aprs_inbox()
 
 import radioid as radioid_mod
 import aprs as aprs_mod
@@ -255,6 +270,13 @@ def api_settings_post():
         settings["update_check_branch"] = data["update_check_branch"].strip()
     if "show_cameras" in data:
         settings["show_cameras"] = bool(data["show_cameras"])
+    if "aprs_inbox_enabled" in data:
+        settings["aprs_inbox_enabled"] = bool(data["aprs_inbox_enabled"])
+    if "aprs_inbox_position" in data:
+        try:
+            settings["aprs_inbox_position"] = max(0, int(data["aprs_inbox_position"]))
+        except (TypeError, ValueError):
+            pass
     save_settings(settings)
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:
@@ -267,6 +289,8 @@ def api_settings_post():
         _rebuild_mqtt_client()
     if any(k in data for k in ("aprs_msg_callsign", "aprs_msg_to_callsign", "aprs_msg_cooldown_min")):
         _rebuild_aprs_messenger()
+    if any(k in data for k in ("aprs_msg_callsign", "aprs_inbox_enabled")):
+        _rebuild_aprs_inbox()
     return jsonify({"ok": True})
 
 
@@ -633,6 +657,15 @@ def test_aprs_msg():
         return jsonify({"success": False, "message": "Callsign required"})
     ok, message = AprsMessenger.test_connection(my_callsign, to_callsign)
     return jsonify({"success": ok, "message": message})
+
+
+@app.route("/api/aprs_inbox")
+def api_aprs_inbox():
+    """Recent APRS-IS messages addressed to your callsign, plus the
+    listener connection's live status -- see aprs_inbox.py."""
+    status = aprs_inbox.status()
+    status["messages"] = aprs_inbox.messages()
+    return jsonify(status)
 
 
 @app.route("/api/test_mqtt", methods=["POST"])

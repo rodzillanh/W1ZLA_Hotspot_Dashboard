@@ -32,7 +32,7 @@ storage.py          hotspots.json / settings.json / favorites.json --
                    flat JSON files in CONFIG_DIR (the mounted volume)
 
 qrz.py, radioid.py, aprs.py, brandmeister.py, aslstats.py,
-mqtt_publisher.py, aprs_messaging.py, update_check.py
+mqtt_publisher.py, aprs_messaging.py, update_check.py, aprs_inbox.py
                    One self-contained client class per integration.
                    Each: caches results, NEVER raises out of its public
                    methods (returns None/False on any failure), and is
@@ -40,7 +40,14 @@ mqtt_publisher.py, aprs_messaging.py, update_check.py
                    rebuild-on-settings-save pattern in app.py.
                    update_check.py compares this deployment's BUILD_COMMIT
                    file against the git host's REST API -- see the
-                   self-update gotcha below before touching it
+                   self-update gotcha below before touching it.
+                   aprs_inbox.py is the one exception to "stateless client,
+                   rebuilt fresh from settings" -- it owns a persistent
+                   background socket (AprsInbox.configure() reconfigures
+                   it in place via a generation counter rather than the
+                   app dropping/recreating the object), since a listening
+                   connection can't be discarded and remade per-call the
+                   way a QRZ/Brandmeister lookup client can
 
 host_stats.py, weather.py
                    Small standalone pollers (host CPU/mem, Open-Meteo).
@@ -383,6 +390,41 @@ config for per-integration credentials; put it in
   a separate, harder problem (real motion-interpolation between sparse
   radar snapshots, which most weather apps don't attempt either) that
   wasn't solved and shouldn't be assumed away.
+
+- **The APRS Messages card (`aprs_inbox.py`) was verified against
+  `aprslib`'s actual source before being written, the same discipline as
+  `aprs_messaging.py`'s send side** — a synthetic message packet parsed
+  with the real library confirms the exact field shape (`from`,
+  `addresse` — note aprslib's own spelling, not "addressee" — `format`,
+  `message_text`, `msgNo`). Critically, **an incoming ack/reject of a
+  message *we* sent also comes back with `format == "message"`**; the
+  only reliable way to tell "a real message to show and ack" apart from
+  "someone acking something I sent" is whether `message_text` is present
+  at all, not the `format` field. Get this wrong and the card would
+  either show ack/reject packets as if they were real messages, or
+  (worse) auto-ack a packet that was never a message to begin with.
+- **The `b/CALLSIGN` "buddy" APRS-IS filter** was chosen deliberately
+  over relying on undocumented "a verified logged-in station gets its
+  own traffic automatically" assumptions, per the documented
+  javAPRSFilter spec (includes packets addressed to the listed callsign,
+  not just from it). This is the one piece of `aprs_inbox.py` NOT yet
+  confirmed against real inbound traffic (unlike the packet-shape parts,
+  which were) — if messages aren't arriving once this is live, re-check
+  the filter syntax before assuming the parsing logic is at fault.
+- **`AprsInbox.configure()` reconfigures the same object in place via a
+  generation counter, not a rebuild-a-fresh-client pattern** — a
+  listening socket needs its own thread lifecycle, unlike the other
+  stateless integration clients. When the callsign or enabled state
+  changes, the generation counter bumps and a new thread starts; the old
+  thread's callback checks the counter and raises `StopIteration`
+  (caught internally by `aprslib`'s own `consumer()` loop) the next time
+  it sees a packet, so it exits cleanly instead of running forever
+  logged in under stale settings. One known, accepted gap: a stale
+  thread blocked waiting on a quiet connection (no traffic, only
+  server heartbeats) won't notice the generation change until *something*
+  arrives to trigger the check — a lingering-connection risk on
+  reconfiguration, not a correctness bug, since the stale callback still
+  refuses to process/store/ack anything once it does check.
 
 ## Testing patterns used throughout this project
 

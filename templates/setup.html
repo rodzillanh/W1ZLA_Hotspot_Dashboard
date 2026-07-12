@@ -353,6 +353,15 @@
                 <div class="toggle {{ 'on' if settings.get('show_asl_favorites', False) else '' }}"
                      id="asl-favorites-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show APRS Messages card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (incoming APRS-IS messages to your callsign — set below in Integrations)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('aprs_inbox_enabled', False) else '' }}"
+                     id="aprs-inbox-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveAppearance()">Save appearance</button>
         <span class="status-txt" id="appearance-status"></span>
@@ -641,6 +650,7 @@
         <div id="card-order-list">
             {% set fleet_pos = settings.get('fleet_activity_position', 0) if settings.get('show_fleet_activity', False) else -1 %}
             {% set asl_fav_pos = settings.get('asl_favorites_position', 0) if settings.get('show_asl_favorites', False) else -1 %}
+            {% set aprs_inbox_pos = settings.get('aprs_inbox_position', 0) if settings.get('aprs_inbox_enabled', False) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -655,6 +665,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">📻 ASL Favorites</span>
                     <span class="node-meta">control card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == aprs_inbox_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__aprs_inbox__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📨 APRS Messages</span>
+                    <span class="node-meta">message inbox card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -692,6 +709,13 @@
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">📻 ASL Favorites</span>
                 <span class="node-meta">control card</span>
+            </div>
+            {% endif %}
+            {% if aprs_inbox_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__aprs_inbox__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">📨 APRS Messages</span>
+                <span class="node-meta">message inbox card</span>
             </div>
             {% endif %}
             {% if show_cams %}
@@ -1024,6 +1048,7 @@ function saveAppearance() {
             show_fleet_activity: document.getElementById('fleet-activity-toggle').classList.contains('on'),
             fleet_activity_hours: parseInt(document.getElementById('fleet-activity-hours').value, 10),
             show_asl_favorites: document.getElementById('asl-favorites-toggle').classList.contains('on'),
+            aprs_inbox_enabled: document.getElementById('aprs-inbox-toggle').classList.contains('on'),
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');
@@ -1141,8 +1166,9 @@ function saveCardOrder() {
         const filtered = allIds.filter(id => id === key || !isSentinel(id));
         return filtered.indexOf(key);
     }
-    const fleetIdx  = sentinelIndex('__fleet_activity__');
-    const aslFavIdx = sentinelIndex('__asl_favorites__');
+    const fleetIdx     = sentinelIndex('__fleet_activity__');
+    const aslFavIdx    = sentinelIndex('__asl_favorites__');
+    const aprsInboxIdx = sentinelIndex('__aprs_inbox__');
     const cameraPositions = {};
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
@@ -1170,6 +1196,13 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ asl_favorites_position: aslFavIdx })
+        }));
+    }
+    if (aprsInboxIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ aprs_inbox_position: aprsInboxIdx })
         }));
     }
     if (Object.keys(cameraPositions).length > 0) {

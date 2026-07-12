@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.11</span>
+                <span class="release-version">v3.12</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>APRS Messages card</span> — optional (Settings → General, off by default). A persistent APRS-IS connection, logged in as the same callsign already set for outbound favorite alerts, shows real incoming APRS text messages addressed to you, with live connection status and automatic acknowledgment (so senders' apps don't think their message never arrived). One card, positioned in the same Card order drag list as Fleet Activity/ASL Favorites/Camera cards</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.11</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Removed the precipitation radar overlay</span> — even after fixing the flicker (v3.10.1), the animation still felt too choppy to be worth keeping. The "Radar" checkbox and everything behind it are gone; the map's Grey line overlay and base tile styles are unaffected</li>
@@ -608,6 +618,7 @@
                 <li><span>AllStarLink stats.allstarlink.org</span> — free node-to-callsign resolution for ASL3 linked nodes, no API key</li>
                 <li><span>Home Assistant (MQTT)</span> — publishes each hotspot as an HA device via MQTT auto-discovery: online/active/favorite-active/update-available binary sensors, plus mode/call/talkgroup/temperature/CPU/RSSI/Brandmeister-status sensors <span style="color:var(--text-dim)">(needs an MQTT broker)</span></li>
                 <li><span>APRS favorite alerts</span> — sends yourself an APRS-IS text message (led by the caller's actual callsign, plus the linked talkgroup/reflector if one is known) when a favorite becomes active, with a per-favorite cooldown <span style="color:var(--text-dim)">(needs your amateur radio callsign)</span></li>
+                <li><span>APRS Messages card</span> — receives real incoming APRS-IS text messages addressed to you, with live connection status and automatic acknowledgment <span style="color:var(--text-dim)">(shares the same callsign setting as APRS favorite alerts)</span></li>
             </ul>
         </div>
 
@@ -638,10 +649,11 @@
         <div class="feature-group">
             <div class="feature-group-title">Settings</div>
             <ul class="feature-list">
-                <li><span>General tab</span> — dashboard name, dark/light mode toggle, toolbar links, host stats and fleet activity card toggles, and (Raspberry Pi standalone installs only) host reboot/power-off buttons</li>
+                <li><span>General tab</span> — dashboard name, dark/light mode toggle, toolbar links, host stats, fleet activity, ASL Favorites, and APRS Messages card toggles, and (Raspberry Pi standalone installs only) host reboot/power-off buttons</li>
                 <li><span>Weather tab</span> — location and °F/°C unit toggle</li>
                 <li><span>Integrations tab</span> — QRZ.com, RadioID.net, APRS.fi, Home Assistant MQTT, and APRS favorite alert credentials/toggles with connection tests</li>
                 <li>Hotspots tab — card order, add/edit/delete hotspots with SSH connection test, optional lat/lon and Brandmeister ID per hotspot</li>
+                <li>Cameras tab — add/edit/delete RTSP or Bambu Labs A1 cameras with a connection test</li>
                 <li>Favorites tab — callsign + optional label, add/remove, browser alerts</li>
                 <li>Version info tab — self-update status/install, module hashes, uptime, changelog, feature list, and a direct README link</li>
             </ul>

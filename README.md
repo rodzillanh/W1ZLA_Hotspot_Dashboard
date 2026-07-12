@@ -239,11 +239,11 @@ and **Version info**.
   (General tab) hides the whole row if you'd rather not show it; the ⚙
   Settings link itself always stays visible either way.
 - **Card order** — drag hotspot cards into whatever order you want them
-  to appear on the dashboard (Hotspots tab). If the Fleet activity or
-  ASL Favorites & Control card is enabled, it appears in the same drag
-  list and can be moved to any position among the hotspot cards, not
-  just first. Every enabled camera card (Settings → Cameras) gets its
-  own row in the same list too, one per camera.
+  to appear on the dashboard (Hotspots tab). If the Fleet activity, ASL
+  Favorites & Control, or APRS Messages card is enabled, it appears in
+  the same drag list and can be moved to any position among the hotspot
+  cards, not just first. Every enabled camera card (Settings → Cameras)
+  gets its own row in the same list too, one per camera.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.
@@ -679,6 +679,32 @@ matching how simple APRS bots generally behave. It uses the caller's
 actual callsign rather than their optional friendly name/label, to read as
 a proper APRS message.
 
+## APRS Messages card
+
+Optional dashboard card (Settings → General → "Show APRS Messages card",
+off by default) — the receiving half of APRS favorite alerts above: a
+persistent APRS-IS connection, logged in as the same callsign already set
+for outbound alerts (Settings → Integrations), that shows real incoming
+APRS text messages addressed to you. One card, like Fleet Activity/ASL
+Favorites/Camera cards — position it anywhere in the same drag-and-drop
+**Card order** list (Settings → Hotspots).
+
+- **Live connection status** — Connected / Connecting / Reconnecting shown
+  next to the card title; a dropped connection retries automatically.
+- **Auto-acknowledgment** — messages that request an ack (most APRS
+  clients do) get one sent back automatically, same as any real APRS
+  client. Skipping this would leave the sender's app thinking the message
+  never arrived, retrying it several times. Shown per-message as a small
+  "✓ ack sent" tag.
+- **Duplicate-safe** — APRS senders retry an unacked message a few times
+  over the network; retries of a message already seen (same sender +
+  message number) are recognized and not shown or re-acked twice.
+- **List stays compact** — capped and scrollable rather than growing the
+  card forever, same pattern as the ASL Favorites card's row list.
+- This is a separate, independent on/off toggle from APRS favorite
+  alerts — you can run either one alone, or both, sharing the one
+  callsign setting.
+
 ## Transmission timer
 
 While a node is active, the card shows a live "⏱ m:ss" counter next to
@@ -786,10 +812,12 @@ same way mode/RSSI/BER are. A couple of behavior notes:
 - No authentication on `/setup` — anyone who can reach the dashboard can
   add/edit/delete hotspots. This also covers the "Host power control"
   buttons (reboot/power off the dashboard's own device), the "ASL
-  Favorites & Control" card's connect/disconnect buttons, and camera
-  cards' live video feeds when those features are active — a materially
-  bigger consequence than editing a config, worth weighing before
-  exposing this dashboard beyond a trusted LAN.
+  Favorites & Control" card's connect/disconnect buttons, camera cards'
+  live video feeds, and the APRS Messages card's inbox (real messages
+  addressed to your callsign, from the public APRS network) when those
+  features are active — a materially bigger consequence than editing a
+  config, worth weighing before exposing this dashboard beyond a
+  trusted LAN.
 - Hotspot passwords are stored in plaintext in `hotspots.json` and are
   re-sent to the browser to pre-fill the Edit form (so editing a hotspot
   doesn't force you to retype the password). Both are fine for a private

@@ -283,6 +283,13 @@ DEFAULT_SETTINGS = {
     # dynamic-list treatment as hotspots.json -- this is just the master
     # on/off switch for the whole feature.
     "show_cameras": False,
+    # APRS Messages card -- off by default. Receives APRS-IS messages
+    # addressed to aprs_msg_callsign (the same "your callsign" setting the
+    # outbound favorite-alert feature already uses -- one identity, two
+    # independent on/off features). Position among the hotspot cards uses
+    # the same single-sentinel scheme as Fleet Activity/ASL Favorites.
+    "aprs_inbox_enabled": False,
+    "aprs_inbox_position": 0,
 }
 
 # --- Fleet activity ---

@@ -485,6 +485,28 @@
         .asl-fav-empty { color: var(--text-dim); font-size: 12.5px; padding: 6px 0 10px; }
         .asl-fav-status-txt { font-size: 11px; color: var(--text-muted); margin-left: 8px; }
 
+        /* --- APRS Messages card --- */
+        .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-left: 8px; }
+        .conn-dot.down { background: var(--text-dim); }
+        .conn-label { font-size: 11px; color: var(--text-muted); font-weight: 400; margin-left: 4px; }
+        .msg-scroll {
+            max-height: 220px; overflow-y: auto; margin: 10px -4px 0; padding: 0 4px;
+            scrollbar-width: thin; scrollbar-color: var(--toolbar-border) transparent;
+        }
+        .msg-scroll::-webkit-scrollbar { width: 7px; }
+        .msg-scroll::-webkit-scrollbar-track  { background: transparent; }
+        .msg-scroll::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
+        .msg-scroll::-webkit-scrollbar-thumb  { background: var(--toolbar-border); border-radius: 4px; }
+        .msg-row { padding: 9px 8px; border-bottom: 1px solid var(--card-border); }
+        .msg-row:last-child { border-bottom: none; }
+        .msg-row.unread { background: var(--accent-dim); border-radius: 6px; }
+        .msg-top { display: flex; align-items: baseline; gap: 6px; margin-bottom: 3px; }
+        .msg-from { color: var(--link); font-weight: 600; font-size: 13px; text-decoration: none; }
+        .msg-time { margin-left: auto; font-size: 10.5px; color: var(--text-dim); flex-shrink: 0; white-space: nowrap; }
+        .msg-text { font-size: 13px; color: var(--text); line-height: 1.4; word-break: break-word; }
+        .msg-ack { display: block; font-size: 10px; color: var(--accent); margin-top: 4px; }
+        .msg-empty { color: var(--text-dim); font-size: 12.5px; padding: 16px 0; text-align: center; display: none; }
+
         /* --- camera cards (RTSP / Bambu Labs A1) --- */
         .camera-card {
             background: var(--card-bg); border: 1px solid var(--card-border);
@@ -868,6 +890,22 @@
             </div>
         </div>
         {% endif %}
+        {% if settings.get('aprs_inbox_enabled', False) %}
+        <div class="metrics-card" id="aprs-inbox-card"
+             style="order:{{ settings.get('aprs_inbox_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">📨 APRS Messages <span class="conn-dot" id="aprs-inbox-conn-dot"></span><span class="conn-label" id="aprs-inbox-conn-label">Connecting…</span></div>
+            </div>
+            <div class="fleet-stats-grid" style="grid-template-columns:1fr 1fr">
+                <div>Messages: <span class="stat-val" id="aprs-inbox-count">—</span></div>
+                <div>Last: <span class="stat-val" id="aprs-inbox-last">—</span></div>
+            </div>
+            <div class="msg-scroll" id="aprs-inbox-scroll">
+                <div id="aprs-inbox-list"></div>
+            </div>
+            <div class="msg-empty" id="aprs-inbox-empty">No messages yet.</div>
+        </div>
+        {% endif %}
         <div id="cards" style="display:contents"></div>
         <div id="camera-cards" style="display:contents"></div>
     </div>
@@ -1029,6 +1067,9 @@ const SHOW_ASL_FAVORITES = {{ 'true' if settings.get('show_asl_favorites', False
 const ASL_FAVORITES_POSITION = {{ settings.get('asl_favorites_position', 0) }};
 const SHOW_CAMERAS = {{ 'true' if settings.get('show_cameras', False) else 'false' }};
 const CAMERA_STATUS_POLL_MS = 5000;
+const SHOW_APRS_INBOX = {{ 'true' if settings.get('aprs_inbox_enabled', False) else 'false' }};
+const APRS_INBOX_POSITION = {{ settings.get('aprs_inbox_position', 0) }};
+const APRS_INBOX_POLL_MS = 10000;
 
 function updateSysbar(data) {
     if (!SHOW_HOST_STATS) return;
@@ -1204,12 +1245,17 @@ function renderCards(data) {
             sentinels.push({ key: 'cam-' + cam.id, pos: Math.max(0, Math.min(cam.position || 0, data.length)) });
         });
     }
+    if (SHOW_APRS_INBOX) {
+        sentinels.push({ key: 'aprsinbox', pos: Math.max(0, Math.min(APRS_INBOX_POSITION, data.length)) });
+    }
     const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);
 
     const fleetCard = document.getElementById('fleet-activity-card');
     if (fleetCard && 'fleet' in sentinelOrders) fleetCard.style.order = sentinelOrders.fleet;
     const aslFavCard = document.getElementById('asl-favorites-card');
     if (aslFavCard && 'aslfav' in sentinelOrders) aslFavCard.style.order = sentinelOrders.aslfav;
+    const aprsInboxCard = document.getElementById('aprs-inbox-card');
+    if (aprsInboxCard && 'aprsinbox' in sentinelOrders) aprsInboxCard.style.order = sentinelOrders.aprsinbox;
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -1520,6 +1566,67 @@ if (SHOW_CAMERAS) {
     fetchCameras();
     setInterval(fetchCameras, 30000);       // pick up cameras added/edited/removed in Settings
     setInterval(fetchCameraStatus, CAMERA_STATUS_POLL_MS);
+}
+
+// --- APRS Messages card ---
+const APRS_INBOX_STATE_LABELS = {
+    connecting: 'Connecting…', connected: 'Connected',
+    reconnecting: 'Reconnecting…', disabled: 'Disabled',
+};
+
+function fmtAgoShort(epochSeconds) {
+    const secs = Math.max(0, Math.floor(Date.now() / 1000 - epochSeconds));
+    if (secs < 60) return 'just now';
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} hr ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+}
+
+// Message text and sender come from a public radio network (untrusted
+// input) and get inserted via innerHTML below -- escape both rather than
+// trusting APRS traffic to be well-formed.
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text == null ? '' : String(text);
+    return div.innerHTML;
+}
+
+function renderAprsInbox(data) {
+    const dot   = document.getElementById('aprs-inbox-conn-dot');
+    const label = document.getElementById('aprs-inbox-conn-label');
+    if (dot)   dot.classList.toggle('down', data.state !== 'connected');
+    if (label) label.textContent = APRS_INBOX_STATE_LABELS[data.state] || data.state;
+
+    const messages = data.messages || [];
+    document.getElementById('aprs-inbox-count').textContent = data.message_count ?? messages.length;
+    document.getElementById('aprs-inbox-last').textContent =
+        messages.length ? fmtAgoShort(messages[0].received_at) : '—';
+
+    document.getElementById('aprs-inbox-empty').style.display = messages.length ? 'none' : 'block';
+    document.getElementById('aprs-inbox-list').innerHTML = messages.map((m, i) => `
+        <div class="msg-row ${i === 0 ? 'unread' : ''}">
+            <div class="msg-top">
+                <a class="msg-from" href="https://www.qrz.com/db/${escapeHtml(m.from)}" target="_blank" rel="noopener">${escapeHtml(m.from)}</a>
+                <span class="msg-time">${fmtAgoShort(m.received_at)}</span>
+            </div>
+            <div class="msg-text">${escapeHtml(m.message_text)}</div>
+            ${m.acked ? '<span class="msg-ack">✓ ack sent</span>' : ''}
+        </div>`).join('');
+}
+
+function fetchAprsInbox() {
+    if (!SHOW_APRS_INBOX) return;
+    fetch('/api/aprs_inbox')
+        .then(r => r.json())
+        .then(renderAprsInbox)
+        .catch(() => {});
+}
+
+if (SHOW_APRS_INBOX) {
+    fetchAprsInbox();
+    setInterval(fetchAprsInbox, APRS_INBOX_POLL_MS);
 }
 
 // --- update-available indicator next to the Settings link ---
