@@ -503,6 +503,152 @@
         <span class="status-txt" id="cards-status"></span>
     </div>
 
+    <div class="section">
+        <div class="section-title">Card order — drag to reorder</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            Every card on the dashboard, hotspots included, in one drag list. To
+            add/edit/delete a hotspot itself, use the Hotspots tab; to add/edit/delete a
+            camera, use the Cameras tab — this list is just for arranging what's already there.
+        </p>
+        <div id="card-order-list">
+            {% set fleet_pos = settings.get('fleet_activity_position', 0) if settings.get('show_fleet_activity', False) else -1 %}
+            {% set asl_fav_pos = settings.get('asl_favorites_position', 0) if settings.get('show_asl_favorites', False) else -1 %}
+            {% set aprs_inbox_pos = settings.get('aprs_inbox_position', 0) if settings.get('aprs_inbox_enabled', False) else -1 %}
+            {% set hf_cond_pos = settings.get('hf_conditions_position', 0) if settings.get('show_hf_conditions', False) else -1 %}
+            {% set band_plan_pos = settings.get('band_plan_position', 0) if settings.get('show_band_plan', False) else -1 %}
+            {% set license_quiz_pos = settings.get('license_quiz_position', 0) if settings.get('show_license_quiz', False) else -1 %}
+            {% set wspr_activity_pos = settings.get('wspr_activity_position', 0) if settings.get('show_wspr_activity', False) else -1 %}
+            {% set show_cams = settings.get('show_cameras', False) %}
+            {% for hs in hotspots %}
+                {% if loop.index0 == fleet_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📊 Fleet activity</span>
+                    <span class="node-meta">metrics card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == asl_fav_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__asl_favorites__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📻 ASL Favorites</span>
+                    <span class="node-meta">control card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == aprs_inbox_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__aprs_inbox__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📨 APRS Messages</span>
+                    <span class="node-meta">message inbox card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == hf_cond_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__hf_conditions__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">☀️ HF Conditions</span>
+                    <span class="node-meta">propagation card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == band_plan_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__band_plan__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📻 Band Plan</span>
+                    <span class="node-meta">reference card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == license_quiz_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__license_quiz__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🎓 License Quiz</span>
+                    <span class="node-meta">practice card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == wspr_activity_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__wspr_activity__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📶 Band Activity</span>
+                    <span class="node-meta">WSPR activity card</span>
+                </div>
+                {% endif %}
+                {% if show_cams %}
+                    {% for cam in cameras if cam.get('position', 0) == loop.index0 %}
+                    <div class="drag-row fleet-activity-row" draggable="true" data-ip="__camera__{{ cam.id }}">
+                        <span class="drag-handle">⠿</span>
+                        <span class="node-name">📷 {{ cam.name }}</span>
+                        <span class="node-meta">camera · {{ {'rtsp': 'RTSP', 'wyze': 'Wyze', 'bambu_a1': 'Bambu A1'}.get(cam.type, cam.type) }}</span>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            <div class="drag-row" draggable="true" data-ip="{{ hs.ip }}">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">{{ hs.name }}</span>
+                <span class="node-meta">{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else '' }}</span>
+            </div>
+            {% endfor %}
+            {% if fleet_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">📊 Fleet activity</span>
+                <span class="node-meta">metrics card</span>
+            </div>
+            {% endif %}
+            {% if asl_fav_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__asl_favorites__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">📻 ASL Favorites</span>
+                <span class="node-meta">control card</span>
+            </div>
+            {% endif %}
+            {% if aprs_inbox_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__aprs_inbox__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">📨 APRS Messages</span>
+                <span class="node-meta">message inbox card</span>
+            </div>
+            {% endif %}
+            {% if hf_cond_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__hf_conditions__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">☀️ HF Conditions</span>
+                <span class="node-meta">propagation card</span>
+            </div>
+            {% endif %}
+            {% if band_plan_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__band_plan__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">📻 Band Plan</span>
+                <span class="node-meta">reference card</span>
+            </div>
+            {% endif %}
+            {% if license_quiz_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__license_quiz__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">🎓 License Quiz</span>
+                <span class="node-meta">practice card</span>
+            </div>
+            {% endif %}
+            {% if wspr_activity_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__wspr_activity__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">📶 Band Activity</span>
+                <span class="node-meta">WSPR activity card</span>
+            </div>
+            {% endif %}
+            {% if show_cams %}
+                {% for cam in cameras if cam.get('position', 0) >= hotspots|length %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__camera__{{ cam.id }}">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📷 {{ cam.name }}</span>
+                    <span class="node-meta">camera · {{ {'rtsp': 'RTSP', 'wyze': 'Wyze', 'bambu_a1': 'Bambu A1'}.get(cam.type, cam.type) }}</span>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        <div style="margin-top:10px">
+            <button class="btn btn-primary" onclick="saveCardOrder()">Save card order</button>
+            <span class="status-txt" id="order-status"></span>
+        </div>
+    </div>
+
 </div>
 
 <!-- ═══════════════════════════════════════════════
@@ -718,77 +864,16 @@
 <div id="panel-hotspots" class="tab-panel">
 
     <div class="section">
-        <div class="section-title">Card order — drag to reorder</div>
-        <div id="card-order-list">
-            {% set fleet_pos = settings.get('fleet_activity_position', 0) if settings.get('show_fleet_activity', False) else -1 %}
-            {% set asl_fav_pos = settings.get('asl_favorites_position', 0) if settings.get('show_asl_favorites', False) else -1 %}
-            {% set aprs_inbox_pos = settings.get('aprs_inbox_position', 0) if settings.get('aprs_inbox_enabled', False) else -1 %}
-            {% set hf_cond_pos = settings.get('hf_conditions_position', 0) if settings.get('show_hf_conditions', False) else -1 %}
-            {% set band_plan_pos = settings.get('band_plan_position', 0) if settings.get('show_band_plan', False) else -1 %}
-            {% set license_quiz_pos = settings.get('license_quiz_position', 0) if settings.get('show_license_quiz', False) else -1 %}
-            {% set wspr_activity_pos = settings.get('wspr_activity_position', 0) if settings.get('show_wspr_activity', False) else -1 %}
-            {% set show_cams = settings.get('show_cameras', False) %}
+        <div class="section-title">Hotspots</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            To reorder this list among the dashboard's other cards, use the
+            <a href="#" onclick="switchTab('cards', document.getElementById('tab-btn-cards')); return false;">Card order list</a>
+            (Cards tab).
+        </p>
+        <div id="hotspots-list">
             {% for hs in hotspots %}
-                {% if loop.index0 == fleet_pos %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
-                    <span class="drag-handle">⠿</span>
-                    <span class="node-name">📊 Fleet activity</span>
-                    <span class="node-meta">metrics card</span>
-                </div>
-                {% endif %}
-                {% if loop.index0 == asl_fav_pos %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__asl_favorites__">
-                    <span class="drag-handle">⠿</span>
-                    <span class="node-name">📻 ASL Favorites</span>
-                    <span class="node-meta">control card</span>
-                </div>
-                {% endif %}
-                {% if loop.index0 == aprs_inbox_pos %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__aprs_inbox__">
-                    <span class="drag-handle">⠿</span>
-                    <span class="node-name">📨 APRS Messages</span>
-                    <span class="node-meta">message inbox card</span>
-                </div>
-                {% endif %}
-                {% if loop.index0 == hf_cond_pos %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__hf_conditions__">
-                    <span class="drag-handle">⠿</span>
-                    <span class="node-name">☀️ HF Conditions</span>
-                    <span class="node-meta">propagation card</span>
-                </div>
-                {% endif %}
-                {% if loop.index0 == band_plan_pos %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__band_plan__">
-                    <span class="drag-handle">⠿</span>
-                    <span class="node-name">📻 Band Plan</span>
-                    <span class="node-meta">reference card</span>
-                </div>
-                {% endif %}
-                {% if loop.index0 == license_quiz_pos %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__license_quiz__">
-                    <span class="drag-handle">⠿</span>
-                    <span class="node-name">🎓 License Quiz</span>
-                    <span class="node-meta">practice card</span>
-                </div>
-                {% endif %}
-                {% if loop.index0 == wspr_activity_pos %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__wspr_activity__">
-                    <span class="drag-handle">⠿</span>
-                    <span class="node-name">📶 Band Activity</span>
-                    <span class="node-meta">WSPR activity card</span>
-                </div>
-                {% endif %}
-                {% if show_cams %}
-                    {% for cam in cameras if cam.get('position', 0) == loop.index0 %}
-                    <div class="drag-row fleet-activity-row" draggable="true" data-ip="__camera__{{ cam.id }}">
-                        <span class="drag-handle">⠿</span>
-                        <span class="node-name">📷 {{ cam.name }}</span>
-                        <span class="node-meta">camera · {{ {'rtsp': 'RTSP', 'wyze': 'Wyze', 'bambu_a1': 'Bambu A1'}.get(cam.type, cam.type) }}</span>
-                    </div>
-                    {% endfor %}
-                {% endif %}
-            <div class="drag-row" draggable="true" data-ip="{{ hs.ip }}">
-                <span class="drag-handle">⠿</span>
+            <div class="drag-row" style="align-items:center">
+                <span style="flex-shrink:0">📡</span>
                 <span class="node-name">{{ hs.name }}</span>
                 <span class="node-meta">{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else '' }}</span>
                 <button class="btn btn-info btn-sm"
@@ -804,69 +889,9 @@
                             onclick="return confirm('Delete ' + this.dataset.name + '?')">Delete</button>
                 </form>
             </div>
+            {% else %}
+            <p style="font-size:13px;color:var(--text-dim)">No hotspots added yet.</p>
             {% endfor %}
-            {% if fleet_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">📊 Fleet activity</span>
-                <span class="node-meta">metrics card</span>
-            </div>
-            {% endif %}
-            {% if asl_fav_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__asl_favorites__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">📻 ASL Favorites</span>
-                <span class="node-meta">control card</span>
-            </div>
-            {% endif %}
-            {% if aprs_inbox_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__aprs_inbox__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">📨 APRS Messages</span>
-                <span class="node-meta">message inbox card</span>
-            </div>
-            {% endif %}
-            {% if hf_cond_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__hf_conditions__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">☀️ HF Conditions</span>
-                <span class="node-meta">propagation card</span>
-            </div>
-            {% endif %}
-            {% if band_plan_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__band_plan__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">📻 Band Plan</span>
-                <span class="node-meta">reference card</span>
-            </div>
-            {% endif %}
-            {% if license_quiz_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__license_quiz__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">🎓 License Quiz</span>
-                <span class="node-meta">practice card</span>
-            </div>
-            {% endif %}
-            {% if wspr_activity_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__wspr_activity__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">📶 Band Activity</span>
-                <span class="node-meta">WSPR activity card</span>
-            </div>
-            {% endif %}
-            {% if show_cams %}
-                {% for cam in cameras if cam.get('position', 0) >= hotspots|length %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__camera__{{ cam.id }}">
-                    <span class="drag-handle">⠿</span>
-                    <span class="node-name">📷 {{ cam.name }}</span>
-                    <span class="node-meta">camera · {{ {'rtsp': 'RTSP', 'wyze': 'Wyze', 'bambu_a1': 'Bambu A1'}.get(cam.type, cam.type) }}</span>
-                </div>
-                {% endfor %}
-            {% endif %}
-        </div>
-        <div style="margin-top:10px">
-            <button class="btn btn-primary" onclick="saveCardOrder()">Save card order</button>
-            <span class="status-txt" id="order-status"></span>
         </div>
     </div>
 

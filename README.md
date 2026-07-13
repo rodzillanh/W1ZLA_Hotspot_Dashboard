@@ -251,12 +251,14 @@ and **Version info**.
   (General tab) hides the whole row if you'd rather not show it; the ⚙
   Settings link itself always stays visible either way.
 - **Card order** — drag hotspot cards into whatever order you want them
-  to appear on the dashboard (Hotspots tab). If the Fleet activity, ASL
+  to appear on the dashboard (Cards tab). If the Fleet activity, ASL
   Favorites & Control, APRS Messages, HF Conditions, Band Plan, License
   Quiz, or Band Activity card is enabled, it appears in the same drag
   list and can be moved to any position among the hotspot cards, not
   just first. Every enabled camera card (Settings → Cameras) gets its
-  own row in the same list too, one per camera.
+  own row in the same list too, one per camera. Adding/editing/deleting
+  a hotspot itself is a separate list on the Hotspots tab — Card order
+  is just for arranging what's already there.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.

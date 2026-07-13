@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.26</span>
+                <span class="release-version">v3.27</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Card order moved from Hotspots to Cards tab</span> — the Hotspots tab's "Card order" section was actually a drag list for every card on the dashboard (Fleet Activity, cameras, all the optional cards), not just hotspots, which didn't match the tab's name or job. Moved it to the Cards tab (right below the on/off toggles it now sits next to), leaving Hotspots with a plain add/edit/delete list of just your hotspots — the same split already used for Cameras (its own tab manages cameras; the Card order list just positions them)</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.26</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Bugfix — "README.md not found" on standalone Pi installs</span> — install.sh/update.sh copy application files via an explicit list, and README.md (read by the Settings → Version "View README" popup) was never on it, so it silently never reached a Pi install. Also fixed update.sh's change-detection, which only compared .py/template/requirements.txt files — a commit that only touched README.md (or the already-bundled License Quiz pool file) would report "up to date, nothing to do" and exit before ever copying it. The error message itself also wrongly assumed a Docker deployment specifically ("check your image build") regardless of which deployment type hit it</li>
@@ -799,10 +809,10 @@
             <div class="feature-group-title">Settings</div>
             <ul class="feature-list">
                 <li><span>General tab</span> — dashboard name, dark/light mode toggle, host stats, toolbar links, software update settings, and (Raspberry Pi standalone installs only) host reboot/power-off buttons</li>
-                <li><span>Cards tab</span> — on/off toggle for every optional dashboard card (fleet activity, ASL Favorites, APRS Messages, HF Conditions, Band Plan, License Quiz, Band Activity), plus each card's own sub-setting (fleet activity time span, station grid square for Band Activity)</li>
+                <li><span>Cards tab</span> — on/off toggle for every optional dashboard card (fleet activity, ASL Favorites, APRS Messages, HF Conditions, Band Plan, License Quiz, Band Activity), each card's own sub-setting (fleet activity time span, station grid square for Band Activity), and the Card order drag list for arranging every card (hotspots included) on the dashboard</li>
                 <li><span>Weather tab</span> — location and °F/°C unit toggle</li>
                 <li><span>Integrations tab</span> — QRZ.com, RadioID.net, APRS.fi, Home Assistant MQTT, and APRS favorite alert credentials/toggles with connection tests</li>
-                <li>Hotspots tab — card order, add/edit/delete hotspots with SSH connection test, optional lat/lon and Brandmeister ID per hotspot</li>
+                <li>Hotspots tab — add/edit/delete hotspots with SSH connection test, optional lat/lon and Brandmeister ID per hotspot</li>
                 <li>Cameras tab — add/edit/delete RTSP or Bambu Labs A1 cameras with a connection test</li>
                 <li>Favorites tab — callsign + optional label, add/remove, browser alerts</li>
                 <li>Version info tab — self-update status/install, module hashes, uptime, changelog, feature list, and a direct README link</li>
