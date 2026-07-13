@@ -15,6 +15,13 @@
             --accent: #27ae60; --link: #2980b9; --amber: #e67e22;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        html {
+            scrollbar-width: thin; scrollbar-color: var(--card-border) transparent;
+        }
+        html::-webkit-scrollbar { width: 10px; }
+        html::-webkit-scrollbar-track { background: transparent; }
+        html::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 5px; }
+        html::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
         body { background: var(--bg); color: var(--text);
                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                font-size: 14px; padding: 20px; max-width: 860px; margin: 0 auto; }
@@ -98,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.24</span>
+                <span class="release-version">v3.25</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Bugfix — ugly white scrollbar in the README/Changelog popup windows</span> — those open in an iframe pointed at <code>/readme</code>/<code>/version</code>, and neither page had any scrollbar styling of its own, so the browser's default (typically plain white/gray) scrollbar showed up against the dashboard's dark theme. Both pages now get the same themed thin scrollbar used elsewhere in the app</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.24</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Bugfix — Version tab silently broke when landing on /setup#version</span> — a JavaScript "temporal dead zone" error (<code>Cannot access 'versionLoaded' before initialization</code>), not a network issue: the deep-link code that jumps straight to the Version tab ran before the <code>let versionLoaded</code>/<code>let vStartTime</code> declarations it depends on, further down the same script. This silently broke the Version tab every time it was reached via that URL — including the lightning-bolt indicator, the "Version info tab" link added in v3.19, and the auto-reload added in v3.20, which lands back on that exact URL after an update. Fixed by moving the deep-link check to the end of the script, after everything it needs is defined</li>
