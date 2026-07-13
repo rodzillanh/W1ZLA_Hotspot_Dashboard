@@ -58,6 +58,17 @@ if ! diff -q "${SCRIPT_DIR}/requirements.txt" "${INSTALL_DIR}/requirements.txt" 
     CHANGED+=("requirements.txt")
 fi
 
+# Bundled non-.py/non-template files need their own explicit diff check too --
+# without this, a commit that only touches one of these would make the
+# ${#CHANGED[@]} -eq 0 check below exit early as "nothing to do", before ever
+# reaching the copy commands that would actually update them.
+if ! diff -q "${SCRIPT_DIR}/extra_2024_2028.json" "${INSTALL_DIR}/extra_2024_2028.json" &>/dev/null; then
+    CHANGED+=("extra_2024_2028.json")
+fi
+if ! diff -q "${SCRIPT_DIR}/README.md" "${INSTALL_DIR}/README.md" &>/dev/null; then
+    CHANGED+=("README.md")
+fi
+
 if [[ ${#CHANGED[@]} -eq 0 ]]; then
     success "All files are already up to date — nothing to do."
     exit 0
@@ -85,6 +96,7 @@ cp -r "${INSTALL_DIR}"/*.py          "$BACKUP_DIR/" 2>/dev/null || true
 cp -r "${INSTALL_DIR}/templates"     "$BACKUP_DIR/" 2>/dev/null || true
 cp    "${INSTALL_DIR}/requirements.txt" "$BACKUP_DIR/" 2>/dev/null || true
 cp    "${INSTALL_DIR}/extra_2024_2028.json" "$BACKUP_DIR/" 2>/dev/null || true
+cp    "${INSTALL_DIR}/README.md"            "$BACKUP_DIR/" 2>/dev/null || true
 success "Backup saved to ${BACKUP_DIR}"
 info  "Your data in ${DATA_DIR} is untouched"
 
@@ -96,6 +108,11 @@ cp "${SCRIPT_DIR}/requirements.txt"        "${INSTALL_DIR}/"
 # module, so it needs its own explicit copy line or it's silently never
 # updated (same reasoning as install.sh's copy of it).
 cp "${SCRIPT_DIR}/extra_2024_2028.json"    "${INSTALL_DIR}/"
+# Read at runtime by the Settings -> Version info tab's "View README"
+# popup (app.py's /readme route) -- same "needs its own explicit copy
+# line" reasoning. Confirmed missing (reported as "README.md not found"
+# on a real Pi install).
+cp "${SCRIPT_DIR}/README.md"               "${INSTALL_DIR}/"
 mkdir -p "${INSTALL_DIR}/templates"
 cp "${SCRIPT_DIR}/templates/"*.html        "${INSTALL_DIR}/templates/"
 # Record the commit this install is now at -- read by the Version tab's
@@ -267,6 +284,7 @@ echo -e "    ${BOLD}sudo systemctl stop ${APP_NAME}${NC}"
 echo -e "    ${BOLD}sudo cp ${BACKUP_DIR}/*.py ${INSTALL_DIR}/${NC}"
 echo -e "    ${BOLD}sudo cp -r ${BACKUP_DIR}/templates ${INSTALL_DIR}/${NC}"
 echo -e "    ${BOLD}sudo cp ${BACKUP_DIR}/extra_2024_2028.json ${INSTALL_DIR}/${NC}"
+echo -e "    ${BOLD}sudo cp ${BACKUP_DIR}/README.md ${INSTALL_DIR}/${NC}"
 echo -e "    ${BOLD}sudo systemctl start ${APP_NAME}${NC}"
 echo
 if [[ "$UPDATER_SOURCE_DIR" != "$SCRIPT_DIR" ]]; then

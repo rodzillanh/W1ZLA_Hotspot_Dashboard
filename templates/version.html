@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.25</span>
+                <span class="release-version">v3.26</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Bugfix — "README.md not found" on standalone Pi installs</span> — install.sh/update.sh copy application files via an explicit list, and README.md (read by the Settings → Version "View README" popup) was never on it, so it silently never reached a Pi install. Also fixed update.sh's change-detection, which only compared .py/template/requirements.txt files — a commit that only touched README.md (or the already-bundled License Quiz pool file) would report "up to date, nothing to do" and exit before ever copying it. The error message itself also wrongly assumed a Docker deployment specifically ("check your image build") regardless of which deployment type hit it</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.25</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Bugfix — ugly white scrollbar in the README/Changelog popup windows</span> — those open in an iframe pointed at <code>/readme</code>/<code>/version</code>, and neither page had any scrollbar styling of its own, so the browser's default (typically plain white/gray) scrollbar showed up against the dashboard's dark theme. Both pages now get the same themed thin scrollbar used elsewhere in the app</li>

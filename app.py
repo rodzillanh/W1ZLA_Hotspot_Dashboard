@@ -575,7 +575,9 @@ def readme_page():
         with open(readme_path, "r", encoding="utf-8") as f:
             readme_text = f.read()
     except FileNotFoundError:
-        readme_text = "README.md not found in the container -- check your image build."
+        readme_text = ("README.md not found alongside the running app -- for a Docker/Unraid "
+                        "deployment, check your image build; for a standalone Pi/Linux install, "
+                        "re-run install.sh or update.sh to pick it up.")
     embed = request.args.get("embed") == "1"
     return render_template("readme.html", settings=load_settings(), readme_text=readme_text, embed=embed)
 

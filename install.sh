@@ -141,6 +141,12 @@ cp "${SOURCE_DIR}/requirements.txt" "$INSTALL_DIR/"
 # module, so it needs its own explicit copy line (same reason templates/
 # needs one) or it silently never reaches INSTALL_DIR.
 cp "${SOURCE_DIR}/extra_2024_2028.json" "$INSTALL_DIR/"
+# The Settings -> Version info tab's "View README" popup reads this at
+# runtime (app.py's /readme route) -- same "needs its own explicit copy
+# line" reasoning, confirmed missing here (reported as "README.md not
+# found" on a real Pi install, /readme's error message assumed Docker
+# specifically -- fixed to be deployment-agnostic too).
+cp "${SOURCE_DIR}/README.md" "$INSTALL_DIR/"
 mkdir -p "${INSTALL_DIR}/templates"
 cp "${SOURCE_DIR}/templates/"*.html "${INSTALL_DIR}/templates/"
 success "Application files copied to ${INSTALL_DIR}"

@@ -574,7 +574,21 @@ config for per-integration credentials; put it in
   its own `cp` line in both scripts now (install.sh's main copy block;
   update.sh's backup block, copy block, and manual-rollback echo lines) —
   if you add another bundled non-`.py`/non-template file, add it in all
-  of those same four places, not just one.
+  of those same four places, not just one. `README.md` had exactly this
+  bug too (confirmed on a real Pi: `/readme` returned "README.md not
+  found," and its error message wrongly assumed a Docker deployment
+  specifically -- "check your image build" -- since that's the only
+  place this gap had been considered before). Fixed the same four-place
+  way, plus a fifth: `update.sh`'s "Checking for changes" diff loop only
+  ever compared `*.py`/templates/`requirements.txt` -- a commit that
+  *only* touched `README.md` or `extra_2024_2028.json` (the latter had
+  this exact same latent gap, never separately noticed) would make the
+  `${#CHANGED[@]} -eq 0` check report "up to date, nothing to do" and
+  exit *before ever reaching the copy commands* that would have updated
+  them. Any future non-`.py`/non-template bundled file needs an explicit
+  `diff -q` check added there too, or it can go stale forever on a
+  standalone install as long as no `.py`/template file happens to change
+  in the same commit.
 - **`wspr_activity.py`'s WSPR band codes are NOT "the MHz digit of the
   frequency" below 10 MHz — confirmed via a real query, not assumed
   from the pattern that happens to work for 6m/10m/20m/etc.** 160m is
