@@ -1163,13 +1163,6 @@ function switchTab(name, btn) {
     if (name === 'version') loadVersion();
 }
 
-// Deep link from the dashboard's update-available indicator (/setup#version)
-// straight to the Version info tab instead of landing on General.
-if (location.hash === '#version') {
-    const btn = document.getElementById('tab-btn-version');
-    if (btn) switchTab('version', btn);
-}
-
 // --- theme toggle ---
 let darkMode = {{ 'true' if settings.dark_mode else 'false' }};
 
@@ -2052,6 +2045,20 @@ function closeDocModalOnBackdrop(e) {
         status.textContent = 'Blocked in browser settings';
     }
 })();
+
+// Deep link from the dashboard's update-available indicator (/setup#version)
+// straight to the Version info tab instead of landing on General. Must run
+// after loadVersion()'s own `let versionLoaded`/`let vStartTime` declarations
+// further up this script -- calling switchTab('version', ...) here used to
+// throw "Cannot access 'versionLoaded' before initialization" (a genuine JS
+// temporal-dead-zone error, not a network issue) because this block ran
+// before those `let`s had executed, which silently broke the Version tab
+// every time someone landed on /setup#version -- including right after an
+// "Install update" click, since the auto-reload lands back on this same URL.
+if (location.hash === '#version') {
+    const btn = document.getElementById('tab-btn-version');
+    if (btn) switchTab('version', btn);
+}
 </script>
 </body>
 </html>

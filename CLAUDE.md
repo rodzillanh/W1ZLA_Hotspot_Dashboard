@@ -642,6 +642,31 @@ config for per-integration credentials; put it in
   that "probably" won't contain a quote (IPs and UUIDs are fine; names,
   usernames, and passwords are exactly the fields most likely to have
   one eventually).
+- **`setup.html`'s `/setup#version` deep-link check must run at the very
+  end of the script, after every `let`/`const` it touches (indirectly,
+  via `loadVersion()`) has already been declared — putting it anywhere
+  earlier reintroduces a real, previously-shipped bug.** It used to sit
+  right after `switchTab()`'s definition, near the top of the script,
+  and called `switchTab('version', btn)` → `loadVersion()` →
+  `versionLoaded`/`vStartTime`, both `let`-declared much further down in
+  the same script (in the "--- version tab ---" section). `let`
+  declarations are hoisted but stay in the temporal dead zone until
+  their declaration line actually executes, so referencing them earlier
+  throws `Uncaught ReferenceError: Cannot access 'versionLoaded' before
+  initialization` — silently breaking the Version tab (and everything
+  that runs after the crash point in that top-level script block) on
+  every page load that lands on `/setup#version` specifically. That URL
+  isn't a rare edge case — it's what the dashboard's lightning-bolt
+  update indicator links to, what the "Version info tab" link (General
+  tab, added v3.19) navigates to, and what `waitForRestart()`'s
+  `location.reload()` (added v3.20) lands back on after every successful
+  self-update — so this bug fired on nearly every real update-checking
+  interaction, reported as "update checking doesn't work" symptoms that
+  were actually this crash, not a server-side/network problem. If you
+  add another deep-link-style init block, put it after all `let`/`const`
+  declarations in the script (the very end is simplest), not near the
+  top next to related function definitions — function declarations
+  hoist safely, `let`/`const` don't.
 
 ## Testing patterns used throughout this project
 

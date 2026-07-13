@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.23</span>
+                <span class="release-version">v3.24</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Bugfix — Version tab silently broke when landing on /setup#version</span> — a JavaScript "temporal dead zone" error (<code>Cannot access 'versionLoaded' before initialization</code>), not a network issue: the deep-link code that jumps straight to the Version tab ran before the <code>let versionLoaded</code>/<code>let vStartTime</code> declarations it depends on, further down the same script. This silently broke the Version tab every time it was reached via that URL — including the lightning-bolt indicator, the "Version info tab" link added in v3.19, and the auto-reload added in v3.20, which lands back on that exact URL after an update. Fixed by moving the deep-link check to the end of the script, after everything it needs is defined</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.23</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>New Cards tab in Settings</span> — the General → Appearance section had grown to 12 toggle-rows, 7 of them near-identical "Show X card" switches (Fleet Activity, ASL Favorites, APRS Messages, HF Conditions, Band Plan, License Quiz, Band Activity) that had nothing to do with appearance. Split into its own Cards tab, leaving Appearance with just light/dark mode, the host stats bar, and toolbar links</li>
