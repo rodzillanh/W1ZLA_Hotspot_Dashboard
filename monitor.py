@@ -262,6 +262,12 @@ class FleetMonitor:
             if ip not in self._data:
                 self._data[ip] = HotspotStatus(name=hotspot["name"], ip=ip)
                 self._failures[ip] = 0
+            else:
+                # Keep the name in sync with hotspots.json -- a rename in
+                # Settings doesn't change the ip, so without this the live
+                # HotspotStatus (created once, above) would keep showing
+                # the old name until the app restarts.
+                self._data[ip].name = hotspot["name"]
 
     def _log_activity(self, ip: str) -> None:
         """Record one completed transmission for the Fleet activity metrics
