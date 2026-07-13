@@ -682,6 +682,31 @@ config for per-integration credentials; put it in
   top next to related function definitions — function declarations
   hoist safely, `let`/`const` don't.
 
+- **Backup/restore (v3.30) reuses each list's existing natural identity
+  field as the merge key, rather than inventing a new one** — hotspot
+  `ip`, favorite `call`, ASL favorite `node`, camera `id` — same fields
+  `storage.py`'s own save functions and the dashboard's own lookups
+  already treat as unique. "Add & update" mode builds a dict keyed on
+  that field seeded from the current on-disk list, then overwrites with
+  entries from the imported file, so an imported entry matching an
+  existing one updates in place instead of duplicating. Settings has no
+  such natural key — its "add & update" mode instead means `dict.update()`
+  (only the keys present in the imported file get overwritten; anything
+  the dashboard already has that isn't in the file is left alone), which
+  is a different merge semantic from the four list-shaped categories and
+  is called out explicitly in both the Settings UI copy and the README
+  so it doesn't read as a bug.
+- **Imported hotspots go through the same `asl_node.isdigit()` guard as
+  the Settings-UI add/edit path** (`api_import_backup` in `app.py`),
+  not just a schema/type check — `asl_node` gets shell-interpolated into
+  an SSH command (`config.build_asl_status_cmd`), so a backup file with
+  a hostile `asl_node` value (e.g. containing `; rm -rf /`) needs to be
+  neutralized on import the same way it already is on manual entry, not
+  just trusted because it came from a JSON file rather than a form
+  field. Verified with a live `app.test_client()` import containing
+  `"asl_node": "59929; rm -rf /"` — the field comes back `None` (stripped
+  by `.pop()`), not the injected string.
+
 ## Testing patterns used throughout this project
 
 No test suite/framework is set up — verification has been done ad hoc but

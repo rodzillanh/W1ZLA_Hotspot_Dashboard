@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.29</span>
+                <span class="release-version">v3.30</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Backup &amp; restore</span> — new Settings → Backup tab exports Hotspots, Favorites, ASL Favorites, Cameras, and Settings (your choice, any combination) as one combined JSON file, and imports that file back — on this dashboard or a different one. Import previews what's in the file before applying anything, and offers "Add &amp; update" (keep what you have, add/update from the file) or "Replace" (checked categories become exactly what's in the file) modes. Categories containing plain-text credentials are flagged before export so you know to handle the file carefully</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.29</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Host CPU temperature in the sysbar</span> — the host stats bar (Settings → General, "Show host CPU &amp; memory bar") now shows a third value alongside CPU% and Memory: the temperature of the machine running the dashboard itself, read from the same <code>/sys/class/thermal/thermal_zone0/temp</code> sysfs path already used for per-hotspot temperature over SSH, just read locally. Shows "N/A" on hosts with no thermal zone (most non-Pi servers, most containers) the same way CPU/Memory already degrade gracefully there</li>

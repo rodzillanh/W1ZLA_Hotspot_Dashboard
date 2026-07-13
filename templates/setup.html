@@ -219,6 +219,49 @@
         .node-meta { font-size: 11px; color: var(--text-dim); }
         .fleet-activity-row { border-left: 2px solid var(--accent); }
 
+        /* --- backup / restore --- */
+        .warn-box {
+            display: flex; gap: 9px; background: rgba(243,156,18,.08);
+            border: 1px solid rgba(243,156,18,.35); border-radius: 7px;
+            padding: 10px 12px; font-size: 12.5px; color: var(--text-muted);
+            line-height: 1.45; margin-bottom: 12px;
+        }
+        .warn-box b { color: var(--amber); }
+        .cat-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+        .cat-row {
+            display: flex; align-items: center; gap: 10px; background: var(--row-bg);
+            border: 1px solid var(--card-border); border-radius: 6px; padding: 9px 12px;
+            cursor: pointer;
+        }
+        .cat-row input[type="checkbox"] { flex-shrink: 0; width: 15px; height: 15px; accent-color: var(--accent); }
+        .cat-icon { font-size: 15px; flex-shrink: 0; }
+        .cat-body { flex: 1; min-width: 0; }
+        .cat-name { font-size: 13px; font-weight: 600; }
+        .cat-meta { font-size: 11px; color: var(--text-dim); }
+        .cat-secret {
+            font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+            color: var(--amber); background: rgba(243,156,18,.16); padding: 1px 6px; border-radius: 8px;
+        }
+        .file-drop {
+            border: 1px dashed var(--card-border); border-radius: 7px;
+            padding: 18px; text-align: center; color: var(--text-muted);
+            font-size: 12.5px; margin-bottom: 12px; cursor: pointer;
+        }
+        .file-drop:hover { border-color: var(--link); color: var(--link); }
+        .file-drop.has-file { border-style: solid; border-color: var(--accent); color: var(--text); }
+        .import-preview { display: none; }
+        .import-preview.show { display: block; }
+        .mode-group { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+        .mode-option {
+            display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px;
+            cursor: pointer; padding: 8px 10px; border: 1px solid var(--card-border);
+            border-radius: 6px; background: var(--row-bg);
+        }
+        .mode-option input { margin-top: 2px; }
+        .mode-option.selected { border-color: var(--link); }
+        .mode-option .mode-label { font-weight: 600; display: block; }
+        .mode-option .mode-desc  { color: var(--text-muted); font-size: 11.5px; }
+
         /* --- hotspot form --- */
         #test-result { font-size: 12px; margin-top: 8px; min-height: 18px; }
         .ok  { color: var(--accent); }
@@ -307,6 +350,7 @@
         <div class="tab-btn"       id="tab-btn-hotspots"      onclick="switchTab('hotspots',     this)">Hotspots</div>
         <div class="tab-btn"       id="tab-btn-cameras"       onclick="switchTab('cameras',      this)">Cameras</div>
         <div class="tab-btn"       id="tab-btn-favorites"     onclick="switchTab('favorites',    this)">Favorites</div>
+        <div class="tab-btn"       id="tab-btn-backup"        onclick="switchTab('backup',       this)">Backup</div>
         <div class="tab-btn"       id="tab-btn-version"       onclick="switchTab('version',      this)">Version info</div>
     </div>
 </div>
@@ -1107,6 +1151,106 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════
+     BACKUP TAB
+     Export/import hotspots, favorites, ASL favorites,
+     cameras, and settings as one combined JSON file
+═══════════════════════════════════════════════ -->
+<div id="panel-backup" class="tab-panel">
+
+    <div class="section">
+        <div class="section-title">Backup — export</div>
+        <div class="warn-box">
+            <span>⚠</span>
+            <span>Checked categories marked <span class="cat-secret" style="margin:0 3px">secrets</span>
+            contain plain-text credentials (SSH passwords, camera RTSP/access codes, QRZ/RadioID/APRS.fi/MQTT
+            keys) — handle the exported file like you would any credentials file.</span>
+        </div>
+        <div class="cat-list">
+            <label class="cat-row">
+                <input type="checkbox" id="export-cat-hotspots" checked>
+                <span class="cat-icon">📡</span>
+                <div class="cat-body">
+                    <div class="cat-name">Hotspots <span class="cat-secret">secrets</span></div>
+                    <div class="cat-meta">{{ hotspots|length }} configured — SSH credentials included</div>
+                </div>
+            </label>
+            <label class="cat-row">
+                <input type="checkbox" id="export-cat-favorites" checked>
+                <span class="cat-icon">⭐</span>
+                <div class="cat-body">
+                    <div class="cat-name">Favorites</div>
+                    <div class="cat-meta">{{ favorites|length }} callsigns</div>
+                </div>
+            </label>
+            <label class="cat-row">
+                <input type="checkbox" id="export-cat-asl_favorites" checked>
+                <span class="cat-icon">📻</span>
+                <div class="cat-body">
+                    <div class="cat-name">ASL Favorites</div>
+                    <div class="cat-meta">{{ asl_favorites|length }} nodes</div>
+                </div>
+            </label>
+            <label class="cat-row">
+                <input type="checkbox" id="export-cat-cameras" checked>
+                <span class="cat-icon">📷</span>
+                <div class="cat-body">
+                    <div class="cat-name">Cameras <span class="cat-secret">secrets</span></div>
+                    <div class="cat-meta">{{ cameras|length }} configured — RTSP URL/access code included</div>
+                </div>
+            </label>
+            <label class="cat-row">
+                <input type="checkbox" id="export-cat-settings" checked>
+                <span class="cat-icon">⚙️</span>
+                <div class="cat-body">
+                    <div class="cat-name">Settings <span class="cat-secret">secrets</span></div>
+                    <div class="cat-meta">dashboard name, card toggles/positions, QRZ/RadioID/APRS.fi/MQTT credentials, etc.</div>
+                </div>
+            </label>
+        </div>
+        <button class="btn btn-primary" onclick="exportBackup()">⬇ Export backup</button>
+        <span class="status-txt">Downloads one .json file with everything checked above.</span>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Restore — import</div>
+        <input type="file" id="backup-file-input" accept=".json" style="display:none"
+               onchange="handleBackupFile(this.files[0])">
+        <div class="file-drop" id="file-drop" onclick="document.getElementById('backup-file-input').click()">
+            <div id="file-drop-label">📁 Click to choose a backup .json file</div>
+        </div>
+
+        <div class="import-preview" id="import-preview">
+            <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:10px">
+                Found in this file — uncheck anything you don't want to restore:
+            </p>
+            <div class="cat-list" id="import-cat-list"></div>
+
+            <div class="mode-group">
+                <label class="mode-option selected" id="mode-merge-label">
+                    <input type="radio" name="import-mode" value="merge" checked onchange="setImportMode('merge')">
+                    <span>
+                        <span class="mode-label">Add &amp; update</span>
+                        <span class="mode-desc">For Hotspots/Favorites/ASL Favorites/Cameras: keep what you already have, add new entries from the file, update ones that match (by IP/callsign/node/camera). Settings: only the keys present in the file are overwritten — everything else stays as-is.</span>
+                    </span>
+                </label>
+                <label class="mode-option" id="mode-replace-label">
+                    <input type="radio" name="import-mode" value="replace" onchange="setImportMode('replace')">
+                    <span>
+                        <span class="mode-label">Replace</span>
+                        <span class="mode-desc">For each checked category, only what's in the file remains — anything else currently configured in that category is removed.</span>
+                    </span>
+                </label>
+            </div>
+
+            <button class="btn btn-primary" onclick="confirmImport()">Confirm restore</button>
+            <button class="btn btn-danger" onclick="cancelImport()" style="margin-left:6px">Cancel</button>
+            <span class="status-txt" id="import-status"></span>
+        </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════
      VERSION TAB
      Container info + module hashes
 ═══════════════════════════════════════════════ -->
@@ -1700,6 +1844,120 @@ function requestNotifPermission() {
             status.textContent = '✕ Not allowed';
         }
     });
+}
+
+// --- backup / restore (backup tab) ---
+const BACKUP_CATEGORY_META = {
+    hotspots:      { icon: '📡', name: 'Hotspots' },
+    favorites:     { icon: '⭐', name: 'Favorites' },
+    asl_favorites: { icon: '📻', name: 'ASL Favorites' },
+    cameras:       { icon: '📷', name: 'Cameras' },
+    settings:      { icon: '⚙️', name: 'Settings' },
+};
+let pendingBackupData = null;
+
+function exportBackup() {
+    const cats = Object.keys(BACKUP_CATEGORY_META).filter(
+        cat => document.getElementById('export-cat-' + cat).checked
+    );
+    if (cats.length === 0) { alert('Select at least one category to export.'); return; }
+    window.location.href = '/api/export_backup?categories=' + cats.join(',');
+}
+
+function handleBackupFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        let parsed;
+        try {
+            parsed = JSON.parse(reader.result);
+        } catch (e) {
+            alert('That file is not valid JSON.');
+            return;
+        }
+        pendingBackupData = parsed;
+        renderImportPreview(parsed, file.name);
+    };
+    reader.onerror = () => alert('Could not read that file.');
+    reader.readAsText(file);
+}
+
+function renderImportPreview(parsed, filename) {
+    document.getElementById('file-drop').classList.add('has-file');
+    document.getElementById('file-drop-label').textContent = '✓ ' + filename;
+
+    const list = document.getElementById('import-cat-list');
+    list.innerHTML = '';
+    let found = 0;
+    for (const cat of Object.keys(BACKUP_CATEGORY_META)) {
+        if (!(cat in parsed)) continue;
+        found++;
+        const meta = BACKUP_CATEGORY_META[cat];
+        const value = parsed[cat];
+        const countText = Array.isArray(value) ? `${value.length} in file` : 'present';
+        const row = document.createElement('label');
+        row.className = 'cat-row';
+        row.innerHTML = `
+            <input type="checkbox" id="import-cat-${cat}" checked>
+            <span class="cat-icon">${meta.icon}</span>
+            <div class="cat-body">
+                <div class="cat-name">${meta.name}</div>
+                <div class="cat-meta">${countText}</div>
+            </div>`;
+        list.appendChild(row);
+    }
+    if (found === 0) {
+        list.innerHTML = '<p style="font-size:12.5px;color:var(--text-dim)">No recognized categories found in this file.</p>';
+    }
+    document.getElementById('import-preview').classList.add('show');
+    document.getElementById('import-status').textContent = '';
+}
+
+function setImportMode(mode) {
+    document.getElementById('mode-merge-label').classList.toggle('selected', mode === 'merge');
+    document.getElementById('mode-replace-label').classList.toggle('selected', mode === 'replace');
+}
+
+function cancelImport() {
+    pendingBackupData = null;
+    document.getElementById('backup-file-input').value = '';
+    document.getElementById('file-drop').classList.remove('has-file');
+    document.getElementById('file-drop-label').textContent = '📁 Click to choose a backup .json file';
+    document.getElementById('import-preview').classList.remove('show');
+}
+
+function confirmImport() {
+    if (!pendingBackupData) return;
+    const mode = document.querySelector('input[name="import-mode"]:checked').value;
+    const body = { mode };
+    for (const cat of Object.keys(BACKUP_CATEGORY_META)) {
+        const cb = document.getElementById('import-cat-' + cat);
+        if (cb && cb.checked && cat in pendingBackupData) {
+            body[cat] = pendingBackupData[cat];
+        }
+    }
+    if (Object.keys(body).length === 1) { alert('Select at least one category to restore.'); return; }
+    if (!confirm(
+        'Restore the checked categories from this backup?\n\n' +
+        (mode === 'replace'
+            ? 'Replace mode: anything currently configured in a checked category that is not in this file will be removed.'
+            : 'Add & update mode: existing data not in this file is kept.')
+    )) return;
+
+    const status = document.getElementById('import-status');
+    status.textContent = 'Restoring…';
+    fetch('/api/import_backup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) { status.textContent = '✕ ' + (data.message || 'Import failed'); return; }
+            status.textContent = '✓ Restored — reloading…';
+            setTimeout(() => location.reload(), 800);
+        })
+        .catch(() => { status.textContent = '✕ Import failed'; });
 }
 
 // --- version tab ---

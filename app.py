@@ -412,7 +412,7 @@ def setup():
         return redirect("/setup")
     return render_template("setup.html", hotspots=load_hotspots(),
                            settings=load_settings(), favorites=load_favorites(),
-                           cameras=load_cameras(),
+                           cameras=load_cameras(), asl_favorites=load_asl_favorites(),
                            can_power_control=HOST_CAN_POWER_CONTROL,
                            host_is_standalone=HOST_IS_STANDALONE)
 
@@ -924,6 +924,147 @@ def api_camera_feed(camera_id):
 @app.route("/api/camera_status")
 def api_camera_status():
     return jsonify({c["id"]: camera_manager.status(c) for c in load_cameras()})
+
+
+# --- backup / restore ---
+# One combined export covering every config category (hotspots, favorites,
+# asl_favorites, cameras, settings) instead of five separate downloads --
+# this is a thin bundling/merging layer over storage.py's existing load_*/
+# save_* functions, no new storage format. Import supports "merge" (add new,
+# update existing by the same identity field each list already uses --
+# hotspot ip, favorite call, asl_favorite node, camera id -- leave everything
+# else untouched) or "replace" (each checked category becomes exactly what's
+# in the file). Settings has no real "identity" to merge by -- merge there
+# just means "overwrite the keys present in the file, leave the rest," which
+# load_settings() already does implicitly on every read via its own merge
+# onto DEFAULT_SETTINGS.
+@app.route("/api/export_backup")
+def api_export_backup():
+    requested = set(
+        c.strip() for c in
+        (request.args.get("categories") or "hotspots,favorites,asl_favorites,cameras,settings").split(",")
+        if c.strip()
+    )
+    backup = {
+        "exported_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+    }
+    if "hotspots" in requested:
+        backup["hotspots"] = load_hotspots()
+    if "favorites" in requested:
+        backup["favorites"] = load_favorites()
+    if "asl_favorites" in requested:
+        backup["asl_favorites"] = load_asl_favorites()
+    if "cameras" in requested:
+        backup["cameras"] = load_cameras()
+    if "settings" in requested:
+        backup["settings"] = load_settings()
+
+    filename = f"dashboard-backup-{datetime.date.today().isoformat()}.json"
+    resp = jsonify(backup)
+    resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return resp
+
+
+@app.route("/api/import_backup", methods=["POST"])
+def api_import_backup():
+    data = request.json or {}
+    mode = data.get("mode", "merge")
+    if mode not in ("merge", "replace"):
+        return jsonify({"ok": False, "message": "Invalid mode"}), 400
+
+    result = {}
+
+    if isinstance(data.get("hotspots"), list):
+        imported = []
+        for h in data["hotspots"]:
+            if not isinstance(h, dict) or not h.get("name") or not h.get("ip"):
+                continue
+            h = dict(h)
+            # Interpolated into a shell string over SSH (config.build_asl_status_cmd)
+            # -- validate digits-only here too, same requirement /setup already
+            # enforces, since an imported file is exactly as untrusted as a form
+            # submission would be (no auth on this endpoint either).
+            asl_node = str(h.get("asl_node", "")).strip()
+            if asl_node and not asl_node.isdigit():
+                h.pop("asl_node", None)
+            imported.append(h)
+        if mode == "replace":
+            hotspots = imported
+        else:
+            by_ip = {h["ip"]: h for h in load_hotspots()}
+            for h in imported:
+                by_ip[h["ip"]] = h
+            hotspots = list(by_ip.values())
+        save_hotspots(hotspots)
+        result["hotspots"] = len(hotspots)
+        if mqtt_pub.enabled:
+            mqtt_pub.set_hotspots(hotspots)
+
+    if isinstance(data.get("favorites"), list):
+        imported = [
+            {"call": f["call"].upper().strip(), "label": f.get("label", "").strip()}
+            for f in data["favorites"] if isinstance(f, dict) and f.get("call", "").strip()
+        ]
+        if mode == "replace":
+            favorites = imported
+        else:
+            by_call = {f["call"]: f for f in load_favorites()}
+            for f in imported:
+                by_call[f["call"]] = f
+            favorites = list(by_call.values())
+        save_favorites(favorites)
+        result["favorites"] = len(favorites)
+
+    if isinstance(data.get("asl_favorites"), list):
+        imported = [
+            {"node": f["node"].strip(), "label": f.get("label", "").strip()}
+            for f in data["asl_favorites"] if isinstance(f, dict) and f.get("node", "").strip().isdigit()
+        ]
+        if mode == "replace":
+            asl_favorites = imported
+        else:
+            by_node = {f["node"]: f for f in load_asl_favorites()}
+            for f in imported:
+                by_node[f["node"]] = f
+            asl_favorites = list(by_node.values())
+        save_asl_favorites(asl_favorites)
+        result["asl_favorites"] = len(asl_favorites)
+
+    if isinstance(data.get("cameras"), list):
+        imported = [
+            c for c in data["cameras"]
+            if isinstance(c, dict) and c.get("id") and c.get("name") and c.get("type") in ("rtsp", "wyze", "bambu_a1")
+        ]
+        if mode == "replace":
+            cameras = imported
+        else:
+            by_id = {c["id"]: c for c in load_cameras()}
+            for c in imported:
+                by_id[c["id"]] = c
+            cameras = list(by_id.values())
+        save_cameras(cameras)
+        result["cameras"] = len(cameras)
+        for c in imported:
+            camera_manager.remove(c["id"])  # drop any live worker so it reconnects with the (possibly new) config
+
+    if isinstance(data.get("settings"), dict):
+        if mode == "replace":
+            new_settings = data["settings"]
+        else:
+            new_settings = load_settings()
+            new_settings.update(data["settings"])
+        save_settings(new_settings)
+        result["settings"] = True
+        # Rebuild every settings-dependent client, same as /api/settings does
+        # on every save -- an imported settings block can change any of these.
+        _rebuild_qrz_client()
+        monitor.set_radioid_enabled(new_settings.get("radioid_enabled", True))
+        _rebuild_aprs_client()
+        _rebuild_mqtt_client()
+        _rebuild_aprs_messenger()
+        _rebuild_aprs_inbox()
+
+    return jsonify({"ok": True, "result": result})
 
 
 def _mqtt_publish_loop():

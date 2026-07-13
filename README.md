@@ -931,6 +931,33 @@ same way mode/RSSI/BER are. A couple of behavior notes:
   diagnosing a missing active-call indicator) and the parser in
   `monitor.py`'s `_extract_destination` can be tuned to match.
 
+## Backup & Restore
+
+Settings → **Backup** tab lets you export/import a single combined JSON file
+covering whichever of these you check: Hotspots, Favorites, ASL Favorites,
+Cameras, and Settings.
+
+- **Export** downloads `dashboard-backup-YYYY-MM-DD.json`. Hotspots,
+  Cameras, and Settings each carry plain-text credentials (SSH passwords,
+  camera RTSP URLs/access codes, QRZ/RadioID/APRS.fi/MQTT keys) — the
+  Backup tab flags these with a "secrets" badge. Treat the exported file
+  like any credentials file.
+- **Import** accepts that same file back (on this dashboard or a different
+  one), with a preview of what it contains before anything is applied, and
+  a choice of mode:
+  - **Add & update** (default) — for Hotspots/Favorites/ASL
+    Favorites/Cameras, keeps what you already have and adds/updates
+    entries from the file, matched by that list's natural key (hotspot
+    `ip`, favorite `call`, ASL favorite `node`, camera `id`). For
+    Settings, only the keys present in the file are overwritten —
+    everything else stays as you had it.
+  - **Replace** — for each checked category, only what's in the file
+    remains; anything else currently configured in that category is
+    removed.
+
+This is the same tool for moving your setup to a new install as it is for
+just keeping a backup around.
+
 ## Known tradeoffs (intentionally left as-is for now)
 
 - No authentication on `/setup` — anyone who can reach the dashboard can
