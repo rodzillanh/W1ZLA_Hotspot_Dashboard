@@ -618,6 +618,31 @@ config for per-integration credentials; put it in
   shared rate limit across however many dashboards happen to be running
   this code.
 
+- **Never interpolate a Jinja value directly into a JS string literal
+  inside an `onclick` attribute (`onclick="fn('{{ value }}')"`) — Jinja's
+  default HTML auto-escaping does NOT protect this, even though it looks
+  like it should.** A single quote in `value` gets escaped to `&#39;` in
+  the HTML source, but the browser's HTML parser decodes that back to a
+  literal `'` *before* handing the attribute's text to the JS engine as
+  inline event-handler code — so the quote still terminates the JS string
+  early and breaks the handler's syntax, silently making the button do
+  nothing. This was a real, reported bug (not hypothetical): a user
+  couldn't Edit one specific hotspot, traced to an apostrophe in its
+  name/SSH username/SSH password. Fixed at all four sites that had this
+  pattern (`editHotspot`/hotspot delete-confirm/`editCamera`/
+  `deleteCamera` in `setup.html`) by moving the values into `data-*`
+  attributes instead (genuinely safe here, since HTML-attribute-escaping
+  is the *only* parsing that happens to them — nothing re-decodes and
+  re-parses them as JS afterward) and reading them back via
+  `this.dataset.*` inside the handler, rather than baking raw values into
+  the onclick string at all. If you add a new Edit/Delete-style button
+  for a list item with user-editable text fields (hotspot/camera name,
+  any free-text setting), use the same `data-*` pattern from the start —
+  don't reintroduce the string-interpolation version even for a field
+  that "probably" won't contain a quote (IPs and UUIDs are fine; names,
+  usernames, and passwords are exactly the fields most likely to have
+  one eventually).
+
 ## Testing patterns used throughout this project
 
 No test suite/framework is set up — verification has been done ad hoc but

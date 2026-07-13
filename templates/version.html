@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.21</span>
+                <span class="release-version">v3.22</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Bugfix — couldn't Edit/Delete a hotspot or camera with an apostrophe (or other quote character) in its name, SSH username, or SSH password</span> — the Edit/Delete buttons built their click handler by interpolating those values directly into a JavaScript string literal in the HTML (e.g. <code>onclick="editHotspot('...')"</code>); a single quote in any of those fields broke the JS syntax and made the button silently do nothing. Fixed by moving those values into <code>data-*</code> attributes instead (safe from this specific bug, since they're never parsed as JS) and reading them back via <code>this.dataset</code> in the click handler</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.21</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Bugfix — update-available lightning bolt indicator showed the wrong color on some devices</span> — it was the ⚡ emoji character, whose bright yellow/black color only renders correctly if the viewing device has a color emoji font installed (Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji). Raspberry Pi OS often doesn't ship one, especially Lite/minimal images, so it silently fell back to a plain monochrome glyph colored by inherited link blue instead. Replaced with an inline SVG icon, which renders identically bright yellow everywhere regardless of installed fonts</li>

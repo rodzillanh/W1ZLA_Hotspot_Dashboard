@@ -767,12 +767,16 @@
                 <span class="node-name">{{ hs.name }}</span>
                 <span class="node-meta">{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else '' }}</span>
                 <button class="btn btn-info btn-sm"
-                        onclick="editHotspot('{{ hs.name }}','{{ hs.ip }}','{{ hs.user }}','{{ hs.pass }}','{{ hs.lat }}','{{ hs.lon }}','{{ hs.brandmeister_id }}','{{ hs.get('type', 'wpsd') }}','{{ hs.get('asl_node', '') }}')">
+                        data-name="{{ hs.name }}" data-ip="{{ hs.ip }}" data-user="{{ hs.user }}"
+                        data-pass="{{ hs.pass }}" data-lat="{{ hs.lat }}" data-lon="{{ hs.lon }}"
+                        data-bmid="{{ hs.brandmeister_id }}" data-type="{{ hs.get('type', 'wpsd') }}"
+                        data-asl-node="{{ hs.get('asl_node', '') }}"
+                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode)">
                     Edit
                 </button>
                 <form action="/api/delete_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
-                    <button class="btn btn-danger btn-sm"
-                            onclick="return confirm('Delete {{ hs.name }}?')">Delete</button>
+                    <button class="btn btn-danger btn-sm" data-name="{{ hs.name }}"
+                            onclick="return confirm('Delete ' + this.dataset.name + '?')">Delete</button>
                 </form>
             </div>
             {% endfor %}
@@ -973,10 +977,14 @@
                 <span class="node-name">{{ cam.name }}</span>
                 <span class="node-meta">{{ {'rtsp': 'RTSP', 'wyze': 'Wyze', 'bambu_a1': 'Bambu A1'}.get(cam.type, cam.type) }}</span>
                 <button class="btn btn-info btn-sm"
-                        onclick="editCamera('{{ cam.id }}','{{ cam.name }}','{{ cam.type }}','{{ cam.get('rtsp_url', '') }}','{{ cam.get('ip', '') }}','{{ cam.get('serial', '') }}','{{ cam.get('access_code', '') }}')">
+                        data-id="{{ cam.id }}" data-name="{{ cam.name }}" data-type="{{ cam.type }}"
+                        data-rtsp-url="{{ cam.get('rtsp_url', '') }}" data-ip="{{ cam.get('ip', '') }}"
+                        data-serial="{{ cam.get('serial', '') }}" data-access-code="{{ cam.get('access_code', '') }}"
+                        onclick="editCamera(this.dataset.id, this.dataset.name, this.dataset.type, this.dataset.rtspUrl, this.dataset.ip, this.dataset.serial, this.dataset.accessCode)">
                     Edit
                 </button>
-                <button class="btn btn-danger btn-sm" onclick="deleteCamera('{{ cam.id }}','{{ cam.name }}')">Delete</button>
+                <button class="btn btn-danger btn-sm" data-id="{{ cam.id }}" data-name="{{ cam.name }}"
+                        onclick="deleteCamera(this.dataset.id, this.dataset.name)">Delete</button>
             </div>
             {% else %}
             <p style="font-size:13px;color:var(--text-dim)">No cameras added yet.</p>
