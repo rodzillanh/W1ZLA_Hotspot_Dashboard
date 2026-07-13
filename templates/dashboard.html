@@ -996,6 +996,10 @@
         <span class="sysbar-val" id="sb-mem-val">—</span>
         <span style="color:var(--text-dim);font-size:10px" id="sb-mem-detail"></span>
     </div>
+    <div class="sysbar-item">
+        <span class="sysbar-label">Temp</span>
+        <span class="sysbar-val" id="sb-temp-val">—</span>
+    </div>
     <span class="sysbar-host" id="sb-host"></span>
 </div>
 
@@ -1438,6 +1442,11 @@ function updateSysbar(data) {
                 `${data.mem_used} / ${data.mem_total}`;
         }
     }
+
+    // No bar for temp (not a 0-100% quantity) -- just the value, same as
+    // "N/A" on hosts with no /sys/class/thermal/thermal_zone0 (most non-Pi
+    // Linux servers, most containers).
+    if (data.temp) document.getElementById('sb-temp-val').textContent = data.temp;
 }
 
 function fetchHostStats() {

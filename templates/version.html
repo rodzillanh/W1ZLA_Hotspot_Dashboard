@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.28</span>
+                <span class="release-version">v3.29</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Host CPU temperature in the sysbar</span> — the host stats bar (Settings → General, "Show host CPU &amp; memory bar") now shows a third value alongside CPU% and Memory: the temperature of the machine running the dashboard itself, read from the same <code>/sys/class/thermal/thermal_zone0/temp</code> sysfs path already used for per-hotspot temperature over SSH, just read locally. Shows "N/A" on hosts with no thermal zone (most non-Pi servers, most containers) the same way CPU/Memory already degrade gracefully there</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.28</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Settings page content now centered under the header</span> — the top bar and tab bar spanned the full window width, but the actual tab content was capped at 720px with no centering, so on a wide desktop monitor it hugged the left edge under a full-width header. Header and tab content now share one centered column (the bars themselves stay full-width for their background/border, just their inner content is centered to match)</li>

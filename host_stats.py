@@ -46,6 +46,7 @@ class HostStats:
         self._interval = interval
         self._lock     = threading.Lock()
         self._cpu:  str = "N/A"
+        self._temp: str = "N/A"
         self._mem_pct:  str = "N/A"
         self._mem_used: str = ""
         self._mem_total: str = ""
@@ -59,6 +60,7 @@ class HostStats:
         with self._lock:
             return {
                 "cpu":       self._cpu,
+                "temp":      self._temp,
                 "mem_pct":   self._mem_pct,
                 "mem_used":  self._mem_used,
                 "mem_total": self._mem_total,
@@ -69,10 +71,12 @@ class HostStats:
     def _loop(self) -> None:
         while True:
             try:
-                cpu = self._sample_cpu()
-                mem = self._sample_mem()
+                cpu  = self._sample_cpu()
+                temp = self._sample_temp()
+                mem  = self._sample_mem()
                 with self._lock:
                     self._cpu       = cpu
+                    self._temp      = temp
                     self._mem_pct   = mem["pct"]
                     self._mem_used  = mem["used"]
                     self._mem_total = mem["total"]
@@ -107,6 +111,22 @@ class HostStats:
             return "N/A"
         cpu_pct = (1 - (idle2 - idle1) / dt) * 100
         return f"{cpu_pct:.1f}%"
+
+    @staticmethod
+    def _sample_temp() -> str:
+        """Same sysfs path and millidegree-C format already used for the
+        per-hotspot temperature reading (config.py's SSH_STATUS_CMD /
+        monitor.py's _parse_temp) -- read locally here instead of over SSH,
+        for whatever host is actually running this app. Absent on non-Pi
+        Linux hosts without a thermal zone, and inside most containers
+        (Docker doesn't expose the host's own thermal zone by default) --
+        degrades to N/A the same way every other stat here does."""
+        try:
+            with open("/sys/class/thermal/thermal_zone0/temp") as f:
+                raw = f.read().strip()
+            return f"{int(raw) / 1000.0:.1f}°C"
+        except (OSError, ValueError):
+            return "N/A"
 
     @staticmethod
     def _sample_mem() -> dict:
