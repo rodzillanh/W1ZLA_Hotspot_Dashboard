@@ -286,6 +286,7 @@
 
 <div class="tab-bar">
     <div class="tab-btn active" id="tab-btn-general"      onclick="switchTab('general',      this)">General</div>
+    <div class="tab-btn"       id="tab-btn-cards"         onclick="switchTab('cards',        this)">Cards</div>
     <div class="tab-btn"       id="tab-btn-weather"       onclick="switchTab('weather',      this)">Weather</div>
     <div class="tab-btn"       id="tab-btn-integrations"  onclick="switchTab('integrations', this)">Integrations</div>
     <div class="tab-btn"       id="tab-btn-hotspots"      onclick="switchTab('hotspots',     this)">Hotspots</div>
@@ -323,90 +324,6 @@
                 <span class="toggle-label">Show toolbar links</span>
                 <div class="toggle {{ 'on' if settings.get('show_toolbar', True) else '' }}"
                      id="toolbar-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Show fleet activity card
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (adds a small SQLite log of completed transmissions)
-                    </span>
-                </span>
-                <div class="toggle {{ 'on' if settings.get('show_fleet_activity', False) else '' }}"
-                     id="fleet-activity-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Fleet activity time span</span>
-                <select id="fleet-activity-hours">
-                    {% set current_hours = settings.get('fleet_activity_hours', 12) %}
-                    <option value="3"  {{ 'selected' if current_hours == 3  else '' }}>Last 3 hours</option>
-                    <option value="6"  {{ 'selected' if current_hours == 6  else '' }}>Last 6 hours</option>
-                    <option value="12" {{ 'selected' if current_hours == 12 else '' }}>Last 12 hours</option>
-                    <option value="24" {{ 'selected' if current_hours == 24 else '' }}>Last 24 hours</option>
-                    <option value="48" {{ 'selected' if current_hours == 48 else '' }}>Last 48 hours</option>
-                </select>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Show ASL favorites &amp; control card
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (connect/disconnect ASL3 links from the dashboard)
-                    </span>
-                </span>
-                <div class="toggle {{ 'on' if settings.get('show_asl_favorites', False) else '' }}"
-                     id="asl-favorites-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Show APRS Messages card
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (incoming APRS-IS messages to your callsign — set below in Integrations)
-                    </span>
-                </span>
-                <div class="toggle {{ 'on' if settings.get('aprs_inbox_enabled', False) else '' }}"
-                     id="aprs-inbox-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Show HF Conditions card
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (solar/band propagation data from N0NBH, no API key needed)
-                    </span>
-                </span>
-                <div class="toggle {{ 'on' if settings.get('show_hf_conditions', False) else '' }}"
-                     id="hf-conditions-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Show Band Plan card
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (General/Extra HF privileges reference, static data, no API)
-                    </span>
-                </span>
-                <div class="toggle {{ 'on' if settings.get('show_band_plan', False) else '' }}"
-                     id="band-plan-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Show License Quiz card
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (one random Extra-class practice question, rotates every ~10 min)
-                    </span>
-                </span>
-                <div class="toggle {{ 'on' if settings.get('show_license_quiz', False) else '' }}"
-                     id="license-quiz-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Show Band Activity card
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (live WSPR spot activity near your station, 160m-6m -- needs a station grid square below)
-                    </span>
-                </span>
-                <div class="toggle {{ 'on' if settings.get('show_wspr_activity', False) else '' }}"
-                     id="wspr-activity-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Station grid square
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (Maidenhead locator, e.g. FN42 -- centers the Band Activity card's 500km radius)
-                    </span>
-                </span>
-                <input type="text" id="station-grid-input" placeholder="FN42" maxlength="6"
-                       style="width:90px;text-transform:uppercase"
-                       value="{{ settings.get('station_grid', '') }}">
             </div>
         </div>
         <button class="btn btn-primary" onclick="saveAppearance()">Save appearance</button>
@@ -476,6 +393,114 @@
             <button class="btn btn-primary" onclick="saveLinks()">Save toolbar links</button>
             <span class="status-txt" id="links-status"></span>
         </div>
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     CARDS TAB
+     On/off switches for every optional dashboard card --
+     split out of General -> Appearance once it grew to 7
+     near-identical "Show X card" toggles.
+═══════════════════════════════════════════════ -->
+<div id="panel-cards" class="tab-panel">
+
+    <div class="section">
+        <div class="section-title">Optional dashboard cards</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            Each card is off by default. Where a card also needs a credential or
+            other setting (e.g. APRS Messages' callsign), that lives in the
+            Integrations tab — these toggles just turn the card on or off, and set
+            its position in the <a href="#" onclick="switchTab('hotspots', document.getElementById('tab-btn-hotspots')); return false;">Card order list</a> (Hotspots tab).
+        </p>
+        <div class="toggle-group">
+            <div class="toggle-row">
+                <span class="toggle-label">Show fleet activity card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (adds a small SQLite log of completed transmissions)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_fleet_activity', False) else '' }}"
+                     id="fleet-activity-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Fleet activity time span</span>
+                <select id="fleet-activity-hours">
+                    {% set current_hours = settings.get('fleet_activity_hours', 12) %}
+                    <option value="3"  {{ 'selected' if current_hours == 3  else '' }}>Last 3 hours</option>
+                    <option value="6"  {{ 'selected' if current_hours == 6  else '' }}>Last 6 hours</option>
+                    <option value="12" {{ 'selected' if current_hours == 12 else '' }}>Last 12 hours</option>
+                    <option value="24" {{ 'selected' if current_hours == 24 else '' }}>Last 24 hours</option>
+                    <option value="48" {{ 'selected' if current_hours == 48 else '' }}>Last 48 hours</option>
+                </select>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show ASL favorites &amp; control card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (connect/disconnect ASL3 links from the dashboard)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_asl_favorites', False) else '' }}"
+                     id="asl-favorites-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show APRS Messages card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (incoming APRS-IS messages to your callsign — set in Integrations)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('aprs_inbox_enabled', False) else '' }}"
+                     id="aprs-inbox-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show HF Conditions card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (solar/band propagation data from N0NBH, no API key needed)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_hf_conditions', False) else '' }}"
+                     id="hf-conditions-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show Band Plan card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (General/Extra HF privileges reference, static data, no API)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_band_plan', False) else '' }}"
+                     id="band-plan-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show License Quiz card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (one random Extra-class practice question, rotates every ~10 min)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_license_quiz', False) else '' }}"
+                     id="license-quiz-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show Band Activity card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (live WSPR spot activity near your station, 160m-6m -- needs a station grid square below)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_wspr_activity', False) else '' }}"
+                     id="wspr-activity-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Station grid square
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (Maidenhead locator, e.g. FN42 -- centers the Band Activity card's 500km radius)
+                    </span>
+                </span>
+                <input type="text" id="station-grid-input" placeholder="FN42" maxlength="6"
+                       style="width:90px;text-transform:uppercase"
+                       value="{{ settings.get('station_grid', '') }}">
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveCards()">Save cards</button>
+        <span class="status-txt" id="cards-status"></span>
     </div>
 
 </div>
@@ -1166,6 +1191,20 @@ function saveAppearance() {
             dark_mode:       darkMode,
             show_host_stats: document.getElementById('host-stats-toggle').classList.contains('on'),
             show_toolbar:    document.getElementById('toolbar-toggle').classList.contains('on'),
+        })
+    }).then(() => {
+        const el = document.getElementById('appearance-status');
+        el.textContent = '✓ Saved';
+        setTimeout(() => el.textContent = '', 2000);
+    });
+}
+
+// --- optional dashboard cards (Cards tab) ---
+function saveCards() {
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
             show_fleet_activity: document.getElementById('fleet-activity-toggle').classList.contains('on'),
             fleet_activity_hours: parseInt(document.getElementById('fleet-activity-hours').value, 10),
             show_asl_favorites: document.getElementById('asl-favorites-toggle').classList.contains('on'),
@@ -1177,7 +1216,7 @@ function saveAppearance() {
             station_grid: document.getElementById('station-grid-input').value.trim(),
         })
     }).then(() => {
-        const el = document.getElementById('appearance-status');
+        const el = document.getElementById('cards-status');
         el.textContent = '✓ Saved';
         setTimeout(() => el.textContent = '', 2000);
     });

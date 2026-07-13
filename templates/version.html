@@ -98,9 +98,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.22</span>
+                <span class="release-version">v3.23</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>New Cards tab in Settings</span> — the General → Appearance section had grown to 12 toggle-rows, 7 of them near-identical "Show X card" switches (Fleet Activity, ASL Favorites, APRS Messages, HF Conditions, Band Plan, License Quiz, Band Activity) that had nothing to do with appearance. Split into its own Cards tab, leaving Appearance with just light/dark mode, the host stats bar, and toolbar links</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.22</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Bugfix — couldn't Edit/Delete a hotspot or camera with an apostrophe (or other quote character) in its name, SSH username, or SSH password</span> — the Edit/Delete buttons built their click handler by interpolating those values directly into a JavaScript string literal in the HTML (e.g. <code>onclick="editHotspot('...')"</code>); a single quote in any of those fields broke the JS syntax and made the button silently do nothing. Fixed by moving those values into <code>data-*</code> attributes instead (safe from this specific bug, since they're never parsed as JS) and reading them back via <code>this.dataset</code> in the click handler</li>
@@ -751,7 +761,8 @@
         <div class="feature-group">
             <div class="feature-group-title">Settings</div>
             <ul class="feature-list">
-                <li><span>General tab</span> — dashboard name, dark/light mode toggle, toolbar links, host stats, fleet activity, ASL Favorites, APRS Messages, HF Conditions, Band Plan, License Quiz, and Band Activity card toggles (plus a station grid square field for Band Activity), and (Raspberry Pi standalone installs only) host reboot/power-off buttons</li>
+                <li><span>General tab</span> — dashboard name, dark/light mode toggle, host stats, toolbar links, software update settings, and (Raspberry Pi standalone installs only) host reboot/power-off buttons</li>
+                <li><span>Cards tab</span> — on/off toggle for every optional dashboard card (fleet activity, ASL Favorites, APRS Messages, HF Conditions, Band Plan, License Quiz, Band Activity), plus each card's own sub-setting (fleet activity time span, station grid square for Band Activity)</li>
                 <li><span>Weather tab</span> — location and °F/°C unit toggle</li>
                 <li><span>Integrations tab</span> — QRZ.com, RadioID.net, APRS.fi, Home Assistant MQTT, and APRS favorite alert credentials/toggles with connection tests</li>
                 <li>Hotspots tab — card order, add/edit/delete hotspots with SSH connection test, optional lat/lon and Brandmeister ID per hotspot</li>

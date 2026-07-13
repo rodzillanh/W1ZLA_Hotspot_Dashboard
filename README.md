@@ -535,7 +535,7 @@ LAN.
 
 ## ASL Favorites & Control
 
-Optional dashboard card (Settings → General → "Show ASL favorites &
+Optional dashboard card (Settings → Cards → "Show ASL favorites &
 control card", off by default), inspired by
 [AllScan](https://github.com/davidgsd/AllScan)'s favorites/scan/connect
 model. Lets you keep a list of ASL node numbers you care about (a
@@ -702,7 +702,7 @@ a proper APRS message.
 
 ## APRS Messages card
 
-Optional dashboard card (Settings → General → "Show APRS Messages card",
+Optional dashboard card (Settings → Cards → "Show APRS Messages card",
 off by default) — the receiving half of APRS favorite alerts above: a
 persistent APRS-IS connection, logged in as the same callsign already set
 for outbound alerts (Settings → Integrations), that shows real incoming
@@ -728,7 +728,7 @@ Favorites/Camera cards — position it anywhere in the same drag-and-drop
 
 ## HF Conditions card
 
-Optional dashboard card (Settings → General → "Show HF Conditions
+Optional dashboard card (Settings → Cards → "Show HF Conditions
 card", off by default) — solar and band propagation data from
 [N0NBH's free public feed](https://www.hamqsl.com/solar.html), no API
 key or signup needed. Same treatment as every other extra card: one
@@ -752,7 +752,7 @@ list.
 
 ## Band Plan card
 
-Optional dashboard card (Settings → General → "Show Band Plan card", off
+Optional dashboard card (Settings → Cards → "Show Band Plan card", off
 by default) — a static FCC Part 97.301 frequency/mode reference for the
 HF bands, General and Extra class privileges shown together on one card.
 No network client at all — the only card in the app with no Python
@@ -770,7 +770,7 @@ module of its own, just data baked into the template.
 
 ## License Quiz card
 
-Optional dashboard card (Settings → General → "Show License Quiz card",
+Optional dashboard card (Settings → Cards → "Show License Quiz card",
 off by default) — one random Amateur Extra (Element 4) practice question
 at a time, auto-rotating to a new one every ~10 minutes, or on demand via
 "New Question". Pool data is bundled server-side (`license_quiz.py`,
@@ -796,7 +796,7 @@ each poll fetches exactly one question.
 
 ## Band Activity card
 
-Optional dashboard card (Settings → General → "Show Band Activity card",
+Optional dashboard card (Settings → Cards → "Show Band Activity card",
 off by default, needs a **station grid square** set below the toggle) —
 live WSPR beacon-spot activity within 500km of your station, for six
 band groups (160m, 80-40m, 30-20m, 17-15m, 12-10m, 6m — the same
@@ -809,7 +809,7 @@ data than HF Conditions: real observed spot counts from
   which swings with whatever happened to transmit in the last few
   minutes. Hover any sparkline for its peak value/hour.
 - **Localized to your station** — set a Maidenhead grid square (e.g.
-  `FN42`) in Settings → General; the dashboard converts it to lat/lon
+  `FN42`) in Settings → Cards; the dashboard converts it to lat/lon
   server-side and filters WSPR Live's data to receivers within 500km.
   Without a grid square set, the card shows an "unavailable" message
   instead of guessing a location.
@@ -879,7 +879,7 @@ appear as pins — the QRZ subscription caveat above applies here too.
   preference (`localStorage`), same reasoning as the map height.
 ## Fleet activity
 
-Optional — off by default (Settings → General → "Show fleet activity
+Optional — off by default (Settings → Cards → "Show fleet activity
 card"), since it adds a small SQLite log (`activity.db` in the appdata
 folder alongside `hotspots.json`) and a write on every completed
 transmission. Once enabled, a "Fleet activity" card appears on the
@@ -899,7 +899,7 @@ By default the card appears first, before any hotspot cards. Its position
 is part of the same drag-and-drop **Card order** list as the hotspot cards
 (Settings → Hotspots) — drag it anywhere in that list to move it.
 
-**Time span** — Settings → General → "Fleet activity time span" — 3, 6, 12
+**Time span** — Settings → Cards → "Fleet activity time span" — 3, 6, 12
 (default), 24, or 48 hours. The chart's bucket width scales with the
 selected span (5 to 60 minutes) so it always renders roughly the same
 number of points rather than getting denser or sparser as the span changes.
