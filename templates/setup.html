@@ -42,13 +42,21 @@
             min-height: 100vh;
         }
 
-        /* --- top bar --- */
+        /* --- top bar ---
+           Full-width background/border, but the actual content sits in a
+           centered inner wrapper capped at the same width as .tab-panel --
+           without this, the header spanned edge-to-edge while the content
+           below it hugged the left edge on any wide screen. */
         .top-bar {
+            border-bottom: 1px solid var(--card-border);
+        }
+        .top-bar-inner {
+            max-width: 720px;
+            margin: 0 auto;
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 14px 20px;
-            border-bottom: 1px solid var(--card-border);
         }
         .page-title { font-size: 17px; font-weight: 500; }
         .back-link {
@@ -58,13 +66,17 @@
         }
         .back-link:hover { text-decoration: underline; }
 
-        /* --- tab bar --- */
+        /* --- tab bar (same full-width-bar/centered-inner split as top-bar) --- */
         .tab-bar {
+            border-bottom: 1px solid var(--card-border);
+            background: var(--bg);
+        }
+        .tab-bar-inner {
+            max-width: 720px;
+            margin: 0 auto;
             display: flex;
             gap: 2px;
             padding: 0 20px;
-            border-bottom: 1px solid var(--card-border);
-            background: var(--bg);
         }
         .tab-btn {
             padding: 10px 18px;
@@ -81,7 +93,7 @@
         }
 
         /* --- tab panels --- */
-        .tab-panel { display: none; padding: 20px; max-width: 720px; }
+        .tab-panel { display: none; padding: 20px; max-width: 720px; margin: 0 auto; }
         .tab-panel.active { display: block; }
 
         /* --- sections --- */
@@ -280,19 +292,23 @@
 <body>
 
 <div class="top-bar">
-    <div class="page-title">⚙ Settings</div>
-    <a class="back-link" href="/">← Back to dashboard</a>
+    <div class="top-bar-inner">
+        <div class="page-title">⚙ Settings</div>
+        <a class="back-link" href="/">← Back to dashboard</a>
+    </div>
 </div>
 
 <div class="tab-bar">
-    <div class="tab-btn active" id="tab-btn-general"      onclick="switchTab('general',      this)">General</div>
-    <div class="tab-btn"       id="tab-btn-cards"         onclick="switchTab('cards',        this)">Cards</div>
-    <div class="tab-btn"       id="tab-btn-weather"       onclick="switchTab('weather',      this)">Weather</div>
-    <div class="tab-btn"       id="tab-btn-integrations"  onclick="switchTab('integrations', this)">Integrations</div>
-    <div class="tab-btn"       id="tab-btn-hotspots"      onclick="switchTab('hotspots',     this)">Hotspots</div>
-    <div class="tab-btn"       id="tab-btn-cameras"       onclick="switchTab('cameras',      this)">Cameras</div>
-    <div class="tab-btn"       id="tab-btn-favorites"     onclick="switchTab('favorites',    this)">Favorites</div>
-    <div class="tab-btn"       id="tab-btn-version"       onclick="switchTab('version',      this)">Version info</div>
+    <div class="tab-bar-inner">
+        <div class="tab-btn active" id="tab-btn-general"      onclick="switchTab('general',      this)">General</div>
+        <div class="tab-btn"       id="tab-btn-cards"         onclick="switchTab('cards',        this)">Cards</div>
+        <div class="tab-btn"       id="tab-btn-weather"       onclick="switchTab('weather',      this)">Weather</div>
+        <div class="tab-btn"       id="tab-btn-integrations"  onclick="switchTab('integrations', this)">Integrations</div>
+        <div class="tab-btn"       id="tab-btn-hotspots"      onclick="switchTab('hotspots',     this)">Hotspots</div>
+        <div class="tab-btn"       id="tab-btn-cameras"       onclick="switchTab('cameras',      this)">Cameras</div>
+        <div class="tab-btn"       id="tab-btn-favorites"     onclick="switchTab('favorites',    this)">Favorites</div>
+        <div class="tab-btn"       id="tab-btn-version"       onclick="switchTab('version',      this)">Version info</div>
+    </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════

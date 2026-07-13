@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.27</span>
+                <span class="release-version">v3.28</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Settings page content now centered under the header</span> — the top bar and tab bar spanned the full window width, but the actual tab content was capped at 720px with no centering, so on a wide desktop monitor it hugged the left edge under a full-width header. Header and tab content now share one centered column (the bars themselves stay full-width for their background/border, just their inner content is centered to match)</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.27</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Card order moved from Hotspots to Cards tab</span> — the Hotspots tab's "Card order" section was actually a drag list for every card on the dashboard (Fleet Activity, cameras, all the optional cards), not just hotspots, which didn't match the tab's name or job. Moved it to the Cards tab (right below the on/off toggles it now sits next to), leaving Hotspots with a plain add/edit/delete list of just your hotspots — the same split already used for Cameras (its own tab manages cameras; the Card order list just positions them)</li>
