@@ -707,6 +707,38 @@ config for per-integration credentials; put it in
   `"asl_node": "59929; rm -rf /"` — the field comes back `None` (stripped
   by `.pop()`), not the injected string.
 
+- **The app is served by `waitress`, not Flask's own dev server (`app.run()`)
+  — and it must stay single-process.** `app.py`'s `main()` owns a single
+  global `FleetMonitor` (its own background SSH-polling threads),
+  `camera_stream.py`'s per-camera ffmpeg workers, and `aprs_inbox.py`'s
+  persistent APRS-IS socket, all as in-process singletons. A typical
+  production WSGI setup (e.g. `gunicorn --workers N`) forks N separate
+  processes, each of which would spin up its *own* independent copy of all
+  of that — N× redundant SSH polling of every hotspot, N× redundant
+  APRS-IS logins (real risk of getting rate-limited/kicked), N× redundant
+  ffmpeg processes per viewed camera. `waitress.serve(app, ...)` has no
+  multi-process/worker concept at all (only `threads=`, currently
+  `config.WAITRESS_THREADS`), which was the deciding factor over gunicorn
+  — there's no flag to accidentally misconfigure into duplicating this
+  state. If a future change ever needs true multi-process scaling, the
+  background-thread ownership model in `app.py`/`monitor.py`/
+  `camera_stream.py`/`aprs_inbox.py` would need to move out of the web
+  process entirely (a separate poller process publishing to shared
+  storage) — don't just add `--workers` to the server invocation.
+  `WAITRESS_THREADS` defaults to 16, well above waitress's own default of
+  4, because each open camera MJPEG stream
+  (`camera_stream.py`'s `stream()` generator) holds a thread for its
+  entire viewing duration on top of normal dashboard polling from any
+  number of browser tabs — confirmed by tracing `api_camera_feed()`'s
+  `Response(camera_manager.stream(camera), mimetype="multipart/x-mixed-
+  replace...")` before making the switch, not assumed. waitress has no
+  built-in TLS/HTTPS support at all (confirmed by inspecting its actual
+  `Adjustments` class, not from memory/docs) — if HTTPS is ever added,
+  it's via a reverse proxy in front (Traefik/nginx/Caddy) terminating TLS
+  and forwarding plain HTTP, using waitress's `trusted_proxy`/
+  `trusted_proxy_headers` options so `request.remote_addr` reflects the
+  real client IP rather than the proxy's.
+
 ## Testing patterns used throughout this project
 
 No test suite/framework is set up — verification has been done ad hoc but

@@ -10,6 +10,7 @@ import time
 import uuid
 
 import paramiko
+import waitress
 from flask import Flask, jsonify, render_template, request, redirect, Response
 
 import config
@@ -1094,7 +1095,12 @@ def main():
     threading.Thread(target=monitor.run_slow_checks_forever, daemon=True).start()
     threading.Thread(target=_mqtt_publish_loop, daemon=True).start()
     threading.Thread(target=_aprs_alert_loop, daemon=True).start()
-    app.run(host=config.HOST, port=config.PORT)
+    # waitress, not Flask's own dev server -- see CLAUDE.md gotcha on why
+    # this must stay a single process (no --workers-style forking): the
+    # FleetMonitor/camera/APRS-inbox background threads started above are
+    # all in-process singletons, and a second process would duplicate every
+    # SSH poll, ffmpeg camera worker, and APRS-IS login.
+    waitress.serve(app, host=config.HOST, port=config.PORT, threads=config.WAITRESS_THREADS)
 
 
 if __name__ == "__main__":

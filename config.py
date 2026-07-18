@@ -12,6 +12,11 @@ CAMERAS_FILE = os.path.join(CONFIG_DIR, "cameras.json")
 # --- Server ---
 HOST = "0.0.0.0"
 PORT = int(os.environ.get("PORT", 5000))
+# waitress's default (4) is sized for typical request/response traffic --
+# too low here, since each open camera MJPEG stream (camera_stream.py) holds
+# a thread for its entire viewing duration on top of normal dashboard
+# polling from any number of browser tabs.
+WAITRESS_THREADS = int(os.environ.get("WAITRESS_THREADS", 16))
 
 # --- Polling ---
 POLL_INTERVAL      = int(os.environ.get("POLL_INTERVAL", 5))

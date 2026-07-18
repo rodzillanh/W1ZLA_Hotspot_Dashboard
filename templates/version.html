@@ -105,9 +105,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.30</span>
+                <span class="release-version">v3.31</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Light/dark toggle on the main dashboard</span> — a sun/moon button in the toolbar flips the theme instantly and saves it, no trip to Settings needed. The old toggle in Settings → General was removed since it's now redundant</li>
+                <li><span>Fixed renamed hotspots not updating on the dashboard</span> — renaming a hotspot in Settings updated the config file immediately, but the running monitor kept showing the old name in its live status until the app restarted. Now synced every poll cycle</li>
+                <li><span>Switched to a production WSGI server (waitress)</span> — replaces Flask's own development server, which upstream explicitly warns against using in production. Runs single-process (required — see the background-thread ownership notes in CLAUDE.md for why a typical multi-worker setup would silently duplicate every SSH poll, camera stream, and APRS-IS connection), with a generous thread pool sized for concurrent camera streams plus normal dashboard polling</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.30</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Backup &amp; restore</span> — new Settings → Backup tab exports Hotspots, Favorites, ASL Favorites, Cameras, and Settings (your choice, any combination) as one combined JSON file, and imports that file back — on this dashboard or a different one. Import previews what's in the file before applying anything, and offers "Add &amp; update" (keep what you have, add/update from the file) or "Replace" (checked categories become exactly what's in the file) modes. Categories containing plain-text credentials are flagged before export so you know to handle the file carefully</li>
