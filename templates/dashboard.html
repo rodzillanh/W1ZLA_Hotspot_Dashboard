@@ -135,6 +135,34 @@
         .update-indicator svg { display: block; width: 15px; height: 15px; }
         @keyframes update-flash { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
 
+        .theme-toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            margin-right: 8px;
+            background: var(--toolbar-btn);
+            border: 1px solid var(--toolbar-border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            cursor: pointer;
+            align-self: center;
+            transition: background .15s, color .15s;
+        }
+        .theme-toggle-btn:hover { background: var(--card-bg); color: var(--text); }
+        .theme-toggle-btn svg { display: block; width: 15px; height: 15px; }
+        /* Icon reflects the CURRENT theme (sun while light, moon while dark) --
+           default (no [data-theme] override) matches the dark-mode :root
+           values used throughout this file, so the moon is the default-visible
+           icon and light mode flips it via the same [data-theme="light"]
+           selector every other themed rule in this file already uses. */
+        .theme-toggle-btn .icon-sun  { display: none; }
+        .theme-toggle-btn .icon-moon { display: block; }
+        [data-theme="light"] .theme-toggle-btn .icon-sun  { display: block; }
+        [data-theme="light"] .theme-toggle-btn .icon-moon { display: none; }
+
         /* --- system bar (host CPU + memory) --- */
         .sysbar {
             display: flex;
@@ -976,6 +1004,16 @@
     {% endfor %}
     {% endif %}
     <span class="toolbar-sep"></span>
+    <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleDashboardTheme()"
+            title="Toggle light/dark mode" aria-label="Toggle light/dark mode">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+        </svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 1020.354 15.354z"/>
+        </svg>
+    </button>
     <a class="update-indicator" id="update-indicator" href="/setup#version" title="Update available">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M13 2 3 14h7l-1 8 11-14h-7l1-8z" fill="#FFCC4D" stroke="#664500" stroke-width="1" stroke-linejoin="round"/>
@@ -1421,6 +1459,18 @@ const LICENSE_QUIZ_POLL_MS = 10 * 60 * 1000;  // auto-rotate to a new random que
 const SHOW_WSPR_ACTIVITY = {{ 'true' if settings.get('show_wspr_activity', False) else 'false' }};
 const WSPR_ACTIVITY_POSITION = {{ settings.get('wspr_activity_position', 0) }};
 const WSPR_ACTIVITY_POLL_MS = 30 * 60 * 1000;  // matches wspr_activity.py's server-side cache TTL
+
+// --- theme toggle (toolbar) ---
+function toggleDashboardTheme() {
+    const html = document.documentElement;
+    const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    html.setAttribute('data-theme', next);
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ dark_mode: next === 'dark' })
+    });
+}
 
 function updateSysbar(data) {
     if (!SHOW_HOST_STATS) return;
