@@ -81,6 +81,18 @@ def build_asl_status_cmd(node: str) -> str:
     return _LINUX_HOST_STATS_CMD + f'sudo asterisk -rx "rpt xnode {node}"'
 
 
+# DigiPi (KM6LYW's Raspberry Pi ham radio data hotspot) -- Direwolf isn't a
+# systemd service on a real device, it's a plain background process logging
+# to /run/direwolf.log; confirmed against a real DigiPi before writing this
+# (see digipi.py's module docstring). 100 lines is generous enough to
+# reliably catch several packets between polls at the default 5s interval.
+DIGIPI_LOG_TAIL_LINES = 100
+
+
+def build_digipi_status_cmd() -> str:
+    return _LINUX_HOST_STATS_CMD + f"tail -n {DIGIPI_LOG_TAIL_LINES} /run/direwolf.log 2>/dev/null"
+
+
 # ASL3 ilink function codes for `rpt cmd <node> ilink <code> <remotenode>` --
 # NOT the DTMF-simulated `rpt fun <node> *3<remotenode>` form, which requires
 # replicating app_rpt's DTMF digit-collection state machine and proved
@@ -295,6 +307,18 @@ DEFAULT_SETTINGS = {
     # the same single-sentinel scheme as Fleet Activity/ASL Favorites.
     "aprs_inbox_enabled": False,
     "aprs_inbox_position": 0,
+    # DigiPi card -- off by default. SSH connection details for a single
+    # DigiPi (digipi.py polls Direwolf's /run/direwolf.log for APRS
+    # activity + the same generic Linux temp/CPU/uptime stats every
+    # hotspot already shows). Single-device config, same precedent as
+    # station_grid/aprs_msg_callsign, not a hotspots.json-style list --
+    # this project only has one to support right now. Position uses the
+    # same single-sentinel scheme as Fleet Activity/ASL Favorites/etc.
+    "digipi_enabled": False,
+    "digipi_ip": "",
+    "digipi_user": "",
+    "digipi_pass": "",
+    "digipi_position": 0,
     # HF Conditions card -- off by default. Solar/band propagation data
     # from N0NBH's free public feed (hf_conditions.py), no API key.
     # Position among the hotspot cards uses the same single-sentinel

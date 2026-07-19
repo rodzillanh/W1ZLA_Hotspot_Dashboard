@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.34</span>
+                <span class="release-version">v3.35</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>DigiPi card</span> — new dedicated card (Settings → Cards to enable, → Integrations for SSH connection details) for a <a href="https://digipi.org/" target="_blank" rel="noopener">DigiPi</a> APRS/Direwolf hotspot: recent packet activity (direction, callsign, type, payload) polled from its Direwolf log, plus a live mirror of the DigiPi's own screen. Built and verified against a real device — supports one DigiPi for now; FLDigi and Winlink (also bundled with DigiPi) aren't covered yet</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.34</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Hotspot uptime badge</span> — each card now shows how long the underlying host has been up ("⏱ 3d 2h") in the top-right corner, next to the name. The data was already being fetched every poll cycle for the temp/CPU stats, just never displayed; hover the badge for the exact value</li>

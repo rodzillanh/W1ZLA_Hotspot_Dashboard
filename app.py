@@ -36,6 +36,7 @@ from camera_stream import CameraStreamManager
 from hf_conditions import HfConditionsClient
 from license_quiz import LicenseQuizPool
 from wspr_activity import WsprActivityClient
+from digipi import DigipiMonitor
 
 import host_stats as host_stats_mod
 
@@ -49,6 +50,7 @@ hf_conditions   = HfConditionsClient()
 camera_manager  = CameraStreamManager()
 license_quiz    = LicenseQuizPool()
 wspr_activity   = WsprActivityClient()
+digipi_monitor  = DigipiMonitor()
 
 # Gates the Settings "Host power control" buttons -- only true on a
 # standalone install running directly on real Raspberry Pi hardware (see
@@ -282,6 +284,19 @@ def api_settings_post():
     if "aprs_inbox_position" in data:
         try:
             settings["aprs_inbox_position"] = max(0, int(data["aprs_inbox_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "digipi_enabled" in data:
+        settings["digipi_enabled"] = bool(data["digipi_enabled"])
+    if "digipi_ip" in data:
+        settings["digipi_ip"] = data["digipi_ip"].strip()
+    if "digipi_user" in data:
+        settings["digipi_user"] = data["digipi_user"].strip()
+    if "digipi_pass" in data:
+        settings["digipi_pass"] = data["digipi_pass"]
+    if "digipi_position" in data:
+        try:
+            settings["digipi_position"] = max(0, int(data["digipi_position"]))
         except (TypeError, ValueError):
             pass
     if "show_hf_conditions" in data:
@@ -745,6 +760,15 @@ def api_aprs_inbox():
     return jsonify(status)
 
 
+@app.route("/api/digipi")
+def api_digipi():
+    """DigiPi connection status + recent parsed Direwolf/APRS activity --
+    see digipi.py."""
+    status = digipi_monitor.status()
+    status["packets"] = digipi_monitor.packets()
+    return jsonify(status)
+
+
 @app.route("/api/test_mqtt", methods=["POST"])
 def test_mqtt():
     """Test MQTT broker connectivity for the Settings 'Test' button."""
@@ -1102,6 +1126,7 @@ def main():
     threading.Thread(target=monitor.run_slow_checks_forever, daemon=True).start()
     threading.Thread(target=_mqtt_publish_loop, daemon=True).start()
     threading.Thread(target=_aprs_alert_loop, daemon=True).start()
+    threading.Thread(target=digipi_monitor.run_forever, daemon=True).start()
     # waitress, not Flask's own dev server -- see CLAUDE.md gotcha on why
     # this must stay a single process (no --workers-style forking): the
     # FleetMonitor/camera/APRS-inbox background threads started above are

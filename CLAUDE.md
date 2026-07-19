@@ -69,6 +69,19 @@ wspr_activity.py  WsprActivityClient: live WSPR beacon-spot counts from
                    cards group bands the same way. Cached per-grid-
                    square, same pattern as hf_conditions.py otherwise.
 
+digipi.py          DigipiMonitor: SSH-polls a DigiPi's Direwolf log
+                   (/run/direwolf.log, NOT a systemd service -- a plain
+                   background process) for APRS activity. Deliberately a
+                   DEDICATED card, not a hotspot type -- a digipeater has
+                   no single "active call" the way WPSD/ASL3 do, so it
+                   doesn't reuse HotspotStatus/monitor.py at all. Own
+                   settings.json keys (digipi_*), own /api/digipi route,
+                   own background thread in app.py's main(). See the
+                   Hard-won gotchas section below before touching the
+                   packet-line parser -- it's built against two real
+                   captured log samples, not DigiPi's own docs (which
+                   don't document the log format at all).
+
 host_stats.py, weather.py
                    Small standalone pollers (host CPU/mem, Open-Meteo).
                    host_stats.py also has is_pi_standalone() (checks
@@ -800,6 +813,57 @@ config for per-integration credentials; put it in
   fixing, not assumed. Any future badge added to that corner (uptime was
   the third) goes inside `.card-header-right`, never as a fourth bare
   sibling, or the spreading bug comes back.
+
+- **DigiPi's Direwolf process is NOT a systemd service — assume it's a
+  plain background process started by a shell script, not `systemctl`.**
+  Confirmed against a real DigiPi (`ps aux` showed `/bin/bash -x
+  /home/pi/direwolf.tnc.sh` → `direwolf ...`, and `systemctl list-units
+  --state=running` didn't show it at all) before writing `digipi.py` —
+  DigiPi's own docs don't mention this. It logs to `/run/direwolf.log`
+  (not `/var/log/...`), which is only reliable because `direwatch.py`
+  (bundled with DigiPi, drives the device's physical screen) already
+  depends on that exact path staying put.
+- **DigiPi's port-8055 web app is DigiPi's own custom "WebChat" UI
+  (Flask/SocketIO), not the unrelated open-source `aprsd` project** —
+  `systemctl status aprsd` returns "unit could not be found" on a real
+  device even though the port matches aprsd's common default. Don't
+  assume a port number implies a specific known project; this was
+  checked directly (`curl` the page, read what it actually serves)
+  before concluding anything about it.
+- **`digipi.py`'s packet-line regex (`^\[([\w.>]+)\]\s+([\w-]+)>([^:]+):
+  (.*)$`) was built against two real captured `/run/direwolf.log`
+  excerpts (30 and 150 lines, spanning many repeats), not DigiPi's/
+  Direwolf's own docs, which don't document this exact text format at
+  all.** Confirmed three tag forms: `[0.N]` (heard directly on RF),
+  `[ig]` (received from the APRS-IS internet feed), `[ig>tx]` (heard on
+  RF, gated out to the internet) — plus non-packet lines that must NOT
+  match (`DCD 0 = 0/1` carrier-detect toggles, `<CALL> audio level = ...`
+  diagnostics + its 3-line "input too high" warning, blank lines). The
+  regex's job is entirely to let packet lines through and let everything
+  else fail to match — there's no separate exclusion list, so a change
+  that makes the regex too permissive would silently start showing
+  diagnostic noise as if it were packet data. Re-verify against a fresh
+  real capture (not memory of the format) before loosening this pattern.
+- **APRS position payloads (the `@`/`!`/`=`-prefixed text after the
+  packet's `:`) are deliberately NOT decoded into lat/lon — shown as raw
+  text.** The digipeater's own beacon uses APRS's compressed position
+  format (e.g. `!R8\&Q<R\`C&`), which is real, fiddly binary-ish encoding
+  this project hasn't verified the way `wspr_activity.py`'s
+  `grid_to_latlon()` was verified against a real row before being
+  trusted. Decoding it wrong would mean showing an incorrect position on
+  a map — a worse failure than just not showing a position. Don't add
+  position decoding here without the same real-data verification
+  discipline used everywhere else in this file.
+- **`direwatch.php`'s screen-mirror image needs no new backend code at
+  all — confirmed by `curl`ing the real page before assuming otherwise.**
+  It's a plain `<canvas>` that loads `/direwatch.png` (unauthenticated
+  static image) and refreshes it via a cache-busted `img.src` every
+  1000ms. `dashboard.html` just points an `<img>` at
+  `http://{DIGIPI_IP}/direwatch.png?t=<timestamp>` directly from the
+  browser, same "link straight to the device's own web UI" pattern
+  already used for `href="http://${hs.ip}"` on WPSD cards — no proxying,
+  no new route, same trusted-LAN assumption already documented elsewhere
+  in this file.
 
 ## Testing patterns used throughout this project
 

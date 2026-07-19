@@ -556,6 +556,15 @@
                        style="width:90px;text-transform:uppercase"
                        value="{{ settings.get('station_grid', '') }}">
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show DigiPi card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (APRS/Direwolf activity + screen mirror -- needs connection details in Integrations)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('digipi_enabled', False) else '' }}"
+                     id="digipi-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveCards()">Save cards</button>
         <span class="status-txt" id="cards-status"></span>
@@ -576,6 +585,7 @@
             {% set band_plan_pos = settings.get('band_plan_position', 0) if settings.get('show_band_plan', False) else -1 %}
             {% set license_quiz_pos = settings.get('license_quiz_position', 0) if settings.get('show_license_quiz', False) else -1 %}
             {% set wspr_activity_pos = settings.get('wspr_activity_position', 0) if settings.get('show_wspr_activity', False) else -1 %}
+            {% set digipi_pos = settings.get('digipi_position', 0) if settings.get('digipi_enabled', False) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -625,6 +635,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">📶 Band Activity</span>
                     <span class="node-meta">WSPR activity card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == digipi_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__digipi__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📡 DigiPi</span>
+                    <span class="node-meta">APRS/Direwolf card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -689,6 +706,13 @@
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">📶 Band Activity</span>
                 <span class="node-meta">WSPR activity card</span>
+            </div>
+            {% endif %}
+            {% if digipi_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__digipi__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">📡 DigiPi</span>
+                <span class="node-meta">APRS/Direwolf card</span>
             </div>
             {% endif %}
             {% if show_cams %}
@@ -909,6 +933,40 @@
             <button class="btn btn-info"    onclick="testAprsMsg()">Send test message</button>
             <button class="btn btn-primary" onclick="saveAprsMsg()">Save APRS alert settings</button>
             <span class="status-txt" id="aprsmsg-status"></span>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">DigiPi
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — a KM6LYW DigiPi APRS/Direwolf hotspot
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            Polls a DigiPi over SSH for recent APRS/Direwolf activity
+            (<code>/run/direwolf.log</code>) plus a live mirror of its own
+            screen — enable the DigiPi card (Cards tab) to show it on the
+            dashboard. Leave the IP blank to disable.
+        </p>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>IP address</label>
+                <input type="text" id="digipi-ip" placeholder="192.168.1.x" value="{{ settings.digipi_ip }}">
+            </div>
+            <div>
+                <label>SSH user</label>
+                <input type="text" id="digipi-user" placeholder="pi" value="{{ settings.digipi_user }}">
+            </div>
+            <div>
+                <label>SSH password</label>
+                <input type="password" id="digipi-pass" placeholder="••••••••" value="{{ settings.digipi_pass }}">
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-info"    onclick="testDigipi()">Test connection</button>
+            <button class="btn btn-primary" onclick="saveDigipi()">Save DigiPi settings</button>
+            <span class="status-txt" id="digipi-status"></span>
         </div>
     </div>
 
@@ -1382,6 +1440,7 @@ function saveCards() {
             show_license_quiz: document.getElementById('license-quiz-toggle').classList.contains('on'),
             show_wspr_activity: document.getElementById('wspr-activity-toggle').classList.contains('on'),
             station_grid: document.getElementById('station-grid-input').value.trim(),
+            digipi_enabled: document.getElementById('digipi-toggle').classList.contains('on'),
         })
     }).then(() => {
         const el = document.getElementById('cards-status');
@@ -1506,6 +1565,7 @@ function saveCardOrder() {
     const bandPlanIdx    = sentinelIndex('__band_plan__');
     const licenseQuizIdx = sentinelIndex('__license_quiz__');
     const wsprActivityIdx = sentinelIndex('__wspr_activity__');
+    const digipiIdx = sentinelIndex('__digipi__');
     const cameraPositions = {};
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
@@ -1568,6 +1628,13 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ wspr_activity_position: wsprActivityIdx })
+        }));
+    }
+    if (digipiIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ digipi_position: digipiIdx })
         }));
     }
     if (Object.keys(cameraPositions).length > 0) {
@@ -2238,6 +2305,41 @@ function saveMqtt() {
             mqtt_port:     document.getElementById('mqtt-port').value.trim() || 1883,
             mqtt_username: document.getElementById('mqtt-username').value.trim(),
             mqtt_password: document.getElementById('mqtt-password').value,
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+// --- DigiPi ---
+async function testDigipi() {
+    const status = document.getElementById('digipi-status');
+    status.textContent = 'Testing...';
+    const r = await fetch('/api/test_ssh', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            ip:   document.getElementById('digipi-ip').value.trim(),
+            user: document.getElementById('digipi-user').value.trim(),
+            pass: document.getElementById('digipi-pass').value,
+        })
+    });
+    const data = await r.json();
+    status.textContent = data.success ? '✓ Connection successful' : '✕ Failed: ' + data.message;
+    status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 4000);
+}
+
+function saveDigipi() {
+    const status = document.getElementById('digipi-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            digipi_ip:   document.getElementById('digipi-ip').value.trim(),
+            digipi_user: document.getElementById('digipi-user').value.trim(),
+            digipi_pass: document.getElementById('digipi-pass').value,
         })
     }).then(() => {
         status.textContent = '✓ Saved';

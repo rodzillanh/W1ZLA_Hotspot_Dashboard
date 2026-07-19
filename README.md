@@ -985,6 +985,38 @@ the "⬆ update" badge and "📍 map" link when those are present — all three
 are grouped into one cluster that stays pinned to the right regardless of
 how many are shown at once, rather than spreading across the card.
 
+## DigiPi card
+
+Shows recent APRS/Direwolf activity and a live screen mirror from a
+[DigiPi](https://digipi.org/) (KM6LYW's Raspberry Pi ham radio data
+hotspot) — off by default. Enable it in Settings → Cards, and set the
+DigiPi's IP/SSH credentials in Settings → Integrations.
+
+- **Recent packets** — polls `/run/direwolf.log` over SSH the same way
+  WPSD's own MMDVM log gets tailed, showing each packet's direction (heard
+  directly over RF, gated from RF out to APRS-IS, or received from the
+  APRS-IS feed), callsign, a simple position/message/status type label,
+  and the raw payload text. Deliberately doesn't decode APRS position
+  payloads into coordinates (especially the compressed format some
+  beacons use) — that's real position/map data, and getting the decoding
+  wrong would be a worse failure than not showing a position at all.
+- **Screen mirror** — a small thumbnail (same size/style as a QRZ caller
+  photo elsewhere on this dashboard, click to enlarge) showing a live
+  mirror of the DigiPi's own physical screen, pulled directly from its
+  `direwatch.png` — the same image the DigiPi's own `direwatch.php` web
+  page shows, just embedded here on a ~2s refresh instead of its own 1s.
+  No credentials needed for this part; it's a plain unauthenticated image
+  on the DigiPi's own web server, fetched directly by your browser (same
+  "link straight to the device's own web UI" pattern this dashboard
+  already uses for a WPSD hotspot's admin page).
+- This is a **dedicated card**, not a hotspot — a digipeater doesn't have
+  one "active call" the way a repeater does, so it doesn't get its own
+  entry in the main hotspot grid. Currently supports one DigiPi.
+- Only APRS/Direwolf is covered right now. FLDigi and Winlink RMS (both
+  also bundled with DigiPi) aren't included yet — this needs a real
+  device actually running them to build against, the same discipline
+  used for everything else in this app.
+
 ## Known tradeoffs (intentionally left as-is for now)
 
 - No authentication on `/setup` — anyone who can reach the dashboard can
