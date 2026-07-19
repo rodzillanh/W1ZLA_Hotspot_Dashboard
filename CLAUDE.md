@@ -656,6 +656,29 @@ config for per-integration credentials; put it in
   that "probably" won't contain a quote (IPs and UUIDs are fine; names,
   usernames, and passwords are exactly the fields most likely to have
   one eventually).
+- **Editing a hotspot's IP address is a rename of its identity key, not
+  just a field update — `/setup` POST needs the pre-edit IP separately
+  from the submitted one.** `hotspots.json` entries are matched/replaced
+  by `ip` (`app.py`'s `hotspots = [h for h in hotspots if h["ip"] !=
+  ...]` upsert pattern). The original version matched on the *submitted*
+  ip, which works fine for adding a new hotspot or editing one without
+  touching its IP, but silently broke changing the IP itself: filtering
+  for the new ip matches nothing (no existing entry has it yet), so the
+  old entry never gets removed — you'd end up with the untouched old
+  entry plus a new orphaned duplicate, which reads as "my IP change
+  didn't save" since the UI's hotspot list still shows the old IP too.
+  Fixed by adding a separate `orig_ip` hidden field (`setup.html`),
+  populated by `editHotspot()` from the ip the record had *before* this
+  edit (not touched by the visible IP input the user might change), and
+  matching on `orig_ip` when present (`app.py`, falls back to the
+  submitted ip for the add-new-hotspot case, where there's no prior
+  entry to match). Verified with a live `app.test_client()` sequence:
+  add → edit-with-IP-change → confirm exactly one hotspot remains at the
+  new IP (not two) → edit-without-IP-change → confirm that path still
+  behaves as before → add a second hotspot → confirm it doesn't clobber
+  the first. If another field is ever promoted to be part of a record's
+  matching identity, it needs this same `orig_<field>` treatment, not
+  just a value swap.
 - **`setup.html`'s `/setup#version` deep-link check must run at the very
   end of the script, after every `let`/`const` it touches (indirectly,
   via `loadVersion()`) has already been declared — putting it anywhere

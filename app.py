@@ -405,7 +405,14 @@ def setup():
             # -- validate digits-only here too, since /setup has no auth.
             if asl_node.isdigit():
                 new_hotspot["asl_node"] = asl_node
-        hotspots = [h for h in hotspots if h["ip"] != new_hotspot["ip"]]
+        # Match on the hotspot's ip *before* this edit, not the (possibly
+        # just-changed) submitted ip -- matching on the new ip meant editing
+        # a hotspot's IP address never removed the old entry (nothing had
+        # that new ip yet to match), leaving a stale duplicate behind under
+        # the old IP and making the change look like it hadn't saved.
+        orig_ip  = request.form.get("orig_ip", "").strip()
+        match_ip = orig_ip or new_hotspot["ip"]
+        hotspots = [h for h in hotspots if h["ip"] != match_ip]
         hotspots.append(new_hotspot)
         save_hotspots(hotspots)
         if mqtt_pub.enabled:

@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.32</span>
+                <span class="release-version">v3.33</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed changing a hotspot's IP address not saving</span> — editing a hotspot and changing its IP left the old entry in place and added a new duplicate under the new IP instead of updating it, since the save logic matched on the newly-submitted IP rather than the one the record had before the edit. Editing the IP now correctly updates the existing entry in place</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.32</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Offline hotspot indicator</span> — a hotspot card now turns red with an "⚠ OFFLINE" badge and a live "offline for Xm Ys" timer once its SSH poll fails a couple times in a row, instead of silently sitting there showing stale last-known data with no indication anything's wrong. No new ping mechanism needed — a failed SSH connection was already being tracked, just never surfaced on the card</li>

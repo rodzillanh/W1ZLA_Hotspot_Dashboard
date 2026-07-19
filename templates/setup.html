@@ -965,6 +965,7 @@
                  <input type="text" id="hs-name" placeholder="Name"></div>
             <div><label>IP address</label>
                  <input type="text" id="hs-ip" placeholder="192.168.1.x"></div>
+            <input type="hidden" id="hs-orig-ip">
             <div><label>SSH user</label>
                  <input type="text" id="hs-user" placeholder="pi"></div>
         </div>
@@ -997,6 +998,7 @@
             <form method="POST" style="margin:0">
                 <input type="hidden" name="name" id="form-name">
                 <input type="hidden" name="ip"   id="form-ip">
+                <input type="hidden" name="orig_ip" id="form-orig-ip">
                 <input type="hidden" name="user" id="form-user">
                 <input type="hidden" name="pass" id="form-pass">
                 <input type="hidden" name="lat"  id="form-lat">
@@ -1585,6 +1587,7 @@ function saveCardOrder() {
 function submitHotspot(e) {
     document.getElementById('form-name').value    = document.getElementById('hs-name').value;
     document.getElementById('form-ip').value      = document.getElementById('hs-ip').value;
+    document.getElementById('form-orig-ip').value = document.getElementById('hs-orig-ip').value;
     document.getElementById('form-user').value    = document.getElementById('hs-user').value;
     document.getElementById('form-pass').value    = document.getElementById('hs-pass').value;
     document.getElementById('form-lat').value     = document.getElementById('hs-lat').value;
@@ -1597,6 +1600,7 @@ function submitHotspot(e) {
 function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode) {
     document.getElementById('hs-name').value    = name;
     document.getElementById('hs-ip').value      = ip;
+    document.getElementById('hs-orig-ip').value = ip;
     document.getElementById('hs-user').value    = user;
     document.getElementById('hs-pass').value    = pass;
     document.getElementById('hs-lat').value     = (lat     && lat     !== 'None') ? lat     : '';
@@ -1611,7 +1615,7 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode) {
 }
 
 function clearHotspotForm() {
-    ['hs-name','hs-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode'].forEach(id => document.getElementById(id).value = '');
+    ['hs-name','hs-ip','hs-orig-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('hs-type').value = 'wpsd';
     onHotspotTypeChange();
     document.getElementById('hotspot-form-title').textContent = 'Add hotspot';
