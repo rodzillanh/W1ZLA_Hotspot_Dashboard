@@ -789,6 +789,17 @@ config for per-integration credentials; put it in
   this ordering the card would show a live-looking "📡 ACTIVE" call timer
   ticking away for a call that's actually long over, alongside a
   contradictory offline badge.
+- **`.card-header`'s right-side badges (update badge, map pin, uptime) are
+  grouped in a `.card-header-right` wrapper, not left as bare siblings of
+  `.card-name`.** `.card-header` is `justify-content: space-between` —
+  with exactly two children (name, one badge) that reads fine, but the
+  original code had `${updateBadge}${mapPin}` concatenated directly with
+  no wrapper, so a card with *both* present (a real, not hypothetical,
+  combination) got 3 flex items spread across the full card width instead
+  of clustering on the right — confirmed by actually reproducing it before
+  fixing, not assumed. Any future badge added to that corner (uptime was
+  the third) goes inside `.card-header-right`, never as a fourth bare
+  sibling, or the spreading bug comes back.
 
 ## Testing patterns used throughout this project
 

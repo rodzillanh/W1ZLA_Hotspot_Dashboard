@@ -334,6 +334,25 @@
             font-weight: 500;
             color: var(--text);
             text-decoration: none;
+            min-width: 0;
+            overflow-wrap: break-word;
+        }
+        /* Groups the update badge / map pin / uptime into one cluster so
+           justify-content: space-between on .card-header only ever spreads
+           two things apart (name, group) -- previously these were bare
+           siblings of .card-name, so 2+ of them spread across the full
+           card width instead of clustering on the right. */
+        .card-header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+            margin-left: 12px;
+        }
+        .card-uptime {
+            font-size: 11px;
+            color: var(--text-dim);
+            white-space: nowrap;
         }
         .card-name:hover { text-decoration: underline; }
         .card-tg {
@@ -988,7 +1007,6 @@
             font-size: 11px;
             color: var(--link);
             cursor: pointer;
-            margin-left: 8px;
             text-decoration: none;
         }
         .update-badge {
@@ -997,7 +1015,6 @@
             border: 1px solid var(--fav-color);
             border-radius: 10px;
             padding: 1px 7px;
-            margin-left: 8px;
             cursor: pointer;
             text-decoration: none;
             display: inline-block;
@@ -1629,6 +1646,22 @@ function fmtOfflineDuration(offlineSince) {
     return `${s}s`;
 }
 
+// --- hotspot uptime (card header badge) -- compacts uptime -p's variable
+// phrasing (day/hour/minute units, any subset present, comma-separated)
+// down to the two most significant units. "up " prefix already stripped
+// server-side (monitor.py) before this runs.
+function fmtUptime(raw) {
+    if (!raw || raw === 'Unknown') return raw || '';
+    const d = /(\d+)\s*day/.exec(raw);
+    const h = /(\d+)\s*hour/.exec(raw);
+    const m = /(\d+)\s*minute/.exec(raw);
+    const parts = [];
+    if (d) parts.push(d[1] + 'd');
+    if (h) parts.push(h[1] + 'h');
+    if (!d && m) parts.push(m[1] + 'm');
+    return parts.length ? parts.join(' ') : raw;
+}
+
 // --- photo modal ---
 function openPhoto(call, name, location, imageUrl) {
     document.getElementById('modal-title').textContent =
@@ -1782,6 +1815,9 @@ function renderCards(data) {
         const mapPin = (hs.lat !== undefined && hs.lat !== null)
             ? `<a class="map-jump-btn" onclick="event.preventDefault(); jumpToNodeOnMap('${hs.ip}')" href="#">📍 map</a>`
             : '';
+        const uptimeBadge = (hs.uptime && hs.uptime !== 'Unknown')
+            ? `<span class="card-uptime" title="Uptime: ${hs.uptime}">⏱ ${fmtUptime(hs.uptime)}</span>`
+            : '';
 
         // Three card states:
         //   active    — is_active true
@@ -1888,7 +1924,7 @@ function renderCards(data) {
         <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}">
           <div class="card-header">
             <a class="card-name" href="http://${hs.ip}" target="_blank" rel="noopener">${hs.name}${chipHtml}</a>
-            ${updateBadge}${mapPin}
+            <div class="card-header-right">${updateBadge}${mapPin}${uptimeBadge}</div>
           </div>
           <div class="card-inner">
             <div class="card-info" style="flex:1;min-width:0">

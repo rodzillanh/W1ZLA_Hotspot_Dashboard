@@ -105,9 +105,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.33</span>
+                <span class="release-version">v3.34</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Hotspot uptime badge</span> — each card now shows how long the underlying host has been up ("⏱ 3d 2h") in the top-right corner, next to the name. The data was already being fetched every poll cycle for the temp/CPU stats, just never displayed; hover the badge for the exact value</li>
+                <li><span>Fixed the card header's badges spreading apart when more than one is shown</span> — the update badge, map pin, and new uptime badge now cluster together on the right regardless of how many are present, instead of spreading across the full card width (a real pre-existing layout issue whenever a hotspot had both a pending update and a map pin)</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.33</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed changing a hotspot's IP address not saving</span> — editing a hotspot and changing its IP left the old entry in place and added a new duplicate under the new IP instead of updating it, since the save logic matched on the newly-submitted IP rather than the one the record had before the edit. Editing the IP now correctly updates the existing entry in place</li>

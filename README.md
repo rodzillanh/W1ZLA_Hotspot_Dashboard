@@ -973,6 +973,18 @@ working" signal than ICMP (it proves the SSH service itself responds, not
 just that the network stack does), and it comes for free every poll cycle
 with no extra network traffic or permissions.
 
+## Card uptime
+
+Each card shows a small "⏱ 3d 2h" badge in the top-right corner, next to the
+hotspot name — how long the underlying Linux host has been up (`uptime -p`
+over SSH, already fetched every poll cycle for the temp/CPU stats, just not
+previously displayed). It's compacted to the two most significant units
+(days+hours, or hours+minutes) rather than shown as the full sentence
+`uptime -p` prints; hover it for the exact value. Shares the same corner as
+the "⬆ update" badge and "📍 map" link when those are present — all three
+are grouped into one cluster that stays pinned to the right regardless of
+how many are shown at once, rather than spreading across the card.
+
 ## Known tradeoffs (intentionally left as-is for now)
 
 - No authentication on `/setup` — anyone who can reach the dashboard can
