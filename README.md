@@ -958,6 +958,21 @@ Cameras, and Settings.
 This is the same tool for moving your setup to a new install as it is for
 just keeping a backup around.
 
+## Offline detection
+
+A hotspot card turns red with an "⚠ OFFLINE" badge once its SSH poll fails
+`FAILURE_THRESHOLD` times in a row (default 2, ~10 seconds at the default
+5-second poll interval — see the env vars table above). The card shows how
+long it's been down with a live-updating timer, same idea as the active-call
+timer elsewhere on the card. Everything else on the card (mode, RSSI, temp,
+etc.) stays visible but dimmed — it's the last known-good data, not live.
+
+This reuses the existing SSH-based poll loop rather than adding a separate
+ping — a failed SSH connection is already a stronger "is this actually
+working" signal than ICMP (it proves the SSH service itself responds, not
+just that the network stack does), and it comes for free every poll cycle
+with no extra network traffic or permissions.
+
 ## Known tradeoffs (intentionally left as-is for now)
 
 - No authentication on `/setup` — anyone who can reach the dashboard can

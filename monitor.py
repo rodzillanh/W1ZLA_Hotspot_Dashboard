@@ -217,6 +217,7 @@ class FleetMonitor:
                 for field_name, value in updates.items():
                     setattr(status, field_name, value)
                 self._failures[ip] = 0
+                status.offline_since = None
         except Exception:
             self._record_failure(ip)
 
@@ -232,6 +233,7 @@ class FleetMonitor:
                 for field_name, value in updates.items():
                     setattr(status, field_name, value)
                 self._failures[ip] = 0
+                status.offline_since = None
         except Exception:
             self._record_failure(ip)
 
@@ -254,7 +256,10 @@ class FleetMonitor:
         with self._lock:
             self._failures[ip] += 1
             if self._failures[ip] >= config.FAILURE_THRESHOLD:
-                self._data[ip].status = "Offline"
+                status = self._data[ip]
+                status.status = "Offline"
+                if status.offline_since is None:
+                    status.offline_since = time.time()
 
     def _ensure_entry(self, hotspot: dict) -> None:
         ip = hotspot["ip"]

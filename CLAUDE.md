@@ -739,6 +739,34 @@ config for per-integration credentials; put it in
   `trusted_proxy_headers` options so `request.remote_addr` reflects the
   real client IP rather than the proxy's.
 
+- **Offline detection (card turns red + "OFFLINE" badge) deliberately reuses
+  the existing SSH-failure tracking in `monitor.py` rather than adding a
+  ping.** `_record_failure()` already set `status = "Offline"` after
+  `config.FAILURE_THRESHOLD` consecutive SSH failures well before the UI did
+  anything with it — confirmed by reading the code before building this,
+  not assumed; the dashboard just never rendered that field. A dedicated
+  ICMP ping would have been redundant work: SSH failing is a *stronger*
+  signal than a failed ping (proves the SSH service itself is down, not
+  just that the network stack doesn't respond), and it's already computed
+  every poll cycle for free. `HotspotStatus.offline_since` (new field) is
+  set once — guarded by `if status.offline_since is None` — the moment
+  status first flips to `"Offline"`, so repeated failures don't keep
+  resetting the clock; both `_check_one_wpsd`'s and `_check_one_asl3`'s
+  success paths clear it back to `None` on the very next successful poll.
+  Follows the same "epoch timestamp + browser-local `timerState` ticking"
+  pattern already used for `tx_start`/`last_heard` in `dashboard.html`,
+  just with its own `'off'` timer type and `fmtOfflineDuration()` (h/m/s
+  rather than tx/lh's fixed `M:SS`, since an outage can plausibly run for
+  hours/days unlike a single transmission).
+- **Offline takes precedence over active/favorite tinting and the
+  active-call/last-heard info block** in `renderCards()` — checked before
+  `hs.is_active`, not after. If a hotspot drops mid-call, `is_active`/
+  `active_call`/`tx_start` are still whatever they were the instant before
+  it went offline (monitor.py never clears them on failure), so without
+  this ordering the card would show a live-looking "📡 ACTIVE" call timer
+  ticking away for a call that's actually long over, alongside a
+  contradictory offline badge.
+
 ## Testing patterns used throughout this project
 
 No test suite/framework is set up — verification has been done ad hoc but

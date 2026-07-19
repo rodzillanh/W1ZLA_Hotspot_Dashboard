@@ -10,6 +10,7 @@ class HotspotStatus:
     name: str
     ip: str
     status: str = "Connecting..."
+    offline_since: Optional[float] = None  # epoch when status first became "Offline"; None if online/unknown
     uptime: str = "Unknown"
     temperature: str = "N/A"
     cpu: str = "N/A"
