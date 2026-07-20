@@ -724,6 +724,11 @@ Favorites/Camera cards — position it anywhere in the same drag-and-drop
   message number) are recognized and not shown or re-acked twice.
 - **List stays compact** — capped and scrollable rather than growing the
   card forever, same pattern as the ASL Favorites card's row list.
+- **Catches messages to any SSID of your callsign** — same as how apps
+  like APRS.fi aggregate messages regardless of which SSID they were
+  sent to (`W1ZLA`, `W1ZLA-9`, `W1ZLA-1`, etc.), not just the exact
+  callsign string typed into Settings. Each message shows which specific
+  SSID it was addressed to, and the ack is sent from that same SSID.
 - This is a separate, independent on/off toggle from APRS favorite
   alerts — you can run either one alone, or both, sharing the one
   callsign setting.

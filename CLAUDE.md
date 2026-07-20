@@ -497,14 +497,32 @@ config for per-integration credentials; put it in
   at all, not the `format` field. Get this wrong and the card would
   either show ack/reject packets as if they were real messages, or
   (worse) auto-ack a packet that was never a message to begin with.
-- **The `b/CALLSIGN` "buddy" APRS-IS filter** was chosen deliberately
-  over relying on undocumented "a verified logged-in station gets its
-  own traffic automatically" assumptions, per the documented
-  javAPRSFilter spec (includes packets addressed to the listed callsign,
-  not just from it). This is the one piece of `aprs_inbox.py` NOT yet
-  confirmed against real inbound traffic (unlike the packet-shape parts,
-  which were) — if messages aren't arriving once this is live, re-check
-  the filter syntax before assuming the parsing logic is at fault.
+- **The `b/CALLSIGN*` "buddy" APRS-IS filter wildcards across every SSID
+  of the configured callsign — it did NOT originally, and that was a
+  real, reported gap, not a hypothetical.** The javAPRSFilter spec's own
+  wording for `b/` is "Pass all traffic from **exact** call" — fetched
+  and quoted directly from aprs-is.net before touching this, not assumed
+  — meaning a bare `b/W1ZLA` only ever matched literal "W1ZLA", silently
+  missing "W1ZLA-9", "W1ZLA-1", etc., unlike how apps such as APRS.fi
+  aggregate messages across all SSIDs of a callsign. Fixed by wildcarding
+  the filter on the base callsign (`_base_call()`, strips a trailing
+  `-N`) and — critically — widening `_on_packet`'s match check to the
+  same base comparison. Both sides have to move together: widening only
+  the filter without widening the match would just mean the new SSID
+  variants arrive and get silently discarded right after; widening only
+  the match without the filter would never receive them from APRS-IS in
+  the first place. Verified against synthetic packets addressed to three
+  different SSIDs of the same base call (all three now show up) plus a
+  deliberately similar-but-different callsign ("W1ZLAB" vs "W1ZLA" —
+  `_base_call()`'s regex only strips an actual `-digits` suffix, so this
+  correctly does NOT match). The login identity sent to APRS-IS still
+  uses the exact configured callsign (SSID included, if any) — only the
+  filter and match widen, not the login itself; `aprslib.passcode()`
+  computes the same value regardless of SSID either way, confirmed
+  directly against the installed library, not assumed. Acks are now sent
+  from the specific SSID a message was actually addressed to
+  (`packet["addresse"]`), not the generic base callsign — the sender's
+  client is tracking the conversation with that specific addressee.
 - **`AprsInbox.configure()` reconfigures the same object in place via a
   generation counter, not a rebuild-a-fresh-client pattern** — a
   listening socket needs its own thread lifecycle, unlike the other

@@ -607,6 +607,7 @@
         .msg-row.unread { background: var(--accent-dim); border-radius: 6px; }
         .msg-top { display: flex; align-items: baseline; gap: 6px; margin-bottom: 3px; }
         .msg-from { color: var(--link); font-weight: 600; font-size: 13px; text-decoration: none; }
+        .msg-to { font-size: 10.5px; color: var(--text-dim); }
         .msg-time { margin-left: auto; font-size: 10.5px; color: var(--text-dim); flex-shrink: 0; white-space: nowrap; }
         .msg-text { font-size: 13px; color: var(--text); line-height: 1.4; word-break: break-word; }
         .msg-ack { display: block; font-size: 10px; color: var(--accent); margin-top: 4px; }
@@ -2258,6 +2259,7 @@ function renderAprsInbox(data) {
         <div class="msg-row ${i === 0 ? 'unread' : ''}">
             <div class="msg-top">
                 <a class="msg-from" href="https://www.qrz.com/db/${escapeHtml(m.from)}" target="_blank" rel="noopener">${escapeHtml(m.from)}</a>
+                ${m.to ? `<span class="msg-to">→ ${escapeHtml(m.to)}</span>` : ''}
                 <span class="msg-time">${fmtAgoShort(m.received_at)}</span>
             </div>
             <div class="msg-text">${escapeHtml(m.message_text)}</div>
