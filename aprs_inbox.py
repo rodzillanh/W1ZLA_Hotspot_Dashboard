@@ -27,6 +27,30 @@ is used for both the filter AND the packet-match check in _on_packet --
 widening only one side would either leak nothing (if the match stayed
 exact) or accept the whole APRS-IS firehose (if the filter were dropped
 instead of widened).
+
+The listening connection logs in UNVERIFIED (passcode "-1"), not with the
+real computed passcode -- confirmed live against the real network, not
+assumed: a connection logged in VERIFIED as a callsign gets disconnected
+by APRS-IS the instant a SECOND connection also logs in VERIFIED as that
+same callsign, which is exactly what happens every time
+aprs_messaging.py's own send (or this module's own _send_ack) opens its
+short-lived verified connection to actually transmit something. This was
+a real, reported bug -- "test message doesn't show up in the inbox" --
+traced to the listener getting kicked and only reconnecting ~15s later
+(RECONNECT_BACKOFF), after the message had already come and gone. Fixed
+by logging the LISTENER in unverified, since it only ever needs to
+receive; verified status only gates transmit permission, and filtering
+behavior is identical either way (confirmed live: an unverified b/W1ZLA*
+listener received a packet sent by a separate verified W1ZLA connection
+without being disconnected). A bigger fix was seriously considered first
+-- routing all sends through this module's own persistent connection
+instead -- but aprslib's IS.sendall() and its consumer() read loop both
+mutate the same socket's blocking mode with no locking between them
+(confirmed by reading aprslib/IS.py directly), so calling sendall() from
+another thread while consumer() blocks in this module's own thread is a
+real, unguarded race. Don't reach for that shared-connection design for
+this bug -- the verified-vs-verified collision was the actual constraint,
+not the number of connections.
 """
 import re
 import time
@@ -116,13 +140,21 @@ class AprsInbox:
                 callsign = self._callsign
             base = _base_call(callsign)
             try:
-                # Login identity stays the exact configured callsign (SSID
-                # included, if given) -- only the FILTER wildcards across
-                # SSIDs, since that's what controls which packets APRS-IS
-                # actually delivers. passcode() strips any SSID internally
-                # either way, so this doesn't change what passcode is used.
-                passcode = str(aprslib.passcode(callsign))
-                ais = aprslib.IS(callsign, passwd=passcode, host=APRS_IS_HOST, port=APRS_IS_PORT)
+                # Unverified login (passcode "-1"), NOT the real computed
+                # passcode -- confirmed by live-testing both ways against
+                # the real network (see module docstring) that APRS-IS
+                # disconnects an existing connection the instant a SECOND
+                # one logs in VERIFIED as the same callsign, which is
+                # exactly what happens every time aprs_messaging.py (or
+                # the ack send below) opens its own short-lived verified
+                # connection to send something. An unverified/receive-only
+                # login doesn't compete for verified status, so it isn't
+                # kicked -- same pattern real APRS-IS monitoring tools
+                # (aprs.fi, findu.com) already use. Filtering behavior is
+                # identical either way; verified status only gates
+                # whether a connection may also inject/transmit, which
+                # this listening connection never needs to do.
+                ais = aprslib.IS(callsign, passwd="-1", host=APRS_IS_HOST, port=APRS_IS_PORT)
                 ais.set_filter(f"b/{base}*")
                 ais.connect()
                 with self._lock:

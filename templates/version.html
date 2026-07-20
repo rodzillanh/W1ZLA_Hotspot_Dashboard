@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.36</span>
+                <span class="release-version">v3.37</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed APRS Messages missing messages sent right around the same time as an outbound alert</span> — the card's listener logged in "verified" (same as any real send), and APRS-IS disconnects a connection the instant a second one logs in verified as the same callsign, which is exactly what every outbound favorite alert (and the "Send test message" button) did. The listener now logs in receive-only, since it never needed to transmit — acks still go out over their own connection, unaffected. Confirmed against the real APRS-IS network before and after the fix</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.36</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed APRS Messages only catching your exact callsign string</span> — the card's APRS-IS filter defaulted to an exact match per the protocol spec, so a bare callsign in Settings silently missed messages sent to any of its SSIDs (e.g. a message to "W1ZLA-9" never showed up if Settings just had "W1ZLA"). Now catches messages to any SSID of your callsign, the same way apps like APRS.fi do — each message shows which specific SSID it was addressed to, and acks are sent from that same SSID</li>

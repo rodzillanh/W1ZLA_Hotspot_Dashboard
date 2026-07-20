@@ -523,6 +523,42 @@ config for per-integration credentials; put it in
   from the specific SSID a message was actually addressed to
   (`packet["addresse"]`), not the generic base callsign — the sender's
   client is tracking the conversation with that specific addressee.
+- **APRS-IS disconnects a connection the instant a SECOND connection logs
+  in VERIFIED as the same callsign — not just when the login callsign
+  string matches.** This was a real, reported bug ("test message doesn't
+  show up in the inbox"), diagnosed and fixed by testing directly against
+  the real network, not guessed: `aprs_inbox.py`'s persistent listener
+  used to log in with the real computed passcode (verified), same as
+  `aprs_messaging.py`'s short-lived send connections — so every real
+  outbound alert (and the "Send test message" button) silently kicked the
+  listener off, which then took `RECONNECT_BACKOFF` (~15s) to recover,
+  long enough to miss the very message that caused the kick. Confirmed
+  two things live before fixing: (1) reproducing the exact scenario
+  (both connections verified as the real callsign) does trigger the kick
+  — the server literally closes the socket right after `logresp W1ZLA
+  verified, ...`; (2) a connection logged in **unverified** (`passwd=
+  "-1"`) as the same callsign survives a second verified connection
+  logging in alongside it, and still receives filtered traffic
+  identically — verified status only gates transmit permission, not what
+  you can receive. Fixed by changing the listener's login to `passwd=
+  "-1"` (it never needed to transmit — acks already use their own
+  separate short-lived verified connection, same pattern
+  `aprs_messaging.py` uses, and that's unaffected since there's only ever
+  one verified connection active at a time now). A bigger fix was
+  seriously considered first — routing all sends through the listener's
+  own persistent connection instead of opening a second one — but reading
+  `aprslib/IS.py` directly turned up a real, unguarded thread-safety
+  hazard for that approach: `sendall()` and the consumer loop's
+  `_socket_readlines()` both mutate the same socket's blocking mode with
+  no locking between them, so calling `sendall()` from another thread
+  while `consumer()` blocks in the listener's own thread is a genuine
+  race, not just a style concern. Don't reach for a shared-connection
+  redesign for this class of bug — the verified-vs-verified collision was
+  the actual constraint, not the connection count. (This also means the
+  SSID-wildcard gotcha above needs a small correction: it says "the login
+  identity sent to APRS-IS still uses the exact configured callsign" —
+  still true, but as of this fix it's an *unverified* login, not
+  verified, for the listener specifically.)
 - **`AprsInbox.configure()` reconfigures the same object in place via a
   generation counter, not a rebuild-a-fresh-client pattern** — a
   listening socket needs its own thread lifecycle, unlike the other
