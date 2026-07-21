@@ -403,6 +403,10 @@ def setup():
             "ip":   ip,
             "user": request.form.get("user"),
             "pass": request.form.get("pass"),
+            # Checkboxes are only present in form data when checked -- absent
+            # means unchecked, not "field not submitted", so this correctly
+            # defaults to disabled if the checkbox was unticked.
+            "enabled": "enabled" in request.form,
         }
         lat = request.form.get("lat", "").strip()
         lon = request.form.get("lon", "").strip()
@@ -855,6 +859,26 @@ def delete_hotspot(ip):
     save_hotspots([h for h in load_hotspots() if h["ip"] != ip])
     monitor.remove(ip)
     openspot_manager.remove(ip)
+    return redirect("/setup")
+
+@app.route("/api/toggle_hotspot/<ip>", methods=["POST"])
+def toggle_hotspot(ip):
+    """Quick on/off from the Settings hotspot list -- config/credentials
+    stay in hotspots.json either way, only the enabled flag flips. Same
+    mutate-save-reconcile shape as /setup's POST handler."""
+    hotspots = load_hotspots()
+    for h in hotspots:
+        if h["ip"] == ip:
+            h["enabled"] = not h.get("enabled", True)
+    save_hotspots(hotspots)
+    if mqtt_pub.enabled:
+        mqtt_pub.set_hotspots(hotspots)
+    openspot_manager.reconcile(hotspots)
+    # If just disabled, drop it from the live snapshot immediately rather
+    # than waiting for the next poll tick's prune_stale to catch up.
+    updated = next((h for h in hotspots if h["ip"] == ip), None)
+    if updated is not None and not updated.get("enabled", True):
+        monitor.remove(ip)
     return redirect("/setup")
 
 

@@ -990,17 +990,22 @@
         </p>
         <div id="hotspots-list">
             {% for hs in hotspots %}
-            <div class="drag-row" style="align-items:center">
+            <div class="drag-row" style="align-items:center{{ ';opacity:.5' if not hs.get('enabled', True) else '' }}">
                 <span style="flex-shrink:0">📡</span>
                 <span class="node-name">{{ hs.name }}</span>
                 <span class="node-meta">{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else (' · openSPOT4' if hs.get('type') == 'openspot4' else '') }}</span>
+                {% if not hs.get('enabled', True) %}<span class="badge">Disabled</span>{% endif %}
+                <form action="/api/toggle_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
+                    <button class="btn btn-info btn-sm" type="submit">{{ 'Enable' if not hs.get('enabled', True) else 'Disable' }}</button>
+                </form>
                 <button class="btn btn-info btn-sm"
                         data-name="{{ hs.name }}" data-ip="{{ hs.ip }}" data-user="{{ hs.user }}"
                         data-pass="{{ hs.pass }}" data-lat="{{ hs.lat }}" data-lon="{{ hs.lon }}"
                         data-bmid="{{ hs.brandmeister_id }}" data-type="{{ hs.get('type', 'wpsd') }}"
                         data-asl-node="{{ hs.get('asl_node', '') }}"
                         data-openspot4-extra-pass="{{ hs.get('openspot4_extra_pass', '') }}"
-                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.openspot4ExtraPass)">
+                        data-enabled="{{ hs.get('enabled', True) }}"
+                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.openspot4ExtraPass, this.dataset.enabled)">
                     Edit
                 </button>
                 <form action="/api/delete_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
@@ -1030,6 +1035,12 @@
             <input type="hidden" id="hs-orig-ip">
             <div id="hs-user-wrap"><label>SSH user</label>
                  <input type="text" id="hs-user" placeholder="pi"></div>
+        </div>
+        <div class="toggle-row" style="border-bottom:none;padding:0 0 10px">
+            <span class="toggle-label">Enabled
+                <span style="font-size:10px;color:var(--text-dim)">(disable to keep this hotspot's saved settings without polling it or showing it on the dashboard)</span>
+            </span>
+            <div class="toggle on" id="hs-enabled-toggle" onclick="this.classList.toggle('on')"></div>
         </div>
         <div class="form-grid" style="margin-bottom:10px">
             <div><label id="hs-pass-label">SSH password</label>
@@ -1083,6 +1094,7 @@
                 <input type="hidden" name="type" id="form-type">
                 <input type="hidden" name="asl_node" id="form-aslnode">
                 <input type="hidden" name="openspot4_extra_pass" id="form-openspot4-extra-pass">
+                <input type="checkbox" name="enabled" id="form-enabled" style="display:none">
                 <button class="btn btn-primary" onclick="submitHotspot(event)">Save hotspot</button>
             </form>
             <button class="btn btn-danger btn-sm" onclick="clearHotspotForm()" style="margin-left:auto">Clear</button>
@@ -1682,9 +1694,10 @@ function submitHotspot(e) {
     document.getElementById('form-type').value    = document.getElementById('hs-type').value;
     document.getElementById('form-aslnode').value = document.getElementById('hs-aslnode').value;
     document.getElementById('form-openspot4-extra-pass').value = document.getElementById('hs-openspot4-extra-pass').value;
+    document.getElementById('form-enabled').checked = document.getElementById('hs-enabled-toggle').classList.contains('on');
 }
 
-function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, openspot4ExtraPass) {
+function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, openspot4ExtraPass, enabled) {
     document.getElementById('hs-name').value    = name;
     document.getElementById('hs-ip').value      = ip;
     document.getElementById('hs-orig-ip').value = ip;
@@ -1696,6 +1709,7 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, opensp
     document.getElementById('hs-type').value    = (type    && type    !== 'None') ? type    : 'wpsd';
     document.getElementById('hs-aslnode').value = (aslNode && aslNode !== 'None') ? aslNode : '';
     document.getElementById('hs-openspot4-extra-pass').value = (openspot4ExtraPass && openspot4ExtraPass !== 'None') ? openspot4ExtraPass : '';
+    document.getElementById('hs-enabled-toggle').classList.toggle('on', enabled !== 'False');
     onHotspotTypeChange();
     document.getElementById('hotspot-form-title').textContent = 'Edit hotspot';
     document.getElementById('hs-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1705,6 +1719,7 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, opensp
 function clearHotspotForm() {
     ['hs-name','hs-ip','hs-orig-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-openspot4-extra-pass'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('hs-type').value = 'wpsd';
+    document.getElementById('hs-enabled-toggle').classList.add('on');
     onHotspotTypeChange();
     document.getElementById('hotspot-form-title').textContent = 'Add hotspot';
     document.getElementById('test-result').textContent = '';

@@ -277,6 +277,12 @@ and **Version info**.
   hotspot on the Hotspots tab's add/edit form. Switches which fields show
   (ASL node number instead of Brandmeister ID) and how that hotspot is
   polled — see "AllStarLink (ASL3) nodes" below.
+- **Per-hotspot Enabled toggle** — Hotspots tab, both in each row (a quick
+  Enable/Disable button, no need to open the edit form) and in the add/edit
+  form itself. A disabled hotspot keeps its saved IP/credentials/settings —
+  it's just skipped from polling and hidden from the dashboard/live map
+  entirely until re-enabled, rather than having to delete and re-add it
+  later.
 - **Host power control** — General tab, only shown on a standalone install
   running directly on real Raspberry Pi hardware; see "Host power control"
   below.

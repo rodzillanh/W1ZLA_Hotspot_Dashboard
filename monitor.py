@@ -129,7 +129,11 @@ class FleetMonitor:
     def run_forever(self) -> None:
         with concurrent.futures.ThreadPoolExecutor(max_workers=config.MAX_WORKERS) as executor:
             while True:
-                hotspots = load_hotspots()
+                # A disabled hotspot stays in hotspots.json (config/creds
+                # retained) but is excluded from both polling and
+                # prune_stale's keep-set, so it's neither checked nor shown
+                # on the dashboard until re-enabled.
+                hotspots = [h for h in load_hotspots() if h.get("enabled", True)]
                 self.prune_stale({h["ip"] for h in hotspots})
                 list(executor.map(self.check_one, hotspots))
                 time.sleep(config.POLL_INTERVAL)
@@ -141,7 +145,7 @@ class FleetMonitor:
         main 5-second poll loop -- see config.VERSION_CHECK_INTERVAL."""
         with concurrent.futures.ThreadPoolExecutor(max_workers=config.MAX_WORKERS) as executor:
             while True:
-                hotspots = load_hotspots()
+                hotspots = [h for h in load_hotspots() if h.get("enabled", True)]
                 self.prune_stale({h["ip"] for h in hotspots})
                 list(executor.map(self.check_one_slow, hotspots))
                 time.sleep(config.VERSION_CHECK_INTERVAL)

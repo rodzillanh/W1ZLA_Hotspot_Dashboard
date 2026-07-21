@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.40</span>
+                <span class="release-version">v3.41</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Per-hotspot Enabled toggle</span> — a quick Enable/Disable button on each Hotspots row, plus a toggle in the add/edit form. Disabling a hotspot keeps its saved IP/credentials/settings but stops polling it and hides it from the dashboard and live map entirely, so a hotspot you're not using right now doesn't need to be deleted and re-added later</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.40</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>openSPOT4 WebSocket read timeout increased from 10s to 60s</span> — a defensive tolerance increase in case the device has quiet stretches longer than 10s. (A separately-reported ~20-second reconnect pattern on this connection turned out to be the openSPOT4's own browser-based admin UI reconnecting, unrelated to this dashboard's connection, which was confirmed to have stayed online throughout — no actual bug found there)</li>

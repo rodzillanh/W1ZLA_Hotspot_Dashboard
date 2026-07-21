@@ -425,7 +425,14 @@ class OpenSpot4Manager:
         self._workers: dict[str, _OpenSpot4Worker] = {}
 
     def reconcile(self, hotspots: list) -> None:
-        desired = {h["ip"]: h for h in hotspots if h.get("type") == "openspot4"}
+        # A disabled hotspot stays in hotspots.json (config/creds retained)
+        # but is excluded here, so its worker gets torn down like any
+        # other removed device -- same "keep config, stop polling" pattern
+        # FleetMonitor's own run_forever()/run_slow_checks_forever() use.
+        desired = {
+            h["ip"]: h for h in hotspots
+            if h.get("type") == "openspot4" and h.get("enabled", True)
+        }
         to_stop = []
         with self._lock:
             for ip, worker in list(self._workers.items()):

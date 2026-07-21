@@ -1245,6 +1245,20 @@ Always clean up `__pycache__` before zipping/packaging a build.
   dataclass — optional keys (`lat`, `lon`, `brandmeister_id`) are simply
   absent rather than null when unset. Use `.get()`, never assume a key
   exists.
+- **`enabled`** (bool, default `True` via `.get("enabled", True)` --
+  absent entirely on any hotspot saved before this field existed, same
+  backward-compat convention as every other optional key here) gates a
+  hotspot out of polling (`monitor.py`'s `run_forever()`/
+  `run_slow_checks_forever()` filter it out before `prune_stale`/
+  `executor.map`) and out of `openspot.py`'s `OpenSpot4Manager.reconcile()`
+  the same way a `type != "openspot4"` hotspot already is. Since
+  `monitor._data` only ever gets an entry via `_ensure_entry()` (called
+  from `check_one()`/`check_one_slow()`, both skipped for a disabled
+  hotspot) and `prune_stale()` actively drops anything not in the
+  current poll's keep-set, a disabled hotspot is absent from
+  `/api/data`/`/api/map_data` with no route changes needed -- don't
+  reintroduce a separate "is this disabled" filter in either route, the
+  absence from `monitor._data` already is that filter.
 - New per-hotspot fields go on `HotspotStatus` in `models.py` with a
   sensible default, so old `hotspots.json`/`settings.json` files from
   before the field existed still load fine.
