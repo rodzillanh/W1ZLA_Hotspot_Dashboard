@@ -990,13 +990,13 @@
         </p>
         <div id="hotspots-list">
             {% for hs in hotspots %}
-            <div class="drag-row" style="align-items:center{{ ';opacity:.5' if not hs.get('enabled', True) else '' }}">
-                <span style="flex-shrink:0">📡</span>
-                <span class="node-name">{{ hs.name }}</span>
-                <span class="node-meta">{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else (' · openSPOT4' if hs.get('type') == 'openspot4' else '') }}</span>
+            <div class="drag-row" style="align-items:center">
+                <span style="flex-shrink:0{{ ';opacity:.5' if not hs.get('enabled', True) else '' }}">📡</span>
+                <span class="node-name"{{ ' style="opacity:.5"'|safe if not hs.get('enabled', True) else '' }}>{{ hs.name }}</span>
+                <span class="node-meta"{{ ' style="opacity:.5"'|safe if not hs.get('enabled', True) else '' }}>{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else (' · openSPOT4' if hs.get('type') == 'openspot4' else '') }}</span>
                 {% if not hs.get('enabled', True) %}<span class="badge">Disabled</span>{% endif %}
                 <form action="/api/toggle_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
-                    <button class="btn btn-info btn-sm" type="submit">{{ 'Enable' if not hs.get('enabled', True) else 'Disable' }}</button>
+                    <button class="btn btn-sm {{ 'btn-primary' if not hs.get('enabled', True) else 'btn-info' }}" type="submit">{{ 'Enable' if not hs.get('enabled', True) else 'Disable' }}</button>
                 </form>
                 <button class="btn btn-info btn-sm"
                         data-name="{{ hs.name }}" data-ip="{{ hs.ip }}" data-user="{{ hs.user }}"
