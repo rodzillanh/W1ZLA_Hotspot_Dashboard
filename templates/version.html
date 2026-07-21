@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.37</span>
+                <span class="release-version">v3.38</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>openSPOT 4 (SharkRF) hotspot type</span> — a third node type alongside WPSD and ASL3, for SharkRF's standalone openSPOT4 devices. Unlike WPSD/ASL3 there's no SSH access at all, so it's monitored over the device's own HTTP/WebSocket API instead — verified live against a real openSPOT 4 Pro (browser dev-tools network capture) rather than SharkRF's own published docs, which turned out to describe an older, incompatible openSPOT generation. Shows live callsign/talkgroup/mode/RSSI/BER on the card, with the device's own DMR-ID→callsign resolution layered with the same QRZ/RadioID lookup every other card uses. DMR calls only for now — other modes (D-STAR/C4FM/NXDN/P25) aren't verified yet</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.37</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed APRS Messages missing messages sent right around the same time as an outbound alert</span> — the card's listener logged in "verified" (same as any real send), and APRS-IS disconnects a connection the instant a second one logs in verified as the same callsign, which is exactly what every outbound favorite alert (and the "Send test message" button) did. The listener now logs in receive-only, since it never needed to transmit — acks still go out over their own connection, unaffected. Confirmed against the real APRS-IS network before and after the fix</li>

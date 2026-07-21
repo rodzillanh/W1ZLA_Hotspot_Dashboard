@@ -1888,7 +1888,8 @@ function renderCards(data) {
     // data is an array — order guaranteed, no Object.values() needed
     container.innerHTML = data.map((hs, i) => {
         const cardOrder  = hotspotOrders[i];
-        const isAsl      = hs.type === 'asl3';
+        const isAsl        = hs.type === 'asl3';
+        const isOpenSpot4  = hs.type === 'openspot4';
         const isFav      = hs.is_favorite && hs.is_active;
         const isOffline  = hs.status === 'Offline';
         // Offline takes precedence over active/favorite tinting -- if the
@@ -1983,17 +1984,28 @@ function renderCards(data) {
 
         const statsGrid = isAsl
             ? ''
-            : `<div class="stats-grid">
-                 <div>Mode: <span class="stat-val">${hs.mode}</span></div>
-                 <div>RSSI: <span class="stat-val">${hs.rssi}</span></div>
-                 <div>BER:  <span class="stat-val">${hs.ber}</span></div>
-                 <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
-                 <div>CPU:  <span class="stat-val">${hs.cpu}</span></div>
-                 ${hs.color_code ? `<div>Color Code: <span class="stat-val">${hs.color_code}</span></div>` : ''}
-                 ${hs.is_active && hs.timeslot ? `<div>Time Slot: <span class="stat-val">${hs.timeslot}</span></div>` : ''}
-                 ${hs.bm_status_text
-                     ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
-               </div>`;
+            : isOpenSpot4
+                // No Linux host stats available (no shell access) and no
+                // color-code/time-slot concept the way WPSD's MMDVM log
+                // exposes -- just what the openSPOT4 WebSocket actually pushes.
+                ? `<div class="stats-grid">
+                     <div>Mode: <span class="stat-val">${hs.mode}</span></div>
+                     <div>RSSI: <span class="stat-val">${hs.rssi}</span></div>
+                     <div>BER:  <span class="stat-val">${hs.ber}</span></div>
+                     ${hs.bm_status_text
+                         ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
+                   </div>`
+                : `<div class="stats-grid">
+                     <div>Mode: <span class="stat-val">${hs.mode}</span></div>
+                     <div>RSSI: <span class="stat-val">${hs.rssi}</span></div>
+                     <div>BER:  <span class="stat-val">${hs.ber}</span></div>
+                     <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
+                     <div>CPU:  <span class="stat-val">${hs.cpu}</span></div>
+                     ${hs.color_code ? `<div>Color Code: <span class="stat-val">${hs.color_code}</span></div>` : ''}
+                     ${hs.is_active && hs.timeslot ? `<div>Time Slot: <span class="stat-val">${hs.timeslot}</span></div>` : ''}
+                     ${hs.bm_status_text
+                         ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
+                   </div>`;
 
         const aslCardSplit = isAsl
             ? `<div class="card-split">

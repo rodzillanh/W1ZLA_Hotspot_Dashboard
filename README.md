@@ -1,7 +1,8 @@
 # W1ZLA WPSD Hotspot Dashboard
 
-Live status dashboard for a fleet of Pi-Star / WPSD hotspots and AllStarLink
-(ASL3) nodes, polled over SSH.
+Live status dashboard for a fleet of Pi-Star / WPSD hotspots, AllStarLink
+(ASL3) nodes (polled over SSH), and openSPOT 4 (SharkRF) nodes (monitored
+over HTTP/WebSocket).
 
 ## Project layout
 
@@ -12,6 +13,7 @@ models.py       HotspotStatus dataclass — the shape of each dashboard card
 storage.py      load/save hotspots.json and settings.json
 storage_activity.py  SQLite log for the optional Fleet activity card
 monitor.py      FleetMonitor: SSH polling + MMDVM log parsing (WPSD) / rpt xnode parsing (ASL3)
+openspot.py     openSPOT4 (SharkRF): persistent WebSocket client, one per configured device
 qrz.py          optional QRZ.com lookup for the active caller's name/city/state/photo/coords
 aslstats.py     optional AllStarLink node-to-callsign lookup for ASL3 nodes
 templates/
@@ -448,6 +450,36 @@ after another through that same node, since the dashboard has no way to
 tell them apart — it only sees "this node is keyed," same as any other
 ASL3 monitoring tool (AllScan included). Not something pollable/fixable
 via SSH; a protocol ceiling, not a bug.
+
+## openSPOT 4 (SharkRF) nodes
+
+A third node type alongside WPSD/Pi-Star and ASL3, added in v3.38 —
+Settings → Hotspots → **Node type** → "openSPOT 4 (SharkRF)". Unlike the
+other two types, an openSPOT4 is a closed embedded device with no SSH
+access at all — there's no user field to fill in, just the device's own
+admin password (the same field WPSD/ASL3 use for the SSH password).
+
+Monitored over the device's own HTTP + WebSocket API rather than SSH:
+logging in gets a JWT, then a persistent WebSocket connection
+(`ws://<ip>/<jwt>`) streams live status and call events, so the card
+updates the moment a call starts or ends rather than waiting on a poll
+cycle. This whole API was verified live against a real openSPOT 4 Pro
+(browser dev-tools network capture) — SharkRF's own published API docs
+turned out to describe an older, incompatible openSPOT generation with
+different endpoint names.
+
+The device resolves DMR-ID-to-callsign itself and reports it directly;
+that callsign still gets the same QRZ/RadioID enrichment (name,
+location, photo) and favorites/APRS-alert treatment as any other card.
+Mode/RSSI/BER and the linked talkgroup show the same way a WPSD card
+does — there's no Linux host access, so temperature/CPU/uptime don't
+appear on an openSPOT4 card.
+
+**DMR calls only, for now.** Call start/end detection is currently only
+verified for DMR — openSPOT4 also supports D-STAR, C4FM(YSF), NXDN, and
+P25, but those modes' call-tracking log format hasn't been confirmed
+against a real call yet, so active-call info may not populate correctly
+in those modes until that's verified.
 
 ## Host power control
 

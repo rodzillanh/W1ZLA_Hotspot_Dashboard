@@ -4,3 +4,4 @@ paho-mqtt>=2.0
 aprslib>=0.7
 bambulabs_api>=2.6
 waitress>=3.0
+websocket-client>=1.7

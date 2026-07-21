@@ -37,6 +37,7 @@ from hf_conditions import HfConditionsClient
 from license_quiz import LicenseQuizPool
 from wspr_activity import WsprActivityClient
 from digipi import DigipiMonitor
+from openspot import OpenSpot4Manager
 
 import host_stats as host_stats_mod
 
@@ -51,6 +52,8 @@ camera_manager  = CameraStreamManager()
 license_quiz    = LicenseQuizPool()
 wspr_activity   = WsprActivityClient()
 digipi_monitor  = DigipiMonitor()
+openspot_manager = OpenSpot4Manager(monitor)
+openspot_manager.reconcile(load_hotspots())  # eager start at boot, mirrors mqtt_pub's startup rebuild
 
 # Gates the Settings "Host power control" buttons -- only true on a
 # standalone install running directly on real Raspberry Pi hardware (see
@@ -420,6 +423,11 @@ def setup():
             # -- validate digits-only here too, since /setup has no auth.
             if asl_node.isdigit():
                 new_hotspot["asl_node"] = asl_node
+        elif node_type == "openspot4":
+            new_hotspot["type"] = "openspot4"
+            # No extra fields -- ip + the generic "pass" (already set
+            # unconditionally above) are all this type needs; "user" is
+            # stored but unused (no SSH/login-user concept for openSPOT4).
         # Match on the hotspot's ip *before* this edit, not the (possibly
         # just-changed) submitted ip -- matching on the new ip meant editing
         # a hotspot's IP address never removed the old entry (nothing had
@@ -432,6 +440,7 @@ def setup():
         save_hotspots(hotspots)
         if mqtt_pub.enabled:
             mqtt_pub.set_hotspots(hotspots)
+        openspot_manager.reconcile(hotspots)
         return redirect("/setup")
     return render_template("setup.html", hotspots=load_hotspots(),
                            settings=load_settings(), favorites=load_favorites(),
@@ -665,6 +674,17 @@ def test_asl_node():
         client.close()
 
 
+@app.route("/api/test_openspot4", methods=["POST"])
+def test_openspot4():
+    """Test an openSPOT4 hotspot's admin password for the Settings 'Test'
+    button -- login + checktok only, no persistent WebSocket opened."""
+    data     = request.json or {}
+    ip       = data.get("ip", "").strip()
+    password = data.get("pass", "")
+    ok, message = openspot_manager.test_connection(ip, password)
+    return jsonify({"success": ok, "message": message})
+
+
 @app.route("/api/asl_connect", methods=["POST"])
 def api_asl_connect():
     """Connect or disconnect a link on an ASL3 hotspot -- the dashboard's
@@ -825,6 +845,7 @@ def reorder_hotspots():
 def delete_hotspot(ip):
     save_hotspots([h for h in load_hotspots() if h["ip"] != ip])
     monitor.remove(ip)
+    openspot_manager.remove(ip)
     return redirect("/setup")
 
 
@@ -1031,6 +1052,7 @@ def api_import_backup():
         result["hotspots"] = len(hotspots)
         if mqtt_pub.enabled:
             mqtt_pub.set_hotspots(hotspots)
+        openspot_manager.reconcile(hotspots)
 
     if isinstance(data.get("favorites"), list):
         imported = [
@@ -1127,6 +1149,7 @@ def main():
     threading.Thread(target=_mqtt_publish_loop, daemon=True).start()
     threading.Thread(target=_aprs_alert_loop, daemon=True).start()
     threading.Thread(target=digipi_monitor.run_forever, daemon=True).start()
+    threading.Thread(target=openspot_manager.run_forever, daemon=True).start()
     # waitress, not Flask's own dev server -- see CLAUDE.md gotcha on why
     # this must stay a single process (no --workers-style forking): the
     # FleetMonitor/camera/APRS-inbox background threads started above are

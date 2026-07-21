@@ -1,11 +1,12 @@
 # CLAUDE.md
 
 Context for Claude Code working in this repo. This is a self-hosted Flask
-dashboard for monitoring a fleet of WPSD/Pi-Star amateur radio hotspots and
-AllStarLink (ASL3) nodes — live status, active-call info, and a map, polled
-over SSH, with optional QRZ/RadioID/APRS/Brandmeister/AllStarLink-stats/Home
-Assistant/APRS-messaging integrations. Runs as Docker (Unraid) or standalone
-via systemd on a Pi/Linux box.
+dashboard for monitoring a fleet of WPSD/Pi-Star amateur radio hotspots,
+AllStarLink (ASL3) nodes (both polled over SSH), and openSPOT 4 (SharkRF)
+nodes (monitored over HTTP/WebSocket, no SSH access at all) — live status,
+active-call info, and a map, with optional QRZ/RadioID/APRS/Brandmeister/
+AllStarLink-stats/Home Assistant/APRS-messaging integrations. Runs as
+Docker (Unraid) or standalone via systemd on a Pi/Linux box.
 
 For end-user-facing docs (install, features, config), see `README.md` —
 this file is oriented at making changes to the code, not using the app.
@@ -20,8 +21,16 @@ monitor.py         FleetMonitor class: SSH polling (paramiko), MMDVM log
                    parsing (WPSD) / `rpt xnode` parsing (ASL3), caller
                    lookup composition, map data assembly. `check_one()`
                    dispatches on `hotspot.get("type", "wpsd")` to
-                   `_check_one_wpsd()` / `_check_one_asl3()` -- this is
-                   the pattern for any future node type
+                   `_check_one_wpsd()` / `_check_one_asl3()` /
+                   `_check_one_openspot4()` -- this is the pattern for
+                   any future node type. The openspot4 branch is a
+                   near-no-op (just the shared LAST_HEARD_TTL aging
+                   check) since that type is push-based, not polled --
+                   see openspot.py. `apply_external_update()` /
+                   `mark_external_offline()` / `lookup_caller_info()` /
+                   `apply_favorite_match()` / `log_activity()` are the
+                   public hooks a push-based integration calls into
+                   FleetMonitor instead of going through check_one()
 models.py          HotspotStatus dataclass -- the shape returned by
                    /api/data. Adding a field here + setting it in
                    monitor.py is how new per-hotspot data reaches the UI
@@ -68,6 +77,22 @@ wspr_activity.py  WsprActivityClient: live WSPR beacon-spot counts from
                    not a solar-index prediction), even though both
                    cards group bands the same way. Cached per-grid-
                    square, same pattern as hf_conditions.py otherwise.
+
+openspot.py        _OpenSpot4Worker + OpenSpot4Manager: openSPOT4 (SharkRF)
+                   has NO SSH access -- monitored over its own HTTP+
+                   WebSocket API instead. One persistent WebSocket
+                   connection per configured device (JWT login, then
+                   `ws://<ip>/<jwt>`, subprotocol `openspot4`), same
+                   "N independent persistent connections" shape as
+                   camera_stream.py's CameraStreamManager, not
+                   aprs_inbox.py's single-global-connection pattern.
+                   Reverse-verified live against a real openSPOT 4 Pro
+                   (browser dev-tools capture) -- SharkRF's own published
+                   API docs (github.com/sharkrf/osp-http-api) describe an
+                   OLDER, incompatible openSPOT generation with different
+                   endpoint names. See the Hard-won gotchas section
+                   before touching the message parser -- only DMR call
+                   start/end log lines are verified against a real call.
 
 digipi.py          DigipiMonitor: SSH-polls a DigiPi's Direwolf log
                    (/run/direwolf.log, NOT a systemd service -- a plain
@@ -919,6 +944,113 @@ config for per-integration credentials; put it in
   no new route, same trusted-LAN assumption already documented elsewhere
   in this file.
 
+- **A WPSD/MMDVM "screen mirror" (DigiPi-style) for the small OLED HATs
+  was explored and rejected as infeasible — not just unbuilt.** Checked
+  live against a real WPSD hotspot (SSH): `/var/www/dashboard/admin/
+  OLED_ajax.php` is a write-only power toggle (`i2cset ... 0xAE`/`0xAF`
+  at I2C address `0x3c`), not a render/capture endpoint; `/dev/fb0`
+  exists but is the Pi's stock HDMI framebuffer (`BCM2708 FB`,
+  1280x720), unrelated to the OLED; no `ssd1306fb`/`fbtft` kernel module
+  is loaded, so the OLED isn't exposed as a Linux framebuffer device at
+  all — MMDVMHost bit-bangs it directly over I2C. On top of that, the
+  SSD1306 controller's own datasheet documents that GDDRAM (its pixel
+  memory) is only readable over the parallel 8080/6800 interface, never
+  over I2C or SPI — a hardware limitation, not a missing driver, so this
+  isn't a "someone hasn't written the code yet" gap. Unlike DigiPi's
+  `direwatch.png` (confirmed servable with a live `curl` before writing
+  any code), there is no live-tested path to actually read back OLED
+  pixel content on this hardware class. A "recreate the display from
+  already-polled data (mode/TG/RSSI/BER/callsign) styled to look like an
+  OLED" version was mocked up and would be technically buildable, but
+  the user disregarded the feature entirely rather than pursue that
+  fallback — don't resurrect this without the user asking again, and if
+  revisited, the I2C-readback wall above is the reason a true mirror
+  specifically (not a recreation) is off the table.
+
+- **openSPOT 4 (SharkRF) support (v3.38) was built entirely from a live
+  protocol reverse-engineering session, not SharkRF's own published API
+  docs.** SharkRF publishes `github.com/sharkrf/osp-http-api` (and
+  `osb-http-api`/`osw-http-api` for openSPOT3/openSPOT2), but a real
+  openSPOT 4 Pro returned a live 404 on that doc's documented
+  `checkauth.cgi` endpoint — confirmed via `curl -v` against the real
+  device (`Server: SharkRF httpsrv`, so definitely a real openSPOT, just
+  a firmware generation the docs don't describe). Found the real API by
+  watching the device's own web UI talk to itself in browser dev tools
+  (Network tab, all requests, not just Fetch/XHR) rather than continuing
+  to guess from mismatched docs — the same "verify against the real
+  thing" discipline as DigiPi's `direwatch.png` discovery. Confirmed
+  live: `GET /checktok` (not `checkauth.cgi` — this firmware drops the
+  `.cgi` suffix and renames things) validates a JWT via
+  `Authorization: Bearer`; live status/call data streams over a
+  **WebSocket**, not polling (`ws://<ip>/<jwt>`, JWT in the URL path
+  since browser JS can't set custom WS handshake headers,
+  `Sec-WebSocket-Protocol: openspot4`) — found by noticing a Network-tab
+  row whose *name* was literally the JWT string, which turned out to be
+  a WS upgrade request. The `gettok`/`login` endpoints (how a fresh JWT
+  is obtained) were never actually captured live — the browser session
+  already had a JWT when capture started — so `openspot.py`'s `_login()`
+  ports the older-gen docs' endpoint names as a starting guess; this
+  turned out to be correct when tested against a real device (Settings
+  → Hotspots → "Test openSPOT4" succeeded on the first real attempt),
+  but re-verify with a live logout/login capture if it ever stops
+  working, rather than assuming the names drifted for no reason.
+- **openSPOT4's WebSocket message shapes were captured from real traffic
+  during an actual DMR call, not inferred from field names.** Key
+  findings, all confirmed live: `{"type":"status",...}` heartbeats
+  (~1/sec) have empty `rssi_values_dbm`/`ber_values` arrays at idle,
+  populated during a call. A call start is a `{"type":"log","log":
+  "dmrct: [0] grp voice call started, dst: <TG> src: <DMR ID> id:
+  <hex>"}` line, immediately followed by `{"type":"csd","id_type":"dmr",
+  "id":<DMR ID>,"callsign":"...","name":"..."}` — the device does its
+  **own** DMR-ID→callsign/name resolution (confirmed by an adjacent log
+  line, `"csd: dmr id ... query took 50ms"` — a live lookup, not a
+  bundled table), so `openspot.py` doesn't need this app's own RadioID
+  lookup for this hotspot type, just the same QRZ/RadioID/APRS
+  enrichment every other card layers on top for location/photo. A call
+  end is `{"type":"log","log":"dmrct: [0] call ended, dur <s>s ber
+  <pct>%25 loss <pct>%25 rssi <dbm>"}` — note the **literal `%25`** in
+  the string (confirmed real, not a decoding bug on this app's end;
+  `openspot.py`'s `_CALL_END_RE` matches it as-is) — with no call `id`/
+  src/dst in this line at all, so it's tracked as "whichever call this
+  device is currently following" (matched by the `<mode>ct:`/channel
+  prefix pair, not the hex id). A real distractor also observed live:
+  `{"type":"log","log":"homebrew: ignoring call from 4000 ended"}` — a
+  differently-worded line for a call on a talkgroup the device isn't
+  relaying, which must NOT be mistaken for the tracked call ending (it
+  naturally fails to match `_CALL_END_RE`'s shape, so no special
+  exclusion list was needed). **Only DMR (`dmrct:` prefix) has been
+  verified against a real call** — D-STAR/C4FM(YSF)/NXDN/P25 presumably
+  use their own `<x>ct:` prefix, but this is an unverified guess
+  (`openspot.py`'s `_MODE_BY_PREFIX`); don't assume those modes populate
+  active-call info correctly until confirmed the same way.
+- **openSPOT4 needed a manager shape closer to `camera_stream.py`'s
+  `CameraStreamManager` than `aprs_inbox.py`'s `AprsInbox`, even though
+  a persistent WebSocket connection sounds more like the latter.** The
+  deciding factor: openSPOT4 hotspots are a list (like wpsd/asl3), so
+  the app needs **N independent persistent connections**, not one
+  global one — `aprs_inbox.py`'s generation-counter trick (for a stale
+  thread to detect it's been superseded) isn't needed here since
+  `OpenSpot4Manager.reconcile()` tears down a replaced/removed device's
+  worker explicitly and synchronously (`worker.stop()`), the same
+  add/diff/stop-old shape `CameraStreamManager` already uses for its own
+  per-camera workers. A reconnect here is also heavier than
+  `aprs_inbox.py`'s (which just reuses a static APRS-IS passcode): every
+  reconnect redoes the full HTTP auth handshake (fresh token → digest →
+  login → new JWT) before reopening the WebSocket, since a JWT can't be
+  reused indefinitely the way an APRS-IS passcode can.
+- **`FleetMonitor._apply_last_heard_ttl()` had to be explicitly wired
+  into a new `_check_one_openspot4()`, not left as a no-op `pass`, or a
+  last-heard caller would never clear on an openspot4 card.** This
+  method is pure state-based aging logic (no log line triggers it) that
+  every WPSD/ASL3 poll tick already calls regardless of whether new data
+  arrived — easy to miss when a new hotspot type is push-based and the
+  first instinct is "there's nothing to poll, so do nothing." By
+  contrast, `config.ACTIVE_TIMEOUT`'s "stale log header" safety net is
+  purely about SSH log-tail-window scrolling and genuinely doesn't apply
+  here, since openSPOT4 gets explicit call-start/call-end push events
+  with no tail window to scroll out of — don't port that one over if
+  another push-based type is ever added.
+
 ## Testing patterns used throughout this project
 
 No test suite/framework is set up — verification has been done ad hoc but
@@ -977,9 +1109,9 @@ Always clean up `__pycache__` before zipping/packaging a build.
   container, not the template defaults.
 - **Pi/Linux standalone**: `install.sh`/`update.sh`/`uninstall.sh`,
   systemd service. `update.sh` diffs `requirements.txt` and reinstalls
-  automatically, so new **pip** dependencies (this project has three:
-  `paho-mqtt`, `aprslib`, `bambulabs_api`) don't need special handling
-  there. A new **system/apt** package (only `ffmpeg` so far, for camera
+  automatically, so new **pip** dependencies (this project has four:
+  `paho-mqtt`, `aprslib`, `bambulabs_api`, `websocket-client`) don't need
+  special handling there. A new **system/apt** package (only `ffmpeg` so far, for camera
   cards) is NOT covered by that diff-and-reinstall logic — it needs its
   own explicit, idempotent `command -v ffmpeg || apt-get install ...`
   check in `update.sh` (see the "Ensure ffmpeg" block), same spirit as

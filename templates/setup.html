@@ -656,7 +656,7 @@
             <div class="drag-row" draggable="true" data-ip="{{ hs.ip }}">
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">{{ hs.name }}</span>
-                <span class="node-meta">{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else '' }}</span>
+                <span class="node-meta">{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else (' · openSPOT4' if hs.get('type') == 'openspot4' else '') }}</span>
             </div>
             {% endfor %}
             {% if fleet_pos >= hotspots|length %}
@@ -991,7 +991,7 @@
             <div class="drag-row" style="align-items:center">
                 <span style="flex-shrink:0">📡</span>
                 <span class="node-name">{{ hs.name }}</span>
-                <span class="node-meta">{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else '' }}</span>
+                <span class="node-meta">{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else (' · openSPOT4' if hs.get('type') == 'openspot4' else '') }}</span>
                 <button class="btn btn-info btn-sm"
                         data-name="{{ hs.name }}" data-ip="{{ hs.ip }}" data-user="{{ hs.user }}"
                         data-pass="{{ hs.pass }}" data-lat="{{ hs.lat }}" data-lon="{{ hs.lon }}"
@@ -1018,17 +1018,18 @@
                  <select id="hs-type" onchange="onHotspotTypeChange()">
                      <option value="wpsd">WPSD / Pi-Star (DMR, D-Star, YSF, P25, NXDN)</option>
                      <option value="asl3">AllStarLink (ASL3)</option>
+                     <option value="openspot4">openSPOT 4 (SharkRF)</option>
                  </select></div>
             <div><label>Name</label>
                  <input type="text" id="hs-name" placeholder="Name"></div>
             <div><label>IP address</label>
                  <input type="text" id="hs-ip" placeholder="192.168.1.x"></div>
             <input type="hidden" id="hs-orig-ip">
-            <div><label>SSH user</label>
+            <div id="hs-user-wrap"><label>SSH user</label>
                  <input type="text" id="hs-user" placeholder="pi"></div>
         </div>
         <div class="form-grid" style="margin-bottom:10px">
-            <div><label>SSH password</label>
+            <div><label id="hs-pass-label">SSH password</label>
                  <input type="password" id="hs-pass" placeholder="••••••••"></div>
             <div><label>Latitude
                      <span style="font-size:10px;color:var(--text-dim)">(optional — shows this node on the live map)</span>
@@ -1037,7 +1038,7 @@
             <div><label>Longitude</label>
                  <input type="text" id="hs-lon" placeholder="e.g. -71.4548"></div>
         </div>
-        <div class="form-grid" style="margin-bottom:10px" id="hs-wpsd-fields">
+        <div class="form-grid" style="margin-bottom:10px" id="hs-bmid-fields">
             <div><label>Brandmeister ID
                      <span style="font-size:10px;color:var(--text-dim)">(optional — your hotspot's CCS7/repeater ID)</span>
                  </label>
@@ -1049,10 +1050,18 @@
                  </label>
                  <input type="text" id="hs-aslnode" placeholder="e.g. 59929"></div>
         </div>
+        <div class="form-grid" style="margin-bottom:10px;display:none" id="hs-openspot4-fields">
+            <div style="grid-column:1/-1;font-size:12px;color:var(--text-dim)">
+                openSPOT4 has no SSH/user concept — the password field above is
+                the device's own admin password, used to log in and open a live
+                status connection. The SSH user field is unused for this type.
+            </div>
+        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-            <button class="btn btn-info" onclick="testConn()">Test connection</button>
+            <button class="btn btn-info" id="hs-test-ssh-btn" onclick="testConn()">Test connection</button>
             <button class="btn btn-info" id="hs-test-bmid-btn" onclick="testBrandmeister()">Test Brandmeister ID</button>
             <button class="btn btn-info" id="hs-test-aslnode-btn" style="display:none" onclick="testAslNode()">Test ASL node</button>
+            <button class="btn btn-info" id="hs-test-openspot4-btn" style="display:none" onclick="testOpenSpot4()">Test openSPOT4</button>
             <form method="POST" style="margin:0">
                 <input type="hidden" name="name" id="form-name">
                 <input type="hidden" name="ip"   id="form-ip">
@@ -1689,13 +1698,22 @@ function clearHotspotForm() {
     document.getElementById('test-result').textContent = '';
 }
 
-// --- node type toggle (WPSD vs ASL3 fields) ---
+// --- node type toggle (WPSD vs ASL3 vs openSPOT4 fields) ---
 function onHotspotTypeChange() {
-    const isAsl = document.getElementById('hs-type').value === 'asl3';
-    document.getElementById('hs-wpsd-fields').style.display     = isAsl ? 'none' : '';
-    document.getElementById('hs-asl-fields').style.display      = isAsl ? '' : 'none';
-    document.getElementById('hs-test-bmid-btn').style.display    = isAsl ? 'none' : '';
-    document.getElementById('hs-test-aslnode-btn').style.display = isAsl ? '' : 'none';
+    const type        = document.getElementById('hs-type').value;
+    const isAsl       = type === 'asl3';
+    const isOpenSpot4 = type === 'openspot4';
+    // Brandmeister ID is valid for wpsd AND openspot4 (both are DMR devices) --
+    // only asl3 has no use for it.
+    document.getElementById('hs-bmid-fields').style.display        = isAsl ? 'none' : '';
+    document.getElementById('hs-asl-fields').style.display         = isAsl ? '' : 'none';
+    document.getElementById('hs-openspot4-fields').style.display   = isOpenSpot4 ? '' : 'none';
+    document.getElementById('hs-user-wrap').style.display          = isOpenSpot4 ? 'none' : '';
+    document.getElementById('hs-pass-label').textContent           = isOpenSpot4 ? 'Device admin password' : 'SSH password';
+    document.getElementById('hs-test-ssh-btn').style.display       = isOpenSpot4 ? 'none' : '';
+    document.getElementById('hs-test-bmid-btn').style.display      = isAsl ? 'none' : '';
+    document.getElementById('hs-test-aslnode-btn').style.display    = isAsl ? '' : 'none';
+    document.getElementById('hs-test-openspot4-btn').style.display  = isOpenSpot4 ? '' : 'none';
 }
 
 // --- connection test ---
@@ -1714,6 +1732,23 @@ async function testConn() {
     });
     const data = await r.json();
     res.textContent = data.success ? '✓ Connection successful' : '✕ Failed: ' + data.message;
+    res.className   = data.success ? 'ok' : 'err';
+}
+
+async function testOpenSpot4() {
+    const res = document.getElementById('test-result');
+    res.textContent = 'Testing...';
+    res.className   = '';
+    const r = await fetch('/api/test_openspot4', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            ip:   document.getElementById('hs-ip').value,
+            pass: document.getElementById('hs-pass').value,
+        })
+    });
+    const data = await r.json();
+    res.textContent = data.success ? '✓ ' + data.message : '✕ Failed: ' + data.message;
     res.className   = data.success ? 'ok' : 'err';
 }
 

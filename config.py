@@ -93,6 +93,17 @@ def build_digipi_status_cmd() -> str:
     return _LINUX_HOST_STATS_CMD + f"tail -n {DIGIPI_LOG_TAIL_LINES} /run/direwolf.log 2>/dev/null"
 
 
+# openSPOT 4 (SharkRF) -- no SSH/shell involved at all (a closed embedded
+# device controlled over HTTP + WebSocket), so unlike WPSD/ASL3/DigiPi
+# above there's no shell command to build here. Just the numeric knobs;
+# protocol details (endpoint paths, regexes, mode-prefix map) live local
+# to openspot.py, same as digipi.py keeps its own PACKET_RE local rather
+# than centralizing it here.
+OPENSPOT4_HTTP_TIMEOUT      = int(os.environ.get("OPENSPOT4_HTTP_TIMEOUT", 5))
+OPENSPOT4_RECV_TIMEOUT      = int(os.environ.get("OPENSPOT4_RECV_TIMEOUT", 10))
+OPENSPOT4_RECONNECT_BACKOFF = int(os.environ.get("OPENSPOT4_RECONNECT_BACKOFF", 10))
+
+
 # ASL3 ilink function codes for `rpt cmd <node> ilink <code> <remotenode>` --
 # NOT the DTMF-simulated `rpt fun <node> *3<remotenode>` form, which requires
 # replicating app_rpt's DTMF digit-collection state machine and proved

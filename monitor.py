@@ -199,11 +199,16 @@ class FleetMonitor:
     def check_one(self, hotspot: dict) -> None:
         """Dispatch to the right poll/parse path for this hotspot's type --
         "wpsd" (MMDVM log tail, default for backward compat with existing
-        hotspots.json entries that predate this field) or "asl3"
-        (AllStarLink, `rpt xnode`)."""
+        hotspots.json entries that predate this field), "asl3"
+        (AllStarLink, `rpt xnode`), or "openspot4" (SharkRF openSPOT4,
+        pushed via openspot.py's persistent WebSocket worker instead of
+        polled here)."""
         self._ensure_entry(hotspot)
-        if hotspot.get("type", "wpsd") == "asl3":
+        node_type = hotspot.get("type", "wpsd")
+        if node_type == "asl3":
             self._check_one_asl3(hotspot)
+        elif node_type == "openspot4":
+            self._check_one_openspot4(hotspot)
         else:
             self._check_one_wpsd(hotspot)
 
@@ -237,6 +242,60 @@ class FleetMonitor:
         except Exception:
             self._record_failure(ip)
 
+    def _check_one_openspot4(self, hotspot: dict) -> None:
+        """openspot.py's persistent WebSocket worker pushes live field
+        updates via apply_external_update() -- there's no SSH poll to run
+        here. This tick's only job is the same LAST_HEARD_TTL aging check
+        WPSD/ASL3 run every cycle (_apply_last_heard_ttl is pure
+        state-based logic, not triggered by a log line), since without
+        it a last-heard caller would never clear on an openspot4 card."""
+        ip = hotspot["ip"]
+        updates: dict = {}
+        self._apply_last_heard_ttl(ip, updates)
+        if updates:
+            with self._lock:
+                status = self._data[ip]
+                for field_name, value in updates.items():
+                    setattr(status, field_name, value)
+
+    def apply_external_update(self, ip: str, updates: dict) -> None:
+        """Push-based integrations (currently just openspot.py) merge a
+        batch of field updates under the shared lock. Receiving ANY
+        message over a persistent connection is itself proof of liveness
+        -- the WS analogue of a successful SSH poll -- so this also
+        resets the failure counter and clears offline_since. Drops the
+        update (rather than KeyError-ing) if ip isn't in self._data yet --
+        a possible race between the openspot worker thread starting and
+        check_one()'s first _ensure_entry() tick at app startup; the next
+        5s poll tick creates the entry and the next WS message lands
+        fine."""
+        with self._lock:
+            if ip not in self._data:
+                return
+            status = self._data[ip]
+            for field_name, value in updates.items():
+                setattr(status, field_name, value)
+            self._failures[ip] = 0
+            status.status = "Online"
+            status.offline_since = None
+
+    def mark_external_offline(self, ip: str) -> None:
+        """Called by openspot.py when a reconnect attempt fails -- same
+        FAILURE_THRESHOLD-gated Offline transition as _record_failure(),
+        just driven by connection state instead of a per-poll exception."""
+        self._record_failure(ip)
+
+    def lookup_caller_info(self, call: str) -> dict:
+        """Public wrapper around _lookup_caller for push-based
+        integrations that don't go through check_one()'s SSH poll path."""
+        return self._lookup_caller(call)
+
+    def apply_favorite_match(self, call: str) -> "tuple[bool, str | None]":
+        return self._apply_favorite_match(call)
+
+    def log_activity(self, ip: str) -> None:
+        self._log_activity(ip)
+
     def _ssh_exec(self, hotspot: dict, cmd: str, timeout: int) -> str:
         """Connect, run one command, return its decoded stdout. Raises on
         any connection/exec failure -- callers handle via _record_failure()."""
@@ -254,8 +313,13 @@ class FleetMonitor:
 
     def _record_failure(self, ip: str) -> None:
         with self._lock:
-            self._failures[ip] += 1
-            if self._failures[ip] >= config.FAILURE_THRESHOLD:
+            self._failures[ip] = self._failures.get(ip, 0) + 1
+            # ip may not be in self._data yet -- previously safe to assume
+            # since this was only ever called after _ensure_entry() ran
+            # earlier in the same check_one() invocation, but
+            # mark_external_offline() (openspot.py) can call in from a
+            # separate thread before that first tick lands.
+            if ip in self._data and self._failures[ip] >= config.FAILURE_THRESHOLD:
                 status = self._data[ip]
                 status.status = "Offline"
                 if status.offline_since is None:
