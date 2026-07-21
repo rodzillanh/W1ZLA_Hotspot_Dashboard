@@ -110,7 +110,7 @@
                 <span class="release-tag">current</span>
             </div>
             <ul class="change-list">
-                <li><span>Fixed openSPOT4 cards dropping/reconnecting roughly every 20 seconds</span> — looked at first like the device only tolerating one active session, but turned out to be this app's own WebSocket read timeout (10s) being too tight for the device's real message cadence, so a normal quiet stretch was mistaken for a dead connection and reconnected unnecessarily on a 20-second cycle. Bumped the timeout to 60s</li>
+                <li><span>openSPOT4 WebSocket read timeout increased from 10s to 60s</span> — a defensive tolerance increase in case the device has quiet stretches longer than 10s. (A separately-reported ~20-second reconnect pattern on this connection turned out to be the openSPOT4's own browser-based admin UI reconnecting, unrelated to this dashboard's connection, which was confirmed to have stayed online throughout — no actual bug found there)</li>
             </ul>
         </div>
 

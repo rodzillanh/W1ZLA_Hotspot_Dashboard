@@ -1090,30 +1090,44 @@ config for per-integration credentials; put it in
   a bare `HTTP Error 401: Unauthorized` — if a card is stuck Offline
   after a profile change and this message appears, the fix is adding
   that profile's password to the textarea, not a network diagnosis.
-- **What first looked like an openSPOT4 "only one session at a time"
-  hardware limitation turned out to be a self-inflicted 20-second
-  drop/reconnect loop in `openspot.py` itself.** First hypothesis (from
-  the device's own UI showing "connection is used from another
-  location" after this dashboard connected): the device only tolerates
-  one active session, a device-side limitation not fixable in this
-  codebase. That was corrected by a real device-side log export (not a
-  browser capture): it showed the device supports multiple numbered
-  WebSocket slots (`httpsrv-ws: [0] websocket opened...`, `[2]
-  websocket opened...`) open **simultaneously** — a limited pool, not a
-  strict single-session rule. The actual reported symptom ("drops every
-  ~20 seconds, nobody touching anything") pointed at this app's own
-  code instead: 20 seconds is exactly `OPENSPOT4_RECV_TIMEOUT` (10s,
-  original default) + `OPENSPOT4_RECONNECT_BACKOFF` (10s) — the
-  WebSocket read was timing out and being treated as a dead connection
-  even though the device was fine, because a 10s no-message window
-  turned out to be too tight for the device's actual (looser than
-  assumed) message cadence. Fixed by bumping `OPENSPOT4_RECV_TIMEOUT`'s
-  default to 60s. The lesson: a plausible first hypothesis (device
-  limitation, matching the APRS-IS verified-kick bug's *shape*) can
-  still be wrong — the fix here ended up being entirely on this app's
-  side, the opposite of the APRS-IS case. Don't assume "it's the
-  device" without checking this app's own timeout math against the
-  reported drop interval first.
+- **A repeated `httpsrv-ws: [2] websocket opened with token ...` line in
+  the openSPOT4's own device-side log (roughly every 20 seconds) turned
+  out to be completely unrelated to this app's connection — it was
+  SharkRF's own browser-based admin web UI reconnecting, not
+  `openspot.py`.** This took three rounds of live investigation to
+  narrow down, worth recording in full since each earlier hypothesis
+  was plausible and each was wrong:
+  1. First hypothesis (from the device's own UI showing "connection is
+     used from another location" after this dashboard connected): the
+     device only tolerates one active session — corrected by a real
+     device-side log export showing multiple numbered WebSocket slots
+     (`[0]`, `[2]`) open simultaneously, a limited pool, not a strict
+     single-session rule.
+  2. Second hypothesis: a self-inflicted 20-second drop/reconnect loop
+     in `openspot.py` itself, since 20s is exactly
+     `OPENSPOT4_RECV_TIMEOUT` (10s, original default) +
+     `OPENSPOT4_RECONNECT_BACKOFF` (10s) — bumped the timeout default to
+     60s on this theory. **This turned out to be the wrong fix for the
+     wrong problem**: after confirming the 60s value was actually
+     deployed (checked live, `docker exec ... grep
+     OPENSPOT4_RECV_TIMEOUT /app/config.py` on the running container,
+     not just the git source dir), the exact same ~20s pattern kept
+     appearing in fresh device-log captures — proving the recv-timeout
+     theory false, not just unconfirmed.
+  3. The actual resolution: asked directly whether the **dashboard
+     card** itself was flickering Offline during this same window. It
+     wasn't — it stayed solidly Online throughout every capture. The
+     repeated `"opened"` log lines were the user's own browser tab open
+     against the device's admin UI reconnecting on its own (unrelated to
+     this app entirely), not `openspot.py`'s connection.
+  The `OPENSPOT4_RECV_TIMEOUT=60` bump from step 2 was kept anyway (a
+  reasonable, harmless tolerance increase either way) but should NOT be
+  cited as "the fix" for this symptom, since there was nothing on this
+  app's side to fix. **Lesson for next time a device-log line looks
+  alarming**: check whether the *dashboard card itself* is actually
+  unstable before assuming a raw device log line implicates this app's
+  connection — a device can log plenty of activity that has nothing to
+  do with any specific client.
 - **The literal `%25` originally documented as "a confirmed real
   firmware quirk" in openSPOT4's `"log"` messages is more precisely a
   WebSocket-transport artifact, not something in the device's real log
