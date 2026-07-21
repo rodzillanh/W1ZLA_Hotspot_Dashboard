@@ -406,7 +406,19 @@ dashboard runs `sudo asterisk -rx "rpt xnode <node>"`, the same way you'd
 run it by hand at a shell prompt. If that SSH user would be prompted for
 a sudo password interactively, the poll (and the Settings "Test ASL node"
 button) will fail silently rather than hang, since there's no way to
-supply a password non-interactively.
+supply a password non-interactively — it'll look like `"Connected, but
+node <N> didn't return link status"` even though the node number is
+correct, since running the same command by hand at an interactive
+terminal lets you type the password and see it succeed, masking the
+problem. If you see that message, confirm it's this rather than a wrong
+node number by running the exact command by hand over SSH — if it
+prompts for a password, set up a passwordless sudo rule for that one
+command (adjust the `asterisk` path if `which asterisk` differs):
+
+```bash
+echo 'youruser ALL=(ALL) NOPASSWD: /usr/sbin/asterisk' | sudo tee /etc/sudoers.d/hotspot-dashboard-asterisk
+sudo chmod 0440 /etc/sudoers.d/hotspot-dashboard-asterisk
+```
 
 Rather than tailing an MMDVM log, an ASL3 hotspot is polled by running
 `asterisk -rx "rpt xnode <node>"` over the same SSH connection, which
