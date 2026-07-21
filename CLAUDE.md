@@ -1057,15 +1057,20 @@ config for per-integration credentials; put it in
   401 immediately after switching that device to a different profile
   (profile switches reboot the device — see `cpsettings`/profile-related
   entries below) — same IP, same password field in Settings, but the new
-  profile simply required a different password. There's no way to query
-  or auto-detect this (that would be a security hole), so
-  `openspot.py`'s `_describe_login_error()` just makes a 401 specifically
-  call this out (`"...each openSPOT4 profile can have its own separate
-  password"`) rather than a bare `HTTP Error 401: Unauthorized`, so a
-  user hitting this after a profile switch has a chance of understanding
-  why without re-diagnosing it from scratch. If a card is stuck Offline
-  after a profile change, check the password in Settings before assuming
-  a connection/network problem.
+  profile simply required a different password. There's no API to query
+  or auto-detect which profile is active (and no way to know a password
+  without the user supplying it), so this isn't solved by picking the
+  "right" one automatically — instead `openspot.py`'s `_collect_passwords()`
+  gathers the primary `pass` field plus an optional multi-line
+  `openspot4_extra_pass` (Settings' "Additional profile passwords"
+  textarea) into an ordered list, and `_login_any()` tries each in turn
+  at login/reconnect time until one authenticates, since only one
+  profile is ever active on a given physical device at once. A 401 after
+  trying every stored password (`_describe_login_error()`) explicitly
+  says how many were tried and that they were all rejected, rather than
+  a bare `HTTP Error 401: Unauthorized` — if a card is stuck Offline
+  after a profile change and this message appears, the fix is adding
+  that profile's password to the textarea, not a network diagnosis.
 - **openSPOT4's "Active config profile" display was investigated and its
   data source was NOT found, despite thorough live network capture.** A
   full fresh-page-load capture (dev tools open before the reload, "All"

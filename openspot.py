@@ -112,19 +112,68 @@ def _login(ip: str, password: str) -> str:
         return json.loads(resp.read())["jwt"]
 
 
-def _describe_login_error(e: Exception) -> str:
-    """A 401 specifically means the password was rejected -- worth calling
-    out that openSPOT4 config profiles can each carry their OWN separate
-    device password (confirmed live: switching profiles, which reboots
-    the device into that profile, silently invalidated a password that
-    had worked moments before against a different profile). Any other
-    error (unreachable/timeout/etc.) is left as the plain exception text."""
+def _collect_passwords(hotspot: dict) -> list:
+    """openSPOT4 config profiles can each have their own separate device
+    password (confirmed live), and only one profile is ever active on a
+    given physical device at a time. Rather than tracking which profile
+    is currently active (there's no API for that -- see CLAUDE.md), just
+    collect every password the user has told us about for this device --
+    the primary "pass" field plus any extras stored for other profiles --
+    and try them all at login time; whichever one matches the currently
+    active profile succeeds. Blank/duplicate entries are dropped, order
+    preserved (primary first) so the common single-profile case tries
+    its one password first, not last."""
+    candidates = [hotspot.get("pass", "")]
+    extra = hotspot.get("openspot4_extra_pass", "") or ""
+    candidates += [line.strip() for line in extra.splitlines()]
+    seen = set()
+    result = []
+    for pw in candidates:
+        if pw and pw not in seen:
+            seen.add(pw)
+            result.append(pw)
+    return result
+
+
+def _login_any(ip: str, passwords: list) -> "tuple[str, int]":
+    """Tries each password in order, returning (jwt, index) for the first
+    that succeeds. Raises the LAST encountered exception if every one
+    fails -- if the device is genuinely unreachable every attempt fails
+    the same way regardless of password, and if every attempt is a 401
+    (all stored passwords rejected by whichever profile is currently
+    active), the last one is just as representative as any other."""
+    if not passwords:
+        raise ValueError("no password configured")
+    last_exc: Exception = ValueError("no password configured")
+    for i, pw in enumerate(passwords):
+        try:
+            return _login(ip, pw), i
+        except Exception as e:
+            last_exc = e
+    raise last_exc
+
+
+def _describe_login_error(e: Exception, num_passwords: int = 1) -> str:
+    """A 401 specifically means every stored password was rejected --
+    worth calling out that openSPOT4 config profiles can each carry
+    their OWN separate device password (confirmed live: switching
+    profiles, which reboots the device into that profile, silently
+    invalidated a password that had worked moments before against a
+    different profile). Any other error (unreachable/timeout/etc.) is
+    left as the plain exception text."""
     if isinstance(e, urllib.error.HTTPError) and e.code == 401:
+        if num_passwords > 1:
+            return (
+                f"Login failed: HTTP 401 Unauthorized -- none of the "
+                f"{num_passwords} stored passwords were accepted for "
+                f"whichever config profile is currently active"
+            )
         return (
             "Login failed: HTTP 401 Unauthorized -- wrong password, or the "
             "device is on a different config profile than when this "
             "password was set (each openSPOT4 profile can have its own "
-            "separate password)"
+            "separate password -- add its password under \"Additional "
+            "profile passwords\" so both are tried automatically)"
         )
     return f"Login failed: {e}"
 
@@ -148,7 +197,7 @@ class _OpenSpot4Worker:
 
     def __init__(self, hotspot: dict, monitor):
         self._ip = hotspot["ip"]
-        self._password = hotspot.get("pass", "")
+        self._passwords = _collect_passwords(hotspot)
         self._monitor = monitor
         self._stop_event = threading.Event()
         self._active_call: dict | None = None  # the one in-flight call this device is tracking
@@ -161,7 +210,8 @@ class _OpenSpot4Worker:
         self._stop_event.set()
 
     def config_matches(self, hotspot: dict) -> bool:
-        return hotspot.get("ip") == self._ip and hotspot.get("pass", "") == self._password
+        return (hotspot.get("ip") == self._ip
+                and _collect_passwords(hotspot) == self._passwords)
 
     def _loop(self) -> None:
         while not self._stop_event.is_set():
@@ -173,7 +223,7 @@ class _OpenSpot4Worker:
                 self._stop_event.wait(config.OPENSPOT4_RECONNECT_BACKOFF)
 
     def _run_once(self) -> None:
-        jwt = _login(self._ip, self._password)
+        jwt, _ = _login_any(self._ip, self._passwords)
         _check_token(self._ip, jwt)  # fail fast with a clear auth error before the WS upgrade
         ws = websocket.create_connection(
             f"ws://{self._ip}/{jwt}",
@@ -366,15 +416,20 @@ class OpenSpot4Manager:
             self.reconcile(load_hotspots())
             time.sleep(config.POLL_INTERVAL)
 
-    def test_connection(self, ip: str, password: str) -> tuple[bool, str]:
+    def test_connection(self, ip: str, password: str, extra_passwords: str = "") -> tuple[bool, str]:
         """Settings 'Test' button -- login + checktok only, no persistent
-        WS opened (mirrors /api/test_asl_node's non-persistent smoke test)."""
+        WS opened (mirrors /api/test_asl_node's non-persistent smoke test).
+        extra_passwords is the raw multi-line textarea value (other config
+        profiles' passwords) -- tried in order alongside the primary one,
+        same as the real worker does."""
+        passwords = _collect_passwords({"pass": password, "openspot4_extra_pass": extra_passwords})
         try:
-            jwt = _login(ip, password)
+            jwt, idx = _login_any(ip, passwords)
         except Exception as e:
-            return False, _describe_login_error(e)
+            return False, _describe_login_error(e, len(passwords))
         try:
             _check_token(ip, jwt)
         except Exception as e:
             return False, f"Token check (checktok) failed: {e}"
-        return True, "Login and token check succeeded"
+        which = "primary password" if idx == 0 else f"additional password #{idx}"
+        return True, f"Login succeeded using the {which}"

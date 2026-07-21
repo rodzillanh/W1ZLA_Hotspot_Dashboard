@@ -425,9 +425,15 @@ def setup():
                 new_hotspot["asl_node"] = asl_node
         elif node_type == "openspot4":
             new_hotspot["type"] = "openspot4"
-            # No extra fields -- ip + the generic "pass" (already set
-            # unconditionally above) are all this type needs; "user" is
-            # stored but unused (no SSH/login-user concept for openSPOT4).
+            # "pass" (already set unconditionally above) is the primary
+            # password; "user" is stored but unused (no SSH/login-user
+            # concept for openSPOT4). openspot4_extra_pass holds any other
+            # config profiles' passwords (one per line) -- each openSPOT4
+            # profile can have its own separate password, confirmed live,
+            # so openspot.py tries all of these in order at login time.
+            extra_pass = request.form.get("openspot4_extra_pass", "")
+            if extra_pass.strip():
+                new_hotspot["openspot4_extra_pass"] = extra_pass
         # Match on the hotspot's ip *before* this edit, not the (possibly
         # just-changed) submitted ip -- matching on the new ip meant editing
         # a hotspot's IP address never removed the old entry (nothing had
@@ -676,12 +682,15 @@ def test_asl_node():
 
 @app.route("/api/test_openspot4", methods=["POST"])
 def test_openspot4():
-    """Test an openSPOT4 hotspot's admin password for the Settings 'Test'
-    button -- login + checktok only, no persistent WebSocket opened."""
-    data     = request.json or {}
-    ip       = data.get("ip", "").strip()
-    password = data.get("pass", "")
-    ok, message = openspot_manager.test_connection(ip, password)
+    """Test an openSPOT4 hotspot's admin password(s) for the Settings
+    'Test' button -- login + checktok only, no persistent WebSocket
+    opened. extra_pass is the raw multi-line textarea value (other
+    config profiles' passwords, since each profile can have its own)."""
+    data       = request.json or {}
+    ip         = data.get("ip", "").strip()
+    password   = data.get("pass", "")
+    extra_pass = data.get("extra_pass", "")
+    ok, message = openspot_manager.test_connection(ip, password, extra_pass)
     return jsonify({"success": ok, "message": message})
 
 

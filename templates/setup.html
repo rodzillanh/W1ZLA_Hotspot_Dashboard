@@ -121,7 +121,8 @@
         input[type="text"],
         input[type="password"],
         input[type="url"],
-        select {
+        select,
+        textarea {
             width: 100%;
             background: var(--input-bg);
             border: 1px solid var(--card-border);
@@ -130,7 +131,8 @@
             color: var(--text);
             font-size: 13px;
         }
-        input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+        textarea { font-family: inherit; resize: vertical; }
+        input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
         .toggle-row select { width: auto; flex-shrink: 0; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .form-grid.one { grid-template-columns: 1fr; }
@@ -997,7 +999,8 @@
                         data-pass="{{ hs.pass }}" data-lat="{{ hs.lat }}" data-lon="{{ hs.lon }}"
                         data-bmid="{{ hs.brandmeister_id }}" data-type="{{ hs.get('type', 'wpsd') }}"
                         data-asl-node="{{ hs.get('asl_node', '') }}"
-                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode)">
+                        data-openspot4-extra-pass="{{ hs.get('openspot4_extra_pass', '') }}"
+                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.openspot4ExtraPass)">
                     Edit
                 </button>
                 <form action="/api/delete_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
@@ -1051,10 +1054,16 @@
                  <input type="text" id="hs-aslnode" placeholder="e.g. 59929"></div>
         </div>
         <div class="form-grid" style="margin-bottom:10px;display:none" id="hs-openspot4-fields">
-            <div style="grid-column:1/-1;font-size:12px;color:var(--text-dim)">
+            <div style="grid-column:1/-1;font-size:12px;color:var(--text-dim);margin-bottom:8px">
                 openSPOT4 has no SSH/user concept — the password field above is
                 the device's own admin password, used to log in and open a live
                 status connection. The SSH user field is unused for this type.
+            </div>
+            <div style="grid-column:1/-1">
+                <label>Additional profile passwords
+                    <span style="font-size:10px;color:var(--text-dim)">(optional, one per line — each openSPOT4 config profile can have its own separate password, so add any others here and they'll all be tried automatically when logging in)</span>
+                </label>
+                <textarea id="hs-openspot4-extra-pass" rows="3" placeholder="e.g. second profile's password&#10;third profile's password"></textarea>
             </div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -1073,6 +1082,7 @@
                 <input type="hidden" name="brandmeister_id" id="form-bmid">
                 <input type="hidden" name="type" id="form-type">
                 <input type="hidden" name="asl_node" id="form-aslnode">
+                <input type="hidden" name="openspot4_extra_pass" id="form-openspot4-extra-pass">
                 <button class="btn btn-primary" onclick="submitHotspot(event)">Save hotspot</button>
             </form>
             <button class="btn btn-danger btn-sm" onclick="clearHotspotForm()" style="margin-left:auto">Clear</button>
@@ -1671,9 +1681,10 @@ function submitHotspot(e) {
     document.getElementById('form-bmid').value    = document.getElementById('hs-bmid').value;
     document.getElementById('form-type').value    = document.getElementById('hs-type').value;
     document.getElementById('form-aslnode').value = document.getElementById('hs-aslnode').value;
+    document.getElementById('form-openspot4-extra-pass').value = document.getElementById('hs-openspot4-extra-pass').value;
 }
 
-function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode) {
+function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, openspot4ExtraPass) {
     document.getElementById('hs-name').value    = name;
     document.getElementById('hs-ip').value      = ip;
     document.getElementById('hs-orig-ip').value = ip;
@@ -1684,6 +1695,7 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode) {
     document.getElementById('hs-bmid').value    = (bmid    && bmid    !== 'None') ? bmid    : '';
     document.getElementById('hs-type').value    = (type    && type    !== 'None') ? type    : 'wpsd';
     document.getElementById('hs-aslnode').value = (aslNode && aslNode !== 'None') ? aslNode : '';
+    document.getElementById('hs-openspot4-extra-pass').value = (openspot4ExtraPass && openspot4ExtraPass !== 'None') ? openspot4ExtraPass : '';
     onHotspotTypeChange();
     document.getElementById('hotspot-form-title').textContent = 'Edit hotspot';
     document.getElementById('hs-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1691,7 +1703,7 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode) {
 }
 
 function clearHotspotForm() {
-    ['hs-name','hs-ip','hs-orig-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode'].forEach(id => document.getElementById(id).value = '');
+    ['hs-name','hs-ip','hs-orig-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-openspot4-extra-pass'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('hs-type').value = 'wpsd';
     onHotspotTypeChange();
     document.getElementById('hotspot-form-title').textContent = 'Add hotspot';
@@ -1743,8 +1755,9 @@ async function testOpenSpot4() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            ip:   document.getElementById('hs-ip').value,
-            pass: document.getElementById('hs-pass').value,
+            ip:         document.getElementById('hs-ip').value,
+            pass:       document.getElementById('hs-pass').value,
+            extra_pass: document.getElementById('hs-openspot4-extra-pass').value,
         })
     });
     const data = await r.json();
