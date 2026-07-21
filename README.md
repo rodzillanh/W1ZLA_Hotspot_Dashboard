@@ -481,6 +481,13 @@ P25, but those modes' call-tracking log format hasn't been confirmed
 against a real call yet, so active-call info may not populate correctly
 in those modes until that's verified.
 
+**Each openSPOT4 config profile can have its own separate password.**
+Switching the device to a different profile (which reboots it) can mean
+the password saved in Settings no longer works, even though the IP
+hasn't changed — the card will show Offline and the Settings "Test"
+button will report a 401 until the password there is updated to match
+whichever profile is currently active.
+
 ## Host power control
 
 Optional "🔄 Reboot Pi" / "⏻ Power off Pi" buttons in Settings → General —

@@ -13,6 +13,10 @@ discipline as everywhere else in this project.
 
 Confirmed live:
 - Auth check: GET /checktok with `Authorization: Bearer <jwt>` -> 200.
+- gettok/login (obtaining a fresh JWT) -- initially ported from
+  SharkRF's older-gen docs as an unverified guess (the first capture
+  session only ever saw an already-issued JWT), but a later fresh-page-
+  load capture caught both by name, confirming the guessed paths exactly.
 - Live status/call data streams over a WebSocket, not polling:
   ws://<ip>/<jwt> (the JWT goes in the URL path, not a header -- a
   workaround since browser JS can't set custom WS handshake headers),
@@ -21,14 +25,17 @@ Confirmed live:
 - Real JSON message shapes observed streaming over that socket (see
   _handle_message below for exact per-type handling).
 
-NOT verified live -- see _login()'s docstring: the exact endpoint names/
-shapes for obtaining a fresh JWT (gettok/login) were never captured,
-since the browser session already had a JWT by the time capture started.
-Ported from SharkRF's older-gen docs as a starting-point guess only.
-
 Only DMR call parsing ("dmrct:" log prefix) has been verified against a
 real call. D-STAR/C4FM(YSF)/NXDN/P25 call start/end log line formats are
 unverified and may use a different prefix -- see _MODE_BY_PREFIX.
+
+An openSPOT4's admin password is NOT one fixed device-wide credential --
+each config profile can have its own separate password (confirmed live:
+a working password started returning 401 immediately after switching
+the device to a different profile, which reboots it into that profile).
+See _describe_login_error() -- a 401 specifically calls this out rather
+than a bare "Unauthorized", since it's the most likely cause after a
+profile change, not a connection/network problem.
 """
 import hashlib
 import json
@@ -45,13 +52,11 @@ from storage import load_hotspots
 
 # --- HTTP auth endpoints ---
 
-# UNVERIFIED against this firmware -- ported from SharkRF's older-gen
-# openSPOT docs (github.com/sharkrf/osp-http-api) as a starting point
-# only. Only /checktok (validating an *already-issued* JWT) was actually
-# confirmed live; the real names/shapes for obtaining a fresh JWT were
-# never captured (see module docstring). If wrong, _login() simply
-# raises and the Settings "Test" button reports "Login failed" -- a
-# clean, contained failure mode, not silently wrong data.
+# Ported from SharkRF's older-gen openSPOT docs (github.com/sharkrf/
+# osp-http-api) as a starting-point guess -- confirmed correct by a later
+# live dev-tools capture of a real fresh page load, which caught both
+# gettok and login by name (see module docstring). /checktok was
+# confirmed live from the start (validating an *already-issued* JWT).
 _GETTOK_PATH = "/gettok"
 _LOGIN_PATH = "/login"
 _CHECKTOK_PATH = "/checktok"
@@ -89,13 +94,8 @@ def _mode_for_prefix(prefix: str) -> str:
 
 
 def _login(ip: str, password: str) -> str:
-    """Full HTTP auth handshake -> a fresh JWT.
-
-    UNVERIFIED against this firmware's real gettok/login endpoints (see
-    module docstring) -- this is the first thing to re-check with a live
-    browser capture of an actual logout+login cycle before trusting it
-    further.
-    """
+    """Full HTTP auth handshake -> a fresh JWT. Endpoint names/shapes
+    confirmed live against this firmware (see module docstring)."""
     req = urllib.request.Request(f"http://{ip}{_GETTOK_PATH}")
     with urllib.request.urlopen(req, timeout=config.OPENSPOT4_HTTP_TIMEOUT) as resp:
         token = json.loads(resp.read())["token"]
@@ -110,6 +110,23 @@ def _login(ip: str, password: str) -> str:
     )
     with urllib.request.urlopen(req, timeout=config.OPENSPOT4_HTTP_TIMEOUT) as resp:
         return json.loads(resp.read())["jwt"]
+
+
+def _describe_login_error(e: Exception) -> str:
+    """A 401 specifically means the password was rejected -- worth calling
+    out that openSPOT4 config profiles can each carry their OWN separate
+    device password (confirmed live: switching profiles, which reboots
+    the device into that profile, silently invalidated a password that
+    had worked moments before against a different profile). Any other
+    error (unreachable/timeout/etc.) is left as the plain exception text."""
+    if isinstance(e, urllib.error.HTTPError) and e.code == 401:
+        return (
+            "Login failed: HTTP 401 Unauthorized -- wrong password, or the "
+            "device is on a different config profile than when this "
+            "password was set (each openSPOT4 profile can have its own "
+            "separate password)"
+        )
+    return f"Login failed: {e}"
 
 
 def _check_token(ip: str, jwt: str) -> None:
@@ -355,7 +372,7 @@ class OpenSpot4Manager:
         try:
             jwt = _login(ip, password)
         except Exception as e:
-            return False, f"Login failed: {e}"
+            return False, _describe_login_error(e)
         try:
             _check_token(ip, jwt)
         except Exception as e:

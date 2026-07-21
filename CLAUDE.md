@@ -1050,8 +1050,46 @@ config for per-integration credentials; put it in
   here, since openSPOT4 gets explicit call-start/call-end push events
   with no tail window to scroll out of — don't port that one over if
   another push-based type is ever added.
-
-## Testing patterns used throughout this project
+- **An openSPOT4's admin password is NOT one fixed device-wide
+  credential — each config profile can have its own separate password.**
+  Confirmed live, the hard way: a hotspot configured and successfully
+  tested against a real device started failing `Test openSPOT4` with a
+  401 immediately after switching that device to a different profile
+  (profile switches reboot the device — see `cpsettings`/profile-related
+  entries below) — same IP, same password field in Settings, but the new
+  profile simply required a different password. There's no way to query
+  or auto-detect this (that would be a security hole), so
+  `openspot.py`'s `_describe_login_error()` just makes a 401 specifically
+  call this out (`"...each openSPOT4 profile can have its own separate
+  password"`) rather than a bare `HTTP Error 401: Unauthorized`, so a
+  user hitting this after a profile switch has a chance of understanding
+  why without re-diagnosing it from scratch. If a card is stuck Offline
+  after a profile change, check the password in Settings before assuming
+  a connection/network problem.
+- **openSPOT4's "Active config profile" display was investigated and its
+  data source was NOT found, despite thorough live network capture.** A
+  full fresh-page-load capture (dev tools open before the reload, "All"
+  filter, not just Fetch/XHR) showed no dedicated profile-fetching
+  request at all — just the known `gettok`/`login`/`checktok`/WS/static-
+  asset requests. The WebSocket's own Messages tab was also checked for
+  a one-time startup message and came up empty. Most likely explanation:
+  the profile name is server-side rendered directly into the initial
+  HTML/JS for that page, not fetched via any separate API call — getting
+  it would mean scraping the device's own admin HTML rather than calling
+  a documented JSON endpoint the way every other piece of this
+  integration does. Deliberately NOT pursued for that reason (same
+  cost/fragility call as the WPSD OLED mirror) — if revisited, start by
+  viewing the raw page source of that specific admin page rather than
+  the network tab, since the network capture already ruled out a
+  separate request.
+- **This session also incidentally confirmed the `gettok`/`login`
+  endpoint names `openspot.py`'s `_login()` had only guessed from
+  older-gen docs** — a later, unrelated dev-tools capture (while
+  chasing the profile question above) caught a full fresh page load
+  including both `gettok` and `login` requests by name, both real and
+  both matching the guessed paths exactly. What was previously flagged
+  as "ported from older-gen docs, unverified" is now directly confirmed
+  live, not just indirectly (via a successful login) inferred.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
