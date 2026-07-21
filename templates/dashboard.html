@@ -1939,7 +1939,10 @@ function renderCards(data) {
 
         let infoBlock;
         if (isOffline) {
-            infoBlock = `<div class="offline-label">⚠ No response — SSH connection failed</div>
+            const offlineReason = isOpenSpot4
+                ? 'No response — WebSocket connection failed'
+                : 'No response — SSH connection failed';
+            infoBlock = `<div class="offline-label">⚠ ${offlineReason}</div>
                <div class="offline-sub">Offline for <span class="offline-duration" id="off-${hs.ip}">${fmtOfflineDuration(hs.offline_since)}</span> · last known data below, may be stale</div>`;
         } else if (hs.is_active) {
             infoBlock = `<div class="active-label" ${activeColor}>📡 ACTIVE:

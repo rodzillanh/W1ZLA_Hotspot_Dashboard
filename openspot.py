@@ -25,9 +25,22 @@ Confirmed live:
 - Real JSON message shapes observed streaming over that socket (see
   _handle_message below for exact per-type handling).
 
-Only DMR call parsing ("dmrct:" log prefix) has been verified against a
-real call. D-STAR/C4FM(YSF)/NXDN/P25 call start/end log line formats are
-unverified and may use a different prefix -- see _MODE_BY_PREFIX.
+Call lifecycle tracking is driven by "calllog" messages, not the
+human-readable "log" text lines -- confirmed live against BOTH a DMR
+call (Homebrew/BrandMeister connector) and a C4FM/YSF call (YSF
+Reflector connector, "TGIF"), which turned out to have genuinely
+different "log" line formats (DMR's has a "[N]" channel bracket; C4FM's
+does not, and never emits an equivalent "call started" log line at
+all -- only "calllog" reliably signals a call starting for every mode
+tested so far). A "calllog" entry with duration 0.0 is a call starting;
+the SAME "id" reappearing later with a real (>0) duration is that call
+ending, with its own ber/loss/rssi -- this is the same shape for DMR and
+C4FM, unlike the "log" lines which differ per mode. The "log" lines are
+only still used to opportunistically learn the human mode name (DMR/
+YSF) via each mode's own "<x>ct:" prefix -- see _MODE_BY_PREFIX. D-STAR/
+NXDN/P25 have not been tested at all; their calllog "src" field shape
+(DMR-ID-like vs. already-a-callsign, see _apply_call_start) and mode
+prefix are both unverified guesses if they ever come up.
 
 An openSPOT4's admin password is NOT one fixed device-wide credential --
 each config profile can have its own separate password (confirmed live:
@@ -44,6 +57,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections import deque
 
 import websocket
 
@@ -64,26 +78,22 @@ _CHECKTOK_PATH = "/checktok"
 # Confirmed live via a captured 101 Switching Protocols WS upgrade.
 _WS_SUBPROTOCOL = "openspot4"
 
-# "dmrct: [0] grp voice call started, dst: 313136 src: 3120038 id: 9efed7317c1b13ce"
-_CALL_START_RE = re.compile(
-    r"^(\w+ct): \[(\d+)\] grp voice call started, dst: (\d+) src: (\d+) id: ([0-9a-f]+)$"
-)
-# "dmrct: [0] call ended, dur 28.9s ber 0.3%25 loss 0.0%25 rssi -47"
-# The literal "%25" is a confirmed real firmware quirk (not a decoding
-# bug on our end) -- parsed as-is, not "fixed" to "%". No id/src/dst in
-# this line -- it's "whichever call this device is currently tracking"
-# (channel index [0]), not re-matched by call id.
-_CALL_END_RE = re.compile(
-    r"^(\w+ct): \[(\d+)\] call ended, dur ([\d.]+)s ber ([\d.]+)%25 loss ([\d.]+)%25 rssi (-?\d+)$"
-)
+# Matches just the mode-name prefix off the FRONT of any "log" line that
+# has one -- e.g. "dmrct: [0] grp voice call started, ..." or
+# "c4fmct: call ended, ...". Deliberately not trying to parse the rest of
+# the line (dst/src/id/dur/ber/loss/rssi) -- calllog gives all of that in
+# a consistent structured shape for every mode tested, this regex exists
+# purely to opportunistically learn the human mode name for display.
+_MODE_LOG_RE = re.compile(r"^(\w+ct):")
 
-# Only "dmrct" (DMR) confirmed live against a real call. Other modes
-# (C4FM/YSF, D-STAR, NXDN, P25) presumably have their own "<x>ct:"
-# prefix -- unverified guess at the pattern, so anything not in this map
-# falls back to stripping "ct" and upper-casing the prefix rather than
-# silently dropping the mode entirely.
+# Only "dmrct" (DMR) and "c4fmct" (C4FM/YSF) confirmed live. Other modes
+# (D-STAR, NXDN, P25) presumably have their own "<x>ct:" prefix --
+# unverified guess at the pattern, so anything not in this map falls back
+# to stripping "ct" and upper-casing the prefix rather than silently
+# dropping the mode entirely.
 _MODE_BY_PREFIX = {
     "dmrct": "DMR",
+    "c4fmct": "YSF",
 }
 
 
@@ -200,7 +210,13 @@ class _OpenSpot4Worker:
         self._passwords = _collect_passwords(hotspot)
         self._monitor = monitor
         self._stop_event = threading.Event()
-        self._active_call: dict | None = None  # the one in-flight call this device is tracking
+        self._active_call: dict | None = None  # {"id","src","dst"} for the one in-flight call this device is tracking
+        # calllog entries get rebroadcast periodically even after a call has
+        # ended (observed live: the same id/duration pair re-appearing
+        # ~10s later, unchanged) -- dedupe so a rebroadcast doesn't
+        # re-trigger "call ended" processing (re-logging Fleet activity,
+        # re-touching last_heard, etc.) every time it re-arrives.
+        self._finalized_call_ids: deque = deque(maxlen=50)
         self._thread = threading.Thread(target=self._loop, daemon=True)
 
     def start(self) -> None:
@@ -257,11 +273,10 @@ class _OpenSpot4Worker:
             self._on_log(msg.get("log", ""))
         elif mtype == "csd":
             self._on_csd(msg)
-        # "wifirssi", "netchk", "cptimeouts", "calllog" are intentionally
-        # not surfaced on the dashboard card in this first pass -- see
-        # plan's non-goals. calllog is redundant with the "log" call-
-        # start line for dst/src, and its own final duration/ber/loss/
-        # rssi at call end are unverified as ever actually being sent.
+        elif mtype == "calllog":
+            self._on_calllog(msg)
+        # "wifirssi", "netchk", "cptimeouts" are intentionally not
+        # surfaced on the dashboard card in this first pass.
 
     def _on_status(self, msg: dict) -> None:
         status = msg.get("status") or {}
@@ -277,53 +292,75 @@ class _OpenSpot4Worker:
         self._monitor.apply_external_update(self._ip, updates)
 
     def _on_log(self, text: str) -> None:
-        m = _CALL_START_RE.match(text)
+        """Only used to opportunistically learn the human mode name (DMR/
+        YSF/...) from whichever mode's own "<x>ct:" log line happens to
+        show up -- call lifecycle itself is driven by _on_calllog, not
+        this. Deliberately doesn't try to parse anything past the prefix
+        (dst/src/dur/ber/etc. all come from calllog instead, in a
+        consistent shape across modes, unlike these log lines which
+        differ per mode -- confirmed live, DMR's has a "[N]" channel
+        bracket and an explicit "call started" line, C4FM's has neither)."""
+        m = _MODE_LOG_RE.match(text)
         if m:
-            prefix, channel, dst, src, call_id = m.groups()
-            self._active_call = {
-                "prefix": prefix,
-                "channel": channel,
-                "dst": dst,
-                "src": src,
-                "id": call_id,
-            }
-            is_fav, fav_label = self._monitor.apply_favorite_match(src)
-            self._monitor.apply_external_update(self._ip, {
-                "is_active": True,
-                "active_call": src,  # placeholder DMR ID until a matching csd resolves a callsign
-                "talkgroup": dst,
-                "mode": _mode_for_prefix(prefix),
-                "tx_start": time.time(),
-                "last_heard": None,
-                "is_favorite": is_fav,
-                "favorite_label": fav_label,
-            })
+            self._monitor.apply_external_update(self._ip, {"mode": _mode_for_prefix(m.group(1))})
+
+    def _on_calllog(self, msg: dict) -> None:
+        """The universal call-lifecycle signal, confirmed live across two
+        different modes/connectors (DMR/Homebrew and C4FM/YSF Reflector):
+        a "calllog" entry with duration 0.0 is a call starting; the SAME
+        "id" reappearing later with a real duration is that call ending.
+        This is a structured JSON shape that's consistent across modes,
+        unlike the "log" text lines this replaced for call tracking."""
+        call_id = msg.get("id")
+        if not call_id:
+            return
+        src = str(msg.get("src") or "")
+        dst = str(msg.get("dst") or "")
+        duration = msg.get("duration")
+        is_final = isinstance(duration, (int, float)) and duration > 0
+
+        if not is_final:
+            if self._active_call and self._active_call["id"] == call_id:
+                return  # already tracking this one -- a rebroadcast of the same "started" state
+            self._active_call = {"id": call_id, "src": src, "dst": dst}
+            self._apply_call_start(src, dst)
             return
 
-        m = _CALL_END_RE.match(text)
-        if m:
-            prefix, channel, dur, ber, loss, rssi = m.groups()
-            active = self._active_call
-            # Must match the SAME call this device is tracking (prefix +
-            # channel), not just "some call ended" -- this also rejects
-            # the differently-worded "homebrew: ignoring call from N
-            # ended" distractor line automatically, since that text never
-            # matches this regex's "<mode>ct: [N] call ended, ..." shape
-            # at all.
-            if active and active["prefix"] == prefix and active["channel"] == channel:
-                self._monitor.apply_external_update(self._ip, {
-                    "is_active": False,
-                    "tx_start": None,
-                    "last_heard": time.time(),
-                    "ber": f"{ber}%",
-                    "rssi": f"{rssi} dBm",
-                })
-                self._monitor.log_activity(self._ip)
-                self._active_call = None
-            return
-        # Anything else (net-chk, homebrew ping/pong, cptimeouts-adjacent
-        # log text, etc.) is deliberately unmatched -- no explicit
-        # exclusion list needed, same convention as digipi.py's PACKET_RE.
+        if call_id in self._finalized_call_ids:
+            return  # already processed this call's ending -- just a periodic rebroadcast
+        self._finalized_call_ids.append(call_id)
+
+        ber = msg.get("ber")
+        rssi = msg.get("rssi")
+        updates = {"is_active": False, "tx_start": None, "last_heard": time.time()}
+        if isinstance(ber, (int, float)) and ber >= 0:
+            updates["ber"] = f"{ber}%"
+        if isinstance(rssi, (int, float)):
+            updates["rssi"] = f"{rssi} dBm"
+        self._monitor.apply_external_update(self._ip, updates)
+        self._monitor.log_activity(self._ip)
+        if self._active_call and self._active_call["id"] == call_id:
+            self._active_call = None
+
+    def _apply_call_start(self, src: str, dst: str) -> None:
+        is_fav, fav_label = self._monitor.apply_favorite_match(src)
+        self._monitor.apply_external_update(self._ip, {
+            "is_active": True,
+            "active_call": src,  # DMR ID placeholder (csd resolves it) or already a real callsign
+            "talkgroup": dst,
+            "tx_start": time.time(),
+            "last_heard": None,
+            "is_favorite": is_fav,
+            "favorite_label": fav_label,
+        })
+        if not src.isdigit():
+            # Not a DMR ID -- src is already a real callsign (confirmed
+            # live for C4FM/YSF, which addresses stations by callsign
+            # directly rather than a numeric ID), so there's no separate
+            # "csd" resolution coming the way DMR gets one. Enrich it
+            # here directly instead, same QRZ/RadioID/APRS path _on_csd
+            # uses for DMR.
+            self._enrich_caller(src)
 
     def _on_csd(self, msg: dict) -> None:
         active = self._active_call
@@ -332,19 +369,21 @@ class _OpenSpot4Worker:
         if msg.get("id_type") != "dmr" or str(msg.get("id")) != active["src"]:
             return
         callsign = msg.get("callsign")
-        device_name = msg.get("name")
-        call = callsign or active["src"]
+        if not callsign:
+            return
+        self._enrich_caller(callsign, msg.get("name"))
 
-        # openSPOT's own DMR-ID lookup only gives callsign+name, not
-        # location/photo/position -- reuse the same QRZ/RadioID/APRS
-        # enrichment path WPSD/ASL3 use for that. Its live-resolved
-        # name/callsign still take priority over QRZ/RadioID's (fresher,
-        # a per-call lookup done by the device itself).
-        if callsign:
-            caller_info = self._monitor.lookup_caller_info(call)
-        else:
-            caller_info = {"name": None, "location": None, "image_url": None,
-                            "lat": None, "lon": None, "source": None}
+    def _enrich_caller(self, call: str, device_name: str = None) -> None:
+        """Shared caller-info enrichment for both DMR (via _on_csd, keyed
+        off a resolved callsign) and C4FM/YSF (via _apply_call_start,
+        already a callsign with no separate resolution step). openSPOT's
+        own DMR-ID lookup (or C4FM/YSF's own callsign addressing) only
+        gives a callsign+name, not location/photo/position -- reuse the
+        same QRZ/RadioID/APRS enrichment path WPSD/ASL3 use for that. The
+        device's own name (when given, DMR only) still takes priority
+        over QRZ/RadioID's (fresher, a per-call lookup done by the
+        device itself)."""
+        caller_info = self._monitor.lookup_caller_info(call)
         resolved_name = device_name or caller_info["name"]
         is_fav, fav_label = self._monitor.apply_favorite_match(call)
 

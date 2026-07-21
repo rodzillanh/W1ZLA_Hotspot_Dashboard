@@ -995,34 +995,53 @@ config for per-integration credentials; put it in
   but re-verify with a live logout/login capture if it ever stops
   working, rather than assuming the names drifted for no reason.
 - **openSPOT4's WebSocket message shapes were captured from real traffic
-  during an actual DMR call, not inferred from field names.** Key
-  findings, all confirmed live: `{"type":"status",...}` heartbeats
-  (~1/sec) have empty `rssi_values_dbm`/`ber_values` arrays at idle,
-  populated during a call. A call start is a `{"type":"log","log":
-  "dmrct: [0] grp voice call started, dst: <TG> src: <DMR ID> id:
-  <hex>"}` line, immediately followed by `{"type":"csd","id_type":"dmr",
-  "id":<DMR ID>,"callsign":"...","name":"..."}` — the device does its
-  **own** DMR-ID→callsign/name resolution (confirmed by an adjacent log
-  line, `"csd: dmr id ... query took 50ms"` — a live lookup, not a
-  bundled table), so `openspot.py` doesn't need this app's own RadioID
-  lookup for this hotspot type, just the same QRZ/RadioID/APRS
-  enrichment every other card layers on top for location/photo. A call
-  end is `{"type":"log","log":"dmrct: [0] call ended, dur <s>s ber
-  <pct>%25 loss <pct>%25 rssi <dbm>"}` — note the **literal `%25`** in
-  the string (confirmed real, not a decoding bug on this app's end;
-  `openspot.py`'s `_CALL_END_RE` matches it as-is) — with no call `id`/
-  src/dst in this line at all, so it's tracked as "whichever call this
-  device is currently following" (matched by the `<mode>ct:`/channel
-  prefix pair, not the hex id). A real distractor also observed live:
-  `{"type":"log","log":"homebrew: ignoring call from 4000 ended"}` — a
-  differently-worded line for a call on a talkgroup the device isn't
-  relaying, which must NOT be mistaken for the tracked call ending (it
-  naturally fails to match `_CALL_END_RE`'s shape, so no special
-  exclusion list was needed). **Only DMR (`dmrct:` prefix) has been
-  verified against a real call** — D-STAR/C4FM(YSF)/NXDN/P25 presumably
-  use their own `<x>ct:` prefix, but this is an unverified guess
-  (`openspot.py`'s `_MODE_BY_PREFIX`); don't assume those modes populate
-  active-call info correctly until confirmed the same way.
+  during two actual calls on two different modes/connectors (DMR via
+  Homebrew/BrandMeister, then C4FM/YSF via a YSF Reflector/"TGIF"
+  profile), not inferred from field names.** `{"type":"status",...}`
+  heartbeats (~1/sec) have empty `rssi_values_dbm`/`ber_values` arrays at
+  idle, populated during a call — same for both modes. The two modes'
+  human-readable `"log"` lines turned out to have genuinely DIFFERENT
+  shapes: DMR emits `"dmrct: [0] grp voice call started, dst: <TG> src:
+  <DMR ID> id: <hex>"` (with a `[N]` channel bracket and an explicit
+  "started" line) and later `"dmrct: [0] call ended, dur <s>s ber
+  <pct>%25 loss <pct>%25 rssi <dbm>"` (note the **literal `%25`** —
+  confirmed real, not a decoding bug); C4FM/YSF only ever emits
+  `"c4fmct: call ended, dur <s>s ber <pct>%25 loss <pct>%25 rssi <dbm>"`
+  (**no `[N]` bracket at all**, and no equivalent "started" line was ever
+  observed) plus a separate `"ysfref: call ended"` line from the
+  connector itself. A first implementation parsed these `"log"` lines
+  directly with mode-specific regexes and completely failed to detect
+  C4FM/YSF calls at all (the bracket-requiring regex just never matched)
+  — confirmed live as a real, reported bug ("card not picking up an
+  active conversation"), not a hypothetical.
+  **Fixed by switching to `"calllog"` messages as the universal call-
+  lifecycle signal instead of the `"log"` text**: a `"calllog"` entry
+  with `duration: 0.0` is a call starting; the SAME `"id"` reappearing
+  later with a real (`> 0`) `duration` is that call ending, complete
+  with its own `ber`/`loss`/`rssi` — confirmed to have this exact shape
+  for BOTH modes tested, unlike the `"log"` lines which differ per mode.
+  `"calllog"` entries also get periodically **rebroadcast** even after
+  finalizing (the same `id`/`duration` pair re-appearing ~10s later,
+  unchanged) — `openspot.py`'s `_finalized_call_ids` dedupes this so a
+  rebroadcast doesn't re-trigger "call ended" processing repeatedly. The
+  `"log"` lines are now only used opportunistically to learn the human
+  mode name (via each mode's own `"<x>ct:"` prefix, `_MODE_LOG_RE`/
+  `_MODE_BY_PREFIX`) — not for call state at all anymore.
+  **Also discovered live**: DMR's `calllog.src` is a numeric DMR ID
+  (needs the separate `"csd"` message to resolve a callsign, as before);
+  C4FM/YSF's `calllog.src` is **already a real callsign** (`"KH7EH"`,
+  not a DMR ID) — YSF addresses stations by callsign natively, so there's
+  no equivalent `"csd"` resolution step for this mode. `openspot.py`
+  distinguishes the two with a simple `src.isdigit()` check
+  (`_apply_call_start`) and enriches directly via the shared
+  `_enrich_caller()` helper when `src` isn't numeric, skipping the `csd`
+  wait entirely. The `"homebrew: ignoring call from 4000 ended"`
+  distractor (a differently-worded line for a call the device isn't
+  relaying) is naturally irrelevant now too, since it was only ever a
+  `"log"` line and calllog-driven tracking doesn't look at `"log"` text
+  for state at all. **D-STAR/NXDN/P25 remain completely unverified** —
+  neither their `calllog.src` shape (DMR-ID-like vs. already-a-callsign)
+  nor their mode-log prefix has been tested against a real call.
 - **openSPOT4 needed a manager shape closer to `camera_stream.py`'s
   `CameraStreamManager` than `aprs_inbox.py`'s `AprsInbox`, even though
   a persistent WebSocket connection sounds more like the latter.** The
@@ -1071,6 +1090,28 @@ config for per-integration credentials; put it in
   a bare `HTTP Error 401: Unauthorized` — if a card is stuck Offline
   after a profile change and this message appears, the fix is adding
   that profile's password to the textarea, not a network diagnosis.
+- **An openSPOT4 appears to only tolerate ONE active web/API session at
+  a time — opening the device's own admin web UI in a browser while this
+  app's persistent WebSocket connection is already open can kick one or
+  the other.** Reported live: the device's own web UI showed "openSPOT4
+  web interface disconnected, connection is used from another location"
+  after this dashboard's connection had been open, and the dashboard's
+  connection was separately observed dropping/reconnecting repeatedly
+  during a session where the device's admin UI was also open in a
+  browser for dev-tools captures. This is the same *shape* of bug as the
+  APRS-IS verified-vs-verified connection kick fixed earlier this
+  project (two things claiming the same "primary" slot, one gets
+  dropped) but almost certainly NOT fixable the same way — there's no
+  known "unverified/observer" login mode for openSPOT4 the way APRS-IS
+  has an unverified receive-only login, and this wasn't tested further
+  given the device is a closed embedded firmware with no published API
+  docs for this generation at all (see the whole `openspot.py` module
+  docstring). Treat this as a real, disclosed hardware/firmware
+  limitation: don't expect the dashboard's live monitoring and the
+  device's own admin web UI to both stay connected reliably at the same
+  time. If a card seems to be dropping/reconnecting for no clear reason,
+  check whether the device's own web UI is open in a browser somewhere
+  before assuming it's an `openspot.py` bug.
 - **openSPOT4's "Active config profile" display was investigated and its
   data source was NOT found, despite thorough live network capture.** A
   full fresh-page-load capture (dev tools open before the reload, "All"

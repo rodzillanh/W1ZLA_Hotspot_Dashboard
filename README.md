@@ -475,11 +475,23 @@ Mode/RSSI/BER and the linked talkgroup show the same way a WPSD card
 does — there's no Linux host access, so temperature/CPU/uptime don't
 appear on an openSPOT4 card.
 
-**DMR calls only, for now.** Call start/end detection is currently only
-verified for DMR — openSPOT4 also supports D-STAR, C4FM(YSF), NXDN, and
-P25, but those modes' call-tracking log format hasn't been confirmed
-against a real call yet, so active-call info may not populate correctly
-in those modes until that's verified.
+**DMR and C4FM(YSF) verified so far.** Call start/end tracking has been
+confirmed against real calls on both DMR (Homebrew/BrandMeister-style
+connectors) and C4FM/YSF (YSF Reflector connectors, e.g. TGIF) — these
+two turned out to behave differently enough under the hood (see
+`CLAUDE.md`) that getting DMR working didn't automatically mean YSF
+would work too, and it initially didn't. D-STAR and NXDN/P25 are still
+unverified — active-call info may not populate correctly in those modes
+until confirmed against a real call the same way.
+
+**Opening the openSPOT4's own web admin page while the dashboard is
+also monitoring it can cause disconnects.** The device appears to only
+tolerate one active session at a time — its own UI has shown "connection
+is used from another location" after the dashboard connected, and the
+dashboard's own connection has been seen dropping/reconnecting while the
+admin UI was open elsewhere. If a card seems to be flapping for no clear
+reason, check whether the device's own web UI is open in a browser
+somewhere first.
 
 **Each openSPOT4 config profile can have its own separate password.**
 Switching the device to a different profile (which reboots it) can mean
