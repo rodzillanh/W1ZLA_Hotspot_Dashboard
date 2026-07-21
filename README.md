@@ -484,15 +484,6 @@ would work too, and it initially didn't. D-STAR and NXDN/P25 are still
 unverified — active-call info may not populate correctly in those modes
 until confirmed against a real call the same way.
 
-**Opening the openSPOT4's own web admin page while the dashboard is
-also monitoring it can cause disconnects.** The device appears to only
-tolerate one active session at a time — its own UI has shown "connection
-is used from another location" after the dashboard connected, and the
-dashboard's own connection has been seen dropping/reconnecting while the
-admin UI was open elsewhere. If a card seems to be flapping for no clear
-reason, check whether the device's own web UI is open in a browser
-somewhere first.
-
 **Each openSPOT4 config profile can have its own separate password.**
 Switching the device to a different profile (which reboots it) can mean
 the password saved in Settings no longer works, even though the IP

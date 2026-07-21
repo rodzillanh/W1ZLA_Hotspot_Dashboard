@@ -100,7 +100,14 @@ def build_digipi_status_cmd() -> str:
 # to openspot.py, same as digipi.py keeps its own PACKET_RE local rather
 # than centralizing it here.
 OPENSPOT4_HTTP_TIMEOUT      = int(os.environ.get("OPENSPOT4_HTTP_TIMEOUT", 5))
-OPENSPOT4_RECV_TIMEOUT      = int(os.environ.get("OPENSPOT4_RECV_TIMEOUT", 10))
+# Originally 10 -- confirmed live (real device log + the drop cadence
+# matching exactly RECV_TIMEOUT + RECONNECT_BACKOFF) that 10s was too
+# tight: the device doesn't reliably push *something* at least once every
+# 10s even when the connection is perfectly healthy, so this was
+# self-inflicted 20-second drop/reconnect cycling, not a device-side
+# kick. Bumped to 60s -- still catches a genuinely dead connection
+# reasonably promptly, just stops mistaking a normal quiet stretch for one.
+OPENSPOT4_RECV_TIMEOUT      = int(os.environ.get("OPENSPOT4_RECV_TIMEOUT", 60))
 OPENSPOT4_RECONNECT_BACKOFF = int(os.environ.get("OPENSPOT4_RECONNECT_BACKOFF", 10))
 
 

@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.39</span>
+                <span class="release-version">v3.40</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed openSPOT4 cards dropping/reconnecting roughly every 20 seconds</span> — looked at first like the device only tolerating one active session, but turned out to be this app's own WebSocket read timeout (10s) being too tight for the device's real message cadence, so a normal quiet stretch was mistaken for a dead connection and reconnected unnecessarily on a 20-second cycle. Bumped the timeout to 60s</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.39</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed openSPOT4 cards not showing C4FM/YSF calls at all</span> — call tracking was originally built around DMR's human-readable log line ("grp voice call started"/"call ended"), then confirmed working, then found to completely miss C4FM/YSF calls (e.g. TGIF) once tested live, since that mode's log lines are shaped differently and never announce a call starting at all. Rebuilt around the "calllog" messages instead, which turned out to signal call start/end consistently across both modes — also fixes the offline card wrongly saying "SSH connection failed" (openSPOT4 never uses SSH)</li>

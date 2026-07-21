@@ -1090,28 +1090,48 @@ config for per-integration credentials; put it in
   a bare `HTTP Error 401: Unauthorized` — if a card is stuck Offline
   after a profile change and this message appears, the fix is adding
   that profile's password to the textarea, not a network diagnosis.
-- **An openSPOT4 appears to only tolerate ONE active web/API session at
-  a time — opening the device's own admin web UI in a browser while this
-  app's persistent WebSocket connection is already open can kick one or
-  the other.** Reported live: the device's own web UI showed "openSPOT4
-  web interface disconnected, connection is used from another location"
-  after this dashboard's connection had been open, and the dashboard's
-  connection was separately observed dropping/reconnecting repeatedly
-  during a session where the device's admin UI was also open in a
-  browser for dev-tools captures. This is the same *shape* of bug as the
-  APRS-IS verified-vs-verified connection kick fixed earlier this
-  project (two things claiming the same "primary" slot, one gets
-  dropped) but almost certainly NOT fixable the same way — there's no
-  known "unverified/observer" login mode for openSPOT4 the way APRS-IS
-  has an unverified receive-only login, and this wasn't tested further
-  given the device is a closed embedded firmware with no published API
-  docs for this generation at all (see the whole `openspot.py` module
-  docstring). Treat this as a real, disclosed hardware/firmware
-  limitation: don't expect the dashboard's live monitoring and the
-  device's own admin web UI to both stay connected reliably at the same
-  time. If a card seems to be dropping/reconnecting for no clear reason,
-  check whether the device's own web UI is open in a browser somewhere
-  before assuming it's an `openspot.py` bug.
+- **What first looked like an openSPOT4 "only one session at a time"
+  hardware limitation turned out to be a self-inflicted 20-second
+  drop/reconnect loop in `openspot.py` itself.** First hypothesis (from
+  the device's own UI showing "connection is used from another
+  location" after this dashboard connected): the device only tolerates
+  one active session, a device-side limitation not fixable in this
+  codebase. That was corrected by a real device-side log export (not a
+  browser capture): it showed the device supports multiple numbered
+  WebSocket slots (`httpsrv-ws: [0] websocket opened...`, `[2]
+  websocket opened...`) open **simultaneously** — a limited pool, not a
+  strict single-session rule. The actual reported symptom ("drops every
+  ~20 seconds, nobody touching anything") pointed at this app's own
+  code instead: 20 seconds is exactly `OPENSPOT4_RECV_TIMEOUT` (10s,
+  original default) + `OPENSPOT4_RECONNECT_BACKOFF` (10s) — the
+  WebSocket read was timing out and being treated as a dead connection
+  even though the device was fine, because a 10s no-message window
+  turned out to be too tight for the device's actual (looser than
+  assumed) message cadence. Fixed by bumping `OPENSPOT4_RECV_TIMEOUT`'s
+  default to 60s. The lesson: a plausible first hypothesis (device
+  limitation, matching the APRS-IS verified-kick bug's *shape*) can
+  still be wrong — the fix here ended up being entirely on this app's
+  side, the opposite of the APRS-IS case. Don't assume "it's the
+  device" without checking this app's own timeout math against the
+  reported drop interval first.
+- **The literal `%25` originally documented as "a confirmed real
+  firmware quirk" in openSPOT4's `"log"` messages is more precisely a
+  WebSocket-transport artifact, not something in the device's real log
+  text.** A raw on-device log export (distinct from the browser-captured
+  WebSocket JSON) shows the actual stored log line as `"c4fmct: call
+  ended, dur 0.7s ber 0.3% loss 0.0% rssi -48"` — a plain `%`, never
+  `%25`. Something specifically in the path from internal log to
+  WebSocket JSON payload double-encodes it. No code change needed
+  (`openspot.py`'s regexes correctly match what actually arrives over
+  the WebSocket, which is `%25`, and that's the only thing this app ever
+  parses) — this is purely a documentation correction so a future reader
+  doesn't conclude the device's *real* logs contain `%25`, only what's
+  serialized into the WS JSON does. Also seen in that same raw log: a
+  third log-line format for the same event (`"ysfref-c4fm: call
+  started"`/`"call stopped"`), and much more verbose per-packet lines
+  (`"c4fmct: got header"`/`"got terminator"`) that never appear over the
+  WebSocket at all — confirms the WS `"log"` feed is a filtered subset
+  of a far more verbose internal log, not the complete picture.
 - **openSPOT4's "Active config profile" display was investigated and its
   data source was NOT found, despite thorough live network capture.** A
   full fresh-page-load capture (dev tools open before the reload, "All"
