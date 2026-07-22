@@ -8,6 +8,7 @@ SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 FAVORITES_FILE = os.path.join(CONFIG_DIR, "favorites.json")
 ASL_FAVORITES_FILE = os.path.join(CONFIG_DIR, "asl_favorites.json")
 CAMERAS_FILE = os.path.join(CONFIG_DIR, "cameras.json")
+QSOS_FILE    = os.path.join(CONFIG_DIR, "qsos.json")
 
 # --- Server ---
 HOST = "0.0.0.0"

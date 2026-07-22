@@ -190,7 +190,12 @@ class WsprActivityClient:
 # Live map's optional "WSPR spots" overlay -- deliberately worldwide, not
 # local, so the layer is always populated and reads as "a lot happening
 # right now" regardless of whether a station_grid is configured.
-SPOT_CACHE_TTL  = 90    # seconds -- feels live without troubling the shared 20 req/min budget
+SPOT_CACHE_TTL  = 30    # seconds -- bumped from 90 on request for a snappier feel; still
+                        # nowhere near wspr.live's 20 req/min shared budget (2 req/min from
+                        # this client alone). Note the underlying data's own ~2-min bursty
+                        # update cadence (confirmed live, see SPOT_WINDOW_SEC below) means
+                        # this mostly just catches each new burst sooner, not a guarantee of
+                        # meaningfully newer data on every single poll.
 SPOT_WINDOW_SEC = 300   # 5 min -- confirmed live that a tight 120s window can return zero
                         # rows (spot inserts arrive in bursts, not a smooth stream); 5 min
                         # reliably had ~6350 rows globally when checked live

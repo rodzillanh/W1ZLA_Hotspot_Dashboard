@@ -107,3 +107,21 @@ def save_cameras(cameras: list) -> None:
     os.makedirs(config.CONFIG_DIR, exist_ok=True)
     with _file_lock, open(config.CAMERAS_FILE, "w") as f:
         json.dump(cameras, f, indent=4)
+
+
+# --- QSOs (imported from an ADIF log) ---
+
+def load_qsos() -> list:
+    if not os.path.exists(config.QSOS_FILE):
+        return []
+    try:
+        with _file_lock, open(config.QSOS_FILE, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_qsos(qsos: list) -> None:
+    os.makedirs(config.CONFIG_DIR, exist_ok=True)
+    with _file_lock, open(config.QSOS_FILE, "w") as f:
+        json.dump(qsos, f, indent=4)

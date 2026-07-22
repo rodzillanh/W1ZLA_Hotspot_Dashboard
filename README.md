@@ -962,6 +962,18 @@ appear as pins — the QRZ subscription caveat above applies here too.
   you turn it off. A genuinely different signal than the single
   "Aurora: N" number on the HF Conditions card — this is the actual
   geographic model, not a single index value.
+- **ADIF QSO import** — a floating "Import ADIF log" control on the map
+  lets you upload a `.adi`/`.adif` log file exported from your logging
+  software; each worked station gets plotted as a band-colored pin.
+  Unlike the layer checkboxes above, this is persistent — it's saved
+  server-side and stays on the map across visits until you clear it,
+  the same as everything else in this app. A "Show on map" checkbox
+  lets you hide the pins temporarily without deleting the imported log.
+  Position comes from the QSO's own `GRIDSQUARE` field when the log
+  includes one, falling back to the same QRZ/RadioID lookup every
+  other card already uses when it doesn't; a QSO with neither is
+  skipped rather than plotted incorrectly. Importing a new log replaces
+  the previous one — there's no merge/dedupe across imports.
 ## Fleet activity
 
 Optional — off by default (Settings → Cards → "Show fleet activity

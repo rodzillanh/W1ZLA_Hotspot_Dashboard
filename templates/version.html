@@ -105,9 +105,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.42</span>
+                <span class="release-version">v3.43</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ADIF QSO import</span> — a floating "Import ADIF log" control on the Live map lets you upload a logging-software export and plot every worked station as a band-colored pin. Unlike the map's optional layer checkboxes, this is persistent (saved server-side, stays across visits) and reuses the same QRZ/RadioID lookup every other card already uses when a QSO's own grid square isn't in the log</li>
+                <li><span>WSPR spots refresh speed increased</span> — from 90s to 30s, still comfortably under wspr.live's shared rate limit; also reduced from up to 400 rendered spots down to the 10 most recent, since the full set was too dense to read at a glance</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.42</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Two new live map overlays</span> — "WSPR spots" plots real, live spotter↔transmitter pairs from wspr.live worldwide, color-coded by band; "Aurora oval" plots NOAA's live OVATION auroral activity model as a glow near the poles. Both are map-legend checkboxes next to Grey line, off by default, and only poll their data source while actually turned on</li>

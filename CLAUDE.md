@@ -94,6 +94,17 @@ openspot.py        _OpenSpot4Worker + OpenSpot4Manager: openSPOT4 (SharkRF)
                    before touching the message parser -- only DMR call
                    start/end log lines are verified against a real call.
 
+adif.py            parse_adif(): a pure ADIF (ham radio log interchange
+                   format) tokenizer for the Live map's "Import ADIF
+                   log" feature -- no ham-radio-lookup dependencies here
+                   by design, position resolution (GRIDSQUARE vs. QRZ/
+                   RadioID callsign fallback via monitor.lookup_caller_
+                   info()) lives in app.py's /api/import_adif route
+                   instead. Imported QSOs persist in qsos.json
+                   (storage.py's load_qsos()/save_qsos(), same flat-file
+                   convention as hotspots.json/cameras.json) -- replaced
+                   wholesale on each import, no merge/dedupe.
+
 digipi.py          DigipiMonitor: SSH-polls a DigiPi's Direwolf log
                    (/run/direwolf.log, NOT a systemd service -- a plain
                    background process) for APRS activity. Deliberately a

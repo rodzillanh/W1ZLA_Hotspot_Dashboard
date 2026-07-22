@@ -21,7 +21,7 @@ import qrz as qrz_mod
 from monitor import FleetMonitor
 from storage import load_hotspots, save_hotspots, load_settings, save_settings, \
                    load_favorites, save_favorites, load_asl_favorites, save_asl_favorites, \
-                   load_cameras, save_cameras
+                   load_cameras, save_cameras, load_qsos, save_qsos
 from weather import WeatherClient
 from qrz import QrzClient
 from aprs import AprsClient
@@ -35,8 +35,9 @@ from update_check import UpdateChecker
 from camera_stream import CameraStreamManager
 from hf_conditions import HfConditionsClient
 from license_quiz import LicenseQuizPool
-from wspr_activity import WsprActivityClient, WsprSpotsClient
+from wspr_activity import WsprActivityClient, WsprSpotsClient, grid_to_latlon
 from aurora import AuroraClient
+from adif import parse_adif
 from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
 
@@ -575,6 +576,56 @@ def api_aurora():
     if data is None:
         return jsonify({"error": "unavailable"}), 503
     return jsonify(data)
+
+@app.route("/api/qsos")
+def api_qsos():
+    return jsonify(load_qsos())
+
+@app.route("/api/import_adif", methods=["POST"])
+def api_import_adif():
+    """Parses an uploaded ADIF log and replaces the stored QSO list
+    wholesale (no merge/dedupe -- a station worked many times is
+    expected). Position resolution: GRIDSQUARE first (direct, no lookup
+    needed), falling back to the same QRZ/RadioID/APRS composition every
+    other card uses (monitor.lookup_caller_info) when absent. A QSO with
+    neither is skipped -- nothing to plot it with."""
+    data = request.json or {}
+    text = data.get("text", "")
+    filename = data.get("filename", "")
+    records = parse_adif(text)
+
+    qsos = []
+    for r in records:
+        call = (r.get("CALL") or "").strip().upper()
+        if not call:
+            continue
+        lat = lon = name = location = None
+        grid = (r.get("GRIDSQUARE") or "").strip()
+        latlon = grid_to_latlon(grid) if grid else None
+        if latlon is not None:
+            lat, lon = latlon
+        else:
+            info = monitor.lookup_caller_info(call)
+            lat, lon = info["lat"], info["lon"]
+            name, location = info["name"], info["location"]
+        if lat is None or lon is None:
+            continue  # can't plot without a position
+        qsos.append({
+            "call": call,
+            "band": (r.get("BAND") or "").strip().lower(),
+            "mode": (r.get("MODE") or "").strip().upper(),
+            "date": (r.get("QSO_DATE") or "").strip(),
+            "lat": lat, "lon": lon,
+            "name": name, "location": location,
+        })
+
+    save_qsos(qsos)
+    return jsonify({"ok": True, "count": len(qsos), "filename": filename, "qsos": qsos})
+
+@app.route("/api/clear_qsos", methods=["POST"])
+def api_clear_qsos():
+    save_qsos([])
+    return jsonify({"ok": True})
 
 @app.route("/api/quiz_question")
 def api_quiz_question():

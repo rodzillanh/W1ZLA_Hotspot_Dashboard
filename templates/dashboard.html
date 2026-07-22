@@ -1011,6 +1011,39 @@
             opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 1000;
         }
         .map-resize-readout.visible { opacity: 1; }
+        /* Floating control for the "Import ADIF log" feature -- distinct
+           from the .map-legend checkboxes below, which are optional LAYER
+           toggles (off by default, no data of their own); this is
+           persistent data with an upload/clear action, so it gets its own
+           always-visible control rather than a legend checkbox. */
+        .qso-import-control {
+            position: absolute; top: 10px; left: 10px; z-index: 1000;
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 9px; padding: 10px 12px; font-size: 11.5px;
+            box-shadow: 0 4px 14px rgba(0,0,0,.35); min-width: 168px;
+        }
+        [data-theme="light"] .qso-import-control { box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+        .qso-import-btn {
+            border: 1px dashed var(--card-border); border-radius: 7px;
+            padding: 8px 6px; text-align: center; color: var(--text-muted);
+            cursor: pointer; transition: border-color .15s, color .15s;
+        }
+        .qso-import-btn:hover { border-color: var(--accent); color: var(--text); }
+        .qso-stats {
+            margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--card-border);
+            color: var(--text-dim); line-height: 1.5;
+        }
+        .qso-show-row {
+            display: flex; align-items: center; gap: 6px; margin-top: 8px;
+            padding-top: 8px; border-top: 1px dashed var(--card-border);
+            color: var(--text-muted); cursor: pointer;
+        }
+        .qso-clear-btn {
+            margin-top: 8px; width: 100%; padding: 5px; border-radius: 6px;
+            border: 1px solid var(--card-border); background: transparent;
+            color: var(--text-muted); font-size: 11px; cursor: pointer;
+        }
+        .qso-clear-btn:hover { border-color: #e74c3c; color: #e74c3c; }
         .map-legend {
             display: flex;
             gap: 16px;
@@ -1466,6 +1499,17 @@
     </div>
     <div class="map-resize-wrap">
         <div id="map"></div>
+        <div class="qso-import-control" id="qso-import-control">
+            <input type="file" id="adif-file-input" accept=".adi,.adif,.txt" style="display:none"
+                   onchange="handleAdifFile(this.files[0])">
+            <div class="qso-import-btn" onclick="document.getElementById('adif-file-input').click()">📂 Import ADIF log</div>
+            <div class="qso-stats" id="qso-stats" style="display:none"></div>
+            <label class="qso-show-row">
+                <input type="checkbox" id="qso-show-toggle" onchange="toggleQsoVisibility()" checked>
+                Show on map
+            </label>
+            <button class="qso-clear-btn" id="qso-clear-btn" style="display:none" onclick="clearQsoLog()">Clear imported log</button>
+        </div>
         <div class="map-resize-readout" id="map-resize-readout">420px</div>
         <div class="map-resize-handle" id="map-resize-handle">
             <div class="map-resize-grip"></div>
@@ -2690,6 +2734,16 @@ function initMap() {
         : L.layerGroup();
     leafletMap.addLayer(callerCluster);
 
+    // Imported ADIF QSOs -- a second, independent cluster group, safe to
+    // coexist with callerCluster above (no shared/global state between
+    // separate L.markerClusterGroup() instances).
+    qsoCluster = (typeof L.markerClusterGroup === 'function')
+        ? L.markerClusterGroup({ maxClusterRadius: 40 })
+        : L.layerGroup();
+    document.getElementById('qso-show-toggle').checked = localStorage.getItem(QSO_SHOW_KEY) !== '0';
+    if (document.getElementById('qso-show-toggle').checked) leafletMap.addLayer(qsoCluster);
+    fetchQsos();
+
     // Default to the dark tile set when the dashboard itself is in dark
     // mode -- matches the rest of the UI instead of a jarring light map
     // sitting inside an otherwise dark page. Still overridable below.
@@ -2916,7 +2970,7 @@ function toggleWsprSpots() {
             wsprSpotsTimer = setInterval(() => {
                 const panel = document.getElementById('panel-map');
                 if (panel && panel.classList.contains('active')) updateWsprSpots();
-            }, 90000);  // matches wspr_activity.py's SPOT_CACHE_TTL
+            }, 30000);  // matches wspr_activity.py's SPOT_CACHE_TTL
         }
     } else {
         if (wsprSpotsLayer) { leafletMap.removeLayer(wsprSpotsLayer); wsprSpotsLayer = null; }
@@ -2996,6 +3050,82 @@ function toggleAurora() {
         if (auroraLayer) { leafletMap.removeLayer(auroraLayer); auroraLayer = null; }
         if (auroraTimer) { clearInterval(auroraTimer); auroraTimer = null; }
     }
+}
+
+// --- map: ADIF QSO import -- persistent data (server-side qsos.json),
+// not an optional layer toggle like grey-line/WSPR/aurora above, so this
+// has its own always-visible control (upload + stats + clear) rather than
+// a .map-legend checkbox. Loaded once at map init, not on a polling
+// interval -- the data only changes on explicit import/clear.
+let qsoCluster = null;
+const QSO_SHOW_KEY = 'w1zla_show_qsos';
+
+// Individual ADIF bands ("20m", "40m", ...), NOT the *grouped* pairs
+// WSPR_BAND_COLORS uses ("80m-40m" etc.) -- needs its own palette.
+const QSO_BAND_COLORS = {
+    '160m': '#8e44ad', '80m': '#e74c3c', '40m': '#e67e22', '30m': '#f1c40f',
+    '20m': '#3498db', '17m': '#2ecc71', '15m': '#1abc9c', '12m': '#16a085',
+    '10m': '#9b59b6', '6m': '#c0392b', '2m': '#7f8c8d',
+};
+
+function renderQsoLayer(qsos) {
+    if (!qsoCluster) return;
+    qsoCluster.clearLayers();
+    (qsos || []).forEach(q => {
+        const color = QSO_BAND_COLORS[q.band] || '#95a5a6';
+        const marker = L.circleMarker([q.lat, q.lon], {
+            radius: 5, color, weight: 1, fillColor: color, fillOpacity: 0.85,
+        }).bindTooltip(`${q.call} - ${q.band} ${q.mode}${q.date ? ' - ' + q.date : ''}`);
+        qsoCluster.addLayer(marker);
+    });
+    updateQsoStats(qsos);
+}
+
+function updateQsoStats(qsos) {
+    const el = document.getElementById('qso-stats');
+    const clearBtn = document.getElementById('qso-clear-btn');
+    if (!qsos || !qsos.length) {
+        el.style.display = 'none';
+        clearBtn.style.display = 'none';
+        return;
+    }
+    const bands = new Set(qsos.map(q => q.band).filter(Boolean));
+    const dates = qsos.map(q => q.date).filter(Boolean).sort();
+    el.textContent = `${qsos.length} QSOs · ${bands.size} bands` +
+        (dates.length ? ` · ${dates[0]}–${dates[dates.length - 1]}` : '');
+    el.style.display = 'block';
+    clearBtn.style.display = 'block';
+}
+
+function fetchQsos() {
+    fetch('/api/qsos').then(r => r.json()).then(renderQsoLayer).catch(() => {});
+}
+
+function handleAdifFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        fetch('/api/import_adif', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text: reader.result, filename: file.name }),
+        }).then(r => r.json()).then(data => {
+            if (data.ok) renderQsoLayer(data.qsos);
+        }).catch(() => {});
+    };
+    reader.readAsText(file);
+}
+
+function clearQsoLog() {
+    if (!confirm('Clear the imported QSO log from the map?')) return;
+    fetch('/api/clear_qsos', { method: 'POST' }).then(() => renderQsoLayer([]));
+}
+
+function toggleQsoVisibility() {
+    const on = document.getElementById('qso-show-toggle').checked;
+    localStorage.setItem(QSO_SHOW_KEY, on ? '1' : '0');
+    if (!leafletMap || !qsoCluster) return;
+    if (on) leafletMap.addLayer(qsoCluster);
+    else leafletMap.removeLayer(qsoCluster);
 }
 
 // Haversine distance in km between two lat/lon points.
