@@ -3143,7 +3143,17 @@ function setMapStyle(style) {
 
 // --- map: drag-to-resize height, persisted per-browser ---
 const MAP_HEIGHT_KEY = 'w1zla_map_height';
-const MAP_HEIGHT_MIN = 220, MAP_HEIGHT_MAX = 760;
+const MAP_HEIGHT_MIN = 220;
+
+// Scales with the actual browser window instead of a fixed number --
+// 760px was a reasonable ceiling on a laptop screen, but on a larger
+// monitor dragging the resize handle all the way to that cap still left
+// a big dead area below the map (a real, reported complaint), since 760
+// was only a small fraction of the available height. 260 is a rough
+// allowance for the toolbar/tabs/caller-chip-row/padding around the map.
+function mapHeightMax() {
+    return Math.max(760, window.innerHeight - 260);
+}
 
 function initMapResize() {
     const mapEl   = document.getElementById('map');
@@ -3153,13 +3163,13 @@ function initMapResize() {
 
     const saved = parseInt(localStorage.getItem(MAP_HEIGHT_KEY), 10);
     if (!isNaN(saved)) {
-        mapEl.style.height = Math.max(MAP_HEIGHT_MIN, Math.min(MAP_HEIGHT_MAX, saved)) + 'px';
+        mapEl.style.height = Math.max(MAP_HEIGHT_MIN, Math.min(mapHeightMax(), saved)) + 'px';
     }
 
     let dragging = false, startY = 0, startH = 0, hideTimer = null;
 
     function setHeight(h) {
-        h = Math.max(MAP_HEIGHT_MIN, Math.min(MAP_HEIGHT_MAX, h));
+        h = Math.max(MAP_HEIGHT_MIN, Math.min(mapHeightMax(), h));
         mapEl.style.height = h + 'px';
         if (readout) readout.textContent = Math.round(h) + 'px';
     }
