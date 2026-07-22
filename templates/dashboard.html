@@ -3093,6 +3093,12 @@ function initMap() {
         leafletMap.addLayer(qsoLinesLayer);
     }
     fetchQsos();
+    // A live WSJT-X QSO can append to qsos.json at any time (see wsjtx.py),
+    // unlike a bulk ADIF import/clear which only ever happens on an
+    // explicit user action -- so unlike the "load once" comment above used
+    // to say, this now needs a periodic re-check. Cheap either way: it's
+    // just a local JSON file read, not a third-party API call.
+    setInterval(fetchQsos, 20000);
 
     // Default to the dark tile set when the dashboard itself is in dark
     // mode -- matches the rest of the UI instead of a jarring light map
@@ -3350,8 +3356,10 @@ function toggleAurora() {
 // --- map: ADIF QSO import -- persistent data (server-side qsos.json),
 // not an optional layer toggle like grey-line/aurora above, so this
 // has its own always-visible control (upload + stats + clear) rather than
-// a .map-legend checkbox. Loaded once at map init, not on a polling
-// interval -- the data only changes on explicit import/clear.
+// a .map-legend checkbox. Re-fetched every 20s (see the setInterval near
+// qsoCluster's init above), not just once at map load -- a live WSJT-X
+// QSO (wsjtx.py) can append to the same file at any time, not just on an
+// explicit import/clear action the way it used to be the only way in.
 let qsoCluster = null;
 let qsoLinesLayer = null;
 const QSO_SHOW_KEY = 'w1zla_show_qsos';

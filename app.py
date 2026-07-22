@@ -40,6 +40,7 @@ from aurora import AuroraClient
 from adif import parse_adif
 from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
+from wsjtx import WsjtxListener
 
 import host_stats as host_stats_mod
 
@@ -57,6 +58,7 @@ aurora_client   = AuroraClient()
 digipi_monitor  = DigipiMonitor()
 openspot_manager = OpenSpot4Manager(monitor)
 openspot_manager.reconcile(load_hotspots())  # eager start at boot, mirrors mqtt_pub's startup rebuild
+wsjtx_listener  = WsjtxListener(monitor)
 
 # Gates the Settings "Host power control" buttons -- only true on a
 # standalone install running directly on real Raspberry Pi hardware (see
@@ -148,6 +150,18 @@ def _rebuild_aprs_inbox() -> None:
     )
 
 _rebuild_aprs_inbox()
+
+def _rebuild_wsjtx() -> None:
+    """configure() itself is a no-op unless enabled state or port actually
+    changed, so this is cheap to call on every settings save regardless of
+    which fields changed -- same pattern as _rebuild_aprs_inbox above."""
+    settings = load_settings()
+    wsjtx_listener.configure(
+        settings.get("wsjtx_enabled", False),
+        settings.get("wsjtx_port", 2237),
+    )
+
+_rebuild_wsjtx()
 
 import radioid as radioid_mod
 import aprs as aprs_mod
@@ -342,6 +356,13 @@ def api_settings_post():
             settings["big_clock_position"] = max(0, int(data["big_clock_position"]))
         except (TypeError, ValueError):
             pass
+    if "wsjtx_enabled" in data:
+        settings["wsjtx_enabled"] = bool(data["wsjtx_enabled"])
+    if "wsjtx_port" in data:
+        try:
+            settings["wsjtx_port"] = max(1, min(65535, int(data["wsjtx_port"])))
+        except (TypeError, ValueError):
+            pass
     save_settings(settings)
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:
@@ -356,6 +377,8 @@ def api_settings_post():
         _rebuild_aprs_messenger()
     if any(k in data for k in ("aprs_msg_callsign", "aprs_inbox_enabled")):
         _rebuild_aprs_inbox()
+    if any(k in data for k in ("wsjtx_enabled", "wsjtx_port")):
+        _rebuild_wsjtx()
     return jsonify({"ok": True})
 
 
@@ -638,6 +661,14 @@ def api_import_adif():
 def api_clear_qsos():
     save_qsos([])
     return jsonify({"ok": True})
+
+@app.route("/api/wsjtx_status")
+def api_wsjtx_status():
+    """Lets Settings show whether the WSJT-X UDP listener is actually
+    receiving anything, not just whether the toggle is on -- proof of
+    life independent of a QSO ever completing (a Heartbeat updates
+    last_packet_at too, see wsjtx.py)."""
+    return jsonify(wsjtx_listener.status())
 
 @app.route("/api/quiz_question")
 def api_quiz_question():
@@ -1235,6 +1266,7 @@ def api_import_backup():
         _rebuild_mqtt_client()
         _rebuild_aprs_messenger()
         _rebuild_aprs_inbox()
+        _rebuild_wsjtx()
 
     return jsonify({"ok": True, "result": result})
 

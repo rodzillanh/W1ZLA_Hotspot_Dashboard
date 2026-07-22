@@ -374,6 +374,14 @@ DEFAULT_SETTINGS = {
     # needs a show/position pair like every other optional card.
     "show_big_clock": False,
     "big_clock_position": 0,
+    # Live WSJT-X QSO logging -- off by default. Listens for WSJT-X's own
+    # UDP telemetry protocol (the same feed GridTracker/JTAlert use) and
+    # appends each logged QSO to the same qsos.json the ADIF importer
+    # writes to, so it shows up on the Live map with zero frontend
+    # changes. No position setting -- this doesn't add a card, it just
+    # feeds the existing QSO map layer. See wsjtx.py.
+    "wsjtx_enabled": False,
+    "wsjtx_port": 2237,
 }
 
 # --- Fleet activity ---

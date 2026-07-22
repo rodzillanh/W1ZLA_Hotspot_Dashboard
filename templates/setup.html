@@ -996,6 +996,44 @@
         </div>
     </div>
 
+    <div class="section">
+        <div class="section-title">WSJT-X live QSO logging
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — plots each logged QSO on the Live map as it happens
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            Listens for WSJT-X's own UDP telemetry (the same feed GridTracker/
+            JTAlert use) — no SSH, no polling. In WSJT-X, go to
+            <b>File → Settings → Reporting</b> and set "UDP Server" to this
+            dashboard's IP address and the port below (WSJT-X's own default is
+            2237). Each logged QSO is added to the same QSO map layer the
+            dashboard's Live map "Import ADIF log" feature uses — position
+            from that QSO's own grid square (or a lookup if it didn't record
+            one), with a line back to WSJT-X's own configured grid square.
+        </p>
+        <div class="toggle-group" style="margin-bottom:10px">
+            <div class="toggle-row">
+                <span class="toggle-label">Enable WSJT-X listening</span>
+                <div class="toggle {{ 'on' if settings.get('wsjtx_enabled', False) else '' }}"
+                     id="wsjtx-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+        </div>
+        <div class="form-grid one" style="margin-bottom:10px">
+            <div>
+                <label>UDP port</label>
+                <input type="number" id="wsjtx-port" min="1" max="65535" style="width:100px"
+                       value="{{ settings.get('wsjtx_port', 2237) }}">
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-info"    onclick="checkWsjtxStatus()">Check status</button>
+            <button class="btn btn-primary" onclick="saveWsjtx()">Save WSJT-X settings</button>
+            <span class="status-txt" id="wsjtx-status"></span>
+        </div>
+    </div>
+
 </div>
 
 
@@ -2436,6 +2474,41 @@ function saveDigipi() {
             digipi_ip:   document.getElementById('digipi-ip').value.trim(),
             digipi_user: document.getElementById('digipi-user').value.trim(),
             digipi_pass: document.getElementById('digipi-pass').value,
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+// --- WSJT-X live QSO logging ---
+async function checkWsjtxStatus() {
+    const status = document.getElementById('wsjtx-status');
+    status.textContent = 'Checking...';
+    const r = await fetch('/api/wsjtx_status');
+    const data = await r.json();
+    if (!data.enabled) {
+        status.textContent = 'Not enabled — save with the toggle on first.';
+        status.style.color = 'var(--text-dim)';
+    } else if (!data.last_packet_at) {
+        status.textContent = `Listening on port ${data.port}, no packets received yet.`;
+        status.style.color = 'var(--text-dim)';
+    } else {
+        const secsAgo = Math.round(Date.now() / 1000 - data.last_packet_at);
+        status.textContent = `✓ Listening on port ${data.port} — last packet ${secsAgo}s ago` +
+            (data.last_qso ? ` (last QSO: ${data.last_qso.call})` : '');
+        status.style.color = 'var(--accent)';
+    }
+}
+
+function saveWsjtx() {
+    const status = document.getElementById('wsjtx-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            wsjtx_enabled: document.getElementById('wsjtx-toggle').classList.contains('on'),
+            wsjtx_port: parseInt(document.getElementById('wsjtx-port').value, 10),
         })
     }).then(() => {
         status.textContent = '✓ Saved';

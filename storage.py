@@ -125,3 +125,22 @@ def save_qsos(qsos: list) -> None:
     os.makedirs(config.CONFIG_DIR, exist_ok=True)
     with _file_lock, open(config.QSOS_FILE, "w") as f:
         json.dump(qsos, f, indent=4)
+
+
+def append_qso(qso: dict) -> None:
+    """Adds one QSO to the existing list -- for live WSJT-X logging
+    (wsjtx.py), which arrives one QSO at a time, unlike a bulk ADIF
+    import which replaces the whole list via save_qsos() above. Read-
+    modify-write under the same _file_lock as every other read/write here,
+    so a live QSO landing mid-request from /api/import_adif or
+    /api/clear_qsos can't interleave with either of those."""
+    os.makedirs(config.CONFIG_DIR, exist_ok=True)
+    with _file_lock:
+        try:
+            with open(config.QSOS_FILE, "r") as f:
+                qsos = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            qsos = []
+        qsos.append(qso)
+        with open(config.QSOS_FILE, "w") as f:
+            json.dump(qsos, f, indent=4)

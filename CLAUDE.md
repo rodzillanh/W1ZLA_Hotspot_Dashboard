@@ -105,6 +105,27 @@ adif.py            parse_adif(): a pure ADIF (ham radio log interchange
                    convention as hotspots.json/cameras.json) -- replaced
                    wholesale on each import, no merge/dedupe.
 
+wsjtx.py           WsjtxListener: listens for WSJT-X's own UDP telemetry
+                   protocol (the same feed GridTracker/JTAlert use) and
+                   appends each logged QSO to the SAME qsos.json adif.py's
+                   importer writes to (storage.py's new append_qso(), not
+                   save_qsos() -- appends one at a time rather than
+                   replacing the whole list, since a live QSO arrives
+                   incrementally). One persistent UDP socket, reconfigured
+                   in place via a generation counter -- same shape as
+                   aprs_inbox.py's AprsInbox, but simpler: UDP has no
+                   login/reconnect-with-backoff to manage, closing the
+                   socket unblocks a stale thread's recvfrom() immediately.
+                   Only handles the QSOLogged message type, not the much
+                   chattier Decode message (every single decode attempt) --
+                   deliberately avoids reproducing the "worldwide spotter
+                   clutter" the WSPR spots map overlay was removed for.
+                   Position resolution reuses the exact same grid-square-
+                   first/monitor.lookup_caller_info()-fallback logic as
+                   adif.py's importer, including the QTH-line behavior
+                   (WSJT-X's own configured grid square, not a settings
+                   fallback, in the very common case it's actually set).
+
 digipi.py          DigipiMonitor: SSH-polls a DigiPi's Direwolf log
                    (/run/direwolf.log, NOT a systemd service -- a plain
                    background process) for APRS activity. Deliberately a
@@ -1251,6 +1272,58 @@ config for per-integration credentials; put it in
   (`L.markerClusterGroup()`) — a MarkerClusterGroup only ever clusters
   point markers, so polylines don't belong inside one. Both layers
   toggle together under the same "Show on map" checkbox.
+- **`wsjtx.py` (v3.45)'s WSJT-X UDP message parser was verified against
+  bmo/py-wsjtx's real, working open-source implementation
+  (github.com/bmo/py-wsjtx/blob/master/pywsjtx/wsjtx_packets.py) before
+  writing this, field-for-field — not from memory, not from WSJT-X's own
+  C++ source comments alone.** Confirmed exact byte layout: header is
+  `magic(u32) schema(u32) pkt_type(u32)`, every packet type then reads
+  `id` as a length-prefixed UTF-8 QString, and `QSOLoggedPacket` (type 5)
+  is `datetime_off(QDateTime) call grid frequency(i64) mode report_sent
+  report_recv tx_power comments name datetime_on op_call my_call my_grid
+  exchange_sent exchange_recv` in that exact order. Verified by hand-
+  building synthetic packets matching this byte layout and confirming
+  `parse_packet()` round-trips them correctly (call/grid/band/mode/date/
+  my_grid all extracted right, including the Julian-day-to-calendar-date
+  math ported from py-wsjtx's own `JDToDateMeeus`) — same "verified
+  against hand-built sample data" discipline as `adif.py`'s tokenizer.
+  **This module was NOT live-tested against a real running WSJT-X
+  instance** (none reachable from this dev environment) — if it ever
+  silently stops picking up QSOs, re-verify against a real packet capture
+  before assuming the parser is still correct, the same "verify against
+  the real thing" discipline as openspot.py/digipi.py.
+- **Deliberately only handles the `QSOLogged` message type (5), not the
+  much chattier `Decode` message (every single decode attempt, most
+  without a usable grid square, several per second across a wide
+  waterfall).** Streaming every decode would reproduce exactly the
+  "worldwide spotter clutter" the WSPR spots map overlay was removed for
+  a few releases earlier in this same document. `QSOLogged` fires once
+  per actually-logged QSO with clean structured fields — functionally one
+  ADIF record's worth of data, arriving live instead of in a bulk file,
+  so `wsjtx.py`'s `_handle_qso` reuses the exact same grid-square-first/
+  `monitor.lookup_caller_info()`-fallback position resolution as
+  `app.py`'s `api_import_adif`, including the QTH-line logic (WSJT-X's
+  own `my_grid` field takes priority over settings' `station_grid`, not
+  the other way around — it's the live grid WSJT-X itself is configured
+  with, which could legitimately differ from this dashboard's
+  `station_grid` on a portable/rover setup).
+- **Live-logged QSOs use `storage.append_qso()` (read-modify-write, one
+  QSO at a time), not `save_qsos()` (wholesale replace) that the bulk
+  ADIF importer uses.** Both write to the same `qsos.json` under the same
+  `_file_lock`, so a live QSO landing mid-request from `/api/import_adif`
+  or `/api/clear_qsos` can't interleave with either. This does mean a new
+  ADIF import or "Clear imported log" click also wipes out any
+  WSJT-X-logged QSOs accumulated so far — a deliberate simplification
+  (one unified list, not two tracked separately) rather than an
+  oversight; don't build separate storage for the two sources unless a
+  real complaint about this surfaces.
+- **The Live map's QSO layer used to be fetched once at map init only
+  ("the data only changes on explicit import/clear," a comment that was
+  true before this feature existed) — now it's also polled every 20s**
+  (`setInterval(fetchQsos, 20000)` near `qsoCluster`'s init in
+  `dashboard.html`), since a live WSJT-X QSO can append to `qsos.json` at
+  any moment, not just on an explicit user action. Cheap either way — it's
+  a local JSON file read, not a third-party API call.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

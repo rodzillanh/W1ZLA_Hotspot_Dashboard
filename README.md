@@ -1000,6 +1000,16 @@ appear as pins — the QRZ subscription caveat above applies here too.
   falling back to your station grid square set in Settings → General
   otherwise. No line is drawn if neither is known. Importing a new log
   replaces the previous one — there's no merge/dedupe across imports.
+- **Live WSJT-X QSO logging** (Settings → Integrations, off by default) —
+  listens for WSJT-X's own UDP telemetry (the same feed GridTracker/
+  JTAlert use, no SSH, no polling) and plots each QSO on the map the
+  moment you log it in WSJT-X, using the same pin/line rendering as an
+  ADIF import above. In WSJT-X, set File → Settings → Reporting → "UDP
+  Server" to this dashboard's IP and the port configured here (2237 by
+  default, WSJT-X's own default too). A "Check status" button shows
+  whether packets are actually being received. Unlike a bulk ADIF import
+  (which replaces the whole map), live-logged QSOs simply add to
+  whatever's already there.
 ## Fleet activity
 
 Optional — off by default (Settings → Cards → "Show fleet activity

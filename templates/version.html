@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.44</span>
+                <span class="release-version">v3.45</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Live WSJT-X QSO logging</span> — a new Settings → Integrations option listens for WSJT-X's own UDP telemetry (the same feed GridTracker/JTAlert use) and plots each QSO on the Live map the instant you log it, no SSH/polling involved. Reuses the same pin/line rendering the ADIF import feature already built — live-logged QSOs simply add to whatever's on the map already, rather than replacing it the way a bulk ADIF import does</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.44</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Big Ass Clock card</span> — a new optional dashboard card (Settings → Cards) with three selectable styles: Digital (12/24hr toggle), Analog (proper clock face — ticks, numerals, tapered hands, gradient bezel), and TIX (dot-matrix digit grids, sized to what each digit actually needs). Digital and Analog can both show a second clock in another timezone or UTC/Zulu; style/format preferences are per-browser, not synced across devices</li>
