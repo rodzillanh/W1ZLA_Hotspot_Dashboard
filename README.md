@@ -940,18 +940,24 @@ same person).
 The **Live map** tab shows an interactive map (Leaflet.js + OpenStreetMap,
 with an optional satellite tile view, no API key required for either) with:
 
-- A **purple square marker for each of your own hotspots** that has a
+- A **square marker for each of your own hotspots** that has a
   latitude/longitude set (Settings → Hotspots). This is opt-in per hotspot
   since there's no reliable way to read a WPSD/Pi-Star node's physical
-  location automatically over SSH.
+  location automatically over SSH. Each hotspot gets its own assigned
+  color (cycled from a fixed palette, in Settings → Hotspots order) — a
+  **"Map key"** in the bottom-left corner of the map ties every color back
+  to its hotspot's name, plus one more entry for FT8/FT4 QSOs (see below).
 - A **pin for every caller** currently active or in any node's last-5
   history, using QRZ/RadioID/APRS coordinates (in that priority order —
-  see the integration sections above). Green pins are active; blue pins
-  are recent. Caller pins cluster at low zoom levels to avoid overlapping
-  when there's a lot of activity.
+  see the integration sections above), colored to match the hotspot that
+  heard them. An active call **pings** (an expanding ring, in that
+  hotspot's own color); a recent one sits static and dimmed — color now
+  tells you *which* hotspot, motion tells you *active vs. recent*. Caller
+  pins cluster at low zoom levels to avoid overlapping when there's a lot
+  of activity.
 - A **dashed distance line** from the receiving hotspot to the caller, for
   active calls only, labeled with the distance in miles or km (matches the
-  Weather tab's °F/°C unit setting).
+  Weather tab's °F/°C unit setting) — in that hotspot's own color too.
 - Click a caller pin for their callsign, name, location, the node that
   heard them, and (for a live APRS position) a note saying so — plus a
   "Go to card →" link that switches to the Dashboard tab and highlights
@@ -985,8 +991,11 @@ appear as pins — the QRZ subscription caveat above applies here too.
   geographic model, not a single index value.
 - **ADIF QSO import** — a floating "Import ADIF log" control on the map
   lets you upload a `.adi`/`.adif` log file exported from your logging
-  software; each worked station gets plotted as a band-colored pin.
-  Unlike the layer checkboxes above, this is persistent — it's saved
+  software; each worked station gets plotted as a pin in one fixed color
+  (shown in the Map key as "FT8/FT4 (WSJT-X)"), distinct from every
+  hotspot's own color — band/mode are still shown in the pin's tooltip,
+  just not encoded as a separate color scheme. Unlike the layer
+  checkboxes above, this is persistent — it's saved
   server-side and stays on the map across visits until you clear it,
   the same as everything else in this app. A "Show on map" checkbox
   lets you hide the pins temporarily without deleting the imported log.

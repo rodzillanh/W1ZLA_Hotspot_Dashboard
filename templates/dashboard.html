@@ -1070,11 +1070,44 @@
         .qso-clear-btn:hover { border-color: #e74c3c; color: #e74c3c; }
         /* A QSO logged live via WSJT-X (wsjtx.py) within the last
            QSO_NEW_WINDOW_SEC pulses/glows so it's obvious something just
-           landed, then fades back to the plain band-colored pin on a later
+           landed, then fades back to the plain QSO-colored pin on a later
            re-render once it's no longer "new" -- no separate timer needed,
            renderQsoLayer already re-checks this every fetchQsos() poll. */
         @keyframes qsoNewPulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
         .qso-new-pulse { animation: qsoNewPulse 1s ease-in-out infinite; }
+        /* An active caller marker "pings" outward in its own hotspot's
+           color (--ring-color, set inline per marker in refreshMap()) --
+           color now means WHICH hotspot, motion means active-vs-recent,
+           replacing the old fixed green/blue scheme. */
+        @keyframes hotspotActivePing {
+            0%   { box-shadow: 0 0 0 0 var(--ring-color, rgba(46,204,113,.7)), 0 0 4px rgba(0,0,0,.4); }
+            70%  { box-shadow: 0 0 0 11px rgba(0,0,0,0), 0 0 4px rgba(0,0,0,.4); }
+            100% { box-shadow: 0 0 0 0 rgba(0,0,0,0), 0 0 4px rgba(0,0,0,.4); }
+        }
+        .caller-pin-active { animation: hotspotActivePing 1.4s ease-out infinite; }
+        .caller-pin-recent { opacity: .55; }
+        /* Floating legend tying each hotspot's assigned color (and the
+           fixed WSJT-X/FT8 color) back to a label -- built dynamically in
+           JS (refreshMap()/renderQsoLayer()) since the hotspot list and
+           its color assignment aren't known at template-render time.
+           Same floating-card style as .qso-import-control. */
+        .map-key {
+            position: absolute; left: 10px; bottom: 10px; z-index: 1000;
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 9px; padding: 10px 12px; font-size: 11.5px;
+            box-shadow: 0 4px 14px rgba(0,0,0,.35); min-width: 172px;
+        }
+        [data-theme="light"] .map-key { box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+        .map-key-title {
+            font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+            color: var(--text-dim); margin-bottom: 7px;
+        }
+        .map-key-row { display: flex; align-items: center; gap: 7px; padding: 2px 0; color: var(--text-muted); }
+        .map-key-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .map-key-swatch.square { border-radius: 2px; }
+        .map-key-row b { color: var(--text); font-weight: 600; }
+        .map-key-sep { border-top: 1px dashed var(--card-border); margin: 6px 0; }
+        .map-key-note { color: var(--text-dim); font-size: 10px; margin-top: 6px; line-height: 1.4; }
         .map-legend {
             display: flex;
             gap: 16px;
@@ -1083,17 +1116,6 @@
             color: var(--text-muted);
             align-items: center;
             flex-wrap: wrap;
-        }
-        .legend-dot {
-            width: 10px; height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 4px;
-        }
-        .legend-square {
-            width: 10px; height: 10px;
-            display: inline-block;
-            margin-right: 4px;
         }
         .callers-list {
             display: flex;
@@ -1522,10 +1544,7 @@
 <!-- Live map tab -->
 <div id="panel-map" class="tab-panel">
     <div class="map-legend">
-        <span><span class="legend-dot" style="background:#2ecc71"></span>Active caller</span>
-        <span><span class="legend-dot" style="background:#5bc0de"></span>Recent (last 5 per node)</span>
-        <span><span class="legend-square" style="background:#9b59b6"></span>Your hotspot</span>
-        <label style="margin-left:auto;display:flex;align-items:center;gap:5px;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
             <input type="checkbox" id="greyline-toggle" onchange="toggleGreyline()">
             Grey line
         </label>
@@ -1555,6 +1574,7 @@
             </label>
             <button class="qso-clear-btn" id="qso-clear-btn" style="display:none" onclick="clearQsoLog()">Clear imported log</button>
         </div>
+        <div class="map-key" id="map-key" style="display:none"></div>
         <div class="map-resize-readout" id="map-resize-readout">420px</div>
         <div class="map-resize-handle" id="map-resize-handle">
             <div class="map-resize-grip"></div>
@@ -3029,6 +3049,41 @@ setInterval(() => {
 }, 1000);
 
 // --- map ---
+// Cycled per hotspot (in /api/map_data's own order) for that hotspot's
+// location marker + every caller pin heard through it -- see refreshMap().
+const HOTSPOT_COLOR_PALETTE = ['#2ecc71', '#3498db', '#e67e22', '#9b59b6', '#f1c40f', '#1abc9c'];
+
+function hexToRgba(hex, alpha) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Builds the bottom-left "Map key" -- one row per hotspot (in its
+// assigned color) plus the fixed QSO_COLOR entry, so every color used
+// anywhere on the map ties back to a label. Rebuilt every refreshMap()
+// call alongside the hotspot markers so it stays current if hotspots are
+// added/removed/reordered.
+function renderMapKey(nodes, hotspotColors) {
+    const key = document.getElementById('map-key');
+    if (!key) return;
+    key.innerHTML = `
+        <div class="map-key-title">Map key</div>
+        ${nodes.map(node => `
+            <div class="map-key-row">
+                <span class="map-key-swatch square" style="background:${hotspotColors[node.ip]}"></span>
+                <b>${node.name}</b>
+            </div>`).join('')}
+        <div class="map-key-row">
+            <span class="map-key-swatch" style="background:${QSO_COLOR}"></span>
+            <b>FT8/FT4 (WSJT-X)</b>
+        </div>
+        <div class="map-key-sep"></div>
+        <div class="map-key-note">Pulsing = active now &middot; dimmed = recent &middot; bright glow = QSO just logged</div>
+    `;
+    key.style.display = 'block';
+}
+
 let nodeMarkers    = [];
 let distanceLines  = [];
 let callerCluster  = null;
@@ -3381,16 +3436,15 @@ let qsoCluster = null;
 let qsoLinesLayer = null;
 const QSO_SHOW_KEY = 'w1zla_show_qsos';
 
-// Individual ADIF bands ("20m", "40m", ...) -- own palette, not shared
-// with any other card's band grouping.
-const QSO_BAND_COLORS = {
-    '160m': '#8e44ad', '80m': '#e74c3c', '40m': '#e67e22', '30m': '#f1c40f',
-    '20m': '#3498db', '17m': '#2ecc71', '15m': '#1abc9c', '12m': '#16a085',
-    '10m': '#9b59b6', '6m': '#c0392b', '2m': '#7f8c8d',
-};
+// One fixed color for every QSO pin (ADIF-imported or live via WSJT-X),
+// deliberately NOT per-band anymore -- this is its own category on the
+// map, distinct from any hotspot's assigned color (HOTSPOT_COLOR_PALETTE
+// below), so "is this HF/FT8 traffic or repeater traffic" reads at a
+// glance. Band is still shown in the tooltip, just not encoded in color.
+const QSO_COLOR = '#ff3fa4';
 
 // How long a live-logged (wsjtx.py) QSO gets the pulsing "just happened"
-// treatment before fading back to a plain band-colored pin. Only entries
+// treatment before fading back to a plain QSO-colored pin. Only entries
 // with a logged_at timestamp are eligible -- bulk ADIF imports have no
 // such field, since there's no "just happened" for a historical log.
 const QSO_NEW_WINDOW_SEC = 600;  // 10 min
@@ -3401,7 +3455,7 @@ function renderQsoLayer(qsos) {
     if (qsoLinesLayer) qsoLinesLayer.clearLayers();
     const nowSec = Date.now() / 1000;
     (qsos || []).forEach(q => {
-        const color = QSO_BAND_COLORS[q.band] || '#95a5a6';
+        const color = QSO_COLOR;
         const isNew = q.logged_at != null && (nowSec - q.logged_at) < QSO_NEW_WINDOW_SEC;
         // Line back to the QTH this QSO was worked from (that record's own
         // MY_GRIDSQUARE, or settings' station_grid otherwise -- resolved
@@ -3529,11 +3583,23 @@ function refreshMap() {
             const chipList = document.getElementById('callers-list');
             chipList.innerHTML = '';
 
+            // Each hotspot gets its own assigned color (cycled from
+            // HOTSPOT_COLOR_PALETTE, in the order /api/map_data returns
+            // them) -- used for both its own location marker and every
+            // caller pin heard through it, so "which hotspot" reads at a
+            // glance instead of the old fixed "active=green/recent=blue"
+            // scheme that couldn't distinguish one hotspot from another.
+            const hotspotColors = {};
+            nodes.forEach((node, i) => {
+                hotspotColors[node.ip] = HOTSPOT_COLOR_PALETTE[i % HOTSPOT_COLOR_PALETTE.length];
+            });
+
             const nodeByName = {};
             nodes.forEach(node => {
+                const color = hotspotColors[node.ip];
                 const icon = L.divIcon({
                     className: '',
-                    html: `<div style="width:14px;height:14px;background:#9b59b6;border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.4)"></div>`,
+                    html: `<div style="width:14px;height:14px;background:${color};border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.4)"></div>`,
                     iconSize: [14,14],
                     iconAnchor: [7,7],
                 });
@@ -3543,12 +3609,14 @@ function refreshMap() {
                 nodeMarkers.push({ ip: node.ip, marker });
                 nodeByName[node.name] = node;
             });
+            renderMapKey(nodes, hotspotColors);
 
             callers.forEach(entry => {
-                const color = entry.is_active ? '#2ecc71' : '#5bc0de';
+                const color = hotspotColors[entry.node_ip] || '#95a5a6';
                 const icon  = L.divIcon({
                     className: '',
-                    html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.4)"></div>`,
+                    html: `<div class="${entry.is_active ? 'caller-pin-active' : 'caller-pin-recent'}"
+                                style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.4);--ring-color:${hexToRgba(color, .7)}"></div>`,
                     iconSize: [12,12],
                     iconAnchor: [6,6],
                 });
@@ -3564,7 +3632,7 @@ function refreshMap() {
                     if (node) {
                         const km   = distanceKm(node.lat, node.lon, entry.lat, entry.lon);
                         const line = L.polyline([[node.lat, node.lon], [entry.lat, entry.lon]], {
-                            color: '#2ecc71', weight: 1.5, dashArray: '4,4', opacity: 0.7,
+                            color, weight: 1.5, dashArray: '4,4', opacity: 0.7,
                         }).bindTooltip(fmtDistance(km), { permanent: true, className: 'distance-label', direction: 'center' })
                           .addTo(leafletMap);
                         distanceLines.push(line);

@@ -1345,6 +1345,44 @@ config for per-integration credentials; put it in
   surfaced anywhere -- a standalone Pi/systemd install has no such
   gap, since the process binds directly to the host's network stack and
   whatever port is picked in Settings just works immediately.
+- **Per-hotspot map colors (v3.46) is a deliberate trade-off, not a pure
+  improvement -- called out explicitly to the user and confirmed before
+  building, mockup-first (`map-colors-mockup.html`), same workflow as
+  every other UI feature this session.** The old scheme (`#2ecc71`
+  green = active caller anywhere, `#5bc0de` blue = recent, fixed purple
+  for every "Your hotspot" marker) gave one glanceable fleet-wide signal
+  ("is ANYTHING active right now") but couldn't distinguish which
+  hotspot a caller came in through. The new scheme
+  (`HOTSPOT_COLOR_PALETTE`, cycled per hotspot in `/api/map_data`'s own
+  node order, applied to that hotspot's own marker + every caller pin
+  heard through it + its distance line) answers "which hotspot" instead,
+  moving active-vs-recent to MOTION (`.caller-pin-active`'s expanding
+  `hotspotActivePing` box-shadow ring vs. `.caller-pin-recent`'s plain
+  dimmed opacity) rather than color. If a future ask wants BOTH signals
+  back (fleet-wide "anything active" AND per-hotspot identity), that's a
+  bigger design problem (two independent visual channels needed
+  simultaneously), not a small tweak to this scheme.
+- **QSO pins (ADIF import + live WSJT-X logging) lost their per-band
+  color scheme in the same change** -- `QSO_BAND_COLORS` (11 band-keyed
+  hex colors) was deleted entirely and replaced with one fixed
+  `QSO_COLOR` (`#ff3fa4`, a hot pink deliberately not used anywhere else
+  on the map), so "is this HF/FT8 traffic or repeater traffic" is a
+  single-glance answer independent of which hotspot colors happen to be
+  assigned. Band is still shown in each pin's tooltip text -- only the
+  color encoding was dropped, not the data itself. Don't resurrect
+  per-band QSO coloring without re-solving how it'd coexist with
+  per-hotspot coloring using the same color space (they'd collide, e.g.
+  `HOTSPOT_COLOR_PALETTE`'s green/blue/orange overlap with band colors
+  a prior version used).
+- **The bottom-left "Map key" (`#map-key`, `renderMapKey()`) is rebuilt
+  from scratch on every `refreshMap()` call**, same "just tear down and
+  rebuild" pattern already used for `nodeMarkers`/`callerCluster` in that
+  function -- not cached/diffed, since the cost is a handful of DOM rows
+  and it needs to reflect hotspots added/removed/reordered without a
+  page reload. It reads `hotspotColors` (built fresh each call, keyed by
+  `node.ip`) plus the fixed `QSO_COLOR` -- always shows the QSO/FT8 row
+  even if no QSOs exist yet, since the "Import ADIF log" control itself
+  is always visible regardless of whether anything's been imported.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
