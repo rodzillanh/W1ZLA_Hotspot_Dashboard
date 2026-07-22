@@ -724,6 +724,43 @@ config for per-integration credentials; put it in
   shared rate limit across however many dashboards happen to be running
   this code.
 
+- **`wspr.rx`'s callsign columns are named `tx_sign`/`rx_sign`, NOT
+  `tx_call`/`rx_call`.** A first attempt at the Live map's "WSPR spots"
+  overlay query (`WsprSpotsClient` in `wspr_activity.py`) guessed
+  `tx_call`/`rx_call` as the natural ham-radio-terminology column names
+  and got a real, immediate `404`/`Code: 47 UNKNOWN_IDENTIFIER` error
+  back from ClickHouse (with a helpful `Maybe you meant: ['tx_lat']`
+  hint) rather than silently returning wrong data -- confirmed the real
+  names via `DESCRIBE TABLE wspr.rx FORMAT JSON` before writing the
+  fixed query. The app's own JSON response still uses `tx_call`/`rx_call`
+  as the *output* key names for frontend clarity -- only the SQL
+  `SELECT` and the dict access on the raw ClickHouse row use the real
+  `tx_sign`/`rx_sign` names, translated at the boundary.
+- **WSPR spot inserts into `wspr.rx` arrive in bursts, not a smooth
+  continuous stream -- a tight time window can return zero rows even
+  when the feed is working correctly.** Confirmed live: querying the
+  last 120 seconds returned 7 rows one moment and 0 rows moments later,
+  while a 5-minute window reliably returned ~6350 rows globally and a
+  10-minute window ~22855. `WsprSpotsClient.SPOT_WINDOW_SEC` is
+  deliberately 300 (5 min), relying on `ORDER BY time DESC LIMIT
+  SPOT_LIMIT` to bound the result size rather than a tight window to
+  guarantee non-empty results -- don't shrink the window back down to
+  "feel more real-time" without re-testing for the empty-window case
+  first.
+- **NOAA SWPC's OVATION aurora feed (`aurora.py`) was verified with a
+  real, complete download before trusting its shape** -- an initial
+  WebFetch-based check against the same URL gave inconsistent/partial
+  numbers (it appears to summarize large responses rather than reading
+  them completely), so the real numbers came from a direct `curl` +
+  full `json.load()`: 65,160 coordinate entries (exactly 360x181, confirming
+  a full 1x1 degree global grid), `[longitude, latitude, aurora_value]`
+  per entry, longitude 0-359 (needs `-360` for values >180 to get
+  standard -180..180 for Leaflet), value range 0-18 at verification time
+  with only ~1000 points above 10. `MIN_INTENSITY=10` is a real,
+  data-backed threshold, not a guess. If this feed's shape is ever
+  suspected to have changed, re-verify with an actual download the same
+  way -- don't trust a WebFetch summary of it alone.
+
 - **Never interpolate a Jinja value directly into a JS string literal
   inside an `onclick` attribute (`onclick="fn('{{ value }}')"`) — Jinja's
   default HTML auto-escaping does NOT protect this, even though it looks

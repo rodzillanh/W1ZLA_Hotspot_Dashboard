@@ -35,7 +35,8 @@ from update_check import UpdateChecker
 from camera_stream import CameraStreamManager
 from hf_conditions import HfConditionsClient
 from license_quiz import LicenseQuizPool
-from wspr_activity import WsprActivityClient
+from wspr_activity import WsprActivityClient, WsprSpotsClient
+from aurora import AuroraClient
 from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
 
@@ -51,6 +52,8 @@ hf_conditions   = HfConditionsClient()
 camera_manager  = CameraStreamManager()
 license_quiz    = LicenseQuizPool()
 wspr_activity   = WsprActivityClient()
+wspr_spots      = WsprSpotsClient()
+aurora_client   = AuroraClient()
 digipi_monitor  = DigipiMonitor()
 openspot_manager = OpenSpot4Manager(monitor)
 openspot_manager.reconcile(load_hotspots())  # eager start at boot, mirrors mqtt_pub's startup rebuild
@@ -550,6 +553,25 @@ def api_wspr_activity():
     every other integration's degrade-gracefully pattern."""
     station_grid = load_settings().get("station_grid", "")
     data = wspr_activity.get(station_grid)
+    if data is None:
+        return jsonify({"error": "unavailable"}), 503
+    return jsonify(data)
+
+@app.route("/api/wspr_spots")
+def api_wspr_spots():
+    """Live global WSPR spot pairs for the Live map's optional "WSPR spots"
+    overlay -- deliberately NOT filtered by station_grid/radius, unlike
+    /api/wspr_activity above (see wspr_activity.py's WsprSpotsClient)."""
+    data = wspr_spots.get()
+    if data is None:
+        return jsonify({"error": "unavailable"}), 503
+    return jsonify(data)
+
+@app.route("/api/aurora")
+def api_aurora():
+    """Live NOAA OVATION aurora-oval overlay for the Live map's optional
+    "Aurora oval" layer -- see aurora.py."""
+    data = aurora_client.get()
     if data is None:
         return jsonify({"error": "unavailable"}), 503
     return jsonify(data)

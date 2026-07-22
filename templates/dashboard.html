@@ -1441,6 +1441,14 @@
             <input type="checkbox" id="greyline-toggle" onchange="toggleGreyline()">
             Grey line
         </label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="wspr-spots-toggle" onchange="toggleWsprSpots()">
+            WSPR spots
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="aurora-toggle" onchange="toggleAurora()">
+            Aurora oval
+        </label>
         <select id="map-style-select" onchange="setMapStyle(this.value)"
                 style="background:var(--card-bg);color:var(--text);
                        border:1px solid var(--card-border);border-radius:5px;
@@ -2691,6 +2699,15 @@ function initMap() {
     updateGreyline();
     if (!greylineTimer) greylineTimer = setInterval(updateGreyline, 60000);
 
+    // WSPR spots / aurora oval default OFF (unlike grey-line) -- both cost
+    // a real backend/external-API round trip, so a first-time visitor who
+    // never opens either checkbox should generate zero extra traffic.
+    document.getElementById('wspr-spots-toggle').checked = localStorage.getItem(WSPR_SPOTS_KEY) === '1';
+    if (document.getElementById('wspr-spots-toggle').checked) toggleWsprSpots();
+
+    document.getElementById('aurora-toggle').checked = localStorage.getItem(AURORA_KEY) === '1';
+    if (document.getElementById('aurora-toggle').checked) toggleAurora();
+
     refreshMap();
 }
 
@@ -2846,6 +2863,106 @@ function toggleGreyline() {
         else greylineLayer.addTo(leafletMap);
     } else if (greylineLayer) {
         leafletMap.removeLayer(greylineLayer);
+    }
+}
+
+// --- map: Live WSPR spots overlay (wspr.live, global -- no station_grid
+// filter, see wspr_activity.py's WsprSpotsClient). Off by default and
+// lazily fetched (unlike grey-line's free local math), since this costs a
+// real backend round trip to a third-party API -- only starts polling
+// once the checkbox is actually turned on, and stops when turned off.
+const WSPR_SPOTS_KEY = 'w1zla_show_wspr_spots';
+let wsprSpotsLayer = null;
+let wsprSpotsTimer = null;
+const WSPR_BAND_COLORS = {  // matches wspr_activity.py's BAND_GROUPS labels
+    '160m': '#e74c3c', '80m-40m': '#e67e22', '30m-20m': '#f1c40f',
+    '17m-15m': '#2ecc71', '12m-10m': '#3498db', '6m': '#9b59b6',
+};
+
+function updateWsprSpots() {
+    if (!leafletMap) return;
+    fetch('/api/wspr_spots').then(r => r.json()).then(data => {
+        if (wsprSpotsLayer) { leafletMap.removeLayer(wsprSpotsLayer); wsprSpotsLayer = null; }
+        if (!data || data.error) return;
+        const group = L.layerGroup();
+        (data.spots || []).forEach(s => {
+            const color = WSPR_BAND_COLORS[s.band] || '#95a5a6';
+            L.polyline([[s.tx_lat, s.tx_lon], [s.rx_lat, s.rx_lon]], {
+                color, weight: 1, opacity: 0.5, interactive: false,
+            }).addTo(group);
+            [[s.tx_lat, s.tx_lon, s.tx_call], [s.rx_lat, s.rx_lon, s.rx_call]].forEach(([lat, lon, call]) => {
+                L.circleMarker([lat, lon], {
+                    radius: 3, color, weight: 1, fillColor: color, fillOpacity: 0.8,
+                }).bindTooltip(`${call} - ${s.band}${s.snr != null ? ' - ' + s.snr + 'dB' : ''}`).addTo(group);
+            });
+        });
+        wsprSpotsLayer = group;
+        if (document.getElementById('wspr-spots-toggle').checked) group.addTo(leafletMap);
+    }).catch(() => {});
+}
+
+function toggleWsprSpots() {
+    const on = document.getElementById('wspr-spots-toggle').checked;
+    localStorage.setItem(WSPR_SPOTS_KEY, on ? '1' : '0');
+    if (on) {
+        updateWsprSpots();
+        if (!wsprSpotsTimer) {
+            wsprSpotsTimer = setInterval(() => {
+                const panel = document.getElementById('panel-map');
+                if (panel && panel.classList.contains('active')) updateWsprSpots();
+            }, 90000);  // matches wspr_activity.py's SPOT_CACHE_TTL
+        }
+    } else {
+        if (wsprSpotsLayer) { leafletMap.removeLayer(wsprSpotsLayer); wsprSpotsLayer = null; }
+        if (wsprSpotsTimer) { clearInterval(wsprSpotsTimer); wsprSpotsTimer = null; }
+    }
+}
+
+// --- map: NOAA aurora-oval overlay (aurora.py) -- same lazy on/off-toggle
+// pattern as the WSPR spots layer above, for the same reason (real
+// backend/external-API cost, unlike grey-line's free math). ---
+const AURORA_KEY = 'w1zla_show_aurora';
+let auroraLayer = null;
+let auroraTimer = null;
+
+function auroraColor(value) {
+    // Simple green -> yellow -> red intensity ramp.
+    if (value > 70) return '#e74c3c';
+    if (value > 30) return '#f1c40f';
+    return '#2ecc71';
+}
+
+function updateAurora() {
+    if (!leafletMap) return;
+    fetch('/api/aurora').then(r => r.json()).then(data => {
+        if (auroraLayer) { leafletMap.removeLayer(auroraLayer); auroraLayer = null; }
+        if (!data || data.error) return;
+        const group = L.layerGroup();
+        (data.points || []).forEach(p => {
+            L.circleMarker([p.lat, p.lon], {
+                radius: 6, stroke: false, fillColor: auroraColor(p.value), fillOpacity: 0.35,
+                interactive: false,
+            }).addTo(group);
+        });
+        auroraLayer = group;
+        if (document.getElementById('aurora-toggle').checked) group.addTo(leafletMap);
+    }).catch(() => {});
+}
+
+function toggleAurora() {
+    const on = document.getElementById('aurora-toggle').checked;
+    localStorage.setItem(AURORA_KEY, on ? '1' : '0');
+    if (on) {
+        updateAurora();
+        if (!auroraTimer) {
+            auroraTimer = setInterval(() => {
+                const panel = document.getElementById('panel-map');
+                if (panel && panel.classList.contains('active')) updateAurora();
+            }, 300000);  // matches aurora.py's CACHE_TTL
+        }
+    } else {
+        if (auroraLayer) { leafletMap.removeLayer(auroraLayer); auroraLayer = null; }
+        if (auroraTimer) { clearInterval(auroraTimer); auroraTimer = null; }
     }
 }
 

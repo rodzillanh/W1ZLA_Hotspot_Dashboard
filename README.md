@@ -949,6 +949,19 @@ appear as pins — the QRZ subscription caveat above applies here too.
   (subsolar point + the sun's zenith angle at each point on the map),
   not a static image, and recomputes once a minute. Also a per-browser
   preference (`localStorage`), same reasoning as the map height.
+- **WSPR spots overlay** — a "WSPR spots" checkbox plots real, live
+  spotter↔transmitter station pairs from `wspr.live`, color-coded by
+  band. Deliberately global (not filtered to your own station's
+  location), so it's always populated and always something moving,
+  even with no station grid square configured. Off by default —
+  turning it on starts a periodic refresh (~90s) that stops the moment
+  you turn it back off, so it costs nothing until you actually want it.
+- **Aurora oval overlay** — an "Aurora oval" checkbox plots NOAA SWPC's
+  live OVATION auroral activity model as a soft, intensity-graded glow
+  near the poles. Also off by default, also stops polling the moment
+  you turn it off. A genuinely different signal than the single
+  "Aurora: N" number on the HF Conditions card — this is the actual
+  geographic model, not a single index value.
 ## Fleet activity
 
 Optional — off by default (Settings → Cards → "Show fleet activity
