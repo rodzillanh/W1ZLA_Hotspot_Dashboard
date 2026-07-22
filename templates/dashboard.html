@@ -1068,6 +1068,13 @@
             color: var(--text-muted); font-size: 11px; cursor: pointer;
         }
         .qso-clear-btn:hover { border-color: #e74c3c; color: #e74c3c; }
+        /* A QSO logged live via WSJT-X (wsjtx.py) within the last
+           QSO_NEW_WINDOW_SEC pulses/glows so it's obvious something just
+           landed, then fades back to the plain band-colored pin on a later
+           re-render once it's no longer "new" -- no separate timer needed,
+           renderQsoLayer already re-checks this every fetchQsos() poll. */
+        @keyframes qsoNewPulse { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+        .qso-new-pulse { animation: qsoNewPulse 1s ease-in-out infinite; }
         .map-legend {
             display: flex;
             gap: 16px;
@@ -3372,24 +3379,34 @@ const QSO_BAND_COLORS = {
     '10m': '#9b59b6', '6m': '#c0392b', '2m': '#7f8c8d',
 };
 
+// How long a live-logged (wsjtx.py) QSO gets the pulsing "just happened"
+// treatment before fading back to a plain band-colored pin. Only entries
+// with a logged_at timestamp are eligible -- bulk ADIF imports have no
+// such field, since there's no "just happened" for a historical log.
+const QSO_NEW_WINDOW_SEC = 600;  // 10 min
+
 function renderQsoLayer(qsos) {
     if (!qsoCluster) return;
     qsoCluster.clearLayers();
     if (qsoLinesLayer) qsoLinesLayer.clearLayers();
+    const nowSec = Date.now() / 1000;
     (qsos || []).forEach(q => {
         const color = QSO_BAND_COLORS[q.band] || '#95a5a6';
+        const isNew = q.logged_at != null && (nowSec - q.logged_at) < QSO_NEW_WINDOW_SEC;
         // Line back to the QTH this QSO was worked from (that record's own
         // MY_GRIDSQUARE, or settings' station_grid otherwise -- resolved
         // server-side in /api/import_adif). Omitted entirely when neither
         // is known, same as any other optional field here.
         if (qsoLinesLayer && q.qth_lat != null && q.qth_lon != null) {
             L.polyline([[q.qth_lat, q.qth_lon], [q.lat, q.lon]], {
-                color, weight: 1, opacity: 0.5, interactive: false,
+                color, weight: isNew ? 2.5 : 1, opacity: isNew ? 0.85 : 0.5, interactive: false,
             }).addTo(qsoLinesLayer);
         }
         const marker = L.circleMarker([q.lat, q.lon], {
-            radius: 5, color, weight: 1, fillColor: color, fillOpacity: 0.85,
-        }).bindTooltip(`${q.call} - ${q.band} ${q.mode}${q.date ? ' - ' + q.date : ''}`);
+            radius: isNew ? 9 : 5, color, weight: isNew ? 2 : 1,
+            fillColor: color, fillOpacity: 0.85,
+            className: isNew ? 'qso-new-pulse' : '',
+        }).bindTooltip(`${q.call} - ${q.band} ${q.mode}${q.date ? ' - ' + q.date : ''}${isNew ? ' (just now)' : ''}`);
         qsoCluster.addLayer(marker);
     });
     updateQsoStats(qsos);

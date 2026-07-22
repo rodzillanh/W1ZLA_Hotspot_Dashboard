@@ -297,6 +297,11 @@ class WsjtxListener:
                 "qth_lat": qth_lat, "qth_lon": qth_lon,
                 "name": name, "location": location,
                 "source": "wsjtx",
+                "logged_at": time.time(),  # epoch seconds -- lets the map
+                # highlight a QSO as "just happened" for a while, then fade
+                # it back to the normal band-colored pin (dashboard.html's
+                # QSO_NEW_WINDOW_SEC). Bulk ADIF imports have no equivalent
+                # field -- there's no "just happened" for a historical log.
             })
         except Exception:
             pass
