@@ -194,7 +194,12 @@ SPOT_CACHE_TTL  = 90    # seconds -- feels live without troubling the shared 20 
 SPOT_WINDOW_SEC = 300   # 5 min -- confirmed live that a tight 120s window can return zero
                         # rows (spot inserts arrive in bursts, not a smooth stream); 5 min
                         # reliably had ~6350 rows globally when checked live
-SPOT_LIMIT      = 400   # caps pins/lines to something Leaflet renders smoothly
+SPOT_LIMIT      = 10    # small on purpose -- an earlier 400-row version was visually a
+                        # tangle of hundreds of crisscrossing lines; a handful of the very
+                        # latest spots (ORDER BY time DESC) reads as "who's active right
+                        # now" without the spaghetti. Since spots arrive in synchronized
+                        # ~2-min bursts, the 10 most recent are typically all from the same
+                        # burst anyway -- a real, coherent snapshot, not an arbitrary trim.
 
 
 class WsprSpotsClient:

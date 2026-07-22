@@ -1057,6 +1057,12 @@
             font-size: 10px;
             color: var(--text-muted);
         }
+        /* Softens the aurora overlay's individual circleMarkers into a
+           blended glow rather than a visible grid of distinct dots --
+           paired with a larger radius/lower opacity in the JS itself. */
+        .aurora-dot {
+            filter: blur(6px);
+        }
         .map-jump-btn {
             font-size: 11px;
             color: var(--link);
@@ -2925,11 +2931,34 @@ const AURORA_KEY = 'w1zla_show_aurora';
 let auroraLayer = null;
 let auroraTimer = null;
 
+function auroraLerp(a, b, t) {
+    return [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * t));
+}
+
+// Continuous green -> yellow -> orange -> red ramp across the realistic
+// value range -- aurora.py's MIN_INTENSITY floor is 10, and real quiet-
+// conditions data tops out around 15-20 (confirmed live), so the old
+// fixed brackets (>30 yellow, >70 red) never fired in practice and every
+// point rendered the same flat green. This interpolates continuously so
+// color actually varies across a normal, non-storm day.
+const AURORA_STOPS = [
+    [10, [46, 204, 113]],   // green  (floor)
+    [25, [241, 196, 15]],   // yellow (typical "active" quiet-day ceiling)
+    [50, [230, 126, 34]],   // orange
+    [80, [231, 76, 60]],    // red    (real storm territory)
+];
 function auroraColor(value) {
-    // Simple green -> yellow -> red intensity ramp.
-    if (value > 70) return '#e74c3c';
-    if (value > 30) return '#f1c40f';
-    return '#2ecc71';
+    for (let i = 0; i < AURORA_STOPS.length - 1; i++) {
+        const [v0, c0] = AURORA_STOPS[i];
+        const [v1, c1] = AURORA_STOPS[i + 1];
+        if (value <= v1) {
+            const t = Math.max(0, (value - v0) / (v1 - v0));
+            const [r, g, b] = auroraLerp(c0, c1, t);
+            return `rgb(${r},${g},${b})`;
+        }
+    }
+    const [, last] = AURORA_STOPS[AURORA_STOPS.length - 1];
+    return `rgb(${last[0]},${last[1]},${last[2]})`;
 }
 
 function updateAurora() {
@@ -2939,9 +2968,12 @@ function updateAurora() {
         if (!data || data.error) return;
         const group = L.layerGroup();
         (data.points || []).forEach(p => {
+            // Larger, low-opacity, blurred circles so adjacent 1-degree
+            // grid points blend into a soft continuous glow instead of
+            // reading as a grid of distinct dots.
             L.circleMarker([p.lat, p.lon], {
-                radius: 6, stroke: false, fillColor: auroraColor(p.value), fillOpacity: 0.35,
-                interactive: false,
+                radius: 16, stroke: false, fillColor: auroraColor(p.value), fillOpacity: 0.22,
+                interactive: false, className: 'aurora-dot',
             }).addTo(group);
         });
         auroraLayer = group;
