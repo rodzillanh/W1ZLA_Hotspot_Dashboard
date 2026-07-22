@@ -22,6 +22,7 @@
   <DonateLink/>
   <Requires/>
   <Config Name="WebUI Port" Target="5000" Default="5000" Mode="tcp" Description="Port for the dashboard web interface" Type="Port" Display="always" Required="true" Mask="false">5000</Config>
+  <Config Name="WSJT-X UDP Port" Target="2237" Default="2237" Mode="udp" Description="Only needed for the optional live WSJT-X QSO logging feature (Settings -> Integrations). Must match the UDP port set there, or WSJT-X's packets never reach the container." Type="Port" Display="always" Required="false" Mask="false">2237</Config>
   <Config Name="App Data" Target="/app/data" Default="/mnt/user/appdata/hotspot-dashboard" Mode="rw" Description="Persistent storage for hotspots.json" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/hotspot-dashboard</Config>
   <Config Name="Poll Interval" Target="POLL_INTERVAL" Default="5" Mode="" Description="Seconds between fleet polling sweeps" Type="Variable" Display="always" Required="false" Mask="false">5</Config>
   <Config Name="SSH Timeout" Target="SSH_TIMEOUT" Default="5" Mode="" Description="SSH connection timeout in seconds" Type="Variable" Display="always" Required="false" Mask="false">5</Config>

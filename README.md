@@ -1010,6 +1010,14 @@ appear as pins — the QRZ subscription caveat above applies here too.
   whether packets are actually being received. Unlike a bulk ADIF import
   (which replaces the whole map), live-logged QSOs simply add to
   whatever's already there.
+  - **Docker/Unraid**: this needs a UDP port actually published from the
+    container, not just the app-level toggle — `docker-compose.yml` and
+    the Unraid template both publish `2237/udp` already. If you change
+    the port in Settings away from 2237, update the container's port
+    mapping to match (Unraid: Docker tab → Edit → add/adjust the "WSJT-X
+    UDP Port" field), or WSJT-X's packets will never reach the container
+    at all. Standalone Pi/systemd installs don't have this extra step —
+    whatever port you pick in Settings just works immediately.
 ## Fleet activity
 
 Optional — off by default (Settings → Cards → "Show fleet activity

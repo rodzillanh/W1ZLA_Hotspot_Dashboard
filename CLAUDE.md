@@ -1324,6 +1324,27 @@ config for per-integration credentials; put it in
   `dashboard.html`), since a live WSJT-X QSO can append to `qsos.json` at
   any moment, not just on an explicit user action. Cheap either way — it's
   a local JSON file read, not a third-party API call.
+- **`wsjtx.py`'s UDP listener needed an explicit port PUBLISHED from the
+  Docker container, not just the app-level Settings toggle -- shipped in
+  v3.45 without this, a real gap caught on review, not before.** Docker's
+  bridge network (what `docker-compose.yml`/`docker-update.sh`/
+  `unraid-template.xml` all use) forwards NOTHING into the container
+  unless a port is explicitly published -- only TCP 5000 (the web UI) was
+  published before this was caught, so WSJT-X packets sent to the
+  Unraid box's IP:2237 were silently dropped at the Docker network
+  boundary, never reaching the socket inside the container, regardless of
+  the `wsjtx_enabled`/`wsjtx_port` Settings fields being configured
+  correctly. Fixed by adding `-p 2237:2237/udp` (`docker-update.sh`),
+  `"2237:2237/udp"` (`docker-compose.yml`), and a matching `Type="Port"
+  Mode="udp"` `<Config>` (`unraid-template.xml`) -- same "keep the
+  container config descriptions in sync, nothing does it automatically"
+  caution already documented above for the WebUI port. If the in-app
+  `wsjtx_port` Settings field is ever changed away from 2237 on a Docker/
+  Unraid install, the container's port mapping needs updating to match,
+  or the feature silently stops receiving anything with no error
+  surfaced anywhere -- a standalone Pi/systemd install has no such
+  gap, since the process binds directly to the host's network stack and
+  whatever port is picked in Settings just works immediately.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

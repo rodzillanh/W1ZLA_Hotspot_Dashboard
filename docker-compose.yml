@@ -4,6 +4,11 @@ services:
     container_name: hotspot-dashboard
     ports:
       - "5000:5000"
+      # Required only for the optional live WSJT-X QSO logging feature
+      # (Settings -> Integrations) -- if you change that feature's UDP
+      # port away from 2237, update this line to match, or WSJT-X's
+      # packets will never reach the container at all.
+      - "2237:2237/udp"
     volumes:
       # Unraid convention: bind-mount into appdata so it's visible/backed up
       # like any other app. Change the host side if you keep appdata elsewhere.

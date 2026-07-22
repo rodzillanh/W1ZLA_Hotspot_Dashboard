@@ -8,6 +8,15 @@
 # on 2026-07-06), so it's a drop-in replacement for the manual
 # GUI stop -> remove -> re-add cycle.
 #
+# -p 2237:2237/udp (added v3.45) is required for the optional live WSJT-X
+# QSO logging feature -- Docker's bridge network doesn't forward ANY port
+# into the container unless it's explicitly published, so without this,
+# WSJT-X's UDP packets sent to this box's IP never reach wsjtx.py's socket
+# at all, regardless of the "wsjtx_port" Settings toggle. If you ever
+# change that Settings field away from 2237, update this line (and the
+# matching Config in unraid-template.xml) to the same port, or the two
+# will drift and the feature will silently stop receiving anything.
+#
 # Includes Unraid's net.unraid.docker.webui label so the container keeps
 # its "WebUI" shortcut in the Docker tab dropdown -- creating a container
 # via plain `docker run` (as this script does) doesn't set that
@@ -55,6 +64,7 @@ docker run -d \
   --name="$CONTAINER_NAME" \
   --restart=unless-stopped \
   -p 5000:5000 \
+  -p 2237:2237/udp \
   -v /mnt/user/appdata/hotspot-dashboard:/app/data \
   -e TZ=America/New_York \
   -e POLL_INTERVAL=5 \

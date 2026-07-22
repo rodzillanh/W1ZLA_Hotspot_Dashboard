@@ -110,7 +110,7 @@
                 <span class="release-tag">current</span>
             </div>
             <ul class="change-list">
-                <li><span>Live WSJT-X QSO logging</span> — a new Settings → Integrations option listens for WSJT-X's own UDP telemetry (the same feed GridTracker/JTAlert use) and plots each QSO on the Live map the instant you log it, no SSH/polling involved. Reuses the same pin/line rendering the ADIF import feature already built — live-logged QSOs simply add to whatever's on the map already, rather than replacing it the way a bulk ADIF import does</li>
+                <li><span>Live WSJT-X QSO logging</span> — a new Settings → Integrations option listens for WSJT-X's own UDP telemetry (the same feed GridTracker/JTAlert use) and plots each QSO on the Live map the instant you log it, no SSH/polling involved. Reuses the same pin/line rendering the ADIF import feature already built — live-logged QSOs simply add to whatever's on the map already, rather than replacing it the way a bulk ADIF import does. Docker/Unraid deployments now publish the UDP port needed to actually receive it (`docker-compose.yml`/`docker-update.sh`/the Unraid template all add `2237/udp`) — standalone Pi/systemd installs need no extra step</li>
             </ul>
         </div>
 
