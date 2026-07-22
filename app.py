@@ -35,7 +35,7 @@ from update_check import UpdateChecker
 from camera_stream import CameraStreamManager
 from hf_conditions import HfConditionsClient
 from license_quiz import LicenseQuizPool
-from wspr_activity import WsprActivityClient, WsprSpotsClient, grid_to_latlon
+from wspr_activity import WsprActivityClient, grid_to_latlon
 from aurora import AuroraClient
 from adif import parse_adif
 from digipi import DigipiMonitor
@@ -53,7 +53,6 @@ hf_conditions   = HfConditionsClient()
 camera_manager  = CameraStreamManager()
 license_quiz    = LicenseQuizPool()
 wspr_activity   = WsprActivityClient()
-wspr_spots      = WsprSpotsClient()
 aurora_client   = AuroraClient()
 digipi_monitor  = DigipiMonitor()
 openspot_manager = OpenSpot4Manager(monitor)
@@ -336,6 +335,13 @@ def api_settings_post():
             pass
     if "station_grid" in data:
         settings["station_grid"] = data["station_grid"].strip().upper()
+    if "show_big_clock" in data:
+        settings["show_big_clock"] = bool(data["show_big_clock"])
+    if "big_clock_position" in data:
+        try:
+            settings["big_clock_position"] = max(0, int(data["big_clock_position"]))
+        except (TypeError, ValueError):
+            pass
     save_settings(settings)
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:
@@ -558,16 +564,6 @@ def api_wspr_activity():
         return jsonify({"error": "unavailable"}), 503
     return jsonify(data)
 
-@app.route("/api/wspr_spots")
-def api_wspr_spots():
-    """Live global WSPR spot pairs for the Live map's optional "WSPR spots"
-    overlay -- deliberately NOT filtered by station_grid/radius, unlike
-    /api/wspr_activity above (see wspr_activity.py's WsprSpotsClient)."""
-    data = wspr_spots.get()
-    if data is None:
-        return jsonify({"error": "unavailable"}), 503
-    return jsonify(data)
-
 @app.route("/api/aurora")
 def api_aurora():
     """Live NOAA OVATION aurora-oval overlay for the Live map's optional
@@ -588,11 +584,19 @@ def api_import_adif():
     expected). Position resolution: GRIDSQUARE first (direct, no lookup
     needed), falling back to the same QRZ/RadioID/APRS composition every
     other card uses (monitor.lookup_caller_info) when absent. A QSO with
-    neither is skipped -- nothing to plot it with."""
+    neither is skipped -- nothing to plot it with.
+
+    Each QSO also gets a "worked from" QTH position, so the map can draw a
+    line back to the home station: MY_GRIDSQUARE on that specific record
+    takes priority (handles a portable/rover log where the operating
+    location changes between QSOs), falling back to settings' station_grid
+    otherwise. A QSO with neither gets no qth_lat/qth_lon -- plotted as a
+    bare pin, no line, same as before this feature existed."""
     data = request.json or {}
     text = data.get("text", "")
     filename = data.get("filename", "")
     records = parse_adif(text)
+    default_qth = grid_to_latlon(load_settings().get("station_grid", ""))
 
     qsos = []
     for r in records:
@@ -610,12 +614,20 @@ def api_import_adif():
             name, location = info["name"], info["location"]
         if lat is None or lon is None:
             continue  # can't plot without a position
+
+        my_grid = (r.get("MY_GRIDSQUARE") or "").strip()
+        qth = grid_to_latlon(my_grid) if my_grid else None
+        if qth is None:
+            qth = default_qth
+        qth_lat, qth_lon = qth if qth is not None else (None, None)
+
         qsos.append({
             "call": call,
             "band": (r.get("BAND") or "").strip().lower(),
             "mode": (r.get("MODE") or "").strip().upper(),
             "date": (r.get("QSO_DATE") or "").strip(),
             "lat": lat, "lon": lon,
+            "qth_lat": qth_lat, "qth_lon": qth_lon,
             "name": name, "location": location,
         })
 

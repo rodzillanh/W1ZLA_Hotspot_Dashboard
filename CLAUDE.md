@@ -735,29 +735,30 @@ config for per-integration credentials; put it in
   shared rate limit across however many dashboards happen to be running
   this code.
 
-- **`wspr.rx`'s callsign columns are named `tx_sign`/`rx_sign`, NOT
-  `tx_call`/`rx_call`.** A first attempt at the Live map's "WSPR spots"
-  overlay query (`WsprSpotsClient` in `wspr_activity.py`) guessed
-  `tx_call`/`rx_call` as the natural ham-radio-terminology column names
-  and got a real, immediate `404`/`Code: 47 UNKNOWN_IDENTIFIER` error
-  back from ClickHouse (with a helpful `Maybe you meant: ['tx_lat']`
-  hint) rather than silently returning wrong data -- confirmed the real
-  names via `DESCRIBE TABLE wspr.rx FORMAT JSON` before writing the
-  fixed query. The app's own JSON response still uses `tx_call`/`rx_call`
-  as the *output* key names for frontend clarity -- only the SQL
-  `SELECT` and the dict access on the raw ClickHouse row use the real
-  `tx_sign`/`rx_sign` names, translated at the boundary.
-- **WSPR spot inserts into `wspr.rx` arrive in bursts, not a smooth
-  continuous stream -- a tight time window can return zero rows even
-  when the feed is working correctly.** Confirmed live: querying the
-  last 120 seconds returned 7 rows one moment and 0 rows moments later,
-  while a 5-minute window reliably returned ~6350 rows globally and a
-  10-minute window ~22855. `WsprSpotsClient.SPOT_WINDOW_SEC` is
-  deliberately 300 (5 min), relying on `ORDER BY time DESC LIMIT
-  SPOT_LIMIT` to bound the result size rather than a tight window to
-  guarantee non-empty results -- don't shrink the window back down to
-  "feel more real-time" without re-testing for the empty-window case
-  first.
+- **The Live map's "WSPR spots" overlay (`WsprSpotsClient` in
+  `wspr_activity.py`) was removed in v3.44** -- worldwide spotter↔
+  transmitter lines just didn't read well at a glance even after a prior
+  round of visual tuning (spot-count limit, etc.), and the user preferred
+  dropping the layer over further tuning. `WsprActivityClient` (the Band
+  Activity card's per-station-grid spot *counts*) is unaffected and still
+  live -- only the separate global per-spot-pair client/route/map layer
+  is gone. Two schema facts learned while it existed are worth keeping in
+  mind if a similar per-spot `wspr.rx` query is ever added again:
+  - **`wspr.rx`'s callsign columns are named `tx_sign`/`rx_sign`, NOT
+    `tx_call`/`rx_call`.** The removed client's first attempt guessed
+    `tx_call`/`rx_call` as the natural ham-radio-terminology names and got
+    a real, immediate `404`/`Code: 47 UNKNOWN_IDENTIFIER` error back from
+    ClickHouse (with a helpful `Maybe you meant: ['tx_lat']` hint) rather
+    than silently returning wrong data -- confirmed the real names via
+    `DESCRIBE TABLE wspr.rx FORMAT JSON` before writing the fixed query.
+  - **WSPR spot inserts into `wspr.rx` arrive in bursts, not a smooth
+    continuous stream -- a tight time window can return zero rows even
+    when the feed is working correctly.** Confirmed live: querying the
+    last 120 seconds returned 7 rows one moment and 0 rows moments later,
+    while a 5-minute window reliably returned ~6350 rows globally and a
+    10-minute window ~22855 -- query a wider window (the removed client
+    used 5 min) and rely on `ORDER BY time DESC LIMIT n` to bound the
+    result size, not a tight window, if resurrecting this.
 - **NOAA SWPC's OVATION aurora feed (`aurora.py`) was verified with a
   real, complete download before trusting its shape** -- an initial
   WebFetch-based check against the same URL gave inconsistent/partial
@@ -1218,6 +1219,38 @@ config for per-integration credentials; put it in
   both matching the guessed paths exactly. What was previously flagged
   as "ported from older-gen docs, unverified" is now directly confirmed
   live, not just indirectly (via a successful login) inferred.
+- **The Big Ass Clock card (v3.44) is the second card with zero backend
+  module** (Band Plan was the first) — everything is `Date`/
+  `Intl.DateTimeFormat` in `dashboard.html`'s own script block, ticking
+  on a plain `setInterval(renderClock, 1000)`, gated by `SHOW_BIG_CLOCK`
+  the same way `fetchHfConditions`/`fetchDigipi` etc. gate their own
+  polling. Style/12-hour-format/second-clock/timezone are `localStorage`
+  only, never `settings.json` — same split as map style/grey-line
+  default, since none of it needs to sync across devices viewing the
+  same dashboard. The TIX style is a mockup-stage interpretation from
+  general recollection, **not verified against a specific real TIX
+  clock product** — each digit is a dot grid sized to what that digit
+  actually needs (hour tens 0-1 → 3 dots; minute/second tens 0-5 → 6
+  dots in a 2x3 grid; every units digit 0-9 → the full 3x3 grid), TIX is
+  always 12-hour and never shows a second clock, kept deliberately
+  simple/glanceable rather than configurable. If a reference photo of a
+  specific real product ever surfaces, re-check the dot-grid layout
+  against it rather than this recollection.
+- **ADIF-imported QSOs (v3.44) each get a line back to the QTH they were
+  worked from, not just a bare pin.** Per-QSO priority: that specific
+  record's own `MY_GRIDSQUARE` field first (handles a portable/rover log
+  where the operating location changes between QSOs — confirmed this is
+  a real per-QSO ADIF field, not just a header field, by testing a
+  multi-record log with different `MY_GRIDSQUARE` values per record),
+  falling back to settings' `station_grid` otherwise. A QSO with neither
+  gets `qth_lat`/`qth_lon` omitted entirely (`app.py`'s
+  `api_import_adif`) and is plotted as a bare pin with no line, same as
+  before this feature existed — don't force a fallback that would draw a
+  misleading line to nowhere. The lines live in their own plain
+  `qsoLinesLayer` (`L.layerGroup()`), not inside `qsoCluster`
+  (`L.markerClusterGroup()`) — a MarkerClusterGroup only ever clusters
+  point markers, so polylines don't belong inside one. Both layers
+  toggle together under the same "Show on map" checkbox.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

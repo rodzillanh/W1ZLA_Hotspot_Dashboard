@@ -559,6 +559,15 @@
                        value="{{ settings.get('station_grid', '') }}">
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show Big Ass Clock card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (digital/analog/TIX clock, optional second timezone -- style is per-browser)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_big_clock', False) else '' }}"
+                     id="big-clock-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show DigiPi card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (APRS/Direwolf activity + screen mirror -- needs connection details in Integrations)
@@ -588,6 +597,7 @@
             {% set license_quiz_pos = settings.get('license_quiz_position', 0) if settings.get('show_license_quiz', False) else -1 %}
             {% set wspr_activity_pos = settings.get('wspr_activity_position', 0) if settings.get('show_wspr_activity', False) else -1 %}
             {% set digipi_pos = settings.get('digipi_position', 0) if settings.get('digipi_enabled', False) else -1 %}
+            {% set big_clock_pos = settings.get('big_clock_position', 0) if settings.get('show_big_clock', False) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -644,6 +654,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">📡 DigiPi</span>
                     <span class="node-meta">APRS/Direwolf card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == big_clock_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__big_clock__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🕐 Big Ass Clock</span>
+                    <span class="node-meta">clock card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -715,6 +732,13 @@
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">📡 DigiPi</span>
                 <span class="node-meta">APRS/Direwolf card</span>
+            </div>
+            {% endif %}
+            {% if big_clock_pos >= hotspots|length %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__big_clock__">
+                <span class="drag-handle">⠿</span>
+                <span class="node-name">🕐 Big Ass Clock</span>
+                <span class="node-meta">clock card</span>
             </div>
             {% endif %}
             {% if show_cams %}
@@ -1472,6 +1496,7 @@ function saveCards() {
             show_wspr_activity: document.getElementById('wspr-activity-toggle').classList.contains('on'),
             station_grid: document.getElementById('station-grid-input').value.trim(),
             digipi_enabled: document.getElementById('digipi-toggle').classList.contains('on'),
+            show_big_clock: document.getElementById('big-clock-toggle').classList.contains('on'),
         })
     }).then(() => {
         const el = document.getElementById('cards-status');
@@ -1597,6 +1622,7 @@ function saveCardOrder() {
     const licenseQuizIdx = sentinelIndex('__license_quiz__');
     const wsprActivityIdx = sentinelIndex('__wspr_activity__');
     const digipiIdx = sentinelIndex('__digipi__');
+    const bigClockIdx = sentinelIndex('__big_clock__');
     const cameraPositions = {};
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
@@ -1666,6 +1692,13 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ digipi_position: digipiIdx })
+        }));
+    }
+    if (bigClockIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ big_clock_position: bigClockIdx })
         }));
     }
     if (Object.keys(cameraPositions).length > 0) {

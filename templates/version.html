@@ -105,9 +105,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.43</span>
+                <span class="release-version">v3.44</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Big Ass Clock card</span> — a new optional dashboard card (Settings → Cards) with three selectable styles: Digital (12/24hr toggle), Analog (proper clock face — ticks, numerals, tapered hands, gradient bezel), and TIX (dot-matrix digit grids, sized to what each digit actually needs). Digital and Analog can both show a second clock in another timezone or UTC/Zulu; style/format preferences are per-browser, not synced across devices</li>
+                <li><span>ADIF import now draws QTH lines</span> — each imported QSO gets a thin line back to the station it was worked from: that QSO's own MY_GRIDSQUARE if the log recorded one (handles a portable/rover log), falling back to your station grid square in Settings otherwise</li>
+                <li><span>Removed the "WSPR spots" map overlay</span> — the dense worldwide spotter↔transmitter lines didn't read well at a glance even after the previous release's tuning; the Band Activity card's own WSPR-based spot counts are unaffected, this only removes the Live map layer</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.43</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>ADIF QSO import</span> — a floating "Import ADIF log" control on the Live map lets you upload a logging-software export and plot every worked station as a band-colored pin. Unlike the map's optional layer checkboxes, this is persistent (saved server-side, stays across visits) and reuses the same QRZ/RadioID lookup every other card already uses when a QSO's own grid square isn't in the log</li>

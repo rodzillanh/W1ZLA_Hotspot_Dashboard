@@ -365,6 +365,15 @@ DEFAULT_SETTINGS = {
     "show_wspr_activity": False,
     "wspr_activity_position": 0,
     "station_grid": "",
+    # Big Ass Clock card -- off by default. Purely client-side (Date/
+    # Intl.DateTimeFormat in dashboard.html), no backend module at all --
+    # same "no Python client" precedent as the Band Plan card. Style
+    # (digital/analog/tix), 12/24hr format, and second-clock/timezone are
+    # all per-browser localStorage preferences (nothing to sync across
+    # devices, same split as map style/grey-line default), so this only
+    # needs a show/position pair like every other optional card.
+    "show_big_clock": False,
+    "big_clock_position": 0,
 }
 
 # --- Fleet activity ---

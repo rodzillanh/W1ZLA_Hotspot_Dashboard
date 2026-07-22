@@ -866,6 +866,34 @@ each poll fetches exactly one question.
   the same dashboard get independent stats.
 - Same drag-and-drop **Card order** placement as every other extra card.
 
+## Big Ass Clock card
+
+Optional dashboard card (Settings → Cards → "Show Big Ass Clock card",
+off by default) — a large clock, purely client-side (no backend module,
+no network call — same as the static Band Plan card). Three selectable
+styles via a dropdown in the card header:
+
+- **Digital** — large tabular time + date. A 12/24-hour toggle in the
+  card's own controls (UTC/Zulu is always forced 24-hour — the real
+  ham radio/aviation convention).
+- **Analog** — a proper clock face: 60 minute ticks with bolder hour
+  marks, numerals, tapered hands with a counterweight tail, and a
+  subtle gradient face/bezel.
+- **TIX** — a dot-matrix "TIX clock" style display: each digit shown as
+  a grid of lit dots, count = digit value. Tens digits get a smaller
+  grid sized to what they actually need (hour tens only ever needs 0-1,
+  minute/second tens only ever needs 0-5) rather than the full 9-dot
+  grid units digits use. Always 12-hour, no second clock — kept
+  deliberately simple/glanceable.
+- **Second clock** — Digital and Analog can both show a second
+  clock alongside the first, in any of several common timezones or
+  UTC/Zulu. Digital's pair stacks vertically; Analog's sits side by
+  side (two round faces read naturally next to each other).
+- Style, format, and second-clock/timezone choices are saved in the
+  browser's **localStorage**, not settings.json — nothing here needs to
+  sync across every device viewing the same dashboard.
+- Same drag-and-drop **Card order** placement as every other extra card.
+
 ## Band Activity card
 
 Optional dashboard card (Settings → Cards → "Show Band Activity card",
@@ -949,13 +977,6 @@ appear as pins — the QRZ subscription caveat above applies here too.
   (subsolar point + the sun's zenith angle at each point on the map),
   not a static image, and recomputes once a minute. Also a per-browser
   preference (`localStorage`), same reasoning as the map height.
-- **WSPR spots overlay** — a "WSPR spots" checkbox plots real, live
-  spotter↔transmitter station pairs from `wspr.live`, color-coded by
-  band. Deliberately global (not filtered to your own station's
-  location), so it's always populated and always something moving,
-  even with no station grid square configured. Off by default —
-  turning it on starts a periodic refresh (~90s) that stops the moment
-  you turn it back off, so it costs nothing until you actually want it.
 - **Aurora oval overlay** — an "Aurora oval" checkbox plots NOAA SWPC's
   live OVATION auroral activity model as a soft, intensity-graded glow
   near the poles. Also off by default, also stops polling the moment
@@ -972,8 +993,13 @@ appear as pins — the QRZ subscription caveat above applies here too.
   Position comes from the QSO's own `GRIDSQUARE` field when the log
   includes one, falling back to the same QRZ/RadioID lookup every
   other card already uses when it doesn't; a QSO with neither is
-  skipped rather than plotted incorrectly. Importing a new log replaces
-  the previous one — there's no merge/dedupe across imports.
+  skipped rather than plotted incorrectly. Each pin also gets a thin
+  line back to the QTH it was worked from — that QSO's own
+  `MY_GRIDSQUARE` field if the log recorded one (handles a portable/
+  rover log where your operating location changes between QSOs),
+  falling back to your station grid square set in Settings → General
+  otherwise. No line is drawn if neither is known. Importing a new log
+  replaces the previous one — there's no merge/dedupe across imports.
 ## Fleet activity
 
 Optional — off by default (Settings → Cards → "Show fleet activity

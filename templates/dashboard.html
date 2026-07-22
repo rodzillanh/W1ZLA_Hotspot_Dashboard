@@ -774,6 +774,30 @@
         .ba-footer a { color: var(--text-dim); }
         .ba-unavailable { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
 
+        /* --- Big Ass Clock card --- */
+        .clock-body { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 240px; justify-content: center; }
+        .clock-dual { display: flex; gap: 16px; align-items: center; justify-content: center; width: 100%; }
+        .clock-dual.stacked { flex-direction: column; gap: 10px; }
+        .clock-zone-label { font-size: 10px; letter-spacing: .5px; text-transform: uppercase; color: var(--text-dim); text-align: center; margin-top: 4px; }
+        .clock-digital-time { font-size: 64px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 1px; color: var(--text); }
+        .clock-digital-time.small { font-size: 48px; }
+        .clock-digital-date { font-size: 13px; color: var(--text-muted); margin-top: -2px; }
+        .clock-tix-row { display: flex; gap: 8px; }
+        .clock-tix-digit { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; width: 50px; height: 50px; }
+        .clock-tix-digit.tens { grid-template-columns: 1fr; width: 16px; }
+        .clock-tix-digit.tens.wide { grid-template-columns: repeat(2, 1fr); width: 32px; }
+        .clock-tix-dot { width: 100%; height: 100%; border-radius: 50%; background: var(--card-border); }
+        .clock-tix-dot.on { background: var(--accent); }
+        .clock-tix-sep { align-self: center; color: var(--text-dim); font-weight: 700; padding: 0 2px; font-size: 20px; }
+        .clock-controls { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--card-border); font-size: 11.5px; color: var(--text-muted); }
+        .clock-ctl-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+        .clock-ctl-row select { background: var(--bg); color: var(--text); border: 1px solid var(--card-border); border-radius: 5px; padding: 3px 6px; font-size: 11px; }
+        .clock-toggle-mini { width: 30px; height: 17px; border-radius: 10px; background: var(--card-border); position: relative; flex-shrink: 0; cursor: pointer; transition: background .15s; }
+        .clock-toggle-mini.on { background: var(--accent); }
+        .clock-toggle-mini::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; }
+        .clock-toggle-mini.on::after { left: 15px; }
+        .clock-disabled-note { color: var(--text-dim); font-style: italic; }
+
         /* --- DigiPi card --- */
         .dp-state {
             font-size: 10px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase;
@@ -1465,6 +1489,24 @@
             <div class="dp-unavailable" id="dp-unavailable" style="display:none">Set a DigiPi IP/credentials in Settings → Integrations to enable this card.</div>
         </div>
         {% endif %}
+        {% if settings.get('show_big_clock', False) %}
+        <div class="metrics-card" id="big-clock-card"
+             style="order:{{ settings.get('big_clock_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">🕐 Big Ass Clock</div>
+                <select id="clock-style-select" onchange="setClockStyle(this.value)"
+                        style="background:var(--card-bg);color:var(--text);
+                               border:1px solid var(--card-border);border-radius:5px;
+                               padding:3px 8px;font-size:12px;cursor:pointer">
+                    <option value="digital">Digital</option>
+                    <option value="analog">Analog</option>
+                    <option value="tix">TIX</option>
+                </select>
+            </div>
+            <div class="clock-body" id="clock-body"></div>
+            <div class="clock-controls" id="clock-controls"></div>
+        </div>
+        {% endif %}
         <div id="cards" style="display:contents"></div>
         <div id="camera-cards" style="display:contents"></div>
     </div>
@@ -1479,10 +1521,6 @@
         <label style="margin-left:auto;display:flex;align-items:center;gap:5px;cursor:pointer">
             <input type="checkbox" id="greyline-toggle" onchange="toggleGreyline()">
             Grey line
-        </label>
-        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-            <input type="checkbox" id="wspr-spots-toggle" onchange="toggleWsprSpots()">
-            WSPR spots
         </label>
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
             <input type="checkbox" id="aurora-toggle" onchange="toggleAurora()">
@@ -1665,6 +1703,8 @@ const DIGIPI_POSITION = {{ settings.get('digipi_position', 0) }};
 const DIGIPI_IP = "{{ settings.get('digipi_ip', '') }}";
 const DIGIPI_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS
 const DIGIPI_SCREEN_REFRESH_MS = 2000;  // direwatch.php's own cache-bust interval is 1000ms, dialed back slightly
+const SHOW_BIG_CLOCK = {{ 'true' if settings.get('show_big_clock', False) else 'false' }};
+const BIG_CLOCK_POSITION = {{ settings.get('big_clock_position', 0) }};
 
 // --- theme toggle (toolbar) ---
 function toggleDashboardTheme() {
@@ -1917,6 +1957,9 @@ function renderCards(data) {
     if (SHOW_DIGIPI) {
         sentinels.push({ key: 'digipi', pos: Math.max(0, Math.min(DIGIPI_POSITION, data.length)) });
     }
+    if (SHOW_BIG_CLOCK) {
+        sentinels.push({ key: 'bigclock', pos: Math.max(0, Math.min(BIG_CLOCK_POSITION, data.length)) });
+    }
     const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);
 
     const fleetCard = document.getElementById('fleet-activity-card');
@@ -1935,6 +1978,8 @@ function renderCards(data) {
     if (wsprActivityCard && 'wspractivity' in sentinelOrders) wsprActivityCard.style.order = sentinelOrders.wspractivity;
     const digipiCard = document.getElementById('digipi-card');
     if (digipiCard && 'digipi' in sentinelOrders) digipiCard.style.order = sentinelOrders.digipi;
+    const bigClockCard = document.getElementById('big-clock-card');
+    if (bigClockCard && 'bigclock' in sentinelOrders) bigClockCard.style.order = sentinelOrders.bigclock;
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -2411,6 +2456,305 @@ if (SHOW_DIGIPI) {
     }
 }
 
+// --- Big Ass Clock card ---
+// Purely client-side -- no backend module, no /api endpoint (same "no
+// Python client" precedent as the static Band Plan card). Style/format/
+// second-clock are per-browser localStorage preferences, not settings.json,
+// since there's nothing here that makes sense to sync across devices
+// viewing the same dashboard (same reasoning as map style/grey-line default).
+const CLOCK_STYLE_KEY = 'w1zla_clock_style';
+const CLOCK_12HR_KEY = 'w1zla_clock_12hr';
+const CLOCK_DUAL_KEY = 'w1zla_clock_dual';
+const CLOCK_DUAL_TZ_KEY = 'w1zla_clock_dual_tz';
+
+let clockStyle = localStorage.getItem(CLOCK_STYLE_KEY) || 'digital';
+let clockDualEnabled = localStorage.getItem(CLOCK_DUAL_KEY) === '1';
+let clockDualTz = localStorage.getItem(CLOCK_DUAL_TZ_KEY) || 'UTC';
+let clockUse12Hour = localStorage.getItem(CLOCK_12HR_KEY) === '1';  // 24hr default, matches ham radio/aviation convention
+let clockTixState = {};  // per-digit-position cached dot layout, keyed by "position:value:dotCount"
+
+const CLOCK_TZ_OPTIONS = [
+    ['UTC', 'UTC / Zulu'],
+    ['America/New_York', 'US Eastern'],
+    ['America/Chicago', 'US Central'],
+    ['America/Denver', 'US Mountain'],
+    ['America/Los_Angeles', 'US Pacific'],
+    ['Europe/London', 'London'],
+    ['Europe/Berlin', 'Berlin'],
+    ['Asia/Tokyo', 'Tokyo'],
+    ['Australia/Sydney', 'Sydney'],
+];
+
+function setClockStyle(style) {
+    clockStyle = style;
+    localStorage.setItem(CLOCK_STYLE_KEY, style);
+    renderClockControls();
+    renderClock();
+}
+
+// 12/24hr only applies to Digital (TIX is always 12hr by design -- see
+// renderClockTix); a normal analog face has no "24-hour mode" concept, the
+// hour hand just makes its usual two rotations per day either way.
+function renderClockFormatToggle() {
+    return `
+        <div class="clock-ctl-row">
+            <div class="clock-toggle-mini ${clockUse12Hour ? 'on' : ''}" onclick="toggleClockFormat()"></div>
+            12-hour format <span class="clock-disabled-note">(UTC/Zulu is always 24hr)</span>
+        </div>`;
+}
+
+function renderClockControls() {
+    const el = document.getElementById('clock-controls');
+    if (!el) return;
+    if (clockStyle === 'tix') {
+        // TIX is always 12hr, full stop -- no format toggle, no second
+        // clock. Kept deliberately simple/fixed rather than configurable.
+        el.innerHTML = `<div class="clock-disabled-note">TIX is always 12-hour, and has no second clock -- kept simple/glanceable by design.</div>`;
+        return;
+    }
+    el.innerHTML = (clockStyle === 'digital' ? renderClockFormatToggle() : '') + `
+        <div class="clock-ctl-row">
+            <div class="clock-toggle-mini ${clockDualEnabled ? 'on' : ''}" onclick="toggleClockDual()"></div>
+            Show a second clock
+        </div>
+        <div class="clock-ctl-row" id="clock-tz-row" style="display:${clockDualEnabled ? 'flex' : 'none'}">
+            Timezone:
+            <select id="clock-tz-select" onchange="setClockTz(this.value)">
+                ${CLOCK_TZ_OPTIONS.map(([v, label]) => `<option value="${v}" ${v === clockDualTz ? 'selected' : ''}>${label}</option>`).join('')}
+            </select>
+        </div>`;
+}
+
+function toggleClockFormat() {
+    clockUse12Hour = !clockUse12Hour;
+    localStorage.setItem(CLOCK_12HR_KEY, clockUse12Hour ? '1' : '0');
+    renderClockControls();
+    renderClock();
+}
+
+function toggleClockDual() {
+    clockDualEnabled = !clockDualEnabled;
+    localStorage.setItem(CLOCK_DUAL_KEY, clockDualEnabled ? '1' : '0');
+    renderClockControls();
+    renderClock();
+}
+
+function setClockTz(tz) {
+    clockDualTz = tz;
+    localStorage.setItem(CLOCK_DUAL_TZ_KEY, tz);
+    renderClock();
+}
+
+function resolveClockTz(tz) {
+    return tz === 'local' ? Intl.DateTimeFormat().resolvedOptions().timeZone : tz;
+}
+
+// UTC/Zulu is always 24hr, full stop -- that's the real ham radio/
+// aviation convention (nobody writes "2100Z" as "9:00 PM Z"). The
+// 12/24hr toggle only ever applies to a non-UTC clock.
+function effectiveClockHour12(tz) {
+    return tz === 'UTC' ? false : clockUse12Hour;
+}
+
+function clockPartsFor(tz, forceHour12) {
+    const h12 = forceHour12 !== undefined ? forceHour12 : effectiveClockHour12(tz);
+    const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: resolveClockTz(tz), hour12: h12,
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        year: 'numeric', month: 'short', day: '2-digit',
+    });
+    const parts = {};
+    fmt.formatToParts(new Date()).forEach(p => parts[p.type] = p.value);
+    return parts;
+}
+
+function renderClockDigital(container, tz, small) {
+    const p = clockPartsFor(tz);
+    const ampm = effectiveClockHour12(tz) ? ` <span style="font-size:.5em;color:var(--text-muted)">${p.dayPeriod}</span>` : '';
+    const wrap = document.createElement('div');
+    wrap.style.textAlign = 'center';
+    wrap.innerHTML = `
+        <div class="clock-digital-time ${small ? 'small' : ''}">${p.hour}:${p.minute}:${p.second}${ampm}</div>
+        <div class="clock-digital-date">${p.month} ${p.day}, ${p.year}</div>
+        <div class="clock-zone-label">${tz === 'UTC' ? 'UTC / Zulu' : tz.split('/').pop().replace('_',' ')}</div>`;
+    container.appendChild(wrap);
+}
+
+let clockAnalogIdCounter = 0;
+
+// Tapered polygon hand with a short counterweight tail behind the
+// pivot -- reads as a proper clock hand instead of a bare ruled line.
+function clockHandPath(cx, cy, angleDeg, length, width, color) {
+    const a = angleDeg * Math.PI / 180;
+    const tipX = cx + Math.sin(a) * length, tipY = cy - Math.cos(a) * length;
+    const perpA = a + Math.PI / 2;
+    const baseW = width, tipW = width * 0.32;
+    const bx = Math.sin(perpA) * baseW / 2, by = -Math.cos(perpA) * baseW / 2;
+    const tx = Math.sin(perpA) * tipW / 2, ty = -Math.cos(perpA) * tipW / 2;
+    const tailLen = length * 0.16;
+    const tailX = cx - Math.sin(a) * tailLen, tailY = cy + Math.cos(a) * tailLen;
+    const pts = [[cx + bx, cy + by], [tipX + tx, tipY + ty], [tipX - tx, tipY - ty], [cx - bx, cy - by]]
+        .map(p => p.map(v => v.toFixed(1)).join(',')).join(' ');
+    return `<polygon points="${pts}" fill="${color}"/>
+        <line x1="${cx.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${tailX.toFixed(1)}" y2="${tailY.toFixed(1)}"
+            stroke="${color}" stroke-width="${(width * 0.55).toFixed(1)}" stroke-linecap="round"/>`;
+}
+
+function renderClockAnalog(container, tz, size) {
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: resolveClockTz(tz) }));
+    const h = now.getHours() % 12, m = now.getMinutes(), s = now.getSeconds();
+    const hAng = (h + m/60) * 30, mAng = (m + s/60) * 6, sAng = s * 6;
+    const r = size/2, cx = r, cy = r;
+    const uid = 'clockface' + (clockAnalogIdCounter++);
+    const showNumerals = size >= 120;
+
+    // 60 minute ticks; every 5th (the hour marks) drawn longer/bolder.
+    const ticks = Array.from({length: 60}, (_, i) => {
+        const isHour = i % 5 === 0;
+        const a = i * 6 * Math.PI / 180;
+        const outer = r - 3;
+        const inner = isHour ? r - (size * 0.09) : r - (size * 0.045);
+        const x1 = cx + Math.sin(a) * outer, y1 = cy - Math.cos(a) * outer;
+        const x2 = cx + Math.sin(a) * inner, y2 = cy - Math.cos(a) * inner;
+        return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
+            stroke="${isHour ? 'var(--text)' : 'var(--text-dim)'}" stroke-width="${isHour ? 2 : 0.8}" stroke-linecap="round"/>`;
+    }).join('');
+
+    const numerals = showNumerals ? Array.from({length: 12}, (_, i) => {
+        const n = i === 0 ? 12 : i;
+        const a = i * 30 * Math.PI / 180;
+        const nr = r - size * 0.165;
+        const x = cx + Math.sin(a) * nr, y = cy - Math.cos(a) * nr;
+        return `<text x="${x.toFixed(1)}" y="${(y + size * 0.03).toFixed(1)}" text-anchor="middle"
+            font-size="${(size * 0.1).toFixed(1)}" font-family="Georgia, 'Times New Roman', serif"
+            fill="var(--text)">${n}</text>`;
+    }).join('') : '';
+
+    const hourHand = clockHandPath(cx, cy, hAng, r * 0.52, size * 0.052, 'var(--text)');
+    const minuteHand = clockHandPath(cx, cy, mAng, r * 0.74, size * 0.036, 'var(--text)');
+
+    const wrap = document.createElement('div');
+    wrap.style.textAlign = 'center';
+    wrap.innerHTML = `
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+            <defs>
+                <radialGradient id="face-${uid}" cx="35%" cy="30%" r="75%">
+                    <stop offset="0%" stop-color="var(--card-bg)"/>
+                    <stop offset="100%" stop-color="var(--bg)"/>
+                </radialGradient>
+                <linearGradient id="bezel-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="var(--card-border)"/>
+                    <stop offset="50%" stop-color="var(--text-dim)"/>
+                    <stop offset="100%" stop-color="var(--card-border)"/>
+                </linearGradient>
+            </defs>
+            <circle cx="${cx}" cy="${cy}" r="${r - 2}" fill="url(#face-${uid})" stroke="url(#bezel-${uid})" stroke-width="3"/>
+            ${ticks}
+            ${numerals}
+            ${hourHand}
+            ${minuteHand}
+            <line x1="${cx}" y1="${cy}" x2="${(cx + Math.sin(sAng*Math.PI/180)*r*0.8).toFixed(1)}" y2="${(cy - Math.cos(sAng*Math.PI/180)*r*0.8).toFixed(1)}"
+                stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round"/>
+            <line x1="${cx}" y1="${cy}" x2="${(cx - Math.sin(sAng*Math.PI/180)*r*0.16).toFixed(1)}" y2="${(cy + Math.cos(sAng*Math.PI/180)*r*0.16).toFixed(1)}"
+                stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round"/>
+            <circle cx="${cx}" cy="${cy}" r="4.5" fill="var(--text)"/>
+            <circle cx="${cx}" cy="${cy}" r="2" fill="var(--accent)"/>
+        </svg>
+        <div class="clock-zone-label">${tz === 'UTC' ? 'UTC / Zulu' : tz.split('/').pop().replace('_',' ')}</div>`;
+    container.appendChild(wrap);
+}
+
+function clockTixDigitDots(position, digit, dotCount) {
+    const key = position + ':' + digit + ':' + dotCount;
+    if (!clockTixState[key]) {
+        const positions = Array.from({length: dotCount}, (_, i) => i);
+        for (let i = positions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [positions[i], positions[j]] = [positions[j], positions[i]];
+        }
+        clockTixState[key] = new Set(positions.slice(0, digit));
+    }
+    return clockTixState[key];
+}
+
+// The tens digit of each pair never needs the full 9-dot grid: hour
+// tens is 0-1 in 12hr mode (a slim 3-dot column), while minute/second
+// tens is 0-5 and gets its own 6-dot grid (2x3) -- big enough to
+// actually show a "5", unlike a too-small 3-dot column that can't.
+function renderClockTixDigit(container, position, digit) {
+    const isTens = position % 2 === 0;
+    const isHourTens = position === 0;
+    const dotCount = isTens ? (isHourTens ? 3 : 6) : 9;
+    const lit = clockTixDigitDots(position, digit, dotCount);
+    const grid = document.createElement('div');
+    grid.className = 'clock-tix-digit' + (isTens ? ' tens' : '') + (isTens && !isHourTens ? ' wide' : '');
+    for (let i = 0; i < dotCount; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'clock-tix-dot' + (lit.has(i) ? ' on' : '');
+        grid.appendChild(dot);
+    }
+    container.appendChild(grid);
+}
+
+function renderClockTix(container) {
+    // TIX is always 12-hour, regardless of the Digital format toggle --
+    // kept simple/glanceable by design.
+    const p = clockPartsFor('local', true);
+    const digits = (p.hour + p.minute + p.second).split('').map(Number);
+    const row = document.createElement('div');
+    row.className = 'clock-tix-row';
+    digits.forEach((d, i) => {
+        renderClockTixDigit(row, i, d);
+        if (i === 1 || i === 3) {
+            const sep = document.createElement('div');
+            sep.className = 'clock-tix-sep';
+            sep.textContent = ':';
+            row.appendChild(sep);
+        }
+    });
+    container.appendChild(row);
+    const label = document.createElement('div');
+    label.className = 'clock-zone-label';
+    label.textContent = `local time (${p.dayPeriod})`;
+    container.appendChild(label);
+}
+
+function renderClock() {
+    const body = document.getElementById('clock-body');
+    if (!body) return;
+    body.innerHTML = '';
+    if (clockStyle === 'tix') {
+        renderClockTix(body);
+        return;
+    }
+    if (!clockDualEnabled) {
+        if (clockStyle === 'digital') renderClockDigital(body, 'local', false);
+        else renderClockAnalog(body, 'local', 190);
+        return;
+    }
+    const dual = document.createElement('div');
+    // Digital stacks vertically -- two full-width time rows read more
+    // clearly than squeezing both side by side. Analog stays side by
+    // side -- two round faces sit naturally next to each other.
+    if (clockStyle === 'digital') {
+        dual.className = 'clock-dual stacked';
+        renderClockDigital(dual, 'local', true);
+        renderClockDigital(dual, clockDualTz, true);
+    } else {
+        dual.className = 'clock-dual';
+        renderClockAnalog(dual, 'local', 145);
+        renderClockAnalog(dual, clockDualTz, 145);
+    }
+    body.appendChild(dual);
+}
+
+if (SHOW_BIG_CLOCK) {
+    document.getElementById('clock-style-select').value = clockStyle;
+    renderClockControls();
+    renderClock();
+    setInterval(renderClock, 1000);
+}
+
 // --- HF Conditions card ---
 const HF_PILL_CLASS = { Good: 'good', Fair: 'fair', Poor: 'poor' };
 
@@ -2736,12 +3080,18 @@ function initMap() {
 
     // Imported ADIF QSOs -- a second, independent cluster group, safe to
     // coexist with callerCluster above (no shared/global state between
-    // separate L.markerClusterGroup() instances).
+    // separate L.markerClusterGroup() instances). qsoLinesLayer is a plain
+    // (non-clustering) group for the QTH lines -- polylines don't belong
+    // inside a MarkerClusterGroup, which only ever clusters point markers.
     qsoCluster = (typeof L.markerClusterGroup === 'function')
         ? L.markerClusterGroup({ maxClusterRadius: 40 })
         : L.layerGroup();
+    qsoLinesLayer = L.layerGroup();
     document.getElementById('qso-show-toggle').checked = localStorage.getItem(QSO_SHOW_KEY) !== '0';
-    if (document.getElementById('qso-show-toggle').checked) leafletMap.addLayer(qsoCluster);
+    if (document.getElementById('qso-show-toggle').checked) {
+        leafletMap.addLayer(qsoCluster);
+        leafletMap.addLayer(qsoLinesLayer);
+    }
     fetchQsos();
 
     // Default to the dark tile set when the dashboard itself is in dark
@@ -2759,12 +3109,9 @@ function initMap() {
     updateGreyline();
     if (!greylineTimer) greylineTimer = setInterval(updateGreyline, 60000);
 
-    // WSPR spots / aurora oval default OFF (unlike grey-line) -- both cost
-    // a real backend/external-API round trip, so a first-time visitor who
-    // never opens either checkbox should generate zero extra traffic.
-    document.getElementById('wspr-spots-toggle').checked = localStorage.getItem(WSPR_SPOTS_KEY) === '1';
-    if (document.getElementById('wspr-spots-toggle').checked) toggleWsprSpots();
-
+    // Aurora oval defaults OFF (unlike grey-line) -- it costs a real
+    // backend/external-API round trip, so a first-time visitor who never
+    // opens the checkbox should generate zero extra traffic.
     document.getElementById('aurora-toggle').checked = localStorage.getItem(AURORA_KEY) === '1';
     if (document.getElementById('aurora-toggle').checked) toggleAurora();
 
@@ -2926,58 +3273,6 @@ function toggleGreyline() {
     }
 }
 
-// --- map: Live WSPR spots overlay (wspr.live, global -- no station_grid
-// filter, see wspr_activity.py's WsprSpotsClient). Off by default and
-// lazily fetched (unlike grey-line's free local math), since this costs a
-// real backend round trip to a third-party API -- only starts polling
-// once the checkbox is actually turned on, and stops when turned off.
-const WSPR_SPOTS_KEY = 'w1zla_show_wspr_spots';
-let wsprSpotsLayer = null;
-let wsprSpotsTimer = null;
-const WSPR_BAND_COLORS = {  // matches wspr_activity.py's BAND_GROUPS labels
-    '160m': '#e74c3c', '80m-40m': '#e67e22', '30m-20m': '#f1c40f',
-    '17m-15m': '#2ecc71', '12m-10m': '#3498db', '6m': '#9b59b6',
-};
-
-function updateWsprSpots() {
-    if (!leafletMap) return;
-    fetch('/api/wspr_spots').then(r => r.json()).then(data => {
-        if (wsprSpotsLayer) { leafletMap.removeLayer(wsprSpotsLayer); wsprSpotsLayer = null; }
-        if (!data || data.error) return;
-        const group = L.layerGroup();
-        (data.spots || []).forEach(s => {
-            const color = WSPR_BAND_COLORS[s.band] || '#95a5a6';
-            L.polyline([[s.tx_lat, s.tx_lon], [s.rx_lat, s.rx_lon]], {
-                color, weight: 1, opacity: 0.5, interactive: false,
-            }).addTo(group);
-            [[s.tx_lat, s.tx_lon, s.tx_call], [s.rx_lat, s.rx_lon, s.rx_call]].forEach(([lat, lon, call]) => {
-                L.circleMarker([lat, lon], {
-                    radius: 3, color, weight: 1, fillColor: color, fillOpacity: 0.8,
-                }).bindTooltip(`${call} - ${s.band}${s.snr != null ? ' - ' + s.snr + 'dB' : ''}`).addTo(group);
-            });
-        });
-        wsprSpotsLayer = group;
-        if (document.getElementById('wspr-spots-toggle').checked) group.addTo(leafletMap);
-    }).catch(() => {});
-}
-
-function toggleWsprSpots() {
-    const on = document.getElementById('wspr-spots-toggle').checked;
-    localStorage.setItem(WSPR_SPOTS_KEY, on ? '1' : '0');
-    if (on) {
-        updateWsprSpots();
-        if (!wsprSpotsTimer) {
-            wsprSpotsTimer = setInterval(() => {
-                const panel = document.getElementById('panel-map');
-                if (panel && panel.classList.contains('active')) updateWsprSpots();
-            }, 30000);  // matches wspr_activity.py's SPOT_CACHE_TTL
-        }
-    } else {
-        if (wsprSpotsLayer) { leafletMap.removeLayer(wsprSpotsLayer); wsprSpotsLayer = null; }
-        if (wsprSpotsTimer) { clearInterval(wsprSpotsTimer); wsprSpotsTimer = null; }
-    }
-}
-
 // --- map: NOAA aurora-oval overlay (aurora.py) -- same lazy on/off-toggle
 // pattern as the WSPR spots layer above, for the same reason (real
 // backend/external-API cost, unlike grey-line's free math). ---
@@ -3053,15 +3348,16 @@ function toggleAurora() {
 }
 
 // --- map: ADIF QSO import -- persistent data (server-side qsos.json),
-// not an optional layer toggle like grey-line/WSPR/aurora above, so this
+// not an optional layer toggle like grey-line/aurora above, so this
 // has its own always-visible control (upload + stats + clear) rather than
 // a .map-legend checkbox. Loaded once at map init, not on a polling
 // interval -- the data only changes on explicit import/clear.
 let qsoCluster = null;
+let qsoLinesLayer = null;
 const QSO_SHOW_KEY = 'w1zla_show_qsos';
 
-// Individual ADIF bands ("20m", "40m", ...), NOT the *grouped* pairs
-// WSPR_BAND_COLORS uses ("80m-40m" etc.) -- needs its own palette.
+// Individual ADIF bands ("20m", "40m", ...) -- own palette, not shared
+// with any other card's band grouping.
 const QSO_BAND_COLORS = {
     '160m': '#8e44ad', '80m': '#e74c3c', '40m': '#e67e22', '30m': '#f1c40f',
     '20m': '#3498db', '17m': '#2ecc71', '15m': '#1abc9c', '12m': '#16a085',
@@ -3071,8 +3367,18 @@ const QSO_BAND_COLORS = {
 function renderQsoLayer(qsos) {
     if (!qsoCluster) return;
     qsoCluster.clearLayers();
+    if (qsoLinesLayer) qsoLinesLayer.clearLayers();
     (qsos || []).forEach(q => {
         const color = QSO_BAND_COLORS[q.band] || '#95a5a6';
+        // Line back to the QTH this QSO was worked from (that record's own
+        // MY_GRIDSQUARE, or settings' station_grid otherwise -- resolved
+        // server-side in /api/import_adif). Omitted entirely when neither
+        // is known, same as any other optional field here.
+        if (qsoLinesLayer && q.qth_lat != null && q.qth_lon != null) {
+            L.polyline([[q.qth_lat, q.qth_lon], [q.lat, q.lon]], {
+                color, weight: 1, opacity: 0.5, interactive: false,
+            }).addTo(qsoLinesLayer);
+        }
         const marker = L.circleMarker([q.lat, q.lon], {
             radius: 5, color, weight: 1, fillColor: color, fillOpacity: 0.85,
         }).bindTooltip(`${q.call} - ${q.band} ${q.mode}${q.date ? ' - ' + q.date : ''}`);
@@ -3124,8 +3430,13 @@ function toggleQsoVisibility() {
     const on = document.getElementById('qso-show-toggle').checked;
     localStorage.setItem(QSO_SHOW_KEY, on ? '1' : '0');
     if (!leafletMap || !qsoCluster) return;
-    if (on) leafletMap.addLayer(qsoCluster);
-    else leafletMap.removeLayer(qsoCluster);
+    if (on) {
+        leafletMap.addLayer(qsoCluster);
+        if (qsoLinesLayer) leafletMap.addLayer(qsoLinesLayer);
+    } else {
+        leafletMap.removeLayer(qsoCluster);
+        if (qsoLinesLayer) leafletMap.removeLayer(qsoLinesLayer);
+    }
 }
 
 // Haversine distance in km between two lat/lon points.

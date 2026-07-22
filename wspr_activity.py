@@ -18,19 +18,6 @@ dashboard, but don't repurpose this client for anything commercial.
 Cached CACHE_TTL (30 min) per station_grid -- an hourly-bucketed chart
 doesn't need to be re-fetched more often than that, and every re-fetch
 counts against wspr.live's shared free rate limit.
-
-WsprSpotsClient (below) is a second, unrelated client sharing this same
-module/rate-limit budget -- global (not per-station_grid) individual
-spot pairs for the Live map's optional "WSPR spots" overlay, not an
-hourly-bucketed count. Its columns were confirmed live via `DESCRIBE
-TABLE wspr.rx` -- the callsign columns are `tx_sign`/`rx_sign`, NOT
-`tx_call`/`rx_call` as first guessed (a real 404/UNKNOWN_IDENTIFIER
-error caught this before it shipped). Spot arrival is bursty, not a
-smooth stream: a live check found a 120-second window sometimes returns
-zero rows, while a 5-minute window reliably returned ~6350 globally and
-a 10-minute window ~22855 -- so this client queries a wider 5-minute
-window and relies on ORDER BY ... LIMIT to cap the result size, rather
-than a tight time window to bound it.
 """
 import json
 import threading
@@ -184,82 +171,3 @@ class WsprActivityClient:
             })
 
         return {"groups": groups, "fetched_at": time.time()}
-
-
-# Global (no station_grid/radius filter), individual spot pairs for the
-# Live map's optional "WSPR spots" overlay -- deliberately worldwide, not
-# local, so the layer is always populated and reads as "a lot happening
-# right now" regardless of whether a station_grid is configured.
-SPOT_CACHE_TTL  = 30    # seconds -- bumped from 90 on request for a snappier feel; still
-                        # nowhere near wspr.live's 20 req/min shared budget (2 req/min from
-                        # this client alone). Note the underlying data's own ~2-min bursty
-                        # update cadence (confirmed live, see SPOT_WINDOW_SEC below) means
-                        # this mostly just catches each new burst sooner, not a guarantee of
-                        # meaningfully newer data on every single poll.
-SPOT_WINDOW_SEC = 300   # 5 min -- confirmed live that a tight 120s window can return zero
-                        # rows (spot inserts arrive in bursts, not a smooth stream); 5 min
-                        # reliably had ~6350 rows globally when checked live
-SPOT_LIMIT      = 10    # small on purpose -- an earlier 400-row version was visually a
-                        # tangle of hundreds of crisscrossing lines; a handful of the very
-                        # latest spots (ORDER BY time DESC) reads as "who's active right
-                        # now" without the spaghetti. Since spots arrive in synchronized
-                        # ~2-min bursts, the 10 most recent are typically all from the same
-                        # burst anyway -- a real, coherent snapshot, not an arbitrary trim.
-
-
-class WsprSpotsClient:
-    """Live global WSPR spot pairs, refreshed independently of
-    WsprActivityClient above (different cache key shape: this has no key
-    at all, just one shared global snapshot)."""
-
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._cache = None
-        self._cache_time = 0.0
-
-    def get(self, force: bool = False) -> dict | None:
-        with self._lock:
-            fresh = (
-                not force and self._cache is not None
-                and (time.time() - self._cache_time) < SPOT_CACHE_TTL
-            )
-            if fresh:
-                return self._cache
-
-        result = self._fetch()
-        with self._lock:
-            if result is not None:
-                self._cache      = result
-                self._cache_time = time.time()
-                return self._cache
-            # Degrade gracefully like every other client here -- serve the
-            # last good snapshot rather than blanking the layer.
-            return self._cache
-
-    @staticmethod
-    def _fetch() -> dict | None:
-        query = (
-            "SELECT tx_sign, rx_sign, tx_lat, tx_lon, rx_lat, rx_lon, band, snr, time "
-            "FROM wspr.rx "
-            f"WHERE band IN ({','.join(str(b) for b in _ALL_BANDS)}) "
-            f"AND time > now() - INTERVAL {SPOT_WINDOW_SEC} SECOND "
-            f"ORDER BY time DESC LIMIT {SPOT_LIMIT} FORMAT JSON"
-        )
-        url = WSPR_LIVE_URL + "?query=" + urllib.parse.quote_plus(query)
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": AGENT})
-            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-                payload = json.loads(resp.read())
-            rows = payload.get("data", [])
-        except Exception:
-            return None
-
-        band_label = {b: label for label, bands in BAND_GROUPS for b in bands}
-        spots = [{
-            "tx_call": r["tx_sign"], "rx_call": r["rx_sign"],
-            "tx_lat":  r["tx_lat"],  "tx_lon":  r["tx_lon"],
-            "rx_lat":  r["rx_lat"],  "rx_lon":  r["rx_lon"],
-            "band":    band_label.get(r["band"], str(r["band"])),
-            "snr":     r.get("snr"),
-        } for r in rows]
-        return {"spots": spots, "fetched_at": time.time()}
