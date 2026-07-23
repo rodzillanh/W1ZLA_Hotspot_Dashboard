@@ -600,7 +600,8 @@ def setup():
                            cameras=setup_cameras, asl_favorites=load_asl_favorites(),
                            can_power_control=HOST_CAN_POWER_CONTROL,
                            host_is_standalone=HOST_IS_STANDALONE,
-                           overflow_sentinels=_overflow_sentinels(setup_settings, setup_hotspots, setup_cameras))
+                           overflow_sentinels=_overflow_sentinels(setup_settings, setup_hotspots, setup_cameras),
+                           app_version=config.APP_VERSION, app_codename=config.APP_CODENAME)
 
 @app.route("/api/host_stats")
 def api_host_stats():
