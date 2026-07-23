@@ -1499,39 +1499,65 @@ config for per-integration credentials; put it in
   generalization (only `#version` was ever wired up). The generalized
   version degrades safely for an unrecognized hash (`document.getElementById('tab-btn-'+tabName)`
   returns null, the `if (btn)` guard just no-ops) rather than throwing.
-- **A real, reported bug: "Big Ass Clock's card position doesn't save"
-  turned out to be a tie-break disagreement between two independently-
-  correct pieces of code, not a save failure at all.** `/api/settings`
-  was persisting `big_clock_position` correctly the whole time (confirmed
-  live) -- the actual problem was that `setup.html`'s Cards-tab drag-list
-  template breaks a POSITION TIE (two sentinels sharing the same saved
-  position, e.g. both still at their default of 0 right after being
-  enabled) by fixed template source order, while `dashboard.html`'s
-  `computeCardOrders()` used to break the identical tie ALPHABETICALLY
-  BY KEY NAME (`a.key.localeCompare(b.key)`). For a real tie between
-  `bigclock` and `licensequiz`, template order puts `licensequiz` first
-  (it's declared earlier in `setup.html`) while alphabetical order put
-  `bigclock` first (`'b' < 'l'`) -- confirmed by literally reproducing
-  the exact tie live (a real `settings.json` with both at position 0)
-  and finding the two files disagreed on which one renders first. From
-  the user's side this reads exactly like "I dragged it, saved it, and
-  it didn't take" -- the position value saved fine, but what they saw in
-  the editor never matched what the real dashboard showed for a tied
-  card, so every attempt to "fix" it by dragging again looked like it
-  silently failed. Fixed by making `computeCardOrders()`'s sort rely on
-  `Array.prototype.sort`'s ES2019+ stability guarantee instead of an
-  independent tiebreak rule (`sentinels.slice().sort((a,b) => a.pos -
-  b.pos)`, no `|| ...localeCompare(...)`), and by re-ordering
-  `renderCards()`'s `sentinels.push()` calls to match `setup.html`'s
-  fallback-block order EXACTLY, including moving the cameras push from
-  right-after-`aslfav` (where it happened to sit, for no particular
-  reason) to dead last, matching `setup.html`'s cameras block (which was
-  already last there). **If either file's sentinel declaration order
-  ever changes again, it must change in both places together** -- these
-  are two independent descriptions of the same ordering, same class of
+- **A real, reported bug: "card position doesn't save" (first seen on Big
+  Ass Clock, then confirmed far more visibly on APRS Messages) had TWO
+  layered causes -- fixing the first one wasn't enough, and the second
+  one was the actual dominant cause in practice.** `/api/settings` was
+  persisting every `*_position` value correctly the whole time (confirmed
+  live at every stage of this investigation) -- both bugs were purely in
+  how the saved value got RENDERED, not in saving it.
+  1. *Tie-break disagreement* (the first, smaller cause): `setup.html`'s
+     Cards-tab drag-list template broke an EXACT position tie (two
+     sentinels sharing the identical saved position, e.g. both still at
+     their default of 0 right after being enabled) by fixed template
+     source order, while `dashboard.html`'s `computeCardOrders()` broke
+     the identical tie ALPHABETICALLY BY KEY NAME
+     (`a.key.localeCompare(b.key)`) -- confirmed live that `bigclock` vs
+     `licensequiz` tied at position 0 rendered in opposite orders in the
+     two files. Fixed by making `computeCardOrders()`'s sort rely on
+     `Array.prototype.sort`'s ES2019+ stability guarantee instead of an
+     independent tiebreak rule, and by re-ordering `renderCards()`'s
+     `sentinels.push()` calls to match `setup.html`'s declaration order
+     exactly (including moving the cameras push to dead last, matching
+     `setup.html`).
+  2. *Overflow collapse* (the real, dominant cause -- this is the one
+     that made APRS Messages "always render first" no matter what
+     position it was dragged to): both `renderCards()` and
+     `setup.html`'s old template independently clamped/checked each
+     sentinel's position against `data.length`/`hotspots|length` -- any
+     position AT OR PAST the hotspot count got treated as one single
+     bucket ("goes after all the hotspots"), with NO regard for the
+     actual numeric value beyond that threshold. Confirmed live: with 1
+     hotspot and `aprs_inbox_position=9`, `license_quiz_position=3`,
+     `band_plan_position=5`, APRS Messages (by far the highest saved
+     position) rendered FIRST, purely because `aprs_inbox` happened to be
+     declared earliest among that user's enabled cards -- the actual
+     values 9/3/5 were completely ignored once all three exceeded the
+     hotspot count, which is the ordinary case for most real installs
+     (few hotspots, several extra cards, all naturally dragged to sit
+     "after everything"). Fixed on the JS side by no longer clamping each
+     sentinel's position down to `data.length` before sorting (only
+     floor at 0) and having `computeCardOrders()` sort on the REAL value,
+     merging only genuinely-overflowing sentinels together at insertion
+     time (preserving their relative order) rather than before the sort
+     ever runs. Fixed on the `setup.html` side by replacing NINE
+     independent copy-pasted `{% if X_pos >= hotspots|length %}` blocks
+     (a real, reported bug in that redundancy itself: no cross-block
+     value comparison was possible in that shape at all) with a single
+     `{% for s in overflow_sentinels %}` loop over a list app.py's new
+     `_overflow_sentinels()` builds once, already sorted by real position
+     with the same stable tiebreak-by-declaration-order as the JS side.
+  **If either file's sentinel declaration order (`_SENTINEL_DEFS` in
+  `app.py`, the `sentinels.push()` sequence in `dashboard.html`) ever
+  changes again, it must change in both places together** -- these are
+  two independent descriptions of the same ordering, same class of
   gotcha as `unraid-template.xml`/`docker-update.sh` needing to stay in
   sync elsewhere in this file, except here a drift is silent (no error,
-  just a wrong-looking card position) rather than loud.
+  just a wrong-looking card position) rather than loud. The INLINE
+  (interleaved-with-hotspots) rendering in `setup.html` was deliberately
+  left untouched -- it already respects individual position values
+  correctly for positions that fall WITHIN the hotspot range; only the
+  overflow section had this bug.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

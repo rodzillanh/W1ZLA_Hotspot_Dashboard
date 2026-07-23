@@ -428,6 +428,66 @@ def api_asl_favorites_post():
     save_asl_favorites(cleaned)
     return jsonify({"ok": True})
 
+# Canonical declaration order for every "extra card" sentinel -- must
+# match dashboard.html's renderCards() sentinels.push() order exactly
+# (cameras last in both places). Used only to compute overflow_sentinels
+# below; the inline (interleaved-with-hotspots) rendering in setup.html
+# still reads settings directly and isn't affected by this list.
+_SENTINEL_DEFS = [
+    ("__fleet_activity__", "show_fleet_activity", "fleet_activity_position", "📊", "Fleet activity", "metrics card"),
+    ("__asl_favorites__", "show_asl_favorites", "asl_favorites_position", "📻", "ASL Favorites", "control card"),
+    ("__aprs_inbox__", "aprs_inbox_enabled", "aprs_inbox_position", "📨", "APRS Messages", "message inbox card"),
+    ("__hf_conditions__", "show_hf_conditions", "hf_conditions_position", "☀️", "HF Conditions", "propagation card"),
+    ("__band_plan__", "show_band_plan", "band_plan_position", "📻", "Band Plan", "reference card"),
+    ("__license_quiz__", "show_license_quiz", "license_quiz_position", "🎓", "License Quiz", "practice card"),
+    ("__wspr_activity__", "show_wspr_activity", "wspr_activity_position", "📶", "Band Activity", "WSPR activity card"),
+    ("__digipi__", "digipi_enabled", "digipi_position", "📡", "DigiPi", "APRS/Direwolf card"),
+    ("__big_clock__", "show_big_clock", "big_clock_position", "🕐", "Big Ass Clock", "clock card"),
+]
+
+_CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
+
+
+def _overflow_sentinels(settings: dict, hotspots: list, cameras: list) -> list:
+    """Enabled cards/cameras whose saved position is at or past the end
+    of the hotspot list, sorted by that REAL position value (stable
+    tie-break = _SENTINEL_DEFS' own order above, matching
+    dashboard.html's sentinels.push() order) -- not the old "whichever
+    template block happens to be declared first" behavior.
+
+    That old behavior was a real, reported bug: a card's position value
+    was saving correctly the whole time, but setup.html's Cards-tab
+    editor rendered every overflowing card in fixed template order
+    regardless of its actual saved position, so dragging a card and
+    saving looked like it silently did nothing whenever that card's
+    position exceeded the hotspot count (an extremely common case --
+    most extra cards get dragged to sit after all the hotspots).
+    Confirmed live: aprs_inbox_position=9, license_quiz_position=3,
+    band_plan_position=5 with 1 hotspot -- APRS Messages rendered FIRST
+    despite having the highest saved position, purely because it was
+    declared earliest in the old template.
+    """
+    hotspot_count = len(hotspots)
+    items = []
+    for data_ip, enabled_key, pos_key, icon, name, meta in _SENTINEL_DEFS:
+        if not settings.get(enabled_key, False):
+            continue
+        pos = settings.get(pos_key, 0)
+        if pos >= hotspot_count:
+            items.append({"data_ip": data_ip, "icon": icon, "name": name, "meta": meta, "pos": pos})
+    if settings.get("show_cameras", False):
+        for cam in cameras:
+            pos = cam.get("position", 0)
+            if pos >= hotspot_count:
+                type_label = _CAMERA_TYPE_LABELS.get(cam.get("type"), cam.get("type"))
+                items.append({
+                    "data_ip": f"__camera__{cam['id']}", "icon": "📷", "name": cam["name"],
+                    "meta": f"camera · {type_label}", "pos": pos,
+                })
+    items.sort(key=lambda it: it["pos"])
+    return items
+
+
 @app.route("/setup", methods=["GET", "POST"])
 def setup():
     if request.method == "POST":
@@ -493,11 +553,15 @@ def setup():
             mqtt_pub.set_hotspots(hotspots)
         openspot_manager.reconcile(hotspots)
         return redirect("/setup")
-    return render_template("setup.html", hotspots=load_hotspots(),
-                           settings=load_settings(), favorites=load_favorites(),
-                           cameras=load_cameras(), asl_favorites=load_asl_favorites(),
+    setup_hotspots = load_hotspots()
+    setup_settings = load_settings()
+    setup_cameras  = load_cameras()
+    return render_template("setup.html", hotspots=setup_hotspots,
+                           settings=setup_settings, favorites=load_favorites(),
+                           cameras=setup_cameras, asl_favorites=load_asl_favorites(),
                            can_power_control=HOST_CAN_POWER_CONTROL,
-                           host_is_standalone=HOST_IS_STANDALONE)
+                           host_is_standalone=HOST_IS_STANDALONE,
+                           overflow_sentinels=_overflow_sentinels(setup_settings, setup_hotspots, setup_cameras))
 
 @app.route("/api/host_stats")
 def api_host_stats():

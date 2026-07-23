@@ -2075,29 +2075,43 @@ function clearStaleNotifs(data) {
 // touching the DOM nodes the sentinel cards own (their charts/timers survive
 // across polls).
 function computeCardOrders(hotspotCount, sentinels) {
-    // Sort by position only -- Array.prototype.sort is guaranteed stable
-    // (ES2019+), so two sentinels tied on position keep whatever relative
-    // order they were pushed onto `sentinels` in by renderCards() above.
-    // That insertion order is deliberately kept in sync with setup.html's
-    // Cards-tab drag-list template order -- an alphabetical-by-key
-    // tiebreak used to live here instead, which disagreed with
-    // setup.html's fixed-template-order tiebreak for the exact same tie,
-    // so the Cards tab editor and the real dashboard could show a tied
-    // card in two different places. See the comment above the cameras
-    // sentinel push in renderCards() before reordering either side again.
+    // Sort by the REAL (unclamped) position -- Array.prototype.sort is
+    // guaranteed stable (ES2019+), so two sentinels tied on the exact
+    // same position keep whatever relative order they were pushed onto
+    // `sentinels` in by renderCards() above. That insertion order is
+    // deliberately kept in sync with setup.html's Cards-tab drag-list
+    // template order (see the comment above the cameras sentinel push in
+    // renderCards()) -- an alphabetical-by-key tiebreak used to live here
+    // instead, which disagreed with setup.html's tiebreak for the exact
+    // same tie, so the Cards tab editor and the real dashboard could show
+    // a tied card in two different places.
     const sorted = sentinels.slice().sort((a, b) => a.pos - b.pos);
     let sIdx = 0;
     let orderCounter = 0;
     const sentinelOrders = {};
     const hotspotOrders = [];
-    for (let i = 0; i <= hotspotCount; i++) {
+    for (let i = 0; i < hotspotCount; i++) {
         while (sIdx < sorted.length && sorted[sIdx].pos === i) {
             sentinelOrders[sorted[sIdx].key] = orderCounter++;
             sIdx++;
         }
-        if (i < hotspotCount) {
-            hotspotOrders.push(orderCounter++);
-        }
+        hotspotOrders.push(orderCounter++);
+    }
+    // Everything left over (position >= hotspotCount) goes after every
+    // hotspot, in their OWN relative sorted order -- not collapsed into
+    // one indistinguishable tie. renderCards() below used to clamp each
+    // sentinel's position down to exactly `hotspotCount` before it ever
+    // reached here, which meant two cards saved at very different
+    // positions (e.g. 3 and 9) both became the literal same number and
+    // lost all relative order -- a real, reported bug ("card position
+    // doesn't save," confirmed live to actually be "position saves fine,
+    // but everything past the hotspot list collapses into one tie
+    // resolved by whichever card happens to be enabled/declared
+    // first"). Sorting on the real value above and only merging
+    // overflow sentinels together HERE, at insert time, fixes that.
+    while (sIdx < sorted.length) {
+        sentinelOrders[sorted[sIdx].key] = orderCounter++;
+        sIdx++;
     }
     return { sentinelOrders, hotspotOrders };
 }
@@ -2136,35 +2150,40 @@ function dismissOnboardingTour() {
 function renderCards(data) {
     checkOnboarding(data.length);
     const container = document.getElementById('cards');
-    // Position is clamped to the current hotspot count in case hotspots
-    // were added/removed since it was saved.
+    // Position is only floored at 0 here -- NOT also capped at
+    // data.length. computeCardOrders() needs each sentinel's real saved
+    // value to sort overflowing ones (position >= hotspotCount) relative
+    // to EACH OTHER; capping them all down to the same literal
+    // data.length here would erase that distinction before it ever
+    // reaches the sort, collapsing them into a single indistinguishable
+    // tie (this was a real, reported bug -- see computeCardOrders()).
     const sentinels = [];
     if (SHOW_FLEET_ACTIVITY) {
-        sentinels.push({ key: 'fleet', pos: Math.max(0, Math.min(FLEET_ACTIVITY_POSITION, data.length)) });
+        sentinels.push({ key: 'fleet', pos: Math.max(0, FLEET_ACTIVITY_POSITION) });
     }
     if (SHOW_ASL_FAVORITES) {
-        sentinels.push({ key: 'aslfav', pos: Math.max(0, Math.min(ASL_FAVORITES_POSITION, data.length)) });
+        sentinels.push({ key: 'aslfav', pos: Math.max(0, ASL_FAVORITES_POSITION) });
     }
     if (SHOW_APRS_INBOX) {
-        sentinels.push({ key: 'aprsinbox', pos: Math.max(0, Math.min(APRS_INBOX_POSITION, data.length)) });
+        sentinels.push({ key: 'aprsinbox', pos: Math.max(0, APRS_INBOX_POSITION) });
     }
     if (SHOW_HF_CONDITIONS) {
-        sentinels.push({ key: 'hfcond', pos: Math.max(0, Math.min(HF_CONDITIONS_POSITION, data.length)) });
+        sentinels.push({ key: 'hfcond', pos: Math.max(0, HF_CONDITIONS_POSITION) });
     }
     if (SHOW_BAND_PLAN) {
-        sentinels.push({ key: 'bandplan', pos: Math.max(0, Math.min(BAND_PLAN_POSITION, data.length)) });
+        sentinels.push({ key: 'bandplan', pos: Math.max(0, BAND_PLAN_POSITION) });
     }
     if (SHOW_LICENSE_QUIZ) {
-        sentinels.push({ key: 'licensequiz', pos: Math.max(0, Math.min(LICENSE_QUIZ_POSITION, data.length)) });
+        sentinels.push({ key: 'licensequiz', pos: Math.max(0, LICENSE_QUIZ_POSITION) });
     }
     if (SHOW_WSPR_ACTIVITY) {
-        sentinels.push({ key: 'wspractivity', pos: Math.max(0, Math.min(WSPR_ACTIVITY_POSITION, data.length)) });
+        sentinels.push({ key: 'wspractivity', pos: Math.max(0, WSPR_ACTIVITY_POSITION) });
     }
     if (SHOW_DIGIPI) {
-        sentinels.push({ key: 'digipi', pos: Math.max(0, Math.min(DIGIPI_POSITION, data.length)) });
+        sentinels.push({ key: 'digipi', pos: Math.max(0, DIGIPI_POSITION) });
     }
     if (SHOW_BIG_CLOCK) {
-        sentinels.push({ key: 'bigclock', pos: Math.max(0, Math.min(BIG_CLOCK_POSITION, data.length)) });
+        sentinels.push({ key: 'bigclock', pos: Math.max(0, BIG_CLOCK_POSITION) });
     }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, aprsinbox, hfcond, bandplan,
@@ -2179,7 +2198,7 @@ function renderCards(data) {
     // order isn't saving" even though the position value saved correctly.
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
-            sentinels.push({ key: 'cam-' + cam.id, pos: Math.max(0, Math.min(cam.position || 0, data.length)) });
+            sentinels.push({ key: 'cam-' + cam.id, pos: Math.max(0, cam.position || 0) });
         });
     }
     const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);

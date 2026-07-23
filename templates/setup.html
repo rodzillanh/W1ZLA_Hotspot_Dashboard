@@ -689,78 +689,20 @@
                 <span class="node-meta">{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else (' · openSPOT4' if hs.get('type') == 'openspot4' else '') }}</span>
             </div>
             {% endfor %}
-            {% if fleet_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
+            {# Every enabled card/camera whose saved position is at or past
+               the end of the hotspot list, sorted by that REAL position
+               value (computed once in app.py's _overflow_sentinels(), not
+               here) -- NOT the old fixed-template-declaration-order
+               behavior, which silently ignored the actual saved position
+               for every overflowing card. See _overflow_sentinels()'s
+               docstring for the exact reported bug this fixed. #}
+            {% for s in overflow_sentinels %}
+            <div class="drag-row fleet-activity-row" draggable="true" data-ip="{{ s.data_ip }}">
                 <span class="drag-handle">⠿</span>
-                <span class="node-name">📊 Fleet activity</span>
-                <span class="node-meta">metrics card</span>
+                <span class="node-name">{{ s.icon }} {{ s.name }}</span>
+                <span class="node-meta">{{ s.meta }}</span>
             </div>
-            {% endif %}
-            {% if asl_fav_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__asl_favorites__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">📻 ASL Favorites</span>
-                <span class="node-meta">control card</span>
-            </div>
-            {% endif %}
-            {% if aprs_inbox_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__aprs_inbox__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">📨 APRS Messages</span>
-                <span class="node-meta">message inbox card</span>
-            </div>
-            {% endif %}
-            {% if hf_cond_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__hf_conditions__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">☀️ HF Conditions</span>
-                <span class="node-meta">propagation card</span>
-            </div>
-            {% endif %}
-            {% if band_plan_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__band_plan__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">📻 Band Plan</span>
-                <span class="node-meta">reference card</span>
-            </div>
-            {% endif %}
-            {% if license_quiz_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__license_quiz__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">🎓 License Quiz</span>
-                <span class="node-meta">practice card</span>
-            </div>
-            {% endif %}
-            {% if wspr_activity_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__wspr_activity__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">📶 Band Activity</span>
-                <span class="node-meta">WSPR activity card</span>
-            </div>
-            {% endif %}
-            {% if digipi_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__digipi__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">📡 DigiPi</span>
-                <span class="node-meta">APRS/Direwolf card</span>
-            </div>
-            {% endif %}
-            {% if big_clock_pos >= hotspots|length %}
-            <div class="drag-row fleet-activity-row" draggable="true" data-ip="__big_clock__">
-                <span class="drag-handle">⠿</span>
-                <span class="node-name">🕐 Big Ass Clock</span>
-                <span class="node-meta">clock card</span>
-            </div>
-            {% endif %}
-            {% if show_cams %}
-                {% for cam in cameras if cam.get('position', 0) >= hotspots|length %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__camera__{{ cam.id }}">
-                    <span class="drag-handle">⠿</span>
-                    <span class="node-name">📷 {{ cam.name }}</span>
-                    <span class="node-meta">camera · {{ {'rtsp': 'RTSP', 'wyze': 'Wyze', 'bambu_a1': 'Bambu A1'}.get(cam.type, cam.type) }}</span>
-                </div>
-                {% endfor %}
-            {% endif %}
+            {% endfor %}
         </div>
         <div style="margin-top:10px">
             <button class="btn btn-primary" onclick="saveCardOrder()">Save card order</button>
