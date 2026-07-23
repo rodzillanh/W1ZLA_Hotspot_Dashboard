@@ -369,6 +369,8 @@ def api_settings_post():
             pass
     if "psk_reporter_callsign" in data:
         settings["psk_reporter_callsign"] = data["psk_reporter_callsign"].strip().upper()
+    if "onboarding_tour_seen" in data:
+        settings["onboarding_tour_seen"] = bool(data["onboarding_tour_seen"])
     save_settings(settings)
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:

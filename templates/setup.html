@@ -391,6 +391,17 @@
     </div>
 
     <div class="section">
+        <div class="section-title">Getting started</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            The one-time "what's available" tour shown on the Dashboard tab after your
+            first hotspot was added. Reopen it anytime — it'll appear next time you
+            visit the Dashboard tab.
+        </p>
+        <button class="btn btn-info" onclick="showOnboardingTourAgain()">Show feature tour again</button>
+        <span class="status-txt" id="onboarding-status"></span>
+    </div>
+
+    <div class="section">
         <div class="section-title">Software updates</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
             Checks this project's git repository for new commits. Go to the
@@ -1544,6 +1555,18 @@ function saveAppearance() {
     });
 }
 
+function showOnboardingTourAgain() {
+    const status = document.getElementById('onboarding-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ onboarding_tour_seen: false })
+    }).then(() => {
+        status.textContent = '✓ It\'ll show next time you visit the Dashboard tab';
+        setTimeout(() => status.textContent = '', 4000);
+    });
+}
+
 // --- optional dashboard cards (Cards tab) ---
 function saveCards() {
     fetch('/api/settings', {
@@ -2649,18 +2672,21 @@ function closeDocModalOnBackdrop(e) {
     }
 })();
 
-// Deep link from the dashboard's update-available indicator (/setup#version)
-// straight to the Version info tab instead of landing on General. Must run
-// after loadVersion()'s own `let versionLoaded`/`let vStartTime` declarations
-// further up this script -- calling switchTab('version', ...) here used to
-// throw "Cannot access 'versionLoaded' before initialization" (a genuine JS
-// temporal-dead-zone error, not a network issue) because this block ran
-// before those `let`s had executed, which silently broke the Version tab
-// every time someone landed on /setup#version -- including right after an
-// "Install update" click, since the auto-reload lands back on this same URL.
-if (location.hash === '#version') {
-    const btn = document.getElementById('tab-btn-version');
-    if (btn) switchTab('version', btn);
+// Deep link straight to a specific tab via /setup#<tabname> (e.g. the
+// dashboard's update-available indicator uses #version; the empty-state
+// "Add your first hotspot" card uses #hotspots) instead of always landing
+// on General. Must run after loadVersion()'s own `let versionLoaded`/
+// `let vStartTime` declarations further up this script -- calling
+// switchTab('version', ...) here used to throw "Cannot access
+// 'versionLoaded' before initialization" (a genuine JS temporal-dead-zone
+// error, not a network issue) because this block used to run before those
+// `let`s had executed, which silently broke the Version tab every time
+// someone landed on /setup#version -- including right after an "Install
+// update" click, since the auto-reload lands back on this same URL.
+if (location.hash) {
+    const tabName = location.hash.slice(1);
+    const btn = document.getElementById('tab-btn-' + tabName);
+    if (btn) switchTab(tabName, btn);
 }
 </script>
 </body>

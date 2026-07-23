@@ -235,6 +235,25 @@ All in `config.py`, overridable without touching code:
 
 Example: `docker compose run -e POLL_INTERVAL=10 ...`
 
+## First run
+
+A fresh install (no hotspots configured yet) shows a plain "Let's get
+your fleet on the map" card in place of the usual card grid, linking
+straight to Settings → Hotspots — everything else in Settings stays
+reachable, nothing is blocked. Once your first hotspot is added, that
+card goes away for good, and a one-time "here's what's available" panel
+appears once, listing every optional integration/card/overlay grouped by
+category (ham radio integrations, extra cards, map overlays, cameras).
+Dismiss it and it's gone — reopen it anytime from Settings → General
+("Show feature tour again").
+
+**Upgrading an existing install never triggers either of these.** Both
+are gated on `settings.json` having genuinely never existed on disk at
+all (not just missing a couple of newer keys) — an existing install's
+`settings.json` already exists from before this feature shipped, so it's
+treated as "already seen," full stop, regardless of how long ago you set
+it up.
+
 ## Dashboard customization
 
 Everything below is configured from the **Settings** page (`/setup`) —

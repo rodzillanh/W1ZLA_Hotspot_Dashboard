@@ -30,7 +30,17 @@ def save_hotspots(hotspots: list) -> None:
 
 def load_settings() -> dict:
     if not os.path.exists(config.SETTINGS_FILE):
-        return dict(config.DEFAULT_SETTINGS)
+        # A genuinely fresh install -- settings.json has never been saved
+        # at all, not even once, so this is the one reliable one-time
+        # signal to distinguish "just installed" from "upgrading an
+        # existing install" (which already has this file on disk, just
+        # missing newer keys -- handled in the merge branch below via
+        # DEFAULT_SETTINGS' own onboarding_tour_seen=True). Queues the
+        # one-time onboarding tour; don't remove this override without
+        # re-reading config.DEFAULT_SETTINGS' comment on the same key.
+        fresh = dict(config.DEFAULT_SETTINGS)
+        fresh["onboarding_tour_seen"] = False
+        return fresh
     try:
         with _file_lock, open(config.SETTINGS_FILE, "r") as f:
             saved = json.load(f)

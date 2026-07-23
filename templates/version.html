@@ -105,9 +105,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.47</span>
+                <span class="release-version">v3.48</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>First-run experience</span> — a fresh install (no hotspots yet) now shows a plain "Let's get your fleet on the map" card instead of a blank dashboard, linking straight to Settings → Hotspots. Once a hotspot is added, a one-time "here's what's available" panel lists every optional integration/card/overlay grouped by category — dismiss it and it's gone, reopen it anytime from Settings → General. <b>Upgrading an existing install never triggers either of these</b> — both are gated on settings.json having never existed on disk at all, not just missing a couple of newer keys</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.47</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>PSK Reporter overlay</span> — a new "PSK Reporter" checkbox on the Live map shows where <i>your own</i> signal was actually heard (Settings → Integrations, needs your callsign), with a line back to your station grid square. Scoped to one callsign by design, not a worldwide feed, so there's no clutter risk. Cached 10 minutes server-side — PSK Reporter's own server actively rate-limits frequent polling, confirmed the hard way while building this</li>

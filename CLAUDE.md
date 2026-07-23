@@ -1449,6 +1449,56 @@ config for per-integration credentials; put it in
   ever revisited, that second-lookup requirement is real and should be
   cached indefinitely per summit code (a summit's location never
   changes), not re-fetched like a live spot.
+- **The first-run empty state + one-time feature tour (v3.48) had exactly
+  one hard requirement: never surprise an existing install.** A naive
+  "add a new settings key defaulting to False, show the tour when it's
+  False" design fails this completely -- `storage.py`'s `load_settings()`
+  merges `dict(config.DEFAULT_SETTINGS)` with whatever's actually saved
+  (`merged.update(saved)`), so ANY existing `settings.json` that predates
+  this feature is simply missing the key and would inherit whatever
+  static default `DEFAULT_SETTINGS` gives it -- there's no way, from a
+  single static default value alone, to tell "genuinely fresh install"
+  apart from "existing install upgrading to this version," because both
+  cases hit the exact same merge code path with the exact same missing
+  key. The actual fix uses `load_settings()`'s OTHER branch -- the one
+  that already existed for a completely different reason (`if not
+  os.path.exists(config.SETTINGS_FILE): return dict(config.DEFAULT_SETTINGS)`,
+  i.e. this specific install's settings.json has literally never been
+  saved, not even once) -- as the one genuinely one-time, reliable
+  fresh-vs-existing signal. `config.DEFAULT_SETTINGS['onboarding_tour_seen']`
+  is `True` (safe default for the "existing file merge" case); the
+  "file doesn't exist at all" branch explicitly overrides it to `False`
+  only in that one code path. Verified with three live `test_client()`
+  scenarios before considering this done, not just reasoned about: (1) a
+  totally fresh `CONFIG_DIR` -> `onboarding_tour_seen` comes back `False`;
+  (2) a `CONFIG_DIR` pre-seeded with a real `settings.json` (containing
+  unrelated real keys, no `onboarding_tour_seen` at all, simulating an
+  upgrade) -> comes back `True`, tour never fires, and every pre-existing
+  setting in that file is untouched; (3) the same pre-seeded scenario
+  with hotspots.json also pre-seeded -> still `True`. Don't touch this
+  default-flip logic without re-running an equivalent live check -- this
+  is exactly the kind of thing that looks obviously correct on a read-
+  through and is subtly backwards in practice.
+- **The empty-state card lives INSIDE `.cards-grid` (`grid-column: 1/-1`),
+  not as a replacement for it**, specifically so it doesn't hide any
+  always-on extra card (Band Plan, License Quiz, Big Ass Clock, etc.)
+  that doesn't depend on hotspots at all and might already be enabled
+  even with zero hotspots configured. `checkOnboarding()` (called from
+  `renderCards()`, which already receives the hotspot array from every
+  `/api/data` poll) is the only thing that toggles its visibility --
+  there's no server-side hotspot check on the `/` route at all, since
+  `dashboard.html` has never received a `hotspots` template variable in
+  the first place (unlike `setup.html`) -- the entire card grid, and now
+  this too, is client-driven from `/api/data`'s own array length.
+- **`/setup#<tabname>` deep-linking was generalized from a `#version`-only
+  special case to any tab**, reusing the exact same TDZ-safety
+  requirement documented elsewhere in this file (must run after every
+  `let`/`const` the tab code touches) -- the empty-state card's "Add your
+  first hotspot" button links to `/setup#hotspots` and "Restore from a
+  backup" links to `/setup#backup`, neither of which worked before this
+  generalization (only `#version` was ever wired up). The generalized
+  version degrades safely for an unrecognized hash (`document.getElementById('tab-btn-'+tabName)`
+  returns null, the `if (btn)` guard just no-ops) rather than throwing.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

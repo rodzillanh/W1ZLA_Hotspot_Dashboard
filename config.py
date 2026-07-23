@@ -390,6 +390,17 @@ DEFAULT_SETTINGS = {
     # checkbox's data, same "blank disables it" convention as
     # station_grid/digipi_ip. See psk_reporter.py.
     "psk_reporter_callsign": "",
+    # One-time "here's what's available" tour panel on the Dashboard tab,
+    # shown once a hotspot exists. Default here is True (already-seen) --
+    # this value is what an EXISTING install's settings.json merges
+    # against when this key is absent from its saved file (an upgrade,
+    # not a fresh install), so upgrading never makes the tour pop up
+    # unexpectedly. A genuinely fresh install (settings.json doesn't
+    # exist yet at all) gets False instead, via a special case in
+    # storage.py's load_settings() -- NOT from this default. Don't
+    # "simplify" by changing this default without re-reading that
+    # special case, or existing installs will start seeing the tour.
+    "onboarding_tour_seen": True,
 }
 
 # --- Fleet activity ---
