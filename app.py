@@ -371,6 +371,10 @@ def api_settings_post():
         settings["psk_reporter_callsign"] = data["psk_reporter_callsign"].strip().upper()
     if "onboarding_tour_seen" in data:
         settings["onboarding_tour_seen"] = bool(data["onboarding_tour_seen"])
+    if "card_order_tiebreak" in data:
+        raw = data["card_order_tiebreak"]
+        if isinstance(raw, list):
+            settings["card_order_tiebreak"] = [str(x) for x in raw]
     save_settings(settings)
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:
@@ -450,24 +454,34 @@ _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
 
 def _overflow_sentinels(settings: dict, hotspots: list, cameras: list) -> list:
     """Enabled cards/cameras whose saved position is at or past the end
-    of the hotspot list, sorted by that REAL position value (stable
-    tie-break = _SENTINEL_DEFS' own order above, matching
-    dashboard.html's sentinels.push() order) -- not the old "whichever
-    template block happens to be declared first" behavior.
+    of the hotspot list, sorted by that position value with an explicit
+    tiebreak (settings.card_order_tiebreak, falling back to _SENTINEL_DEFS'
+    own declared order for anything not in that list).
 
-    That old behavior was a real, reported bug: a card's position value
-    was saving correctly the whole time, but setup.html's Cards-tab
-    editor rendered every overflowing card in fixed template order
-    regardless of its actual saved position, so dragging a card and
-    saving looked like it silently did nothing whenever that card's
-    position exceeded the hotspot count (an extremely common case --
-    most extra cards get dragged to sit after all the hotspots).
-    Confirmed live: aprs_inbox_position=9, license_quiz_position=3,
-    band_plan_position=5 with 1 hotspot -- APRS Messages rendered FIRST
-    despite having the highest saved position, purely because it was
-    declared earliest in the old template.
+    A card's *_position field only ever records "how many hotspot rows
+    precede this card" -- confirmed live that this is a genuine, deeper
+    bug than it first looked: two or more cards dragged to sit on the
+    SAME side of every hotspot (extremely common -- e.g. "all after the
+    last hotspot" with only 1-2 real hotspots configured) compute the
+    IDENTICAL saved position no matter what relative order they were
+    actually dragged into, because "count of preceding hotspots" is
+    genuinely all that number can represent. A first fix (sorting
+    correctly by that position value instead of always using fixed
+    template order) only helped when two cards' saved positions actually
+    differed -- it did nothing for this same-boundary case, which is why
+    "APRS Messages always renders first" persisted even after that fix:
+    with only 1-2 hotspots, APRS Messages and several other enabled cards
+    all save the exact same position, and the earliest-declared one
+    (APRS Messages, per _SENTINEL_DEFS) always wins that tie regardless
+    of how many times you drag-and-save. The real fix is
+    card_order_tiebreak -- an explicit list of "__key__" ids in last-
+    dragged order, populated by setup.html's saveCardOrder(), used here
+    purely as a secondary sort key. Empty by default, which preserves
+    today's exact _SENTINEL_DEFS-order fallback for anything the user
+    hasn't explicitly reordered relative to a same-boundary sibling yet.
     """
     hotspot_count = len(hotspots)
+    tiebreak = settings.get("card_order_tiebreak", []) or []
     items = []
     for data_ip, enabled_key, pos_key, icon, name, meta in _SENTINEL_DEFS:
         if not settings.get(enabled_key, False):
@@ -484,7 +498,12 @@ def _overflow_sentinels(settings: dict, hotspots: list, cameras: list) -> list:
                     "data_ip": f"__camera__{cam['id']}", "icon": "📷", "name": cam["name"],
                     "meta": f"camera · {type_label}", "pos": pos,
                 })
-    items.sort(key=lambda it: it["pos"])
+
+    def sort_key(it):
+        tb_rank = tiebreak.index(it["data_ip"]) if it["data_ip"] in tiebreak else len(tiebreak)
+        return (it["pos"], tb_rank)
+
+    items.sort(key=sort_key)
     return items
 
 

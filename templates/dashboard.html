@@ -1847,6 +1847,11 @@ const SHOW_HOST_STATS    = {{ 'true' if settings.get('show_host_stats', True) el
 const DISTANCE_UNIT      = "{{ settings.get('weather_unit', 'F') }}";  // "F" -> miles, "C" -> km
 const DARK_MODE          = {{ 'true' if settings.dark_mode else 'false' }};
 const ONBOARDING_TOUR_SEEN = {{ 'true' if settings.get('onboarding_tour_seen', True) else 'false' }};
+// Secondary sort key for computeCardOrders() -- see setup.html's
+// saveCardOrder() and app.py's _overflow_sentinels() for why *_position
+// alone can't distinguish relative order among cards sharing the same
+// hotspot boundary.
+const CARD_ORDER_TIEBREAK = {{ settings.get('card_order_tiebreak', []) | tojson }};
 const SHOW_FLEET_ACTIVITY    = {{ 'true' if settings.get('show_fleet_activity', False) else 'false' }};
 const FLEET_ACTIVITY_POSITION = {{ settings.get('fleet_activity_position', 0) }};
 const FLEET_ACTIVITY_HOURS    = {{ settings.get('fleet_activity_hours', 12) }};
@@ -2074,18 +2079,45 @@ function clearStaleNotifs(data) {
 // hotspot cards' orders so CSS `order` alone reflows the whole grid, without
 // touching the DOM nodes the sentinel cards own (their charts/timers survive
 // across polls).
+// Translates renderCards()'s short sentinel keys ('fleet', 'aprsinbox',
+// 'cam-<id>', ...) to the "__long_name__" ids setup.html's drag list /
+// CARD_ORDER_TIEBREAK actually use (data-ip attributes) -- two different
+// naming schemes for the same set of cards that happen to coexist in
+// this codebase (short keys are only ever used internally by this JS
+// file; the long "__key__" form is what's stored/dragged in Settings).
+const SENTINEL_KEY_TO_DATA_IP = {
+    fleet: '__fleet_activity__', aslfav: '__asl_favorites__', aprsinbox: '__aprs_inbox__',
+    hfcond: '__hf_conditions__', bandplan: '__band_plan__', licensequiz: '__license_quiz__',
+    wspractivity: '__wspr_activity__', digipi: '__digipi__', bigclock: '__big_clock__',
+};
+function sentinelDataIp(key) {
+    if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
+    return SENTINEL_KEY_TO_DATA_IP[key] || key;
+}
+
 function computeCardOrders(hotspotCount, sentinels) {
-    // Sort by the REAL (unclamped) position -- Array.prototype.sort is
-    // guaranteed stable (ES2019+), so two sentinels tied on the exact
-    // same position keep whatever relative order they were pushed onto
-    // `sentinels` in by renderCards() above. That insertion order is
-    // deliberately kept in sync with setup.html's Cards-tab drag-list
-    // template order (see the comment above the cameras sentinel push in
-    // renderCards()) -- an alphabetical-by-key tiebreak used to live here
-    // instead, which disagreed with setup.html's tiebreak for the exact
-    // same tie, so the Cards tab editor and the real dashboard could show
-    // a tied card in two different places.
-    const sorted = sentinels.slice().sort((a, b) => a.pos - b.pos);
+    // Sort by the REAL (unclamped) position first; ties broken by
+    // CARD_ORDER_TIEBREAK (an explicit list of "__key__" ids in the
+    // user's last-dragged order, saved by setup.html's saveCardOrder())
+    // -- *_position alone only ever records "how many hotspot rows
+    // precede this card", which genuinely cannot distinguish relative
+    // order among several cards sharing the same hotspot boundary (a
+    // real, reported bug: with few hotspots, most extra cards end up
+    // saving the IDENTICAL position, and the previous alphabetical/
+    // insertion-order tiebreak here just picked whichever was declared
+    // first, no matter how many times the card was dragged and saved).
+    // A card not yet present in CARD_ORDER_TIEBREAK (e.g. never
+    // explicitly reordered against a sibling) falls back to Array.sort's
+    // ES2019+ stability guarantee, i.e. `sentinels`' own push() order --
+    // which is deliberately kept in sync with setup.html's declared
+    // order (see the comment above the cameras sentinel push in
+    // renderCards()), so an empty/incomplete tiebreak list still matches
+    // today's exact default behavior.
+    const tiebreakRank = (key) => {
+        const idx = CARD_ORDER_TIEBREAK.indexOf(sentinelDataIp(key));
+        return idx === -1 ? CARD_ORDER_TIEBREAK.length : idx;
+    };
+    const sorted = sentinels.slice().sort((a, b) => a.pos - b.pos || tiebreakRank(a.key) - tiebreakRank(b.key));
     let sIdx = 0;
     let orderCounter = 0;
     const sentinelOrders = {};

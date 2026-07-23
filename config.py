@@ -401,6 +401,20 @@ DEFAULT_SETTINGS = {
     # "simplify" by changing this default without re-reading that
     # special case, or existing installs will start seeing the tour.
     "onboarding_tour_seen": True,
+    # Explicit relative-order tiebreak for the "extra card" drag list
+    # (Settings -> Cards). Each *_position field only ever records "how
+    # many hotspot rows precede this card" -- a real, reported bug: two+
+    # cards dragged to sit on the SAME side of every hotspot (extremely
+    # common, e.g. "all after the last hotspot") end up computing the
+    # IDENTICAL saved position no matter their relative order, since
+    # that's genuinely all a single "count of preceding hotspots" number
+    # can represent. This list (of "__key__"-style sentinel/camera ids,
+    # in the user's last-dragged order) is the secondary sort key used
+    # to break that tie -- empty by default, which preserves today's
+    # exact fallback behavior (declared order in app.py's _SENTINEL_DEFS)
+    # for any card never yet explicitly reordered relative to a sibling,
+    # so this is purely additive and never surprises an existing install.
+    "card_order_tiebreak": [],
 }
 
 # --- Fleet activity ---

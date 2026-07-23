@@ -1657,11 +1657,28 @@ function saveCardOrder() {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
     });
 
+    // Explicit relative-order tiebreak -- *_position only ever records
+    // "how many hotspot rows precede this card", so two+ cards dragged to
+    // sit on the SAME side of every hotspot (e.g. all after the last one,
+    // extremely common with few hotspots) save the IDENTICAL position no
+    // matter their actual drag order; that number genuinely can't carry
+    // any more information than that. This is the full sentinel-only
+    // sub-order (in current DOM order) saved alongside the positions
+    // above, used purely to break same-position ties on the server side
+    // (see app.py's _overflow_sentinels) -- fixes a real, reported bug
+    // ("APRS Messages always renders first no matter how it's dragged").
+    const cardOrderTiebreak = allIds.filter(isSentinel);
+
     const saves = [
         fetch('/api/reorder_hotspots', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(ips)
+        }),
+        fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ card_order_tiebreak: cardOrderTiebreak })
         }),
     ];
     // Only present (and only saved) when the respective card is enabled --
