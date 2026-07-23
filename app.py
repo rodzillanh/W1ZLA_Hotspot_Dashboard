@@ -196,6 +196,8 @@ def api_version():
     return jsonify({
         "container_start": _BUILD_TIME,
         "modules": _MODULE_HASHES,
+        "app_version": config.APP_VERSION,
+        "app_codename": config.APP_CODENAME,
     })
 
 @app.route("/api/data")
@@ -805,7 +807,8 @@ def api_quiz_question():
 @app.route("/version")
 def version_page():
     embed = request.args.get("embed") == "1"
-    return render_template("version.html", settings=load_settings(), embed=embed)
+    return render_template("version.html", settings=load_settings(), embed=embed,
+                           app_version=config.APP_VERSION, app_codename=config.APP_CODENAME)
 
 @app.route("/api/check_for_updates")
 def api_check_for_updates():

@@ -1685,5 +1685,16 @@ Always clean up `__pycache__` before zipping/packaging a build.
 - Version bumps + changelog entries live in `templates/version.html`
   (`<div class="release">` blocks) — bump for real app-behavior changes,
   not for deployment-script-only edits like `docker-update.sh`.
+- **Since v3.49, every version also gets a codename** — a deceased rock
+  & roll musician, one per release, purely cosmetic (shown on `/version`
+  as "Current build: vX.Y \"Name\""), same spirit as Ubuntu's animal
+  names. Source of truth is `config.py`'s `VERSION_CODENAMES` list
+  (`APP_VERSION`/`APP_CODENAME` derive from it, `APP_CODENAME` is always
+  `VERSION_CODENAMES[-1]`) — when bumping the version, append the next
+  name to that list and bump `APP_VERSION` together, don't just edit
+  `version.html`'s changelog in isolation or the two will disagree. Only
+  use real, verifiable deceased rock musicians (don't invent one or
+  guess whether someone's still alive) — pre-v3.49 releases were never
+  retroactively named, so the list only needs to grow forward from here.
 - No JS build step, no npm — all frontend libraries (Leaflet, marked.js,
   leaflet.markercluster) are loaded from CDN via plain `<script>` tags.

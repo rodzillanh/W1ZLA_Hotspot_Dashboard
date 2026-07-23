@@ -1,6 +1,21 @@
 """Central place for all the constants that used to be scattered/hardcoded."""
 import os
 
+# --- Version codename ---
+# Each release gets a codename, one deceased rock & roll musician per
+# version, in the order they were used -- purely cosmetic (shown on the
+# Version info page as "Current build: <version> <codename>"), same
+# spirit as Ubuntu's animal names or Android's dessert codenames. This
+# list only covers versions from when this feature was introduced
+# onward -- earlier releases (pre-v3.49) were never retroactively named.
+# To cut a new named release: bump APP_VERSION and append the next name
+# here (VERSION_CODENAMES[-1] is always the current build's codename).
+APP_VERSION = "3.49"
+VERSION_CODENAMES = [
+    "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
+]
+APP_CODENAME = VERSION_CODENAMES[-1]
+
 # --- Storage ---
 CONFIG_DIR   = os.environ.get("CONFIG_DIR", "/app/data")
 CONFIG_FILE  = os.path.join(CONFIG_DIR, "hotspots.json")

@@ -81,6 +81,10 @@
     <div class="card">
         <div class="card-title">Container</div>
         <div class="info-row">
+            <span class="info-label">Current build</span>
+            <span class="info-val accent">v{{ app_version }} "{{ app_codename }}"</span>
+        </div>
+        <div class="info-row">
             <span class="info-label">Started</span>
             <span class="info-val accent" id="start-time">—</span>
         </div>
@@ -105,9 +109,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.48</span>
+                <span class="release-version">v3.49 "Elvis"</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Named releases</span> — starting with this one, each version gets a codename (a deceased rock &amp; roll musician, one per release) shown on this page as "Current build"</li>
+                <li><span>Card order fixes</span> — dragging an "extra card" (Fleet Activity, APRS Messages, License Quiz, etc.) to sit among several others on the same side of every hotspot now actually respects the order you dragged them into, instead of always falling back to a fixed internal order regardless of how many times you saved. Two rendering-side inconsistencies were also fixed along the way (Settings editor vs. the real dashboard disagreeing on tied positions, and positions past the hotspot count collapsing together) — see CLAUDE.md for the full story if you're curious</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.48</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>First-run experience</span> — a fresh install (no hotspots yet) now shows a plain "Let's get your fleet on the map" card instead of a blank dashboard, linking straight to Settings → Hotspots. Once a hotspot is added, a one-time "here's what's available" panel lists every optional integration/card/overlay grouped by category — dismiss it and it's gone, reopen it anytime from Settings → General. <b>Upgrading an existing install never triggers either of these</b> — both are gated on settings.json having never existed on disk at all, not just missing a couple of newer keys</li>
