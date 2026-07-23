@@ -1027,6 +1027,19 @@ appear as pins — the QRZ subscription caveat above applies here too.
     UDP Port" field), or WSJT-X's packets will never reach the container
     at all. Standalone Pi/systemd installs don't have this extra step —
     whatever port you pick in Settings just works immediately.
+- **POTA spots** — a "POTA spots" checkbox in the map legend plots
+  current Parks on the Air activator spots worldwide, color-coded
+  separately from every hotspot/QSO color (shown in the Map key). Free,
+  no-auth public feed (`api.pota.app`), no configuration needed — just
+  turn it on. Off by default, only polls while the checkbox is checked.
+- **PSK Reporter** — a "PSK Reporter" checkbox plots where **your own**
+  signal was actually heard, using your callsign (Settings →
+  Integrations). Deliberately scoped to one callsign, not a worldwide
+  feed — there's no clutter risk the way the old WSPR spots overlay had.
+  Each report gets a line back to your station grid square. Off by
+  default; PSK Reporter's own server actively rate-limits frequent
+  polling, so this is cached 10 minutes server-side regardless of how
+  long the checkbox has been on.
 ## Fleet activity
 
 Optional — off by default (Settings → Cards → "Show fleet activity

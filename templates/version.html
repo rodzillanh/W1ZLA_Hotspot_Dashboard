@@ -105,9 +105,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.46</span>
+                <span class="release-version">v3.47</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>PSK Reporter overlay</span> — a new "PSK Reporter" checkbox on the Live map shows where <i>your own</i> signal was actually heard (Settings → Integrations, needs your callsign), with a line back to your station grid square. Scoped to one callsign by design, not a worldwide feed, so there's no clutter risk. Cached 10 minutes server-side — PSK Reporter's own server actively rate-limits frequent polling, confirmed the hard way while building this</li>
+                <li><span>POTA spots overlay</span> — a new "POTA spots" checkbox plots current Parks on the Air activator spots worldwide, free/no-auth public feed, no configuration needed</li>
+                <li>Both new overlays get their own fixed color in the Map key, alongside every hotspot's own color</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.46</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Per-hotspot map colors + a Map key</span> — each hotspot now gets its own assigned color for its location marker, its caller pins, and its distance line, instead of the old fixed "green=active/blue=recent" scheme that couldn't tell one hotspot's traffic from another's on a multi-hotspot fleet. Active vs. recent is now shown by motion (an expanding ping vs. a static dimmed dot) within that color. FT8/FT4 QSOs (ADIF import or live WSJT-X logging) get their own fixed color too, separate from any hotspot's. A new "Map key" in the bottom-left corner ties every color back to its label, live-rebuilt from your actual hotspot list</li>

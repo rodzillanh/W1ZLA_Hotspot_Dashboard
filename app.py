@@ -37,6 +37,8 @@ from hf_conditions import HfConditionsClient
 from license_quiz import LicenseQuizPool
 from wspr_activity import WsprActivityClient, grid_to_latlon
 from aurora import AuroraClient
+from pota import PotaClient
+from psk_reporter import PskReporterClient
 from adif import parse_adif
 from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
@@ -55,6 +57,8 @@ camera_manager  = CameraStreamManager()
 license_quiz    = LicenseQuizPool()
 wspr_activity   = WsprActivityClient()
 aurora_client   = AuroraClient()
+pota_client     = PotaClient()
+psk_reporter    = PskReporterClient()
 digipi_monitor  = DigipiMonitor()
 openspot_manager = OpenSpot4Manager(monitor)
 openspot_manager.reconcile(load_hotspots())  # eager start at boot, mirrors mqtt_pub's startup rebuild
@@ -363,6 +367,8 @@ def api_settings_post():
             settings["wsjtx_port"] = max(1, min(65535, int(data["wsjtx_port"])))
         except (TypeError, ValueError):
             pass
+    if "psk_reporter_callsign" in data:
+        settings["psk_reporter_callsign"] = data["psk_reporter_callsign"].strip().upper()
     save_settings(settings)
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:
@@ -594,6 +600,35 @@ def api_aurora():
     data = aurora_client.get()
     if data is None:
         return jsonify({"error": "unavailable"}), 503
+    return jsonify(data)
+
+@app.route("/api/pota_spots")
+def api_pota_spots():
+    """Live Parks on the Air activator spots for the Live map's optional
+    "POTA spots" layer -- see pota.py. No per-user config needed, unlike
+    most other overlays here."""
+    data = pota_client.get()
+    if data is None:
+        return jsonify({"error": "unavailable"}), 503
+    return jsonify(data)
+
+@app.route("/api/psk_reporter")
+def api_psk_reporter():
+    """Live PSK Reporter reception reports for settings.psk_reporter_callsign
+    -- see psk_reporter.py. 503 covers both "no callsign configured" and
+    "fetch failed", same degrade-gracefully pattern as every other
+    integration's route here. Also resolves settings.station_grid to
+    qth_lat/qth_lon server-side (reusing grid_to_latlon, same as the ADIF
+    importer/wsjtx.py) so the frontend can draw a "heard from here" line
+    without needing its own grid-square math."""
+    settings = load_settings()
+    callsign = settings.get("psk_reporter_callsign", "")
+    data = psk_reporter.get(callsign)
+    if data is None:
+        return jsonify({"error": "unavailable"}), 503
+    qth = grid_to_latlon(settings.get("station_grid", ""))
+    data = dict(data)
+    data["qth_lat"], data["qth_lon"] = qth if qth is not None else (None, None)
     return jsonify(data)
 
 @app.route("/api/qsos")

@@ -1552,6 +1552,14 @@
             <input type="checkbox" id="aurora-toggle" onchange="toggleAurora()">
             Aurora oval
         </label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="pota-toggle" onchange="togglePota()">
+            POTA spots
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="psk-toggle" onchange="togglePsk()">
+            PSK Reporter
+        </label>
         <select id="map-style-select" onchange="setMapStyle(this.value)"
                 style="background:var(--card-bg);color:var(--text);
                        border:1px solid var(--card-border);border-radius:5px;
@@ -3052,6 +3060,13 @@ setInterval(() => {
 // Cycled per hotspot (in /api/map_data's own order) for that hotspot's
 // location marker + every caller pin heard through it -- see refreshMap().
 const HOTSPOT_COLOR_PALETTE = ['#2ecc71', '#3498db', '#e67e22', '#9b59b6', '#f1c40f', '#1abc9c'];
+// Fixed colors for the other map categories -- each deliberately distinct
+// from HOTSPOT_COLOR_PALETTE and from each other, so "what kind of thing
+// is this pin" reads at a glance regardless of how many hotspots are
+// configured. QSO_COLOR is declared near qsoCluster below (same file,
+// different section -- referenced here only in comments, not moved).
+const POTA_COLOR = '#00bcd4';
+const PSK_COLOR   = '#aeea00';
 
 function hexToRgba(hex, alpha) {
     const n = parseInt(hex.slice(1), 16);
@@ -3060,24 +3075,46 @@ function hexToRgba(hex, alpha) {
 }
 
 // Builds the bottom-left "Map key" -- one row per hotspot (in its
-// assigned color) plus the fixed QSO_COLOR entry, so every color used
-// anywhere on the map ties back to a label. Rebuilt every refreshMap()
-// call alongside the hotspot markers so it stays current if hotspots are
-// added/removed/reordered.
+// assigned color), the fixed QSO_COLOR entry, plus a row each for POTA/
+// PSK Reporter only while their layer toggle is actually checked (no
+// point listing a color for a layer that isn't even on). This is the
+// SINGLE function that writes #map-key's innerHTML -- both refreshMap()
+// (on its normal 3s cycle, passing the latest hotspot list) and the
+// POTA/PSK toggle handlers (which have no hotspot list of their own)
+// call this same function, so there's only ever one writer, never two
+// racing to rebuild the same DOM node. lastMapNodes/lastHotspotColors
+// remember the latest hotspot data between refreshMap() calls so a
+// toggle click can rebuild the key without needing to re-fetch it.
+let lastMapNodes = [];
+let lastHotspotColors = {};
+
 function renderMapKey(nodes, hotspotColors) {
+    if (nodes !== undefined) { lastMapNodes = nodes; lastHotspotColors = hotspotColors; }
     const key = document.getElementById('map-key');
     if (!key) return;
+    const potaOn = document.getElementById('pota-toggle')?.checked;
+    const pskOn  = document.getElementById('psk-toggle')?.checked;
     key.innerHTML = `
         <div class="map-key-title">Map key</div>
-        ${nodes.map(node => `
+        ${lastMapNodes.map(node => `
             <div class="map-key-row">
-                <span class="map-key-swatch square" style="background:${hotspotColors[node.ip]}"></span>
+                <span class="map-key-swatch square" style="background:${lastHotspotColors[node.ip]}"></span>
                 <b>${node.name}</b>
             </div>`).join('')}
         <div class="map-key-row">
             <span class="map-key-swatch" style="background:${QSO_COLOR}"></span>
             <b>FT8/FT4 (WSJT-X)</b>
         </div>
+        ${potaOn ? `
+        <div class="map-key-row">
+            <span class="map-key-swatch" style="background:${POTA_COLOR}"></span>
+            <b>POTA spots</b>
+        </div>` : ''}
+        ${pskOn ? `
+        <div class="map-key-row">
+            <span class="map-key-swatch" style="background:${PSK_COLOR}"></span>
+            <b>PSK Reporter</b>
+        </div>` : ''}
         <div class="map-key-sep"></div>
         <div class="map-key-note">Pulsing = active now &middot; dimmed = recent &middot; bright glow = QSO just logged</div>
     `;
@@ -3182,6 +3219,14 @@ function initMap() {
     // opens the checkbox should generate zero extra traffic.
     document.getElementById('aurora-toggle').checked = localStorage.getItem(AURORA_KEY) === '1';
     if (document.getElementById('aurora-toggle').checked) toggleAurora();
+
+    // POTA/PSK Reporter -- same off-by-default, lazy-fetch-on-toggle
+    // reasoning as Aurora oval above.
+    document.getElementById('pota-toggle').checked = localStorage.getItem(POTA_KEY) === '1';
+    if (document.getElementById('pota-toggle').checked) togglePota();
+
+    document.getElementById('psk-toggle').checked = localStorage.getItem(PSK_KEY) === '1';
+    if (document.getElementById('psk-toggle').checked) togglePsk();
 
     refreshMap();
 }
@@ -3423,6 +3468,115 @@ function toggleAurora() {
         if (auroraLayer) { leafletMap.removeLayer(auroraLayer); auroraLayer = null; }
         if (auroraTimer) { clearInterval(auroraTimer); auroraTimer = null; }
     }
+}
+
+// --- map: POTA (Parks on the Air) activator spots -- same lazy on/off
+// toggle pattern as Aurora oval above, for the same reason (real
+// backend/external-API cost). No per-user config needed (see pota.py) --
+// unlike PSK Reporter below, there's no "my callsign" involved.
+const POTA_KEY = 'w1zla_show_pota';
+let potaLayer = null;
+let potaTimer = null;
+
+function updatePota() {
+    if (!leafletMap) return;
+    fetch('/api/pota_spots').then(r => r.json()).then(data => {
+        if (potaLayer) { leafletMap.removeLayer(potaLayer); potaLayer = null; }
+        if (!data || data.error) return;
+        const group = L.layerGroup();
+        (data.spots || []).forEach(s => {
+            L.circleMarker([s.lat, s.lon], {
+                radius: 5, color: POTA_COLOR, weight: 1, fillColor: POTA_COLOR, fillOpacity: 0.85,
+            }).bindTooltip(`${s.activator} - ${s.reference}${s.park_name ? ' (' + s.park_name + ')' : ''}<br>${s.band || '?'} ${s.mode}`).addTo(group);
+        });
+        potaLayer = group;
+        if (document.getElementById('pota-toggle').checked) group.addTo(leafletMap);
+        renderMapKey();
+    }).catch(() => {});
+}
+
+function togglePota() {
+    const on = document.getElementById('pota-toggle').checked;
+    localStorage.setItem(POTA_KEY, on ? '1' : '0');
+    if (on) {
+        updatePota();
+        if (!potaTimer) {
+            potaTimer = setInterval(() => {
+                const panel = document.getElementById('panel-map');
+                if (panel && panel.classList.contains('active')) updatePota();
+            }, 60000);  // matches pota.py's CACHE_TTL
+        }
+    } else {
+        if (potaLayer) { leafletMap.removeLayer(potaLayer); potaLayer = null; }
+        if (potaTimer) { clearInterval(potaTimer); potaTimer = null; }
+    }
+    renderMapKey();
+}
+
+// --- map: PSK Reporter -- "where was MY signal actually heard", scoped
+// to settings.psk_reporter_callsign (see psk_reporter.py). Deliberately
+// NOT a worldwide feed like the removed WSPR spots overlay -- there's no
+// clutter risk here since it's inherently one callsign's own reports.
+// Same lazy on/off toggle pattern as Aurora oval/POTA above.
+const PSK_KEY = 'w1zla_show_psk';
+let pskLayer = null;
+let pskLinesLayer = null;
+let pskTimer = null;
+
+function updatePsk() {
+    if (!leafletMap) return;
+    fetch('/api/psk_reporter').then(r => r.json()).then(data => {
+        if (pskLayer) { leafletMap.removeLayer(pskLayer); pskLayer = null; }
+        if (pskLinesLayer) { leafletMap.removeLayer(pskLinesLayer); pskLinesLayer = null; }
+        if (!data || data.error) return;
+        const group = L.layerGroup();
+        const lines = L.layerGroup();
+        const qthLat = data.qth_lat, qthLon = data.qth_lon;
+        (data.spots || []).forEach(s => {
+            if (qthLat != null && qthLon != null) {
+                L.polyline([[qthLat, qthLon], [s.lat, s.lon]], {
+                    color: PSK_COLOR, weight: 1, opacity: 0.5, interactive: false,
+                }).addTo(lines);
+            }
+            const ago = s.heard_at ? Math.round(Date.now() / 1000 - s.heard_at) : null;
+            L.circleMarker([s.lat, s.lon], {
+                radius: 5, color: PSK_COLOR, weight: 1, fillColor: PSK_COLOR, fillOpacity: 0.85,
+            }).bindTooltip(`${s.receiver_call} - ${s.band || '?'}${ago != null ? ' - ' + fmtAgo(ago) + ' ago' : ''}`).addTo(group);
+        });
+        pskLayer = group;
+        pskLinesLayer = lines;
+        if (document.getElementById('psk-toggle').checked) {
+            group.addTo(leafletMap);
+            lines.addTo(leafletMap);
+        }
+        renderMapKey();
+    }).catch(() => {});
+}
+
+function togglePsk() {
+    const on = document.getElementById('psk-toggle').checked;
+    localStorage.setItem(PSK_KEY, on ? '1' : '0');
+    if (on) {
+        updatePsk();
+        if (!pskTimer) {
+            pskTimer = setInterval(() => {
+                const panel = document.getElementById('panel-map');
+                if (panel && panel.classList.contains('active')) updatePsk();
+            }, 600000);  // matches psk_reporter.py's CACHE_TTL
+        }
+    } else {
+        if (pskLayer) { leafletMap.removeLayer(pskLayer); pskLayer = null; }
+        if (pskLinesLayer) { leafletMap.removeLayer(pskLinesLayer); pskLinesLayer = null; }
+        if (pskTimer) { clearInterval(pskTimer); pskTimer = null; }
+    }
+    renderMapKey();
+}
+
+// Small helper for PSK Reporter tooltips -- "how long ago was this heard".
+function fmtAgo(secs) {
+    if (secs < 60) return secs + 's';
+    if (secs < 3600) return Math.round(secs / 60) + 'm';
+    return Math.round(secs / 3600) + 'h';
 }
 
 // --- map: ADIF QSO import -- persistent data (server-side qsos.json),

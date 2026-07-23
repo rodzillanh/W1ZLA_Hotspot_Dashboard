@@ -382,6 +382,14 @@ DEFAULT_SETTINGS = {
     # feeds the existing QSO map layer. See wsjtx.py.
     "wsjtx_enabled": False,
     "wsjtx_port": 2237,
+    # PSK Reporter overlay for the Live map -- off (no callsign) by
+    # default. Unlike POTA (a free public feed needing no per-user
+    # config, just a per-browser localStorage toggle like grey-line/
+    # aurora), this needs to know "my callsign" to query
+    # retrieve.pskreporter.info for -- blank disables the map-legend
+    # checkbox's data, same "blank disables it" convention as
+    # station_grid/digipi_ip. See psk_reporter.py.
+    "psk_reporter_callsign": "",
 }
 
 # --- Fleet activity ---

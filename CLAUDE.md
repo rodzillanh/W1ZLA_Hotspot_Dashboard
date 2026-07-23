@@ -126,6 +126,30 @@ wsjtx.py           WsjtxListener: listens for WSJT-X's own UDP telemetry
                    (WSJT-X's own configured grid square, not a settings
                    fallback, in the very common case it's actually set).
 
+pota.py            PotaClient: live Parks on the Air activator spots
+                   (api.pota.app, free/no-auth/CORS-open, confirmed live)
+                   for the Live map's "POTA spots" overlay. No per-user
+                   config needed -- unlike psk_reporter.py below, POTA's
+                   feed already carries lat/lon directly, no grid-square
+                   conversion needed. Reuses wsjtx.py's freq_to_band()
+                   (after converting POTA's kHz-string frequency to Hz)
+                   rather than a third duplicate band-edge table.
+
+psk_reporter.py    PskReporterClient: live PSK Reporter reception reports
+                   (retrieve.pskreporter.info) for the Live map's "PSK
+                   Reporter" overlay -- shows where YOUR OWN signal was
+                   heard, scoped to settings.psk_reporter_callsign, NOT a
+                   worldwide feed like the removed WSPR spots overlay.
+                   XML response (confirmed live, NOT JSON despite some
+                   secondhand summaries), fields as plain XML attributes,
+                   not child tags like qrz.py's shape. Cached 10 min --
+                   PSK Reporter's server actively rate-limited this
+                   dev environment after a handful of test queries a
+                   couple minutes apart, so this is deliberately far more
+                   conservative than every other integration's caching
+                   here. See the Hard-won gotchas section for the
+                   flowStartSeconds request-vs-response meaning trap.
+
 digipi.py          DigipiMonitor: SSH-polls a DigiPi's Direwolf log
                    (/run/direwolf.log, NOT a systemd service -- a plain
                    background process) for APRS activity. Deliberately a
@@ -1375,14 +1399,56 @@ config for per-integration credentials; put it in
   `HOTSPOT_COLOR_PALETTE`'s green/blue/orange overlap with band colors
   a prior version used).
 - **The bottom-left "Map key" (`#map-key`, `renderMapKey()`) is rebuilt
-  from scratch on every `refreshMap()` call**, same "just tear down and
-  rebuild" pattern already used for `nodeMarkers`/`callerCluster` in that
-  function -- not cached/diffed, since the cost is a handful of DOM rows
-  and it needs to reflect hotspots added/removed/reordered without a
-  page reload. It reads `hotspotColors` (built fresh each call, keyed by
-  `node.ip`) plus the fixed `QSO_COLOR` -- always shows the QSO/FT8 row
-  even if no QSOs exist yet, since the "Import ADIF log" control itself
-  is always visible regardless of whether anything's been imported.
+  from scratch on every call, but is now the ONE function allowed to
+  write `#map-key`'s innerHTML, not just something `refreshMap()` calls.**
+  Originally only `refreshMap()` called it (with fresh `nodes`/
+  `hotspotColors` args each time); once POTA/PSK Reporter overlays needed
+  their own key rows toggled independently of the hotspot poll cycle,
+  `renderMapKey()` was changed to cache its last `nodes`/`hotspotColors`
+  in `lastMapNodes`/`lastHotspotColors` (only overwritten when called
+  WITH args) and to read the POTA/PSK checkboxes' live `.checked` state
+  directly on every call, args or not. `togglePota()`/`togglePsk()`/
+  their `update*()` counterparts all call `renderMapKey()` with NO args
+  now, relying on those cached values -- if this function had stayed
+  "always needs nodes+hotspotColors passed in," the toggle handlers would
+  have needed to re-fetch `/api/map_data` just to redraw a legend, or
+  there'd have been two independent writers racing to rebuild the same
+  DOM node (whichever poll cycle fired last would silently clobber the
+  other's row). Don't add a third direct writer to `#map-key` -- route
+  any new legend row through this same function.
+- **PSK Reporter's `flowStartSeconds` means something different on each
+  side of the same query** -- confirmed by reading a real response
+  against a real request, not assumed from the field name alone. As a
+  REQUEST parameter it's a negative relative offset ("how many seconds
+  of history to fetch", e.g. `-1800` for the last 30 min). In the
+  RESPONSE, each `<receptionReport>`'s `flowStartSeconds` attribute is an
+  ABSOLUTE Unix epoch (confirmed by comparing it against the response's
+  own `currentSeconds` attribute, which matched wall-clock "now" at
+  request time). `psk_reporter.py`'s `_fetch()` sends the negative form
+  and stores the absolute form as `heard_at` -- don't reuse one variable
+  name across both without re-reading which side of the call you're on.
+- **PSK Reporter's rate limit is real and was hit within minutes of
+  starting to test it, not just a documented suggestion.** A handful of
+  test queries (varying `senderCallsign`/window) from the same dev-
+  environment IP a couple of minutes apart got a real
+  `{"message": "Your IP has made too many queries too often..."}` JSON
+  error back -- notably JSON, even though every successful response is
+  XML. `psk_reporter.py`'s `CACHE_TTL` (600s) is set with real margin
+  above their documented "no more than once every five minutes" guidance
+  specifically because of this -- don't lower it to "feel more live"
+  without expecting the shared IP (every dashboard instance behind the
+  same egress IP, e.g. a whole household) to eventually get blocked.
+- **POTA's spot feed needed zero position resolution** -- confirmed live
+  that `api.pota.app/spot/activator` returns `latitude`/`longitude`
+  directly on every spot, unlike PSK Reporter (grid square, needs
+  `grid_to_latlon()`) or SOTA (considered, not built -- its spots carry
+  only an association+summit code, no coordinates at all; getting a
+  position would need a SECOND lookup per distinct summit against
+  `api-db2.sota.org.uk/api/summits/{assoc}/{code}`, confirmed live but
+  never implemented since SOTA was explicitly deprioritized). If SOTA is
+  ever revisited, that second-lookup requirement is real and should be
+  cached indefinitely per summit code (a summit's location never
+  changes), not re-fetched like a live spot.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

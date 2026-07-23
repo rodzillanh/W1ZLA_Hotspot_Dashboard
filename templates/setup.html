@@ -1034,6 +1034,32 @@
         </div>
     </div>
 
+    <div class="section">
+        <div class="section-title">PSK Reporter
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — a "PSK Reporter" checkbox on the Live map
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            Shows where <b>your own</b> signal was actually heard — a different
+            question than "who's active" (there's no worldwide clutter here,
+            it's scoped to one callsign). Set your callsign below, then enable
+            "PSK Reporter" in the map legend. Cached 10 minutes per PSK
+            Reporter's own request (their server actively rate-limits IPs that
+            poll more often than that).
+        </p>
+        <div class="form-grid one" style="margin-bottom:10px">
+            <div>
+                <label>Your callsign</label>
+                <input type="text" id="psk-callsign" placeholder="W1ZLA" style="width:140px;text-transform:uppercase"
+                       value="{{ settings.get('psk_reporter_callsign', '') }}">
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="savePskReporter()">Save PSK Reporter settings</button>
+        <span class="status-txt" id="psk-status"></span>
+    </div>
+
 </div>
 
 
@@ -2509,6 +2535,21 @@ function saveWsjtx() {
         body: JSON.stringify({
             wsjtx_enabled: document.getElementById('wsjtx-toggle').classList.contains('on'),
             wsjtx_port: parseInt(document.getElementById('wsjtx-port').value, 10),
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+// --- PSK Reporter ---
+function savePskReporter() {
+    const status = document.getElementById('psk-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            psk_reporter_callsign: document.getElementById('psk-callsign').value.trim(),
         })
     }).then(() => {
         status.textContent = '✓ Saved';
