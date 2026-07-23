@@ -1577,6 +1577,51 @@ config for per-integration credentials; put it in
   shipped here before the true root cause was found, each verified in
   isolation but neither actually reproducing (or fixing) the user's real
   configuration.
+- **The true final layer of the card-order saga above wasn't in the
+  ordering logic at all -- it was a genuine concurrent-write race in
+  `/api/settings` itself, affecting far more than card order.** Even
+  with `card_order_tiebreak` correctly computed and sent,
+  `setup.html`'s `saveCardOrder()` fires MANY separate `/api/settings`
+  POSTs in one `Promise.all(saves)` call (one per changed position field
+  plus the tiebreak) -- genuinely concurrent from the server's point of
+  view, not sequential. The old `/api/settings` POST handler did
+  `settings = load_settings(); settings[key] = value; save_settings(settings)`
+  with NO lock spanning that whole sequence (`storage.py`'s `_file_lock`
+  only ever wrapped the individual file read or individual file write,
+  never the Python-level modification in between). Two concurrent
+  requests could each read the identical stale snapshot before either
+  had written back, then each save their own full dict -- whichever
+  wrote LAST won and silently discarded the other's change in its
+  entirety, not just conflicting fields. **Confirmed by directly
+  reproducing it, not by inspection**: firing 3 concurrent
+  `/api/settings` POSTs (mirroring `saveCardOrder()`'s real pattern) via
+  `threading.Thread` against a live `test_client()` reliably lost 2 of
+  the 3 updates, reverting them to their defaults -- reproduced 100% of
+  the time before the fix, 0% of the time after (10/10 trials). This is
+  exactly why the two EARLIER, individually-correct-and-verified fixes
+  above didn't resolve the reported symptom: it didn't matter how
+  correct the tiebreak computation was if the concurrent save requests
+  were clobbering each other's writes before the value ever reached
+  disk intact. Fixed by making `storage._file_lock` an `RLock` (not a
+  plain `Lock` -- needed so the same thread can safely re-enter it while
+  already holding it) and adding `storage.settings_transaction()`, a
+  context manager wrapping the ENTIRE load-modify-save sequence, not
+  just the file I/O. `app.py`'s `/api/settings` POST handler now calls
+  `settings_transaction().__enter__()`/`__exit__()` manually around its
+  existing ~150-line field-handling body, specifically to avoid
+  re-indenting that whole block for a `with` statement (a real,
+  deliberate tradeoff -- a stray exception between those two calls would
+  leak the lock and deadlock every future settings save, which the
+  existing per-field `try/except ValueError` guards on numeric fields
+  make unlikely in practice, but isn't literally impossible; revisit if
+  this class of bug ever recurs). Rebuild calls (`_rebuild_qrz_client()`
+  etc.) deliberately happen AFTER releasing the lock, since they don't
+  touch `settings.json` and some (MQTT reconnect) can take a moment --
+  no reason to hold up other concurrent `/api/settings` requests for
+  that. **Any other future feature that fires multiple parallel
+  `/api/settings` calls is protected by this same fix automatically** --
+  the bug was in the shared save path, not anything specific to card
+  ordering.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

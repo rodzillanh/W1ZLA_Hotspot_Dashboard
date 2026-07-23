@@ -1,11 +1,20 @@
 """Reading and writing the hotspots.json and settings.json config files."""
+import contextlib
 import json
 import os
 import threading
 
 import config
 
-_file_lock = threading.Lock()
+# RLock, not a plain Lock -- settings_transaction() below needs to hold
+# this lock across a whole load-modify-save sequence while STILL calling
+# load_settings()/save_settings(), which each also acquire it internally
+# for their own individual read/write. A plain Lock would deadlock a
+# thread against itself the moment settings_transaction() called either
+# of them; RLock lets the same thread re-enter without blocking on
+# itself, while still serializing against every OTHER thread exactly as
+# before.
+_file_lock = threading.RLock()
 
 
 # --- hotspots ---
@@ -56,6 +65,37 @@ def save_settings(settings: dict) -> None:
     os.makedirs(config.CONFIG_DIR, exist_ok=True)
     with _file_lock, open(config.SETTINGS_FILE, "w") as f:
         json.dump(settings, f, indent=4)
+
+
+@contextlib.contextmanager
+def settings_transaction():
+    """Serializes an entire load-modify-save sequence for settings.json
+    against every OTHER concurrent settings_transaction() (or plain
+    load_settings()/save_settings() call) -- confirmed live as a real,
+    reported bug without this: setup.html's saveCardOrder() fires several
+    /api/settings POSTs in parallel (one per changed field), and without
+    a lock spanning the WHOLE read-modify-write sequence, two concurrent
+    requests can each read the same stale snapshot before either has
+    written, then each write back their own full settings dict --
+    whichever writes last wins and silently discards the other's change
+    in its entirety. A live test firing 3 concurrent /api/settings POSTs
+    lost 2 of the 3 updates this way (both reverted to their defaults).
+    Callers should do the usual `settings = load_settings(); settings[k]
+    = v; save_settings(settings)` sequence INSIDE this context manager's
+    `with` block, e.g.:
+
+        with settings_transaction():
+            settings = load_settings()
+            settings["foo"] = "bar"
+            save_settings(settings)
+
+    Safe to call load_settings()/save_settings() from inside this block
+    because _file_lock is an RLock -- the same thread re-entering it
+    (which those two functions each do internally) doesn't deadlock,
+    while a DIFFERENT thread's transaction still blocks until this one
+    exits, serializing the whole sequence exactly as intended."""
+    with _file_lock:
+        yield
 
 
 # --- favorites ---

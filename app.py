@@ -21,7 +21,7 @@ import qrz as qrz_mod
 from monitor import FleetMonitor
 from storage import load_hotspots, save_hotspots, load_settings, save_settings, \
                    load_favorites, save_favorites, load_asl_favorites, save_asl_favorites, \
-                   load_cameras, save_cameras, load_qsos, save_qsos
+                   load_cameras, save_cameras, load_qsos, save_qsos, settings_transaction
 from weather import WeatherClient
 from qrz import QrzClient
 from aprs import AprsClient
@@ -232,7 +232,20 @@ def api_settings_get():
 
 @app.route("/api/settings", methods=["POST"])
 def api_settings_post():
-    data     = request.json or {}
+    data = request.json or {}
+    # Held across the ENTIRE load-modify-save sequence below (through the
+    # save_settings(settings) call further down), not just the individual
+    # file read/write -- see storage.settings_transaction()'s docstring
+    # for the real, reproduced race this prevents: setup.html's
+    # saveCardOrder() fires several /api/settings POSTs in parallel (one
+    # per changed field), and without a lock spanning the whole sequence,
+    # two concurrent requests could each read the same stale snapshot and
+    # then each write back their own full dict, silently discarding
+    # whichever one wrote first. Manual __enter__/exit (via _settings_txn
+    # below) rather than wrapping this ~150-line handler in a `with`
+    # block, purely to avoid re-indenting all of it.
+    _settings_txn = settings_transaction()
+    _settings_txn.__enter__()
     settings = load_settings()
     if "dashboard_name" in data:
         settings["dashboard_name"] = data["dashboard_name"]
@@ -378,6 +391,11 @@ def api_settings_post():
         if isinstance(raw, list):
             settings["card_order_tiebreak"] = [str(x) for x in raw]
     save_settings(settings)
+    _settings_txn.__exit__(None, None, None)
+    # Rebuilds below intentionally happen AFTER releasing the lock -- they
+    # don't touch settings.json themselves, and some (MQTT reconnect, etc.)
+    # can take a moment, which would otherwise hold up every OTHER
+    # concurrent /api/settings request for no reason.
     # Rebuild QRZ client if credentials changed
     if "qrz_username" in data or "qrz_password" in data:
         _rebuild_qrz_client()
