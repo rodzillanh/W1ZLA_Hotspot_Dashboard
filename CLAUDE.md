@@ -1499,6 +1499,39 @@ config for per-integration credentials; put it in
   generalization (only `#version` was ever wired up). The generalized
   version degrades safely for an unrecognized hash (`document.getElementById('tab-btn-'+tabName)`
   returns null, the `if (btn)` guard just no-ops) rather than throwing.
+- **A real, reported bug: "Big Ass Clock's card position doesn't save"
+  turned out to be a tie-break disagreement between two independently-
+  correct pieces of code, not a save failure at all.** `/api/settings`
+  was persisting `big_clock_position` correctly the whole time (confirmed
+  live) -- the actual problem was that `setup.html`'s Cards-tab drag-list
+  template breaks a POSITION TIE (two sentinels sharing the same saved
+  position, e.g. both still at their default of 0 right after being
+  enabled) by fixed template source order, while `dashboard.html`'s
+  `computeCardOrders()` used to break the identical tie ALPHABETICALLY
+  BY KEY NAME (`a.key.localeCompare(b.key)`). For a real tie between
+  `bigclock` and `licensequiz`, template order puts `licensequiz` first
+  (it's declared earlier in `setup.html`) while alphabetical order put
+  `bigclock` first (`'b' < 'l'`) -- confirmed by literally reproducing
+  the exact tie live (a real `settings.json` with both at position 0)
+  and finding the two files disagreed on which one renders first. From
+  the user's side this reads exactly like "I dragged it, saved it, and
+  it didn't take" -- the position value saved fine, but what they saw in
+  the editor never matched what the real dashboard showed for a tied
+  card, so every attempt to "fix" it by dragging again looked like it
+  silently failed. Fixed by making `computeCardOrders()`'s sort rely on
+  `Array.prototype.sort`'s ES2019+ stability guarantee instead of an
+  independent tiebreak rule (`sentinels.slice().sort((a,b) => a.pos -
+  b.pos)`, no `|| ...localeCompare(...)`), and by re-ordering
+  `renderCards()`'s `sentinels.push()` calls to match `setup.html`'s
+  fallback-block order EXACTLY, including moving the cameras push from
+  right-after-`aslfav` (where it happened to sit, for no particular
+  reason) to dead last, matching `setup.html`'s cameras block (which was
+  already last there). **If either file's sentinel declaration order
+  ever changes again, it must change in both places together** -- these
+  are two independent descriptions of the same ordering, same class of
+  gotcha as `unraid-template.xml`/`docker-update.sh` needing to stay in
+  sync elsewhere in this file, except here a drift is silent (no error,
+  just a wrong-looking card position) rather than loud.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

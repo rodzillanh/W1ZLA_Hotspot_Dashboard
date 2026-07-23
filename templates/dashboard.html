@@ -2075,7 +2075,17 @@ function clearStaleNotifs(data) {
 // touching the DOM nodes the sentinel cards own (their charts/timers survive
 // across polls).
 function computeCardOrders(hotspotCount, sentinels) {
-    const sorted = sentinels.slice().sort((a, b) => a.pos - b.pos || a.key.localeCompare(b.key));
+    // Sort by position only -- Array.prototype.sort is guaranteed stable
+    // (ES2019+), so two sentinels tied on position keep whatever relative
+    // order they were pushed onto `sentinels` in by renderCards() above.
+    // That insertion order is deliberately kept in sync with setup.html's
+    // Cards-tab drag-list template order -- an alphabetical-by-key
+    // tiebreak used to live here instead, which disagreed with
+    // setup.html's fixed-template-order tiebreak for the exact same tie,
+    // so the Cards tab editor and the real dashboard could show a tied
+    // card in two different places. See the comment above the cameras
+    // sentinel push in renderCards() before reordering either side again.
+    const sorted = sentinels.slice().sort((a, b) => a.pos - b.pos);
     let sIdx = 0;
     let orderCounter = 0;
     const sentinelOrders = {};
@@ -2135,11 +2145,6 @@ function renderCards(data) {
     if (SHOW_ASL_FAVORITES) {
         sentinels.push({ key: 'aslfav', pos: Math.max(0, Math.min(ASL_FAVORITES_POSITION, data.length)) });
     }
-    if (SHOW_CAMERAS) {
-        cameras.forEach(cam => {
-            sentinels.push({ key: 'cam-' + cam.id, pos: Math.max(0, Math.min(cam.position || 0, data.length)) });
-        });
-    }
     if (SHOW_APRS_INBOX) {
         sentinels.push({ key: 'aprsinbox', pos: Math.max(0, Math.min(APRS_INBOX_POSITION, data.length)) });
     }
@@ -2160,6 +2165,22 @@ function renderCards(data) {
     }
     if (SHOW_BIG_CLOCK) {
         sentinels.push({ key: 'bigclock', pos: Math.max(0, Math.min(BIG_CLOCK_POSITION, data.length)) });
+    }
+    // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
+    // template order exactly (fleet, aslfav, aprsinbox, hfcond, bandplan,
+    // licensequiz, wspractivity, digipi, bigclock, THEN cameras), since
+    // computeCardOrders() below now relies on a stable sort to break ties
+    // by insertion order, not by an independent alphabetical rule. Two
+    // sentinels can easily tie on position (e.g. right after enabling
+    // several cards at once, before any has been dragged from its
+    // position-0 default) -- if this order ever drifts from setup.html's,
+    // the Cards tab editor and the real dashboard will visibly disagree
+    // about where a tied card ends up, which reads exactly like "my card
+    // order isn't saving" even though the position value saved correctly.
+    if (SHOW_CAMERAS) {
+        cameras.forEach(cam => {
+            sentinels.push({ key: 'cam-' + cam.id, pos: Math.max(0, Math.min(cam.position || 0, data.length)) });
+        });
     }
     const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);
 
