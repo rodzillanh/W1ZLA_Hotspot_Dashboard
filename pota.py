@@ -30,10 +30,13 @@ import urllib.request
 from wsjtx import freq_to_band
 
 POTA_SPOTS_URL = "https://api.pota.app/spot/activator"
-CACHE_TTL = 60  # seconds -- a reasonable "feels live" cadence for a free,
-                # rate-limit-undocumented API; not aggressive enough to
-                # risk being a bad citizen on an endpoint with no stated
-                # budget to stay under.
+CACHE_TTL = 20  # seconds -- a hunter chasing a live activator cares about
+                # freshness (an activator can QSY or finish up within a
+                # couple minutes, so a stale spot list means chasing
+                # someone who's already gone). Bumped up from an initial
+                # 60s specifically for this reason -- still nowhere near
+                # aggressive for a CORS-open, rate-limit-undocumented
+                # public endpoint that didn't push back at all in testing.
 TIMEOUT = 15
 AGENT = "hotspot-dashboard/1.0"
 

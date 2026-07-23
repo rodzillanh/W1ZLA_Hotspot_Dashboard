@@ -3504,7 +3504,7 @@ function togglePota() {
             potaTimer = setInterval(() => {
                 const panel = document.getElementById('panel-map');
                 if (panel && panel.classList.contains('active')) updatePota();
-            }, 60000);  // matches pota.py's CACHE_TTL
+            }, 20000);  // matches pota.py's CACHE_TTL
         }
     } else {
         if (potaLayer) { leafletMap.removeLayer(potaLayer); potaLayer = null; }
