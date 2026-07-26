@@ -263,9 +263,13 @@ to configure. It's a genuinely different visual identity (graphite panel
 surfaces, a warm amber accent, a separate cyan color meaning "on-air right
 now", monospace treatment for callsigns/frequencies/timers) rather than a
 recolor. A "✨ Try new look" link on the regular dashboard's toolbar takes
-you there; "← Back to classic" goes back. Purely a preview for now — your
-regular dashboard at `/` is completely unaffected either way, and there's
-no setting that changes which one loads by default.
+you there; "← Back to classic" goes back — both work as a one-time peek
+regardless of your saved preference below.
+
+**"Use the new beta look by default"** (Settings → General → Appearance)
+makes `/` itself render the beta look every time, instead of needing
+`/beta` or the toolbar link. Off by default — your dashboard keeps the
+classic look until you turn this on.
 
 ## Dashboard customization
 

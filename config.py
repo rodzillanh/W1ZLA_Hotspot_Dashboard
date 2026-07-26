@@ -294,6 +294,12 @@ HOTSPOT_INFO_CHECK_CMD = (
 DEFAULT_SETTINGS = {
     "dashboard_name": "W1ZLA Hotspot Dashboard",
     "dark_mode": True,
+    # Which template "/" itself renders by default -- overridable per-visit
+    # via ?view=classic / ?view=beta (used by the "Try new look"/"Back to
+    # classic" toolbar links so those always work as a one-time peek
+    # regardless of this persisted default). /beta stays available as its
+    # own unconditional URL either way.
+    "use_beta_dashboard": False,
     "links": [
         {"label": "Brandmeister", "url": "https://brandmeister.network"},
         {"label": "QRZ.com",      "url": "https://www.qrz.com"},

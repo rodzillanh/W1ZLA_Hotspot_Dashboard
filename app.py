@@ -277,6 +277,8 @@ def api_settings_post():
         settings["show_host_stats"] = bool(data["show_host_stats"])
     if "show_toolbar" in data:
         settings["show_toolbar"] = bool(data["show_toolbar"])
+    if "use_beta_dashboard" in data:
+        settings["use_beta_dashboard"] = bool(data["use_beta_dashboard"])
     if "show_fleet_activity" in data:
         settings["show_fleet_activity"] = bool(data["show_fleet_activity"])
     if "fleet_activity_position" in data:
@@ -447,7 +449,16 @@ def api_settings_post():
 
 @app.route("/")
 def dashboard():
-    return render_template("dashboard.html", settings=load_settings())
+    """Renders whichever template the "Use the new beta look" Settings
+    toggle (settings.use_beta_dashboard) prefers -- overridable per-visit
+    via ?view=classic / ?view=beta regardless of that persisted default,
+    which is how the "Try new look"/"Back to classic" toolbar links work
+    as a one-time peek without touching the saved setting."""
+    settings = load_settings()
+    view = request.args.get("view")
+    use_beta = settings.get("use_beta_dashboard", False) if view not in ("classic", "beta") else view == "beta"
+    template = "dashboard_beta.html" if use_beta else "dashboard.html"
+    return render_template(template, settings=settings)
 
 @app.route("/beta")
 def dashboard_beta():

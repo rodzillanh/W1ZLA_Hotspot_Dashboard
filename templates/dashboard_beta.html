@@ -545,11 +545,15 @@
 
         /* S-meter-style RSSI/BER bars -- grid-column:1/-1 so each spans both
            .stats-grid columns instead of sitting in a single narrow cell. */
-        .meter-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-muted); }
-        .meter-label { width: 32px; flex-shrink: 0; font-family: var(--font-mono); }
-        .meter-track { flex: 1; height: 5px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+        /* RSSI + BER share one line, half the width each (was two stacked
+           full-width rows) -- frees up a full grid row per card. */
+        .meter-row-combined { grid-column: 1 / -1; display: flex; gap: 14px; }
+        .meter-half { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text-muted); }
+        .meter-half-plain { font-size: 13px; }  /* matches the plain stat-val rows around it when a value doesn't parse */
+        .meter-label { width: 26px; flex-shrink: 0; font-family: var(--font-mono); }
+        .meter-track { flex: 1; min-width: 0; height: 5px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
         .meter-fill { display: block; height: 100%; border-radius: 3px; }
-        .meter-val { width: 60px; flex-shrink: 0; text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text); }
+        .meter-val { flex-shrink: 0; text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text); }
 
         .recent-row {
             margin-top: 12px;
@@ -1428,7 +1432,7 @@
             <path d="M13 2 3 14h7l-1 8 11-14h-7l1-8z" fill="#FFCC4D" stroke="#664500" stroke-width="1" stroke-linejoin="round"/>
         </svg>
     </a>
-    <a class="settings-link" href="/" title="Back to the classic dashboard">← Back to classic</a>
+    <a class="settings-link" href="/?view=classic" title="Back to the classic dashboard">← Back to classic</a>
     <a class="settings-link" href="/setup">⚙ Settings</a>
 </div>
 
@@ -2166,23 +2170,29 @@ function berColor(str) {
     if (ber <= 3) return 'var(--caution)';
     return 'var(--danger)';
 }
-function rssiMeterRow(rssiStr) {
-    const pct = rssiBarPct(rssiStr);
-    if (pct === null) return `<div>RSSI: <span class="stat-val">${rssiStr}</span></div>`;
-    return `<div class="meter-row" title="Approximate -- MMDVM RSSI is calibrated per-device (varies ~10dB between individual units), not a universal dBm scale">
-        <span class="meter-label">RSSI</span>
-        <span class="meter-track"><span class="meter-fill" style="width:${pct.toFixed(0)}%;background:${rssiColor(pct)}"></span></span>
-        <span class="meter-val">${rssiStr}</span>
-    </div>`;
-}
-function berMeterRow(berStr) {
-    const pct = berBarPct(berStr);
-    if (pct === null) return `<div>BER: <span class="stat-val">${berStr}</span></div>`;
-    return `<div class="meter-row">
-        <span class="meter-label">BER</span>
-        <span class="meter-track"><span class="meter-fill" style="width:${pct.toFixed(0)}%;background:${berColor(berStr)}"></span></span>
-        <span class="meter-val">${berStr}</span>
-    </div>`;
+// Combined onto one line, half the width each -- was two full-width
+// stacked rows; halving them frees up a full grid row per card. Each
+// half degrades independently to plain text if its own value doesn't
+// parse (e.g. "N/A"), so a hotspot with only one of the two available
+// still gets a compact combined line rather than an empty gap.
+function rssiBerMeterRow(rssiStr, berStr) {
+    const rssiPct = rssiBarPct(rssiStr);
+    const berPct  = berBarPct(berStr);
+    const rssiHalf = rssiPct === null
+        ? `<div class="meter-half meter-half-plain">RSSI: <span class="stat-val">${rssiStr}</span></div>`
+        : `<div class="meter-half" title="Approximate -- MMDVM RSSI is calibrated per-device (varies ~10dB between individual units), not a universal dBm scale">
+            <span class="meter-label">RSSI</span>
+            <span class="meter-track"><span class="meter-fill" style="width:${rssiPct.toFixed(0)}%;background:${rssiColor(rssiPct)}"></span></span>
+            <span class="meter-val">${rssiStr}</span>
+          </div>`;
+    const berHalf = berPct === null
+        ? `<div class="meter-half meter-half-plain">BER: <span class="stat-val">${berStr}</span></div>`
+        : `<div class="meter-half">
+            <span class="meter-label">BER</span>
+            <span class="meter-track"><span class="meter-fill" style="width:${berPct.toFixed(0)}%;background:${berColor(berStr)}"></span></span>
+            <span class="meter-val">${berStr}</span>
+          </div>`;
+    return `<div class="meter-row-combined">${rssiHalf}${berHalf}</div>`;
 }
 
 // --- TX timer ---
@@ -2603,16 +2613,14 @@ function renderCards(data) {
                 ? `<div class="stats-grid">
                      <div>Mode: <span class="stat-val">${hs.mode}</span></div>
                      ${hs.frequency && hs.frequency !== 'N/A' ? `<div>Freq: <span class="stat-val">${hs.frequency}${hs.duplex && hs.duplex !== 'N/A' ? ' (' + hs.duplex + ')' : ''}</span></div>` : ''}
-                     ${rssiMeterRow(hs.rssi)}
-                     ${berMeterRow(hs.ber)}
+                     ${rssiBerMeterRow(hs.rssi, hs.ber)}
                      ${hs.bm_status_text
                          ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
                    </div>`
                 : `<div class="stats-grid">
                      <div>Mode: <span class="stat-val">${hs.mode}</span></div>
                      ${hs.frequency && hs.frequency !== 'N/A' ? `<div>Freq: <span class="stat-val">${hs.frequency}${hs.duplex && hs.duplex !== 'N/A' ? ' (' + hs.duplex + ')' : ''}</span></div>` : ''}
-                     ${rssiMeterRow(hs.rssi)}
-                     ${berMeterRow(hs.ber)}
+                     ${rssiBerMeterRow(hs.rssi, hs.ber)}
                      <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
                      <div>CPU:  <span class="stat-val">${hs.cpu}</span></div>
                      ${hs.color_code ? `<div>Color Code: <span class="stat-val">${hs.color_code}</span></div>` : ''}
