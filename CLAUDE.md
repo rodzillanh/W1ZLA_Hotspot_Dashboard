@@ -1682,6 +1682,31 @@ config for per-integration credentials; put it in
   `hamalert.py` has no equivalent of `openspot.py`'s
   `_collect_passwords()`/multi-password-textarea pattern. Don't add one
   without a real reported case of it being needed.
+- **Since March 2024, HamAlert has a dedicated Telnet password
+  (hamalert.org → Destinations), separate from the main website/app
+  login -- confirmed directly from the developer's own forum post, not
+  assumed.** HB9DQM (forum.hamalert.org/t/api-key-generation-limited-
+  access/683): "I have just added the option to set a separate Telnet
+  password on the Destinations page. This can only be used to login to
+  the Telnet interface, not to the website or app." The original
+  implementation's Settings field was just labeled "HamAlert password,"
+  which risked someone typing their actual account login there instead
+  -- fixed by relabeling it "HamAlert Telnet password" plus explanatory
+  text linking to the Destinations page. `hamalert.py` itself needed NO
+  code change for this -- `configure()`/`test_connection()` already just
+  pass through whatever password is supplied; this was purely a
+  Settings-UI-copy gap, not a protocol bug.
+- **`HamAlertListener.test_connection()` (Settings "Test connection"
+  button) has no documented explicit login-accepted/-rejected signal to
+  key off of** -- HamAlert's Telnet interface, per its own forum, only
+  documents `sh/dx N`/`set/json`/`echo`, nothing about a login response.
+  The heuristic used instead: open a fresh one-off connection, log in,
+  and see whether the server closes the socket within a few seconds
+  (`chunk == b""`) vs. leaves it open. **This heuristic itself is
+  unverified against a real invalid-login case** (no real account
+  available in this dev environment) -- if it ever reports a false
+  positive/negative, re-check against a live account before assuming
+  the heuristic is wrong, not just the credentials.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

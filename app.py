@@ -1081,6 +1081,15 @@ def api_aprs_inbox():
     return jsonify(status)
 
 
+@app.route("/api/test_hamalert", methods=["POST"])
+def test_hamalert():
+    """Test a HamAlert Telnet login for the Settings 'Test connection'
+    button -- see HamAlertListener.test_connection()."""
+    data = request.json or {}
+    ok, message = HamAlertListener.test_connection(data.get("username", ""), data.get("password", ""))
+    return jsonify({"success": ok, "message": message})
+
+
 @app.route("/api/hamalert")
 def api_hamalert():
     """Recent HamAlert trigger matches, plus the listener connection's

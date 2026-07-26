@@ -1051,12 +1051,19 @@
                        value="{{ settings.get('hamalert_username', '') }}">
             </div>
             <div>
-                <label>HamAlert password</label>
+                <label>HamAlert Telnet password</label>
                 <input type="password" id="hamalert-password" placeholder="••••••••"
                        value="{{ settings.get('hamalert_password', '') }}">
             </div>
         </div>
+        <p style="font-size:11px;color:var(--text-dim);margin-bottom:12px;line-height:1.5">
+            This is the dedicated <b>Telnet password</b> from hamalert.org →
+            <a href="https://hamalert.org/destinations" target="_blank" rel="noopener">Destinations</a> —
+            not your regular website/app login password. HamAlert added this as a
+            separate credential specifically for the Telnet interface.
+        </p>
         <button class="btn btn-primary" onclick="saveHamAlert()">Save HamAlert settings</button>
+        <button class="btn btn-info" onclick="testHamAlert()">Test connection</button>
         <span class="status-txt" id="hamalert-status"></span>
     </div>
 
@@ -2608,6 +2615,23 @@ function saveHamAlert() {
         status.textContent = '✓ Saved';
         setTimeout(() => status.textContent = '', 2000);
     });
+}
+
+async function testHamAlert() {
+    const status = document.getElementById('hamalert-status');
+    status.textContent = 'Testing...';
+    const r = await fetch('/api/test_hamalert', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            username: document.getElementById('hamalert-username').value.trim(),
+            password: document.getElementById('hamalert-password').value,
+        })
+    });
+    const data = await r.json();
+    status.textContent = data.success ? '✓ ' + data.message : '✕ ' + data.message;
+    status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
 }
 
 // --- APRS favorite alerts ---

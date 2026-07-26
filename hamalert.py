@@ -36,6 +36,18 @@ alerts, re-verify the login sequence and JSON line shape against a live
 account/packet capture before assuming this parser is still correct,
 same "verify against the real thing" discipline as every other
 reverse-engineered protocol in this project (openspot.py, digipi.py).
+
+Since March 2024, HamAlert supports a dedicated Telnet password (set on
+hamalert.org's own Destinations page), separate from the main website/
+app login password -- confirmed directly from the developer (HB9DQM) on
+the support forum: "I have just added the option to set a separate
+Telnet password on the Destinations page. This can only be used to
+login to the Telnet interface, not to the website or app."
+(forum.hamalert.org/t/api-key-generation-limited-access/683). This
+module's `configure()`/`test_connection()` just pass through whatever
+password the user supplies -- it's Settings' UI copy that's responsible
+for telling the user to use that dedicated Telnet password rather than
+their main account password, not this module.
 """
 import json
 import socket
@@ -83,6 +95,49 @@ class HamAlertListener:
                 self._connected = False
         if enabled and username and password:
             threading.Thread(target=self._run, args=(generation, username, password), daemon=True).start()
+
+    @staticmethod
+    def test_connection(username: str, password: str, timeout: float = 8.0) -> tuple:
+        """Settings 'Test connection' button -- a fresh, one-off login
+        attempt, no persistent listener touched (mirrors mqtt_publisher.py's/
+        openspot.py's own test_connection() shape). HamAlert's Telnet
+        interface has no documented explicit login-accepted/-rejected
+        message (confirmed via its own support forum, forum.hamalert.org/
+        t/documentation-for-telnet-interface/682) -- the socket staying
+        open after login, rather than the server closing it, is the best
+        available success signal here. NOT verified against a real
+        invalid-login case (no real account available in this dev
+        environment) -- if this ever reports a false positive/negative,
+        re-check against a live account before assuming the heuristic
+        itself is wrong, same discipline as every other unverified corner
+        of this module."""
+        username = (username or "").strip()
+        password = password or ""
+        if not username or not password:
+            return False, "Username and password required"
+        try:
+            sock = socket.create_connection((HAMALERT_HOST, HAMALERT_PORT), timeout=10)
+        except OSError as e:
+            return False, f"Could not reach {HAMALERT_HOST}: {e}"
+        try:
+            sock.sendall((username + "\r\n").encode())
+            sock.sendall((password + "\r\n").encode())
+            sock.sendall(b"set/json\r\n")
+            sock.settimeout(timeout)
+            try:
+                chunk = sock.recv(4096)
+            except socket.timeout:
+                chunk = None  # no data within timeout, but socket still open -- treated as success
+            if chunk == b"":
+                return False, ("Connection closed right after login -- check the username and "
+                                "Telnet password (hamalert.org -> Destinations; a separate "
+                                "password from your website/app login)")
+            return True, "Connected -- login was not rejected"
+        finally:
+            try:
+                sock.close()
+            except OSError:
+                pass
 
     def recent(self) -> list:
         with self._lock:

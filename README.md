@@ -824,15 +824,20 @@ default) — shows your own personal
 [HamAlert](https://hamalert.org) alert matches (DXCC needed, specific
 callsigns, band/mode triggers, etc.) live as they happen. HamAlert is a
 separate free service you configure yourself — set up your alert
-"triggers" on hamalert.org first, then enter your HamAlert login
-(Settings → Integrations → HamAlert). This dashboard connects outbound
-to HamAlert's Telnet-based streaming interface (no inbound port needed
-on your end) and shows each matching spot as it arrives: callsign
-(linked to QRZ), source (DX cluster / Reverse Beacon Network / POTA /
-SOTA / WWFF / PSK Reporter), frequency/mode, DXCC entity, and — when
-present — the specific trigger comment that matched (e.g. "New DXCC
-needed"). Position it anywhere in the same drag-and-drop **Card order**
-list (Settings → Hotspots), same as Fleet Activity/APRS Messages/etc.
+"triggers" on hamalert.org first, then enter your HamAlert username and
+**Telnet password** (Settings → Integrations → HamAlert). The Telnet
+password is a dedicated credential HamAlert lets you set on its own
+**Destinations** page — separate from your regular website/app login,
+specifically for this kind of integration — not the password you use to
+log into hamalert.org itself. A "Test connection" button confirms the
+login before you enable the card. This dashboard connects outbound to
+HamAlert's Telnet-based streaming interface (no inbound port needed on
+your end) and shows each matching spot as it arrives: callsign (linked
+to QRZ), source (DX cluster / Reverse Beacon Network / POTA / SOTA /
+WWFF / PSK Reporter), frequency/mode, DXCC entity, and — when present —
+the specific trigger comment that matched (e.g. "New DXCC needed").
+Position it anywhere in the same drag-and-drop **Card order** list
+(Settings → Hotspots), same as Fleet Activity/APRS Messages/etc.
 
 ## HF Conditions card
 
