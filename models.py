@@ -41,6 +41,20 @@ class HotspotStatus:
     ber: str = "N/A"
     rssi: str = "N/A"
     mode: str = "N/A"
+    # WPSD-only (read from /etc/mmdvmhost, a slow check -- see
+    # config.HOTSPOT_INFO_CHECK_CMD). All already formatted for display;
+    # all stay "N/A" for ASL3/openSPOT4, which have no equivalent.
+    frequency: str = "N/A"  # "433.750 MHz", or "433.750/434.350 MHz" if RX != TX (duplex)
+    duplex: str = "N/A"  # "Simplex" or "Duplex"
+    # The hotspot's own registered callsign/DMR ID (e.g. "W1ZLA (3100486)")
+    # -- distinct from active_call, which is whoever's currently keying up
+    # THROUGH this hotspot, not the hotspot's own identity.
+    hotspot_callsign: str = "N/A"
+    # The hotspot's own configured location string (e.g. "Barrington, NH")
+    # -- distinct from caller_location (the active caller's QRZ-looked-up
+    # location) and from this hotspot's lat/lon map coordinates (a separate
+    # Settings field, not read from the device at all).
+    hotspot_location: str = "N/A"
     # Brandmeister repeater profile (only populated if a brandmeister_id is
     # configured for this hotspot in Settings -> Hotspots). status_text is
     # shown as-is (e.g. "DMO") rather than collapsed into an online/offline

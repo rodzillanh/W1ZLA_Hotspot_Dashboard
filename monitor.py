@@ -198,6 +198,53 @@ class FleetMonitor:
         except Exception:
             pass  # slow checks are best-effort -- never affect the main poll loop
 
+        try:
+            info_output = self._ssh_exec(hotspot, config.HOTSPOT_INFO_CHECK_CMD, config.SSH_TIMEOUT).strip()
+            rx_mhz = tx_mhz = None
+            duplex = callsign = dmr_id = location = None
+            for line in info_output.splitlines():
+                key, sep, val = line.partition("=")
+                if not sep:
+                    continue
+                val = val.strip().strip('"')
+                if key == "RXFrequency" and val.isdigit():
+                    rx_mhz = int(val) / 1_000_000
+                elif key == "TXFrequency" and val.isdigit():
+                    tx_mhz = int(val) / 1_000_000
+                elif key == "Duplex":
+                    duplex = {"0": "Simplex", "1": "Duplex"}.get(val)
+                elif key == "Callsign" and val:
+                    callsign = val
+                elif key == "Id" and val and val != "0":
+                    dmr_id = val
+                elif key == "Location" and val:
+                    location = val
+
+            updates = {}
+            if rx_mhz is not None:
+                # Simplex (the overwhelming majority of WPSD hotspots) shows
+                # one number, matching WPSD's own dashboard's "TX/RX Freq."
+                # display; only shows both if they genuinely differ (duplex).
+                updates["frequency"] = (
+                    f"{rx_mhz:.3f} MHz" if tx_mhz is None or abs(tx_mhz - rx_mhz) < 0.0001
+                    else f"{rx_mhz:.3f}/{tx_mhz:.3f} MHz"
+                )
+            if duplex is not None:
+                updates["duplex"] = duplex
+            if callsign:
+                updates["hotspot_callsign"] = f"{callsign} ({dmr_id})" if dmr_id else callsign
+            if location:
+                updates["hotspot_location"] = location
+
+            if updates:
+                with self._lock:
+                    if ip in self._data:
+                        status = self._data[ip]
+                        for field_name, value in updates.items():
+                            setattr(status, field_name, value)
+        except Exception:
+            pass  # best-effort, same as the update check above
+
     # --- per-hotspot check ---
 
     def check_one(self, hotspot: dict) -> None:

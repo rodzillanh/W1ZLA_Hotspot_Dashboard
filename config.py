@@ -264,6 +264,32 @@ VERSION_CHECK_CMD = (
     "check_repo /usr/local/bin WPSD-Binaries"
 )
 
+# WPSD's own live MMDVMHost config -- confirmed against a real WPSD install
+# (2026-07) to be /etc/mmdvmhost (no ".ini", no hyphen -- WPSD generates this
+# itself from the admin panel's hardware/frequency settings; it does NOT
+# match upstream MMDVMHost's own shipped template, which has no RXFrequency/
+# TXFrequency at all as of the current g4klx/MMDVMHost master). Reads a
+# handful of static, rarely-changing fields for the hotspot card: Freq
+# (RX/TXFrequency), Duplex, and identity info (Callsign/Id/Location) from
+# the [General]/[Info] sections. Scoped with an awk state machine keyed on
+# the CURRENT section header, not a bare `grep -E '^(Callsign|Id|Duplex)='`
+# -- confirmed against a real full config dump that "Callsign"/"Id" are
+# plausible/common key names other sections (DMR/D-Star/NXDN network
+# blocks, etc.) could reasonably reuse for their own unrelated purposes,
+# so anchoring by key name alone risks silently grabbing the wrong line if
+# either ever appears again further down the file. RXFrequency/TXFrequency
+# specifically also needs this scoping for the same reason as before:
+# CallsignFrequency (CW ID interval), AckFrequency (ack tone Hz),
+# CTCSSFrequency (FM sub-tone Hz), and a bare Frequency= key all exist
+# elsewhere in this same file and are unrelated to the radio's actual
+# RX/TX frequency.
+HOTSPOT_INFO_CHECK_CMD = (
+    "awk -F= '/^\\[/{s=$0} "
+    "s==\"[General]\" && /^(Callsign|Id|Duplex)=/ {print} "
+    "s==\"[Info]\" && /^(RXFrequency|TXFrequency|Location)=/ {print}' "
+    "/etc/mmdvmhost 2>/dev/null"
+)
+
 # --- Dashboard defaults (overridden by settings.json) ---
 DEFAULT_SETTINGS = {
     "dashboard_name": "W1ZLA Hotspot Dashboard",

@@ -427,6 +427,7 @@
             white-space: nowrap;
         }
         .card-name:hover { text-decoration: underline; }
+        .card-identity { font-size: 11px; color: var(--text-dim); margin: -6px 0 10px; }
         .card-tg {
             font-size: 13px;
             color: var(--text-muted);
@@ -2353,6 +2354,19 @@ function renderCards(data) {
             ? `<span class="card-uptime" title="Uptime: ${hs.uptime}">⏱ ${fmtUptime(hs.uptime)}</span>`
             : '';
 
+        // Hotspot's own registered callsign/DMR ID + configured location,
+        // read from /etc/mmdvmhost (WPSD-only) -- distinct from the card's
+        // own "name" (a user-set label in Settings, could be a nickname)
+        // and from active_call (whoever's currently keying up THROUGH this
+        // hotspot, not the hotspot's own identity).
+        const identityBits = [
+            (hs.hotspot_callsign && hs.hotspot_callsign !== 'N/A') ? hs.hotspot_callsign : '',
+            (hs.hotspot_location && hs.hotspot_location !== 'N/A') ? hs.hotspot_location : '',
+        ].filter(Boolean);
+        const identityLine = identityBits.length
+            ? `<div class="card-identity">${identityBits.join(' · ')}</div>`
+            : '';
+
         // Three card states:
         //   active    — is_active true
         //   lastHeard — is_active false, active_call set, last_heard within TTL
@@ -2425,6 +2439,7 @@ function renderCards(data) {
                 // exposes -- just what the openSPOT4 WebSocket actually pushes.
                 ? `<div class="stats-grid">
                      <div>Mode: <span class="stat-val">${hs.mode}</span></div>
+                     ${hs.frequency && hs.frequency !== 'N/A' ? `<div>Freq: <span class="stat-val">${hs.frequency}${hs.duplex && hs.duplex !== 'N/A' ? ' (' + hs.duplex + ')' : ''}</span></div>` : ''}
                      <div>RSSI: <span class="stat-val">${hs.rssi}</span></div>
                      <div>BER:  <span class="stat-val">${hs.ber}</span></div>
                      ${hs.bm_status_text
@@ -2432,6 +2447,7 @@ function renderCards(data) {
                    </div>`
                 : `<div class="stats-grid">
                      <div>Mode: <span class="stat-val">${hs.mode}</span></div>
+                     ${hs.frequency && hs.frequency !== 'N/A' ? `<div>Freq: <span class="stat-val">${hs.frequency}${hs.duplex && hs.duplex !== 'N/A' ? ' (' + hs.duplex + ')' : ''}</span></div>` : ''}
                      <div>RSSI: <span class="stat-val">${hs.rssi}</span></div>
                      <div>BER:  <span class="stat-val">${hs.ber}</span></div>
                      <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
@@ -2474,6 +2490,7 @@ function renderCards(data) {
             <a class="card-name" href="http://${hs.ip}" target="_blank" rel="noopener">${hs.name}${chipHtml}</a>
             <div class="card-header-right">${updateBadge}${mapPin}${uptimeBadge}</div>
           </div>
+          ${identityLine}
           <div class="card-inner">
             <div class="card-info" style="flex:1;min-width:0">
               <div style="display:flex;gap:12px;align-items:flex-start">

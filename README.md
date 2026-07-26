@@ -425,6 +425,30 @@ run against a repo it doesn't recognize as owned by the current user, and
 fails silently under this check's error suppression. This flag doesn't
 modify the hotspot's own git config; it only applies to this one command.
 
+## WPSD radio frequency / duplex / identity display
+
+A WPSD hotspot's card shows a few extra pieces of static info, all read
+from `/etc/mmdvmhost` (WPSD's own live MMDVMHost config — confirmed
+against a real install; it's not the same as upstream MMDVMHost's own
+shipped config template, which has no such fields at all):
+
+- **Frequency**, right next to Mode (e.g. "433.750 MHz (Simplex)") —
+  shown as one combined number plus Simplex/Duplex for the overwhelming
+  majority of hotspots; shown as "RX/TX MHz" only if RX and TX genuinely
+  differ.
+- **Registered callsign/DMR ID and configured location**, as a small line
+  under the card's name (e.g. "W1ZLA (3100486) · Barrington, NH") — the
+  hotspot's own identity as configured on the device, distinct from
+  whatever name you've given the card in Settings (which might be a
+  nickname) and distinct from whoever's currently keying up through it.
+
+All of this is read on the same slow background cadence as the update
+check above, not every poll — it rarely changes. Not available for ASL3
+(AllStarLink has no equivalent concept) or openSPOT 4 (no SSH access at
+all), so these lines simply don't appear on those card types; a field
+missing from your `/etc/mmdvmhost` (e.g. no `Location` set) just omits
+that piece rather than showing a placeholder.
+
 ## AllStarLink (ASL3) nodes
 
 A second node type alongside WPSD/Pi-Star, added in v3.0 — Settings →

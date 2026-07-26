@@ -1827,6 +1827,49 @@ config for per-integration credentials; put it in
   MMDVM/hotspot-tuning sources the same way, not from a plausible-looking
   guess.
 
+- **`config.HOTSPOT_INFO_CHECK_CMD` (WPSD radio frequency/duplex/identity
+  display) went through a real wrong-guess-then-correction, worth
+  recording so it isn't repeated.** A WebSearch summary claimed upstream
+  MMDVMHost stores RX/TXFrequency under an `[Info]` section in
+  `MMDVM.ini` -- fetching the actual current `g4klx/MMDVMHost` repo
+  directly (not trusting the search summary) showed the real template
+  file is named `MMDVM-Host.ini` (a 404 on the guessed `MMDVM.ini`
+  filename was the first clue something was off), and its actual section
+  list has no `[Info]` section and no frequency field anywhere -- the
+  WebSearch result was simply wrong/stale. The real answer came from
+  asking the user to SSH into an actual WPSD hotspot and grep for it
+  live: WPSD generates its own separate config at **`/etc/mmdvmhost`**
+  (no `.ini`, no hyphen -- this is WPSD's own generated file, not
+  upstream MMDVMHost's shipped template), confirmed via a full real dump
+  to have a genuine `[Info]` section after all (WPSD's own, unrelated to
+  upstream's naming) containing `RXFrequency=433750000`/
+  `TXFrequency=433750000` (Hz, matches WPSD's own admin dashboard's
+  displayed "433.750 MHz" exactly), `Location="Barrington, NH"`, and
+  more; plus a `[General]` section with `Callsign=W1ZLA`, `Id=3100486`,
+  `Duplex=0`.
+  That same real file also has `CallsignFrequency` (CW ID interval),
+  `AckFrequency` (ack tone Hz), `CTCSSFrequency` (FM sub-tone Hz), and a
+  bare `Frequency=` key -- all real, all unrelated to RX/TX radio
+  frequency, and easy to grab by mistake with a loose `grep -i
+  frequency`. Because `Callsign=`/`Id=` are also plausible, common key
+  names other sections (DMR/D-Star/NXDN network blocks, etc.) could
+  reasonably reuse for unrelated purposes, `HOTSPOT_INFO_CHECK_CMD`
+  doesn't key off field name alone -- it's an `awk` state machine scoped
+  to the CURRENT `[section]` header (`s=="[General]" && /^(Callsign|Id|
+  Duplex)=/`, `s=="[Info]" && /^(RXFrequency|TXFrequency|Location)=/`),
+  confirmed against the user's real full file to match only the 6
+  intended lines, nothing from elsewhere in the file. `Location`'s value
+  arrives double-quoted in the file (`Location="Barrington, NH"`) --
+  `monitor.py`'s parsing strips surrounding quotes (`val.strip('"')`)
+  generically, a no-op for the other, unquoted keys. **Lesson**: a
+  WebSearch/WebFetch summary of a config format is not verification --
+  fetching the actual current source (or, better, asking for a live grep/
+  dump against the real device) is what actually caught this before any
+  code shipped against the wrong assumption, twice over (first the wrong
+  file/section entirely, then the real file turning out to have
+  plausible key-name collisions a naive grep would have silently
+  mismatched).
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
