@@ -48,6 +48,16 @@ module's `configure()`/`test_connection()` just pass through whatever
 password the user supplies -- it's Settings' UI copy that's responsible
 for telling the user to use that dedicated Telnet password rather than
 their main account password, not this module.
+
+Confirmed live against a real account (2026-07-26, a POTA-sourced test
+match): `triggerComment` comes back as an EMPTY LIST (`[]`), not `null`
+or an absent key, when a match has no specific trigger reason attached
+-- NOT the plain string this module originally assumed from the
+WhiskeyTangoHotel/forum sources alone. An empty list is truthy in JS, so
+passing it straight through to the frontend rendered an empty, blank
+"trigger" pill on every alert without one. `_handle_line()` normalizes
+this server-side (joins a non-empty list, or `None`) so the frontend
+only ever sees a real string or nothing.
 """
 import json
 import socket
@@ -230,6 +240,14 @@ class HamAlertListener:
         if not isinstance(data, dict) or not data.get("callsign"):
             return
 
+        # triggerComment comes back as an EMPTY LIST (not null/absent) when
+        # a match had no specific trigger reason -- confirmed live against a
+        # real account. Normalize to a plain string or None here so the
+        # frontend never has to special-case "truthy but empty" JS arrays.
+        trigger_comment = data.get("triggerComment")
+        if isinstance(trigger_comment, list):
+            trigger_comment = ", ".join(str(x) for x in trigger_comment if x) or None
+
         alert = {
             "callsign": data.get("callsign"),
             "full_callsign": data.get("fullCallsign") or data.get("callsign"),
@@ -240,7 +258,7 @@ class HamAlertListener:
             "source": data.get("source"),
             "entity": data.get("entity"),
             "comment": data.get("comment"),
-            "trigger_comment": data.get("triggerComment"),
+            "trigger_comment": trigger_comment,
             "received_at": time.time(),
         }
         with self._lock:
