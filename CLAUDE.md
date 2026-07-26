@@ -1196,6 +1196,32 @@ config for per-integration credentials; put it in
   for state at all. **D-STAR/NXDN/P25 remain completely unverified** —
   neither their `calllog.src` shape (DMR-ID-like vs. already-a-callsign)
   nor their mode-log prefix has been tested against a real call.
+- **`calllog.dst` arrives partially MASKED BY THE DEVICE ITSELF for at
+  least some C4FM/YSF group calls** — confirmed live via a real user's
+  WebSocket capture (2026-07): `"dst":"*****FEWaf/127"`, rendered on the
+  dashboard as a garbled-looking "Linked: *****FEWaf/127". Confirmed this
+  isn't a parsing bug on this app's side two ways: (1) the SAME openSPOT4's
+  own free-text `"log"` message for the identical call already contains
+  the identical masked text (`"log":"c4fmct: data call started, dst:
+  *****FEWaf dgid: 127 src: 9Z3MG ..."`), so the masking happens before
+  the data ever reaches this app; (2) cross-checked the masked fragment
+  itself against that same device's own admin call-log page, which
+  listed caller 9Z3MG as `"9Z3MG (Radio ID: FEWaf, ...)"` — i.e. `FEWaf`
+  is the CALLER's own YSF Radio ID leaking into the `dst` field, not a
+  destination/room name fragment, so showing it verbatim is actively
+  misleading, not just cosmetically ugly. The one part of this field
+  confirmed both real and stable is the trailing `/<n>`: YSF's DG-ID
+  (Digital Group ID), spelled out explicitly in that same device log
+  line (`dgid: 127`) — every masked sample captured (DG-ID 127 → "..FEWaf",
+  DG-ID 0 → all-asterisks with nothing revealed) was consistent with this.
+  Fixed via `openspot.py`'s `_clean_dst()`: if `dst` contains both `*` and
+  `/`, show `"DG-ID <n>"` instead of the raw masked string; otherwise pass
+  it through unchanged (a no-op for DMR, whose `dst` is a plain talkgroup
+  number with neither character). If this ever needs revisiting -- e.g.
+  if SharkRF's firmware changes what gets masked, or D-STAR/NXDN/P25 turn
+  out to have their own version of this -- re-verify against a real
+  WebSocket capture cross-checked with the device's own admin UI the same
+  way, don't assume the masking pattern generalizes without checking.
 - **openSPOT4 needed a manager shape closer to `camera_stream.py`'s
   `CameraStreamManager` than `aprs_inbox.py`'s `AprsInbox`, even though
   a persistent WebSocket connection sounds more like the latter.** The

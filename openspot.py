@@ -103,6 +103,31 @@ def _mode_for_prefix(prefix: str) -> str:
     return prefix[:-2].upper() if prefix.endswith("ct") else prefix.upper()
 
 
+def _clean_dst(dst: str) -> str:
+    """calllog's "dst" field arrives partially MASKED BY THE DEVICE ITSELF
+    for at least some C4FM/YSF group calls -- e.g. "*****FEWaf/127" --
+    confirmed live via a real WebSocket capture where the device's own
+    free-text "log" line (`"log":"c4fmct: data call started, dst:
+    *****FEWaf dgid: 127 src: 9Z3MG ..."`) contains the identical masked
+    text, so this isn't a parsing bug on this app's side, nothing more
+    can be recovered from it. Cross-checked the masked fragment itself
+    against the SAME openSPOT4's own admin call-log page, which listed
+    the CALLER (src) as "9Z3MG (Radio ID: FEWaf, ...)" -- i.e. "FEWaf" is
+    the caller's own YSF Radio ID leaking into this field, not a
+    destination/room name fragment at all, so it's actively misleading
+    to display verbatim. The trailing "/<n>" is the one part of this
+    field confirmed both real and stable: YSF's DG-ID (Digital Group ID),
+    spelled out explicitly in that same device log line ("dgid: 127").
+    DMR's dst is a plain talkgroup number with no "*"/"/" in it at all,
+    so this is a no-op for DMR -- only reshapes the confirmed-masked
+    C4FM/YSF case."""
+    if "*" in dst and "/" in dst:
+        dgid = dst.rsplit("/", 1)[-1]
+        if dgid.isdigit():
+            return f"DG-ID {dgid}"
+    return dst
+
+
 def _login(ip: str, password: str) -> str:
     """Full HTTP auth handshake -> a fresh JWT. Endpoint names/shapes
     confirmed live against this firmware (see module docstring)."""
@@ -347,7 +372,7 @@ class _OpenSpot4Worker:
         self._monitor.apply_external_update(self._ip, {
             "is_active": True,
             "active_call": src,  # DMR ID placeholder (csd resolves it) or already a real callsign
-            "talkgroup": dst,
+            "talkgroup": _clean_dst(dst),
             "tx_start": time.time(),
             "last_heard": None,
             "is_favorite": is_fav,
