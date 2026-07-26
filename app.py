@@ -449,6 +449,14 @@ def api_settings_post():
 def dashboard():
     return render_template("dashboard.html", settings=load_settings())
 
+@app.route("/beta")
+def dashboard_beta():
+    """Reskinned 'instrument panel' visual redesign, served side-by-side with
+    the classic dashboard -- same settings kwarg, same /api/* backend, zero
+    shared markup/JS (see CLAUDE.md for why this is a full duplicate rather
+    than a shared partial)."""
+    return render_template("dashboard_beta.html", settings=load_settings())
+
 @app.route("/api/favorites", methods=["GET"])
 def api_favorites_get():
     return jsonify(load_favorites())

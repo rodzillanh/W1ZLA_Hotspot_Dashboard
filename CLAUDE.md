@@ -205,6 +205,45 @@ camera_stream.py   CameraStreamManager: bridges RTSP (ffmpeg subprocess)
 templates/dashboard.html   Main UI: cards + live map (Leaflet). One big
                            inline <script> block, no build step, no
                            frontend framework
+templates/dashboard_beta.html
+                           Served at `/beta` (`app.py`'s `dashboard_beta()`,
+                           right next to `dashboard()`) -- a from-scratch
+                           visual reskin ("instrument panel" identity:
+                           graphite panels, a warm amber brand accent used
+                           ONLY for identity, a separate cyan `--live` token
+                           meaning "on-air/connected right now", monospace
+                           for every data value) evaluated side-by-side with
+                           the classic dashboard before deciding whether to
+                           promote it. Started as a literal `cp` of
+                           dashboard.html, NOT a Jinja-inherited/shared
+                           partial -- this codebase has no template
+                           inheritance anywhere (setup.html/dashboard.html/
+                           version.html are already three independent full
+                           files, not fragments of one), and introducing it
+                           just for this would be a bigger, riskier refactor
+                           than accepting the duplication. Every fetch/
+                           render JS function's DATA-HANDLING logic is
+                           reused verbatim -- same `/api/*` routes, same
+                           `_SENTINEL_DEFS` card-order system, same Leaflet
+                           map subsystem -- only CSS (rewritten in place,
+                           not layered on top) and a handful of targeted
+                           template tweaks changed (a colored top-rail +
+                           dot-prefixed status chips on hotspot cards via
+                           CSS `::before` only, no JS; real RSSI/BER S-meter
+                           bars in `renderCards()`; HF Conditions' `.hf-pill`
+                           text badges swapped for dot+label `.cond-dot` plus
+                           decorative gauge bars under the 4 stat numbers).
+                           A same-named CSS custom property was sometimes
+                           reused in the original file for two UNRELATED
+                           meanings at once (`--tx-color` meant both "transmit
+                           timer" and "fair/warning" state) -- these couldn't
+                           be fixed with a simple alias and were repointed
+                           per call site instead; see the retheme's own
+                           reasoning in the file's `:root` comment before
+                           touching either dashboard template's color tokens.
+                           Zero backend changes -- `dashboard_beta()` passes
+                           the exact same `settings=load_settings()` kwarg
+                           `dashboard()` does.
 templates/setup.html       Settings UI: General / Weather / Integrations /
                            Hotspots / Cameras / Favorites tabs
 templates/version.html     Changelog + feature list + module hash/version
@@ -1707,6 +1746,60 @@ config for per-integration credentials; put it in
   available in this dev environment) -- if it ever reports a false
   positive/negative, re-check against a live account before assuming
   the heuristic is wrong, not just the credentials.
+
+- **A real, previously-unnoticed production bug: hotspot cards' "Last heard"
+  timer showed a nonsense number like "495860h" instead of an elapsed time.**
+  Found while eyeballing the beta redesign against real data (a D-STAR
+  contact's "Last heard" line) -- NOT a bug introduced by the redesign
+  itself, since `dashboard_beta.html` started as a byte-for-byte `cp` of
+  `dashboard.html` and neither `fmtAgo`/`fmtTx` was touched; confirmed the
+  identical bug was already live in production `dashboard.html` before
+  fixing either file. Root cause: **two functions named `fmtAgo` existed in
+  the same top-level script scope with incompatible signatures** --
+  `fmtAgo(ts)` (hotspot cards' "Last heard" timer, takes an absolute Unix
+  timestamp) and a second `fmtAgo(secs)` added later for PSK Reporter's map
+  tooltips (takes an already-computed elapsed-seconds duration). JS lets a
+  later `function` declaration in the same scope silently redeclare/replace
+  an earlier one with the same name -- no error, no warning -- so the PSK
+  one always won, and every hotspot card's `fmtAgo(hs.last_heard)` call ran
+  a ~1.7-billion-second Unix timestamp through `secs / 3600` math meant for
+  a duration, producing exactly this kind of huge bogus "hours" figure.
+  Fixed by renaming the PSK-specific one to `fmtAgoCompact` and updating its
+  one call site -- not by touching the hotspot-card version, which was
+  always correct. **If you ever see a `function` declared twice with the
+  same name in this file's single big `<script>` block, that's this same
+  class of bug waiting to happen again** -- there's no linter catching it,
+  so a quick `grep -n "^function <name>("` sanity check is worth doing
+  after adding any new same-named helper, the same discipline that caught
+  this one.
+
+- **`dashboard_beta.html`'s RSSI/BER S-meter bars deliberately treat the two
+  values differently -- researched, not guessed, before picking a scale for
+  either.** MMDVM's own calibration docs
+  (github.com/g4klx/MMDVM/wiki/MMDVM-Calibration) confirm RSSI-to-dBm
+  mapping comes from a per-device `RSSI.dat` calibration file generated
+  against a reference radio (MMDVMCal's "S mode") -- a real calibration
+  file checked directly (`RSSI_gm340uhf_RA4NHY.dat`) confirms this
+  explicitly varies **~10dB between individual units of the same hardware**
+  and spans a raw range of -43 to -142 dBm for just that one reference
+  radio. There is no universal MMDVM RSSI dBm-to-quality spec to be
+  rigorous against -- claiming one would be dishonest. `rssiBarPct()`'s
+  -120..-60 dBm scale is therefore explicitly illustrative (own code
+  comment says so, plus a user-facing tooltip on the bar itself), not
+  presented as calibrated fact.
+  BER has no official spec either, but DOES have consistent, sourced
+  real-world convention from actual MMDVM/hotspot tuning writeups: a
+  well-tuned hotspot runs well under 1% BER (M1GEO's Pi-Star BER tuning
+  writeup, george-smart.co.uk/2020/06/getting-the-best-bit-error-rate-ber-
+  from-your-pi-star-mmdvm, documents an optimized result of 0.0887%), a
+  repeater-builder groups.io thread on DMR BER testing treats >1% as
+  something worth investigating/adjusting RX offset for, and that same
+  M1GEO writeup's *before* baseline of 3.5% is explicitly called out as
+  "significantly higher than other users." `berColor()` uses these real
+  numbers directly (<1% good, 1-3% fair, >3% poor) rather than a generic
+  percentile split -- if this ever needs revisiting, re-derive from real
+  MMDVM/hotspot-tuning sources the same way, not from a plausible-looking
+  guess.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

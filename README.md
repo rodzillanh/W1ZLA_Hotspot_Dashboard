@@ -18,6 +18,7 @@ qrz.py          optional QRZ.com lookup for the active caller's name/city/state/
 aslstats.py     optional AllStarLink node-to-callsign lookup for ASL3 nodes
 templates/
     dashboard.html
+    dashboard_beta.html
     setup.html
 Dockerfile
 docker-compose.yml      for the Compose Manager plugin / non-Unraid Docker hosts
@@ -253,6 +254,18 @@ all (not just missing a couple of newer keys) — an existing install's
 `settings.json` already exists from before this feature shipped, so it's
 treated as "already seen," full stop, regardless of how long ago you set
 it up.
+
+## Beta dashboard (new look preview)
+
+A redesigned "instrument panel" look is available side-by-side with the
+regular dashboard at **`/beta`** — same live data, same Settings, nothing
+to configure. It's a genuinely different visual identity (graphite panel
+surfaces, a warm amber accent, a separate cyan color meaning "on-air right
+now", monospace treatment for callsigns/frequencies/timers) rather than a
+recolor. A "✨ Try new look" link on the regular dashboard's toolbar takes
+you there; "← Back to classic" goes back. Purely a preview for now — your
+regular dashboard at `/` is completely unaffected either way, and there's
+no setting that changes which one loads by default.
 
 ## Dashboard customization
 
