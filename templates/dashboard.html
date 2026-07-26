@@ -700,6 +700,11 @@
             display: inline-block; margin-top: 5px; font-size: 10.5px; color: var(--accent);
             background: var(--accent-dim); padding: 2px 7px; border-radius: 4px;
         }
+        .ha-diag {
+            font-size: 11px; color: var(--text-dim); background: rgba(231,76,60,.08);
+            border: 1px solid rgba(231,76,60,.25); border-radius: 6px; padding: 7px 9px;
+            margin-bottom: 8px; line-height: 1.4;
+        }
 
         /* --- HF Conditions card --- */
         .hf-updated { font-size: 10.5px; color: var(--text-dim); }
@@ -1654,6 +1659,7 @@
                 <div>Alerts today: <span class="stat-val" id="hamalert-count">—</span></div>
                 <div>Last: <span class="stat-val" id="hamalert-last">—</span></div>
             </div>
+            <div class="ha-diag" id="hamalert-diag" style="display:none"></div>
             <div class="msg-scroll" id="hamalert-scroll">
                 <div id="hamalert-list"></div>
             </div>
@@ -2725,6 +2731,16 @@ function renderHamAlert(data) {
     const label = document.getElementById('hamalert-conn-label');
     if (dot)   dot.classList.toggle('down', !data.connected);
     if (label) label.textContent = !data.enabled ? 'Disabled' : (data.connected ? 'Connected' : 'Connecting…');
+
+    const diag = document.getElementById('hamalert-diag');
+    if (diag) {
+        if (!data.connected && data.enabled && data.last_error) {
+            diag.textContent = '⚠ ' + data.last_error;
+            diag.style.display = 'block';
+        } else {
+            diag.style.display = 'none';
+        }
+    }
 
     const alerts = data.alerts || [];
     document.getElementById('hamalert-count').textContent = alerts.length;

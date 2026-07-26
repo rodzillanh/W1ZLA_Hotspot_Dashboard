@@ -79,6 +79,7 @@ class HamAlertListener:
         self._alerts = deque(maxlen=MAX_ALERTS)
         self._connected = False
         self._last_alert_at = None
+        self._last_error = None
 
     def configure(self, enabled: bool, username: str, password: str) -> None:
         username = (username or "").strip()
@@ -149,6 +150,7 @@ class HamAlertListener:
                 "enabled": self._enabled,
                 "connected": self._connected,
                 "last_alert_at": self._last_alert_at,
+                "last_error": self._last_error,
             }
 
     def _run(self, generation: int, username: str, password: str) -> None:
@@ -169,6 +171,7 @@ class HamAlertListener:
                         sock.close()
                         return
                     self._connected = True
+                    self._last_error = None
 
                 buf = b""
                 last_heartbeat = time.time()
@@ -182,6 +185,9 @@ class HamAlertListener:
                     except socket.timeout:
                         chunk = None
                     if chunk == b"":
+                        with self._lock:
+                            self._last_error = ("Server closed the connection -- likely a rejected "
+                                                 "login (wrong username/Telnet password)")
                         break  # server closed the connection
                     if chunk:
                         buf += chunk
@@ -191,8 +197,9 @@ class HamAlertListener:
                     if time.time() - last_heartbeat > HEARTBEAT_INTERVAL:
                         sock.sendall(b"echo hb\r\n")
                         last_heartbeat = time.time()
-            except OSError:
-                pass
+            except OSError as e:
+                with self._lock:
+                    self._last_error = str(e)
             finally:
                 with self._lock:
                     self._connected = False
