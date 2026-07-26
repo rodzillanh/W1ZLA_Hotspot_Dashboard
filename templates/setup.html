@@ -132,6 +132,14 @@
             font-size: 13px;
         }
         textarea { font-family: inherit; resize: vertical; }
+        .pw-field-wrap { position: relative; }
+        .pw-field-wrap input { padding-right: 30px; }
+        .pw-toggle-btn {
+            position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+            background: none; border: none; cursor: pointer; font-size: 14px;
+            line-height: 1; padding: 4px 5px; color: var(--text-muted);
+        }
+        .pw-toggle-btn:hover { color: var(--text); }
         input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
         .toggle-row select { width: auto; flex-shrink: 0; }
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -1139,7 +1147,10 @@
         </div>
         <div class="form-grid" style="margin-bottom:10px">
             <div><label id="hs-pass-label">SSH password</label>
-                 <input type="password" id="hs-pass" placeholder="••••••••"></div>
+                 <div class="pw-field-wrap">
+                     <input type="password" id="hs-pass" placeholder="••••••••">
+                     <button type="button" class="pw-toggle-btn" onclick="toggleHsPasswordVisibility(this)" title="Show/hide password">👁</button>
+                 </div></div>
             <div><label>Latitude
                      <span style="font-size:10px;color:var(--text-dim)">(optional — shows this node on the live map)</span>
                  </label>
@@ -1853,6 +1864,7 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, opensp
     document.getElementById('hs-openspot4-extra-pass').value = (openspot4ExtraPass && openspot4ExtraPass !== 'None') ? openspot4ExtraPass : '';
     document.getElementById('hs-enabled-toggle').classList.toggle('on', enabled !== 'False');
     onHotspotTypeChange();
+    resetHsPasswordVisibility();
     document.getElementById('hotspot-form-title').textContent = 'Edit hotspot';
     document.getElementById('hs-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
     document.getElementById('hs-name').focus();
@@ -1863,8 +1875,30 @@ function clearHotspotForm() {
     document.getElementById('hs-type').value = 'wpsd';
     document.getElementById('hs-enabled-toggle').classList.add('on');
     onHotspotTypeChange();
+    resetHsPasswordVisibility();
     document.getElementById('hotspot-form-title').textContent = 'Add hotspot';
     document.getElementById('test-result').textContent = '';
+}
+
+// Re-masks the SSH/device password field -- called whenever the form is
+// cleared or (re)populated for a different hotspot, so "show password" from
+// editing one hotspot doesn't stay revealed when you open another.
+function resetHsPasswordVisibility() {
+    const input = document.getElementById('hs-pass');
+    const btn = document.querySelector('.pw-toggle-btn');
+    if (input) input.type = 'password';
+    if (btn) btn.textContent = '👁';
+}
+
+function toggleHsPasswordVisibility(btn) {
+    const input = document.getElementById('hs-pass');
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        btn.textContent = '👁';
+    }
 }
 
 // --- node type toggle (WPSD vs ASL3 vs openSPOT4 fields) ---
