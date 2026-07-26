@@ -683,6 +683,24 @@
         .msg-ack { display: block; font-size: 10px; color: var(--accent); margin-top: 4px; }
         .msg-empty { color: var(--text-dim); font-size: 12.5px; padding: 16px 0; text-align: center; display: none; }
 
+        /* --- HamAlert card --- */
+        .ha-badge {
+            font-size: 10px; font-weight: 600; letter-spacing: .3px; padding: 1px 7px; border-radius: 9px;
+            text-transform: uppercase;
+        }
+        .ha-badge.pota     { background: rgba(0,188,212,.16); color: #00bcd4; }
+        .ha-badge.cluster,
+        .ha-badge.dxcluster { background: rgba(155,89,182,.16); color: #9b59b6; }
+        .ha-badge.rbn      { background: rgba(230,126,34,.16); color: #e67e22; }
+        .ha-badge.sota     { background: rgba(241,196,15,.16); color: #f1c40f; }
+        .ha-badge.wwff       { background: rgba(46,204,113,.16); color: #2ecc71; }
+        .ha-badge.pskreporter { background: rgba(91,192,222,.16); color: #5bc0de; }
+        .ha-freq { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .ha-trigger {
+            display: inline-block; margin-top: 5px; font-size: 10.5px; color: var(--accent);
+            background: var(--accent-dim); padding: 2px 7px; border-radius: 4px;
+        }
+
         /* --- HF Conditions card --- */
         .hf-updated { font-size: 10.5px; color: var(--text-dim); }
         .hf-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
@@ -1626,6 +1644,22 @@
             <div class="clock-controls" id="clock-controls"></div>
         </div>
         {% endif %}
+        {% if settings.get('hamalert_enabled', False) %}
+        <div class="metrics-card" id="hamalert-card"
+             style="order:{{ settings.get('hamalert_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">🔔 HamAlert <span class="conn-dot" id="hamalert-conn-dot"></span><span class="conn-label" id="hamalert-conn-label">Connecting…</span></div>
+            </div>
+            <div class="fleet-stats-grid" style="grid-template-columns:1fr 1fr">
+                <div>Alerts today: <span class="stat-val" id="hamalert-count">—</span></div>
+                <div>Last: <span class="stat-val" id="hamalert-last">—</span></div>
+            </div>
+            <div class="msg-scroll" id="hamalert-scroll">
+                <div id="hamalert-list"></div>
+            </div>
+            <div class="msg-empty" id="hamalert-empty">No alerts yet.</div>
+        </div>
+        {% endif %}
         <div id="cards" style="display:contents"></div>
         <div id="camera-cards" style="display:contents"></div>
     </div>
@@ -1880,6 +1914,9 @@ const DIGIPI_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS
 const DIGIPI_SCREEN_REFRESH_MS = 2000;  // direwatch.php's own cache-bust interval is 1000ms, dialed back slightly
 const SHOW_BIG_CLOCK = {{ 'true' if settings.get('show_big_clock', False) else 'false' }};
 const BIG_CLOCK_POSITION = {{ settings.get('big_clock_position', 0) }};
+const SHOW_HAMALERT = {{ 'true' if settings.get('hamalert_enabled', False) else 'false' }};
+const HAMALERT_POSITION = {{ settings.get('hamalert_position', 0) }};
+const HAMALERT_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS
 
 // --- theme toggle (toolbar) ---
 function toggleDashboardTheme() {
@@ -2089,6 +2126,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     fleet: '__fleet_activity__', aslfav: '__asl_favorites__', aprsinbox: '__aprs_inbox__',
     hfcond: '__hf_conditions__', bandplan: '__band_plan__', licensequiz: '__license_quiz__',
     wspractivity: '__wspr_activity__', digipi: '__digipi__', bigclock: '__big_clock__',
+    hamalert: '__hamalert__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -2217,9 +2255,12 @@ function renderCards(data) {
     if (SHOW_BIG_CLOCK) {
         sentinels.push({ key: 'bigclock', pos: Math.max(0, BIG_CLOCK_POSITION) });
     }
+    if (SHOW_HAMALERT) {
+        sentinels.push({ key: 'hamalert', pos: Math.max(0, HAMALERT_POSITION) });
+    }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, aprsinbox, hfcond, bandplan,
-    // licensequiz, wspractivity, digipi, bigclock, THEN cameras), since
+    // licensequiz, wspractivity, digipi, bigclock, hamalert, THEN cameras), since
     // computeCardOrders() below now relies on a stable sort to break ties
     // by insertion order, not by an independent alphabetical rule. Two
     // sentinels can easily tie on position (e.g. right after enabling
@@ -2253,6 +2294,8 @@ function renderCards(data) {
     if (digipiCard && 'digipi' in sentinelOrders) digipiCard.style.order = sentinelOrders.digipi;
     const bigClockCard = document.getElementById('big-clock-card');
     if (bigClockCard && 'bigclock' in sentinelOrders) bigClockCard.style.order = sentinelOrders.bigclock;
+    const hamAlertCard = document.getElementById('hamalert-card');
+    if (hamAlertCard && 'hamalert' in sentinelOrders) hamAlertCard.style.order = sentinelOrders.hamalert;
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -2669,6 +2712,50 @@ function fetchAprsInbox() {
 if (SHOW_APRS_INBOX) {
     fetchAprsInbox();
     setInterval(fetchAprsInbox, APRS_INBOX_POLL_MS);
+}
+
+// --- HamAlert card ---
+const HA_SOURCE_LABEL = {
+    dxcluster: 'Cluster', cluster: 'Cluster', rbn: 'RBN', pota: 'POTA',
+    sota: 'SOTA', wwff: 'WWFF', pskreporter: 'PSK',
+};
+
+function renderHamAlert(data) {
+    const dot   = document.getElementById('hamalert-conn-dot');
+    const label = document.getElementById('hamalert-conn-label');
+    if (dot)   dot.classList.toggle('down', !data.connected);
+    if (label) label.textContent = !data.enabled ? 'Disabled' : (data.connected ? 'Connected' : 'Connecting…');
+
+    const alerts = data.alerts || [];
+    document.getElementById('hamalert-count').textContent = alerts.length;
+    document.getElementById('hamalert-last').textContent =
+        data.last_alert_at ? fmtAgoShort(data.last_alert_at) : '—';
+
+    document.getElementById('hamalert-empty').style.display = alerts.length ? 'none' : 'block';
+    document.getElementById('hamalert-list').innerHTML = alerts.map((a, i) => `
+        <div class="msg-row ${i === 0 ? 'unread' : ''}">
+            <div class="msg-top">
+                <a class="msg-from" href="https://www.qrz.com/db/${escapeHtml(a.callsign)}" target="_blank" rel="noopener">${escapeHtml(a.full_callsign || a.callsign)}</a>
+                ${a.source ? `<span class="ha-badge ${escapeHtml(a.source)}">${HA_SOURCE_LABEL[a.source] || escapeHtml(a.source)}</span>` : ''}
+                ${a.frequency ? `<span class="ha-freq">${escapeHtml(String(a.frequency))}${a.mode ? ' ' + escapeHtml(a.mode) : ''}</span>` : ''}
+                <span class="msg-time">${fmtAgoShort(a.received_at)}</span>
+            </div>
+            <div class="msg-text">${[a.entity, a.spotter ? 'via ' + escapeHtml(a.spotter) : ''].filter(Boolean).join(' · ')}</div>
+            ${a.trigger_comment ? `<span class="ha-trigger">${escapeHtml(a.trigger_comment)}</span>` : ''}
+        </div>`).join('');
+}
+
+function fetchHamAlert() {
+    if (!SHOW_HAMALERT) return;
+    fetch('/api/hamalert')
+        .then(r => r.json())
+        .then(renderHamAlert)
+        .catch(() => {});
+}
+
+if (SHOW_HAMALERT) {
+    fetchHamAlert();
+    setInterval(fetchHamAlert, HAMALERT_POLL_MS);
 }
 
 // --- DigiPi card ---

@@ -163,6 +163,27 @@ digipi.py          DigipiMonitor: SSH-polls a DigiPi's Direwolf log
                    captured log samples, not DigiPi's own docs (which
                    don't document the log format at all).
 
+hamalert.py        HamAlertListener: persistent Telnet connection to
+                   hamalert.org:7300 (a user's own personal DXCC/
+                   callsign/band alert triggers, configured on their
+                   HamAlert account, not this app) for the optional
+                   "HamAlert" notification card. Same generation-counter
+                   reconfigure-in-place shape as aprs_inbox.py's
+                   AprsInbox/wsjtx.py's WsjtxListener, adapted for plain
+                   Telnet instead of APRS-IS/WSJT-X UDP. Login is a bare
+                   username\r\n then password\r\n (no prompt-matching),
+                   set/json\r\n switches the session to one JSON object
+                   per matched spot -- both confirmed against a real
+                   third-party integration and HamAlert's own support
+                   forum, NOT live-tested against a real account (none
+                   available in this dev environment) -- see the
+                   Hard-won gotchas section before touching the login/
+                   parsing logic if this ever stops working. Deliberately
+                   uses the Telnet destination over HamAlert's webhook
+                   alternative, since a webhook would require this
+                   dashboard to accept a public inbound connection --
+                   the one thing every other integration here avoids.
+
 host_stats.py, weather.py
                    Small standalone pollers (host CPU/mem, Open-Meteo).
                    host_stats.py also has is_pi_standalone() (checks
@@ -1622,6 +1643,45 @@ config for per-integration credentials; put it in
   `/api/settings` calls is protected by this same fix automatically** --
   the bug was in the shared save path, not anything specific to card
   ordering.
+
+- **HamAlert notification card (v3.50, `hamalert.py`) was built entirely
+  from real third-party sources, not HamAlert's own docs -- HamAlert
+  publishes none for its Telnet interface.** Its own maintainer confirmed
+  on the support forum (forum.hamalert.org/t/documentation-for-telnet-
+  interface/682) that the only supported commands are `sh/dx N` and
+  `set/json`, plus one undocumented `echo foo` (echoes `foo` back --
+  used here as a keepalive, since there's no other heartbeat). The login
+  handshake (send `username\r\n` then `password\r\n`, no prompt-waiting
+  or matching needed) was confirmed against a real, working third-party
+  integration (WhiskeyTangoHotel's Pimoroni Galactic Unicorn project,
+  whiskeytangohotel.com/2023/05/hamalertorg-integration-with-pimoroni.html)
+  rather than guessed from classic packet-cluster login conventions.
+  `set/json` switches the session to one JSON object per matched spot;
+  confirmed field shape (`callsign`, `fullCallsign`, `band`, `mode`,
+  `frequency`, `spotter`, `source` -- one of dxcluster/rbn/pota/sota/
+  wwff/pskreporter -- `dxcc`, `entity`, `comment`, `triggerComment`) from
+  that same source plus HamAlert forum discussion. **This module was NOT
+  live-tested against a real HamAlert account** (none available in this
+  dev environment) -- if it ever fails to connect or silently stops
+  showing alerts, re-verify the login sequence and JSON shape against a
+  live account/packet capture before assuming the parser is still
+  correct, same discipline as openspot.py/digipi.py/wsjtx.py.
+- **HamAlert's Telnet destination was chosen over its URL GET/POST
+  webhook alternative specifically because the webhook would require
+  this dashboard to accept a public inbound connection** -- the first
+  such requirement anywhere in this app; every other integration either
+  polls outward (QRZ, RadioID, Brandmeister, PSK Reporter, POTA) or
+  listens only on the local network (WSJT-X UDP, openSPOT4's WebSocket
+  is initiated outbound by this app too). Telnet keeps that invariant
+  intact: `HamAlertListener._run()` opens the connection outbound to
+  `hamalert.org:7300`, same shape as `aprs_inbox.py`'s APRS-IS
+  connection.
+- **An openSPOT4-style admin-password-per-profile gotcha does NOT apply
+  here** -- HamAlert credentials are one fixed username/password per
+  HamAlert account, not per physical device/profile, so
+  `hamalert.py` has no equivalent of `openspot.py`'s
+  `_collect_passwords()`/multi-password-textarea pattern. Don't add one
+  without a real reported case of it being needed.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

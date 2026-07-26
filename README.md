@@ -274,12 +274,12 @@ and **Version info**.
 - **Card order** — drag hotspot cards into whatever order you want them
   to appear on the dashboard (Cards tab). If the Fleet activity, ASL
   Favorites & Control, APRS Messages, HF Conditions, Band Plan, License
-  Quiz, or Band Activity card is enabled, it appears in the same drag
-  list and can be moved to any position among the hotspot cards, not
-  just first. Every enabled camera card (Settings → Cameras) gets its
-  own row in the same list too, one per camera. Adding/editing/deleting
-  a hotspot itself is a separate list on the Hotspots tab — Card order
-  is just for arranging what's already there.
+  Quiz, Band Activity, Big Ass Clock, or HamAlert card is enabled, it
+  appears in the same drag list and can be moved to any position among
+  the hotspot cards, not just first. Every enabled camera card (Settings
+  → Cameras) gets its own row in the same list too, one per camera.
+  Adding/editing/deleting a hotspot itself is a separate list on the
+  Hotspots tab — Card order is just for arranging what's already there.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.
@@ -816,6 +816,23 @@ Favorites/Camera cards — position it anywhere in the same drag-and-drop
 - This is a separate, independent on/off toggle from APRS favorite
   alerts — you can run either one alone, or both, sharing the one
   callsign setting.
+
+## HamAlert card
+
+Optional dashboard card (Settings → Cards → "Show HamAlert card", off by
+default) — shows your own personal
+[HamAlert](https://hamalert.org) alert matches (DXCC needed, specific
+callsigns, band/mode triggers, etc.) live as they happen. HamAlert is a
+separate free service you configure yourself — set up your alert
+"triggers" on hamalert.org first, then enter your HamAlert login
+(Settings → Integrations → HamAlert). This dashboard connects outbound
+to HamAlert's Telnet-based streaming interface (no inbound port needed
+on your end) and shows each matching spot as it arrives: callsign
+(linked to QRZ), source (DX cluster / Reverse Beacon Network / POTA /
+SOTA / WWFF / PSK Reporter), frequency/mode, DXCC entity, and — when
+present — the specific trigger comment that matched (e.g. "New DXCC
+needed"). Position it anywhere in the same drag-and-drop **Card order**
+list (Settings → Hotspots), same as Fleet Activity/APRS Messages/etc.
 
 ## HF Conditions card
 

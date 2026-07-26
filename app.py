@@ -43,6 +43,7 @@ from adif import parse_adif
 from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
 from wsjtx import WsjtxListener
+from hamalert import HamAlertListener
 
 import host_stats as host_stats_mod
 
@@ -63,6 +64,7 @@ digipi_monitor  = DigipiMonitor()
 openspot_manager = OpenSpot4Manager(monitor)
 openspot_manager.reconcile(load_hotspots())  # eager start at boot, mirrors mqtt_pub's startup rebuild
 wsjtx_listener  = WsjtxListener(monitor)
+hamalert_listener = HamAlertListener()
 
 # Gates the Settings "Host power control" buttons -- only true on a
 # standalone install running directly on real Raspberry Pi hardware (see
@@ -166,6 +168,20 @@ def _rebuild_wsjtx() -> None:
     )
 
 _rebuild_wsjtx()
+
+def _rebuild_hamalert() -> None:
+    """configure() itself is a no-op unless enabled/username/password
+    actually changed, so this is cheap to call on every settings save
+    regardless of which fields changed -- same pattern as
+    _rebuild_aprs_inbox/_rebuild_wsjtx above."""
+    settings = load_settings()
+    hamalert_listener.configure(
+        settings.get("hamalert_enabled", False),
+        settings.get("hamalert_username", ""),
+        settings.get("hamalert_password", ""),
+    )
+
+_rebuild_hamalert()
 
 import radioid as radioid_mod
 import aprs as aprs_mod
@@ -390,6 +406,17 @@ def api_settings_post():
         raw = data["card_order_tiebreak"]
         if isinstance(raw, list):
             settings["card_order_tiebreak"] = [str(x) for x in raw]
+    if "hamalert_enabled" in data:
+        settings["hamalert_enabled"] = bool(data["hamalert_enabled"])
+    if "hamalert_username" in data:
+        settings["hamalert_username"] = data["hamalert_username"].strip()
+    if "hamalert_password" in data:
+        settings["hamalert_password"] = data["hamalert_password"]
+    if "hamalert_position" in data:
+        try:
+            settings["hamalert_position"] = max(0, int(data["hamalert_position"]))
+        except (TypeError, ValueError):
+            pass
     save_settings(settings)
     _settings_txn.__exit__(None, None, None)
     # Rebuilds below intentionally happen AFTER releasing the lock -- they
@@ -411,6 +438,8 @@ def api_settings_post():
         _rebuild_aprs_inbox()
     if any(k in data for k in ("wsjtx_enabled", "wsjtx_port")):
         _rebuild_wsjtx()
+    if any(k in data for k in ("hamalert_enabled", "hamalert_username", "hamalert_password")):
+        _rebuild_hamalert()
     return jsonify({"ok": True})
 
 
@@ -467,6 +496,7 @@ _SENTINEL_DEFS = [
     ("__wspr_activity__", "show_wspr_activity", "wspr_activity_position", "📶", "Band Activity", "WSPR activity card"),
     ("__digipi__", "digipi_enabled", "digipi_position", "📡", "DigiPi", "APRS/Direwolf card"),
     ("__big_clock__", "show_big_clock", "big_clock_position", "🕐", "Big Ass Clock", "clock card"),
+    ("__hamalert__", "hamalert_enabled", "hamalert_position", "🔔", "HamAlert", "notification card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -1051,6 +1081,15 @@ def api_aprs_inbox():
     return jsonify(status)
 
 
+@app.route("/api/hamalert")
+def api_hamalert():
+    """Recent HamAlert trigger matches, plus the listener connection's
+    live status -- see hamalert.py."""
+    status = hamalert_listener.status()
+    status["alerts"] = hamalert_listener.recent()
+    return jsonify(status)
+
+
 @app.route("/api/digipi")
 def api_digipi():
     """DigiPi connection status + recent parsed Direwolf/APRS activity --
@@ -1409,6 +1448,7 @@ def api_import_backup():
         _rebuild_aprs_messenger()
         _rebuild_aprs_inbox()
         _rebuild_wsjtx()
+        _rebuild_hamalert()
 
     return jsonify({"ok": True, "result": result})
 
