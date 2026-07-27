@@ -305,11 +305,12 @@ and **Version info**.
   Settings link itself always stays visible either way.
 - **Card order** — drag hotspot cards into whatever order you want them
   to appear on the dashboard (Cards tab). If the Fleet activity, ASL
-  Favorites & Control, APRS Messages, HF Conditions, Band Plan, License
-  Quiz, Band Activity, Big Ass Clock, or HamAlert card is enabled, it
-  appears in the same drag list and can be moved to any position among
-  the hotspot cards, not just first. Every enabled camera card (Settings
-  → Cameras) gets its own row in the same list too, one per camera.
+  Favorites & Control, HF Conditions, Band Plan, License Quiz, Band
+  Activity, Big Ass Clock, or Notifications (APRS Messages + HamAlert)
+  card is enabled, it appears in the same drag list and can be moved to
+  any position among the hotspot cards, not just first. Every enabled
+  camera card (Settings → Cameras) gets its own row in the same list
+  too, one per camera.
   Adding/editing/deleting a hotspot itself is a separate list on the
   Hotspots tab — Card order is just for arranging what's already there.
 - **Weather** — its own tab on the Settings page: a location field
@@ -842,18 +843,25 @@ matching how simple APRS bots generally behave. It uses the caller's
 actual callsign rather than their optional friendly name/label, to read as
 a proper APRS message.
 
-## APRS Messages card
+## Notifications card
 
-Optional dashboard card (Settings → Cards → "Show APRS Messages card",
-off by default) — the receiving half of APRS favorite alerts above: a
-persistent APRS-IS connection, logged in as the same callsign already set
-for outbound alerts (Settings → Integrations), that shows real incoming
-APRS text messages addressed to you. One card, like Fleet Activity/ASL
-Favorites/Camera cards — position it anywhere in the same drag-and-drop
-**Card order** list (Settings → Hotspots).
+Optional dashboard card (Settings → Cards) that merges two independent
+message/alert sources into one scrollable, time-sorted list — appears as
+soon as *either* is enabled, and both remain separate on/off toggles
+underneath. Position it anywhere in the same drag-and-drop **Card order**
+list (Settings → Hotspots), same as Fleet Activity/ASL Favorites/Camera
+cards. When both sources are enabled, filter chips (All / APRS / HamAlert)
+let you narrow the list to one; with only one enabled, the card just shows
+that source's rows with no filter chips needed. Each row is tagged with a
+small 📨 (APRS) or 🔔 (HamAlert) icon so the source stays visible even in
+the combined "All" view.
 
-- **Live connection status** — Connected / Connecting / Reconnecting shown
-  next to the card title; a dropped connection retries automatically.
+**APRS Messages** (Settings → Cards → "Show APRS Messages card", off by
+default) — the receiving half of APRS favorite alerts above: a persistent
+APRS-IS connection, logged in as the same callsign already set for
+outbound alerts (Settings → Integrations), that shows real incoming APRS
+text messages addressed to you.
+
 - **Auto-acknowledgment** — messages that request an ack (most APRS
   clients do) get one sent back automatically, same as any real APRS
   client. Skipping this would leave the sender's app thinking the message
@@ -862,8 +870,6 @@ Favorites/Camera cards — position it anywhere in the same drag-and-drop
 - **Duplicate-safe** — APRS senders retry an unacked message a few times
   over the network; retries of a message already seen (same sender +
   message number) are recognized and not shown or re-acked twice.
-- **List stays compact** — capped and scrollable rather than growing the
-  card forever, same pattern as the ASL Favorites card's row list.
 - **Catches messages to any SSID of your callsign** — same as how apps
   like APRS.fi aggregate messages regardless of which SSID they were
   sent to (`W1ZLA`, `W1ZLA-9`, `W1ZLA-1`, etc.), not just the exact
@@ -873,25 +879,27 @@ Favorites/Camera cards — position it anywhere in the same drag-and-drop
   alerts — you can run either one alone, or both, sharing the one
   callsign setting.
 
-## HamAlert card
-
-Optional dashboard card (Settings → Cards → "Show HamAlert card", off by
-default) — shows your own personal
-[HamAlert](https://hamalert.org) alert matches (DXCC needed, specific
-callsigns, band/mode triggers, etc.) live as they happen. HamAlert is a
-separate free service you configure yourself — set up your alert
-"triggers" on hamalert.org first, then enter your HamAlert username and
-**Telnet password** (Settings → Integrations → HamAlert). The Telnet
-password is a dedicated credential HamAlert lets you set on its own
-**Destinations** page — separate from your regular website/app login,
-specifically for this kind of integration — not the password you use to
-log into hamalert.org itself. A "Test connection" button confirms the
-login before you enable the card. This dashboard connects outbound to
+**HamAlert** (Settings → Cards → "Show HamAlert card", off by default) —
+shows your own personal [HamAlert](https://hamalert.org) alert matches
+(DXCC needed, specific callsigns, band/mode triggers, etc.) live as they
+happen. HamAlert is a separate free service you configure yourself — set
+up your alert "triggers" on hamalert.org first, then enter your HamAlert
+username and **Telnet password** (Settings → Integrations → HamAlert).
+The Telnet password is a dedicated credential HamAlert lets you set on
+its own **Destinations** page — separate from your regular website/app
+login, specifically for this kind of integration — not the password you
+use to log into hamalert.org itself. A "Test connection" button confirms
+the login before you enable the card. This dashboard connects outbound to
 HamAlert's Telnet-based streaming interface (no inbound port needed on
 your end) and shows each matching spot as it arrives: callsign (linked
 to QRZ), source (DX cluster / Reverse Beacon Network / POTA / SOTA /
 WWFF / PSK Reporter), frequency/mode, DXCC entity, and — when present —
 the specific trigger comment that matched (e.g. "New DXCC needed").
+
+Both sources share one connection-status readout in the card header
+(Connected / Connecting / Reconnecting per source) and one combined,
+capped/scrollable list — same pattern as the ASL Favorites card's row
+list — rather than growing the card forever.
 Position it anywhere in the same drag-and-drop **Card order** list
 (Settings → Hotspots), same as Fleet Activity/APRS Messages/etc.
 
@@ -1281,10 +1289,10 @@ DigiPi's IP/SSH credentials in Settings → Integrations.
   add/edit/delete hotspots. This also covers the "Host power control"
   buttons (reboot/power off the dashboard's own device), the "ASL
   Favorites & Control" card's connect/disconnect buttons, camera cards'
-  live video feeds, and the APRS Messages card's inbox (real messages
-  addressed to your callsign, from the public APRS network) when those
-  features are active — a materially bigger consequence than editing a
-  config, worth weighing before exposing this dashboard beyond a
+  live video feeds, and the Notifications card's APRS inbox (real
+  messages addressed to your callsign, from the public APRS network)
+  when those features are active — a materially bigger consequence than
+  editing a config, worth weighing before exposing this dashboard beyond a
   trusted LAN.
 - Hotspot passwords are stored in plaintext in `hotspots.json` and are
   re-sent to the browser to pre-fill the Edit form (so editing a hotspot

@@ -639,14 +639,13 @@
         <div id="card-order-list">
             {% set fleet_pos = settings.get('fleet_activity_position', 0) if settings.get('show_fleet_activity', False) else -1 %}
             {% set asl_fav_pos = settings.get('asl_favorites_position', 0) if settings.get('show_asl_favorites', False) else -1 %}
-            {% set aprs_inbox_pos = settings.get('aprs_inbox_position', 0) if settings.get('aprs_inbox_enabled', False) else -1 %}
             {% set hf_cond_pos = settings.get('hf_conditions_position', 0) if settings.get('show_hf_conditions', False) else -1 %}
             {% set band_plan_pos = settings.get('band_plan_position', 0) if settings.get('show_band_plan', False) else -1 %}
             {% set license_quiz_pos = settings.get('license_quiz_position', 0) if settings.get('show_license_quiz', False) else -1 %}
             {% set wspr_activity_pos = settings.get('wspr_activity_position', 0) if settings.get('show_wspr_activity', False) else -1 %}
             {% set digipi_pos = settings.get('digipi_position', 0) if settings.get('digipi_enabled', False) else -1 %}
             {% set big_clock_pos = settings.get('big_clock_position', 0) if settings.get('show_big_clock', False) else -1 %}
-            {% set hamalert_pos = settings.get('hamalert_position', 0) if settings.get('hamalert_enabled', False) else -1 %}
+            {% set notifications_pos = settings.get('notifications_position', 0) if (settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False)) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -661,13 +660,6 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">📻 ASL Favorites</span>
                     <span class="node-meta">control card</span>
-                </div>
-                {% endif %}
-                {% if loop.index0 == aprs_inbox_pos %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__aprs_inbox__">
-                    <span class="drag-handle">⠿</span>
-                    <span class="node-name">📨 APRS Messages</span>
-                    <span class="node-meta">message inbox card</span>
                 </div>
                 {% endif %}
                 {% if loop.index0 == hf_cond_pos %}
@@ -712,11 +704,11 @@
                     <span class="node-meta">clock card</span>
                 </div>
                 {% endif %}
-                {% if loop.index0 == hamalert_pos %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__hamalert__">
+                {% if loop.index0 == notifications_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__notifications__">
                     <span class="drag-handle">⠿</span>
-                    <span class="node-name">🔔 HamAlert</span>
-                    <span class="node-meta">notification card</span>
+                    <span class="node-name">🔔 Notifications</span>
+                    <span class="node-meta">APRS + HamAlert inbox card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -1733,14 +1725,13 @@ function saveCardOrder() {
     }
     const fleetIdx     = sentinelIndex('__fleet_activity__');
     const aslFavIdx    = sentinelIndex('__asl_favorites__');
-    const aprsInboxIdx = sentinelIndex('__aprs_inbox__');
     const hfCondIdx    = sentinelIndex('__hf_conditions__');
     const bandPlanIdx    = sentinelIndex('__band_plan__');
     const licenseQuizIdx = sentinelIndex('__license_quiz__');
     const wsprActivityIdx = sentinelIndex('__wspr_activity__');
     const digipiIdx = sentinelIndex('__digipi__');
     const bigClockIdx = sentinelIndex('__big_clock__');
-    const hamalertIdx = sentinelIndex('__hamalert__');
+    const notificationsIdx = sentinelIndex('__notifications__');
     const cameraPositions = {};
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
@@ -1787,13 +1778,6 @@ function saveCardOrder() {
             body: JSON.stringify({ asl_favorites_position: aslFavIdx })
         }));
     }
-    if (aprsInboxIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ aprs_inbox_position: aprsInboxIdx })
-        }));
-    }
     if (hfCondIdx !== -1) {
         saves.push(fetch('/api/settings', {
             method: 'POST',
@@ -1836,11 +1820,11 @@ function saveCardOrder() {
             body: JSON.stringify({ big_clock_position: bigClockIdx })
         }));
     }
-    if (hamalertIdx !== -1) {
+    if (notificationsIdx !== -1) {
         saves.push(fetch('/api/settings', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ hamalert_position: hamalertIdx })
+            body: JSON.stringify({ notifications_position: notificationsIdx })
         }));
     }
     if (Object.keys(cameraPositions).length > 0) {

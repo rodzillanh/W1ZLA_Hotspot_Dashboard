@@ -1897,6 +1897,32 @@ config for per-integration credentials; put it in
   plausible key-name collisions a naive grep would have silently
   mismatched).
 
+- **The APRS Messages and HamAlert cards were merged into one
+  "Notifications" card (v3.51) at the presentation layer only -- the two
+  integrations themselves stay fully independent.** `aprs_inbox_enabled`/
+  `hamalert_enabled` are untouched (own Settings toggles, own connections,
+  own `/api/aprs_inbox`/`/api/hamalert` routes) -- only the CARD got
+  merged: one `#notifications-card` (rendered if `aprs_inbox_enabled OR
+  hamalert_enabled`), one `notifications_position` setting, one entry in
+  `app.py`'s `_SENTINEL_DEFS`. The one real backend change this required:
+  `_overflow_sentinels()`'s `enabled_key` lookup used to always be a
+  single settings key string (`settings.get(enabled_key, False)`) --
+  Notifications needed an OR across two independent keys, so
+  `_SENTINEL_DEFS` now allows `enabled_key` to be a tuple
+  (`("aprs_inbox_enabled", "hamalert_enabled")`), and
+  `_overflow_sentinels()` branches on `isinstance(enabled_key, tuple)` to
+  check `any()` across it -- every existing single-string sentinel entry
+  is unaffected. The merged card's connection header shows an independent
+  dot per enabled source (APRS/HamAlert can be up/down independently, so
+  one combined dot would hide that), and filter chips (All/APRS/HamAlert)
+  only render when BOTH sources are enabled -- with just one on, there's
+  nothing to filter and the chips would be dead UI. `aprs_inbox_position`/
+  `hamalert_position` are now unused dead settings keys, kept in
+  `config.DEFAULT_SETTINGS` only for backward compat with old
+  `settings.json` files that already have them -- don't resurrect them as
+  live position sources if this is ever touched again, `notifications_position`
+  is the only one either template's JS or `setup.html`'s drag list reads.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

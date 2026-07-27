@@ -421,6 +421,11 @@ def api_settings_post():
             settings["hamalert_position"] = max(0, int(data["hamalert_position"]))
         except (TypeError, ValueError):
             pass
+    if "notifications_position" in data:
+        try:
+            settings["notifications_position"] = max(0, int(data["notifications_position"]))
+        except (TypeError, ValueError):
+            pass
     save_settings(settings)
     _settings_txn.__exit__(None, None, None)
     # Rebuilds below intentionally happen AFTER releasing the lock -- they
@@ -510,14 +515,13 @@ def api_asl_favorites_post():
 _SENTINEL_DEFS = [
     ("__fleet_activity__", "show_fleet_activity", "fleet_activity_position", "📊", "Fleet activity", "metrics card"),
     ("__asl_favorites__", "show_asl_favorites", "asl_favorites_position", "📻", "ASL Favorites", "control card"),
-    ("__aprs_inbox__", "aprs_inbox_enabled", "aprs_inbox_position", "📨", "APRS Messages", "message inbox card"),
     ("__hf_conditions__", "show_hf_conditions", "hf_conditions_position", "☀️", "HF Conditions", "propagation card"),
     ("__band_plan__", "show_band_plan", "band_plan_position", "📻", "Band Plan", "reference card"),
     ("__license_quiz__", "show_license_quiz", "license_quiz_position", "🎓", "License Quiz", "practice card"),
     ("__wspr_activity__", "show_wspr_activity", "wspr_activity_position", "📶", "Band Activity", "WSPR activity card"),
     ("__digipi__", "digipi_enabled", "digipi_position", "📡", "DigiPi", "APRS/Direwolf card"),
     ("__big_clock__", "show_big_clock", "big_clock_position", "🕐", "Big Ass Clock", "clock card"),
-    ("__hamalert__", "hamalert_enabled", "hamalert_position", "🔔", "HamAlert", "notification card"),
+    ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -555,7 +559,14 @@ def _overflow_sentinels(settings: dict, hotspots: list, cameras: list) -> list:
     tiebreak = settings.get("card_order_tiebreak", []) or []
     items = []
     for data_ip, enabled_key, pos_key, icon, name, meta in _SENTINEL_DEFS:
-        if not settings.get(enabled_key, False):
+        # enabled_key is a tuple for a card backed by more than one
+        # independent integration (e.g. Notifications = APRS inbox OR
+        # HamAlert) -- enabled if ANY of them is, not all.
+        if isinstance(enabled_key, tuple):
+            is_enabled = any(settings.get(k, False) for k in enabled_key)
+        else:
+            is_enabled = settings.get(enabled_key, False)
+        if not is_enabled:
             continue
         pos = settings.get(pos_key, 0)
         if pos >= hotspot_count:

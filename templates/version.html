@@ -109,9 +109,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.50 "Bowie"</span>
+                <span class="release-version">v3.51 "Lennon"</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Notifications card</span> — the APRS Messages and HamAlert cards are now merged into one "Notifications" card, sorted by time with a small icon marking which source each row came from. Both integrations stay independent (Settings → Cards keeps separate "Show APRS Messages card"/"Show HamAlert card" toggles, and each keeps its own connection-status indicator) — the card just appears once either is enabled. With both enabled, filter chips (All/APRS/HamAlert) let you narrow the list to one source</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.50 "Bowie"</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>HamAlert notification card</span> — a new optional card showing your own personal <a href="https://hamalert.org" target="_blank" rel="noopener">HamAlert</a> alert matches (DXCC needed, specific callsigns, band/mode triggers, etc.) live as they happen, pulled over HamAlert's Telnet interface. Set your HamAlert username/Telnet password in Settings → Integrations (note: a dedicated Telnet password from hamalert.org's own Destinations page, not your regular website/app login), test it with the new "Test connection" button, then enable the card in Settings → Cards</li>
@@ -1021,7 +1031,7 @@
                 <li><span>AllStarLink stats.allstarlink.org</span> — free node-to-callsign resolution for ASL3 linked nodes, no API key</li>
                 <li><span>Home Assistant (MQTT)</span> — publishes each hotspot as an HA device via MQTT auto-discovery: online/active/favorite-active/update-available binary sensors, plus mode/call/talkgroup/temperature/CPU/RSSI/Brandmeister-status sensors <span style="color:var(--text-dim)">(needs an MQTT broker)</span></li>
                 <li><span>APRS favorite alerts</span> — sends yourself an APRS-IS text message (led by the caller's actual callsign, plus the linked talkgroup/reflector if one is known) when a favorite becomes active, with a per-favorite cooldown <span style="color:var(--text-dim)">(needs your amateur radio callsign)</span></li>
-                <li><span>APRS Messages card</span> — receives real incoming APRS-IS text messages addressed to you, with live connection status and automatic acknowledgment <span style="color:var(--text-dim)">(shares the same callsign setting as APRS favorite alerts)</span></li>
+                <li><span>Notifications card</span> — merges two independent sources into one time-sorted list: APRS Messages (real incoming APRS-IS text messages addressed to you, with automatic acknowledgment <span style="color:var(--text-dim)">(shares the same callsign setting as APRS favorite alerts)</span>) and HamAlert (your own personal <a href="https://hamalert.org" target="_blank" rel="noopener">HamAlert</a> alert matches — DXCC needed, specific callsigns, band/mode triggers — pulled over its Telnet interface). Each source keeps its own on/off toggle and connection-status indicator; filter chips appear once both are enabled</li>
                 <li><span>HF Conditions card</span> — solar flux/A-index/K-index/sunspots and a Good/Fair/Poor band-by-band propagation table (80m–10m, day and night) from N0NBH's free feed, no API key</li>
             </ul>
         </div>
@@ -1054,9 +1064,9 @@
             <div class="feature-group-title">Settings</div>
             <ul class="feature-list">
                 <li><span>General tab</span> — dashboard name, dark/light mode toggle, host stats, toolbar links, software update settings, and (Raspberry Pi standalone installs only) host reboot/power-off buttons</li>
-                <li><span>Cards tab</span> — on/off toggle for every optional dashboard card (fleet activity, ASL Favorites, APRS Messages, HF Conditions, Band Plan, License Quiz, Band Activity), each card's own sub-setting (fleet activity time span, station grid square for Band Activity), and the Card order drag list for arranging every card (hotspots included) on the dashboard</li>
+                <li><span>Cards tab</span> — on/off toggle for every optional dashboard card (fleet activity, ASL Favorites, APRS Messages, HamAlert, HF Conditions, Band Plan, License Quiz, Band Activity), each card's own sub-setting (fleet activity time span, station grid square for Band Activity), and the Card order drag list for arranging every card (hotspots included) on the dashboard</li>
                 <li><span>Weather tab</span> — location and °F/°C unit toggle</li>
-                <li><span>Integrations tab</span> — QRZ.com, RadioID.net, APRS.fi, Home Assistant MQTT, and APRS favorite alert credentials/toggles with connection tests</li>
+                <li><span>Integrations tab</span> — QRZ.com, RadioID.net, APRS.fi, Home Assistant MQTT, APRS favorite alert, and HamAlert credentials/toggles with connection tests</li>
                 <li>Hotspots tab — add/edit/delete hotspots with SSH connection test, optional lat/lon and Brandmeister ID per hotspot</li>
                 <li>Cameras tab — add/edit/delete RTSP or Bambu Labs A1 cameras with a connection test</li>
                 <li>Favorites tab — callsign + optional label, add/remove, browser alerts</li>

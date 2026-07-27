@@ -817,6 +817,17 @@
             margin-bottom: 8px; line-height: 1.4;
         }
 
+        /* --- Notifications card (merged APRS Messages + HamAlert) --- */
+        .notif-source { font-size: 13px; flex-shrink: 0; line-height: 1; opacity: .85; }
+        .conn-pair { display: flex; gap: 14px; font-size: 11px; }
+        .conn-item { display: flex; align-items: center; }
+        .filter-row { display: flex; gap: 6px; margin: 10px 0 2px; }
+        .filter-chip {
+            font-size: 11px; padding: 3px 10px; border-radius: 20px; cursor: pointer;
+            border: 1px solid var(--card-border); background: transparent; color: var(--text-muted);
+        }
+        .filter-chip.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
+
         /* --- HF Conditions card --- */
         .hf-updated { font-size: 10.5px; color: var(--text-dim); }
         .hf-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
@@ -1566,20 +1577,36 @@
             </div>
         </div>
         {% endif %}
-        {% if settings.get('aprs_inbox_enabled', False) %}
-        <div class="metrics-card" id="aprs-inbox-card"
-             style="order:{{ settings.get('aprs_inbox_position', 0) }}">
+        {% if settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) %}
+        <div class="metrics-card" id="notifications-card"
+             style="order:{{ settings.get('notifications_position', 0) }}">
             <div class="metrics-header">
-                <div class="card-name">📨 APRS Messages <span class="conn-dot" id="aprs-inbox-conn-dot"></span><span class="conn-label" id="aprs-inbox-conn-label">Connecting…</span></div>
+                <div class="card-name">🔔 Notifications</div>
+                <div class="conn-pair">
+                    {% if settings.get('aprs_inbox_enabled', False) %}
+                    <span class="conn-item">📨 APRS<span class="conn-dot" id="aprs-inbox-conn-dot"></span></span>
+                    {% endif %}
+                    {% if settings.get('hamalert_enabled', False) %}
+                    <span class="conn-item">🔔 HamAlert<span class="conn-dot" id="hamalert-conn-dot"></span></span>
+                    {% endif %}
+                </div>
             </div>
             <div class="fleet-stats-grid" style="grid-template-columns:1fr 1fr">
-                <div>Messages: <span class="stat-val" id="aprs-inbox-count">—</span></div>
-                <div>Last: <span class="stat-val" id="aprs-inbox-last">—</span></div>
+                <div>Total: <span class="stat-val" id="notif-count">—</span></div>
+                <div>Last: <span class="stat-val" id="notif-last">—</span></div>
             </div>
-            <div class="msg-scroll" id="aprs-inbox-scroll">
-                <div id="aprs-inbox-list"></div>
+            <div class="ha-diag" id="hamalert-diag" style="display:none"></div>
+            {% if settings.get('aprs_inbox_enabled', False) and settings.get('hamalert_enabled', False) %}
+            <div class="filter-row">
+                <span class="filter-chip active" data-filter="all" onclick="setNotifFilter('all')">All</span>
+                <span class="filter-chip" data-filter="aprs" onclick="setNotifFilter('aprs')">📨 APRS</span>
+                <span class="filter-chip" data-filter="hamalert" onclick="setNotifFilter('hamalert')">🔔 HamAlert</span>
             </div>
-            <div class="msg-empty" id="aprs-inbox-empty">No messages yet.</div>
+            {% endif %}
+            <div class="msg-scroll" id="notif-scroll">
+                <div id="notif-list"></div>
+            </div>
+            <div class="msg-empty" id="notif-empty">No notifications yet.</div>
         </div>
         {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
@@ -1783,23 +1810,6 @@
             </div>
             <div class="clock-body" id="clock-body"></div>
             <div class="clock-controls" id="clock-controls"></div>
-        </div>
-        {% endif %}
-        {% if settings.get('hamalert_enabled', False) %}
-        <div class="metrics-card" id="hamalert-card"
-             style="order:{{ settings.get('hamalert_position', 0) }}">
-            <div class="metrics-header">
-                <div class="card-name">🔔 HamAlert <span class="conn-dot" id="hamalert-conn-dot"></span><span class="conn-label" id="hamalert-conn-label">Connecting…</span></div>
-            </div>
-            <div class="fleet-stats-grid" style="grid-template-columns:1fr 1fr">
-                <div>Alerts today: <span class="stat-val" id="hamalert-count">—</span></div>
-                <div>Last: <span class="stat-val" id="hamalert-last">—</span></div>
-            </div>
-            <div class="ha-diag" id="hamalert-diag" style="display:none"></div>
-            <div class="msg-scroll" id="hamalert-scroll">
-                <div id="hamalert-list"></div>
-            </div>
-            <div class="msg-empty" id="hamalert-empty">No alerts yet.</div>
         </div>
         {% endif %}
         <div id="cards" style="display:contents"></div>
@@ -2036,7 +2046,6 @@ const ASL_FAVORITES_POSITION = {{ settings.get('asl_favorites_position', 0) }};
 const SHOW_CAMERAS = {{ 'true' if settings.get('show_cameras', False) else 'false' }};
 const CAMERA_STATUS_POLL_MS = 5000;
 const SHOW_APRS_INBOX = {{ 'true' if settings.get('aprs_inbox_enabled', False) else 'false' }};
-const APRS_INBOX_POSITION = {{ settings.get('aprs_inbox_position', 0) }};
 const APRS_INBOX_POLL_MS = 10000;
 const SHOW_HF_CONDITIONS = {{ 'true' if settings.get('show_hf_conditions', False) else 'false' }};
 const HF_CONDITIONS_POSITION = {{ settings.get('hf_conditions_position', 0) }};
@@ -2057,8 +2066,9 @@ const DIGIPI_SCREEN_REFRESH_MS = 2000;  // direwatch.php's own cache-bust interv
 const SHOW_BIG_CLOCK = {{ 'true' if settings.get('show_big_clock', False) else 'false' }};
 const BIG_CLOCK_POSITION = {{ settings.get('big_clock_position', 0) }};
 const SHOW_HAMALERT = {{ 'true' if settings.get('hamalert_enabled', False) else 'false' }};
-const HAMALERT_POSITION = {{ settings.get('hamalert_position', 0) }};
 const HAMALERT_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS
+const SHOW_NOTIFICATIONS = SHOW_APRS_INBOX || SHOW_HAMALERT;
+const NOTIFICATIONS_POSITION = {{ settings.get('notifications_position', 0) }};
 const COURTESY_TONE_ENABLED = {{ 'true' if settings.get('beta_courtesy_tone', False) else 'false' }};
 
 // --- theme toggle (toolbar) ---
@@ -2417,17 +2427,17 @@ function clearStaleNotifs(data) {
 // hotspot cards' orders so CSS `order` alone reflows the whole grid, without
 // touching the DOM nodes the sentinel cards own (their charts/timers survive
 // across polls).
-// Translates renderCards()'s short sentinel keys ('fleet', 'aprsinbox',
+// Translates renderCards()'s short sentinel keys ('fleet', 'notifications',
 // 'cam-<id>', ...) to the "__long_name__" ids setup.html's drag list /
 // CARD_ORDER_TIEBREAK actually use (data-ip attributes) -- two different
 // naming schemes for the same set of cards that happen to coexist in
 // this codebase (short keys are only ever used internally by this JS
 // file; the long "__key__" form is what's stored/dragged in Settings).
 const SENTINEL_KEY_TO_DATA_IP = {
-    fleet: '__fleet_activity__', aslfav: '__asl_favorites__', aprsinbox: '__aprs_inbox__',
+    fleet: '__fleet_activity__', aslfav: '__asl_favorites__',
     hfcond: '__hf_conditions__', bandplan: '__band_plan__', licensequiz: '__license_quiz__',
     wspractivity: '__wspr_activity__', digipi: '__digipi__', bigclock: '__big_clock__',
-    hamalert: '__hamalert__',
+    notifications: '__notifications__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -2535,9 +2545,6 @@ function renderCards(data) {
     if (SHOW_ASL_FAVORITES) {
         sentinels.push({ key: 'aslfav', pos: Math.max(0, ASL_FAVORITES_POSITION) });
     }
-    if (SHOW_APRS_INBOX) {
-        sentinels.push({ key: 'aprsinbox', pos: Math.max(0, APRS_INBOX_POSITION) });
-    }
     if (SHOW_HF_CONDITIONS) {
         sentinels.push({ key: 'hfcond', pos: Math.max(0, HF_CONDITIONS_POSITION) });
     }
@@ -2556,12 +2563,12 @@ function renderCards(data) {
     if (SHOW_BIG_CLOCK) {
         sentinels.push({ key: 'bigclock', pos: Math.max(0, BIG_CLOCK_POSITION) });
     }
-    if (SHOW_HAMALERT) {
-        sentinels.push({ key: 'hamalert', pos: Math.max(0, HAMALERT_POSITION) });
+    if (SHOW_NOTIFICATIONS) {
+        sentinels.push({ key: 'notifications', pos: Math.max(0, NOTIFICATIONS_POSITION) });
     }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
-    // template order exactly (fleet, aslfav, aprsinbox, hfcond, bandplan,
-    // licensequiz, wspractivity, digipi, bigclock, hamalert, THEN cameras), since
+    // template order exactly (fleet, aslfav, hfcond, bandplan,
+    // licensequiz, wspractivity, digipi, bigclock, notifications, THEN cameras), since
     // computeCardOrders() below now relies on a stable sort to break ties
     // by insertion order, not by an independent alphabetical rule. Two
     // sentinels can easily tie on position (e.g. right after enabling
@@ -2581,8 +2588,6 @@ function renderCards(data) {
     if (fleetCard && 'fleet' in sentinelOrders) fleetCard.style.order = sentinelOrders.fleet;
     const aslFavCard = document.getElementById('asl-favorites-card');
     if (aslFavCard && 'aslfav' in sentinelOrders) aslFavCard.style.order = sentinelOrders.aslfav;
-    const aprsInboxCard = document.getElementById('aprs-inbox-card');
-    if (aprsInboxCard && 'aprsinbox' in sentinelOrders) aprsInboxCard.style.order = sentinelOrders.aprsinbox;
     const hfCondCard = document.getElementById('hf-conditions-card');
     if (hfCondCard && 'hfcond' in sentinelOrders) hfCondCard.style.order = sentinelOrders.hfcond;
     const bandPlanCard = document.getElementById('band-plan-card');
@@ -2595,8 +2600,8 @@ function renderCards(data) {
     if (digipiCard && 'digipi' in sentinelOrders) digipiCard.style.order = sentinelOrders.digipi;
     const bigClockCard = document.getElementById('big-clock-card');
     if (bigClockCard && 'bigclock' in sentinelOrders) bigClockCard.style.order = sentinelOrders.bigclock;
-    const hamAlertCard = document.getElementById('hamalert-card');
-    if (hamAlertCard && 'hamalert' in sentinelOrders) hamAlertCard.style.order = sentinelOrders.hamalert;
+    const notificationsCard = document.getElementById('notifications-card');
+    if (notificationsCard && 'notifications' in sentinelOrders) notificationsCard.style.order = sentinelOrders.notifications;
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -3001,10 +3006,14 @@ if (SHOW_CAMERAS) {
     setInterval(fetchCameraStatus, CAMERA_STATUS_POLL_MS);
 }
 
-// --- APRS Messages card ---
+// --- Notifications card (merged APRS Messages + HamAlert) ---
 const APRS_INBOX_STATE_LABELS = {
     connecting: 'Connecting…', connected: 'Connected',
     reconnecting: 'Reconnecting…', disabled: 'Disabled',
+};
+const HA_SOURCE_LABEL = {
+    dxcluster: 'Cluster', cluster: 'Cluster', rbn: 'RBN', pota: 'POTA',
+    sota: 'SOTA', wwff: 'WWFF', pskreporter: 'PSK',
 };
 
 function fmtAgoShort(epochSeconds) {
@@ -3019,81 +3028,45 @@ function fmtAgoShort(epochSeconds) {
 
 // Message text and sender come from a public radio network (untrusted
 // input) and get inserted via innerHTML below -- escape both rather than
-// trusting APRS traffic to be well-formed.
+// trusting APRS/HamAlert traffic to be well-formed.
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text == null ? '' : String(text);
     return div.innerHTML;
 }
 
-function renderAprsInbox(data) {
-    const dot   = document.getElementById('aprs-inbox-conn-dot');
-    const label = document.getElementById('aprs-inbox-conn-label');
-    if (dot)   dot.classList.toggle('down', data.state !== 'connected');
-    if (label) label.textContent = APRS_INBOX_STATE_LABELS[data.state] || data.state;
+let notifAprsData = null;
+let notifHamAlertData = null;
+let notifFilter = 'all';
 
-    const messages = data.messages || [];
-    document.getElementById('aprs-inbox-count').textContent = data.message_count ?? messages.length;
-    document.getElementById('aprs-inbox-last').textContent =
-        messages.length ? fmtAgoShort(messages[0].received_at) : '—';
+function setNotifFilter(filter) {
+    notifFilter = filter;
+    document.querySelectorAll('#notifications-card .filter-chip').forEach(el => {
+        el.classList.toggle('active', el.dataset.filter === filter);
+    });
+    renderNotifications();
+}
 
-    document.getElementById('aprs-inbox-empty').style.display = messages.length ? 'none' : 'block';
-    document.getElementById('aprs-inbox-list').innerHTML = messages.map((m, i) => `
-        <div class="msg-row ${i === 0 ? 'unread' : ''}">
+function renderNotifRow(item, unread) {
+    if (item.source === 'aprs') {
+        const m = item.data;
+        return `
+        <div class="msg-row ${unread ? 'unread' : ''}">
             <div class="msg-top">
+                <span class="notif-source" title="APRS message">📨</span>
                 <a class="msg-from" href="https://www.qrz.com/db/${escapeHtml(m.from)}" target="_blank" rel="noopener">${escapeHtml(m.from)}</a>
                 ${m.to ? `<span class="msg-to">→ ${escapeHtml(m.to)}</span>` : ''}
                 <span class="msg-time">${fmtAgoShort(m.received_at)}</span>
             </div>
             <div class="msg-text">${escapeHtml(m.message_text)}</div>
             ${m.acked ? '<span class="msg-ack">✓ ack sent</span>' : ''}
-        </div>`).join('');
-}
-
-function fetchAprsInbox() {
-    if (!SHOW_APRS_INBOX) return;
-    fetch('/api/aprs_inbox')
-        .then(r => r.json())
-        .then(renderAprsInbox)
-        .catch(() => {});
-}
-
-if (SHOW_APRS_INBOX) {
-    fetchAprsInbox();
-    setInterval(fetchAprsInbox, APRS_INBOX_POLL_MS);
-}
-
-// --- HamAlert card ---
-const HA_SOURCE_LABEL = {
-    dxcluster: 'Cluster', cluster: 'Cluster', rbn: 'RBN', pota: 'POTA',
-    sota: 'SOTA', wwff: 'WWFF', pskreporter: 'PSK',
-};
-
-function renderHamAlert(data) {
-    const dot   = document.getElementById('hamalert-conn-dot');
-    const label = document.getElementById('hamalert-conn-label');
-    if (dot)   dot.classList.toggle('down', !data.connected);
-    if (label) label.textContent = !data.enabled ? 'Disabled' : (data.connected ? 'Connected' : 'Connecting…');
-
-    const diag = document.getElementById('hamalert-diag');
-    if (diag) {
-        if (!data.connected && data.enabled && data.last_error) {
-            diag.textContent = '⚠ ' + data.last_error;
-            diag.style.display = 'block';
-        } else {
-            diag.style.display = 'none';
-        }
+        </div>`;
     }
-
-    const alerts = data.alerts || [];
-    document.getElementById('hamalert-count').textContent = alerts.length;
-    document.getElementById('hamalert-last').textContent =
-        data.last_alert_at ? fmtAgoShort(data.last_alert_at) : '—';
-
-    document.getElementById('hamalert-empty').style.display = alerts.length ? 'none' : 'block';
-    document.getElementById('hamalert-list').innerHTML = alerts.map((a, i) => `
-        <div class="msg-row ${i === 0 ? 'unread' : ''}">
+    const a = item.data;
+    return `
+        <div class="msg-row ${unread ? 'unread' : ''}">
             <div class="msg-top">
+                <span class="notif-source" title="HamAlert">🔔</span>
                 <a class="msg-from" href="https://www.qrz.com/db/${escapeHtml(a.callsign)}" target="_blank" rel="noopener">${escapeHtml(a.full_callsign || a.callsign)}</a>
                 ${a.source ? `<span class="ha-badge ${escapeHtml(a.source)}">${HA_SOURCE_LABEL[a.source] || escapeHtml(a.source)}</span>` : ''}
                 ${a.frequency ? `<span class="ha-freq">${escapeHtml(String(a.frequency))}${a.mode ? ' ' + escapeHtml(a.mode) : ''}</span>` : ''}
@@ -3101,20 +3074,80 @@ function renderHamAlert(data) {
             </div>
             <div class="msg-text">${[a.entity, a.spotter ? 'via ' + escapeHtml(a.spotter) : ''].filter(Boolean).join(' · ')}</div>
             ${a.trigger_comment ? `<span class="ha-trigger">${escapeHtml(a.trigger_comment)}</span>` : ''}
-        </div>`).join('');
+        </div>`;
 }
 
-function fetchHamAlert() {
-    if (!SHOW_HAMALERT) return;
-    fetch('/api/hamalert')
+function renderNotifications() {
+    const items = [];
+    if (notifAprsData) {
+        (notifAprsData.messages || []).forEach(m => items.push({ source: 'aprs', received_at: m.received_at, data: m }));
+    }
+    if (notifHamAlertData) {
+        (notifHamAlertData.alerts || []).forEach(a => items.push({ source: 'hamalert', received_at: a.received_at, data: a }));
+    }
+    items.sort((a, b) => (b.received_at || 0) - (a.received_at || 0));
+
+    const countEl = document.getElementById('notif-count');
+    const lastEl  = document.getElementById('notif-last');
+    if (countEl) countEl.textContent = items.length;
+    if (lastEl)  lastEl.textContent = items.length ? fmtAgoShort(items[0].received_at) : '—';
+
+    const filtered = notifFilter === 'all' ? items : items.filter(i => i.source === notifFilter);
+
+    const emptyEl = document.getElementById('notif-empty');
+    if (emptyEl) emptyEl.style.display = filtered.length ? 'none' : 'block';
+    const listEl = document.getElementById('notif-list');
+    if (listEl) listEl.innerHTML = filtered.map((item, i) => renderNotifRow(item, i === 0)).join('');
+}
+
+function fetchNotifAprs() {
+    if (!SHOW_APRS_INBOX) return;
+    fetch('/api/aprs_inbox')
         .then(r => r.json())
-        .then(renderHamAlert)
+        .then(data => {
+            notifAprsData = data;
+            const dot = document.getElementById('aprs-inbox-conn-dot');
+            if (dot) {
+                dot.classList.toggle('down', data.state !== 'connected');
+                dot.title = APRS_INBOX_STATE_LABELS[data.state] || data.state;
+            }
+            renderNotifications();
+        })
         .catch(() => {});
 }
 
+function fetchNotifHamAlert() {
+    if (!SHOW_HAMALERT) return;
+    fetch('/api/hamalert')
+        .then(r => r.json())
+        .then(data => {
+            notifHamAlertData = data;
+            const dot = document.getElementById('hamalert-conn-dot');
+            if (dot) {
+                dot.classList.toggle('down', !data.connected);
+                dot.title = !data.enabled ? 'Disabled' : (data.connected ? 'Connected' : 'Connecting…');
+            }
+            const diag = document.getElementById('hamalert-diag');
+            if (diag) {
+                if (!data.connected && data.enabled && data.last_error) {
+                    diag.textContent = '⚠ ' + data.last_error;
+                    diag.style.display = 'block';
+                } else {
+                    diag.style.display = 'none';
+                }
+            }
+            renderNotifications();
+        })
+        .catch(() => {});
+}
+
+if (SHOW_APRS_INBOX) {
+    fetchNotifAprs();
+    setInterval(fetchNotifAprs, APRS_INBOX_POLL_MS);
+}
 if (SHOW_HAMALERT) {
-    fetchHamAlert();
-    setInterval(fetchHamAlert, HAMALERT_POLL_MS);
+    fetchNotifHamAlert();
+    setInterval(fetchNotifHamAlert, HAMALERT_POLL_MS);
 }
 
 // --- DigiPi card ---

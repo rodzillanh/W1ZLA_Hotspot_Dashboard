@@ -10,10 +10,11 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.50"
+APP_VERSION = "3.51"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
+    "Lennon",           # v3.51 -- John Lennon (1940-1980)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -476,6 +477,12 @@ DEFAULT_SETTINGS = {
     "hamalert_username": "",
     "hamalert_password": "",
     "hamalert_position": 0,
+    # Notifications card (merged APRS Messages + HamAlert display, v3.51) --
+    # aprs_inbox_enabled/hamalert_enabled above stay independent (each still
+    # gates its own connection); this only controls where the ONE merged
+    # card sits. aprs_inbox_position/hamalert_position are now unused dead
+    # settings, kept only for backward compat with old settings.json files.
+    "notifications_position": 0,
 }
 
 # --- Fleet activity ---
