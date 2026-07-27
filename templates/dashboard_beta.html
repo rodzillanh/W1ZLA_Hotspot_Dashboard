@@ -531,7 +531,9 @@
             font-weight: 500;
             font-size: 15px;
             margin-bottom: 3px;
-            animation: pulse 1.4s infinite;
+            /* No longer pulses -- the VU meter (below, while active) already
+               reads as "something's happening right now," so a flashing
+               "ACTIVE:" label on top of that was redundant motion. */
         }
         .active-call-link {
             color: var(--live);
@@ -2238,31 +2240,32 @@ function vuMeterRow(ip) {
     return `<div class="vu-meter" id="vu-${ip}">${segs}</div>`;
 }
 
+// Anchored to each hotspot's own real RSSI reading (rssiBarPct), not fully
+// decorative -- a weak-signal call visibly tops out lower than a strong
+// one, jittered for a "live" look rather than a static bar.
+function paintVu(ip) {
+    const el = document.getElementById('vu-' + ip);
+    if (!el || !activeVu[ip]) return;
+    const rssiPct = activeVu[ip].rssiPct;
+    const base = rssiPct === null ? 0.5 : Math.max(0.15, Math.min(1, rssiPct / 100));
+    const phase = Date.now() / 260 + ip.length;  // per-ip offset so simultaneous calls don't sync up
+    const level = Math.max(0, Math.min(1, base * (0.55 + Math.abs(Math.sin(phase)) * 0.55 + Math.random() * 0.12)));
+    const segs = el.querySelectorAll('.vu-seg');
+    const lit = Math.round(level * segs.length);
+    segs.forEach((seg, i) => {
+        if (i >= lit) { seg.style.background = 'var(--panel-2)'; return; }
+        const pct = i / segs.length;
+        seg.style.background = pct > 0.85 ? 'var(--danger)' : pct > 0.65 ? 'var(--caution)' : 'var(--good)';
+    });
+}
+
 // Ticks faster than the 3s poll cycle, same "look up by id, update in
 // place" pattern as the tx-time/last-heard timer tick below -- innerHTML
 // gets fully replaced every poll, so anything animating between polls has
 // to be driven by a persistent loop querying the DOM by id, not a
 // per-render setInterval that would get torn down with the old markup.
-// Anchored to each hotspot's own real RSSI reading (rssiBarPct), not
-// fully decorative -- a weak-signal call visibly tops out lower than a
-// strong one, jittered for a "live" look rather than a static bar.
 setInterval(() => {
-    const now = Date.now();
-    Object.keys(activeVu).forEach(ip => {
-        const el = document.getElementById('vu-' + ip);
-        if (!el) return;
-        const rssiPct = activeVu[ip].rssiPct;
-        const base = rssiPct === null ? 0.5 : Math.max(0.15, Math.min(1, rssiPct / 100));
-        const phase = now / 260 + ip.length;  // per-ip offset so simultaneous calls don't sync up
-        const level = Math.max(0, Math.min(1, base * (0.55 + Math.abs(Math.sin(phase)) * 0.55 + Math.random() * 0.12)));
-        const segs = el.querySelectorAll('.vu-seg');
-        const lit = Math.round(level * segs.length);
-        segs.forEach((seg, i) => {
-            if (i >= lit) { seg.style.background = 'var(--panel-2)'; return; }
-            const pct = i / segs.length;
-            seg.style.background = pct > 0.85 ? 'var(--danger)' : pct > 0.65 ? 'var(--caution)' : 'var(--good)';
-        });
-    });
+    Object.keys(activeVu).forEach(paintVu);
 }, 110);
 
 // --- courtesy tone (beta only, off by default) ---
@@ -2810,10 +2813,16 @@ function renderCards(data) {
     if (cardsOuter) cardsOuter.classList.toggle('spotlight', activeCount > 0);
 
     // VU meter tracking -- which hotspots the fast tick loop (above) should
-    // animate, and the real RSSI reading each one anchors to.
+    // animate, and the real RSSI reading each one anchors to. Paints
+    // immediately rather than waiting for the next scheduled tick (up to
+    // 110ms away) -- the innerHTML assignment above just created brand-new,
+    // blank .vu-seg elements for every active card, and without this the
+    // browser could paint that blank frame before the tick loop ever gets
+    // to it, showing as a flicker synced to every 3s poll.
     data.forEach(hs => {
         if (hs.is_active) {
             activeVu[hs.ip] = { rssiPct: rssiBarPct(hs.rssi) };
+            paintVu(hs.ip);
         } else if (activeVu[hs.ip]) {
             delete activeVu[hs.ip];
         }
