@@ -271,6 +271,21 @@ makes `/` itself render the beta look every time, instead of needing
 `/beta` or the toolbar link. Off by default — your dashboard keeps the
 classic look until you turn this on.
 
+The beta view has a few extras beyond the reskin itself:
+
+- **Fleet status pill** in the toolbar — "X/Y online · Z active now,"
+  turning live/pulsing the instant anything's on the air, without needing
+  to scroll through cards to check.
+- **Spotlight dimming** — when any hotspot is active, the idle ones dim
+  slightly so the live one stands out.
+- **A live VU meter** on an active hotspot's card, replacing the RSSI/BER
+  line while a call is in progress — anchored to that hotspot's real
+  signal reading, not just decorative animation.
+- **An optional courtesy tone** (Settings → General → Appearance → "Play
+  a courtesy tone on new activity") — a short synthesized beep, same idea
+  as a real repeater's courtesy tone, when any hotspot's active call
+  starts. Off by default.
+
 ## Dashboard customization
 
 Everything below is configured from the **Settings** page (`/setup`) —

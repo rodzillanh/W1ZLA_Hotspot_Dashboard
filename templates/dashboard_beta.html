@@ -129,6 +129,33 @@
             padding: 14px 18px 10px;
         }
         .dashboard-title { font-size: 20px; font-weight: 500; }
+
+        /* --- fleet status pill (toolbar) --- */
+        .fleet-status {
+            display: flex; align-items: center; gap: 9px; padding: 6px 13px; border-radius: 10px;
+            background: var(--panel); border: 1px solid var(--border); font-family: var(--font-mono);
+            font-size: 12px; font-variant-numeric: tabular-nums;
+            transition: border-color .3s, background .3s; flex-shrink: 0;
+        }
+        .fleet-status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex-shrink: 0; }
+        .fleet-status.has-active { border-color: color-mix(in srgb, var(--live) 40%, var(--border)); background: var(--live-dim); }
+        .fleet-status.has-active .dot { background: var(--live); animation: pulse 1.6s ease-in-out infinite; }
+        .fleet-status b { color: var(--text); font-weight: 600; }
+        .fleet-status .sep { color: var(--border); }
+
+        /* --- spotlight: idle hotspot cards dim while ANY hotspot is
+           active, so the live one visually pops. Scoped to .hotspot-card
+           specifically -- sentinel cards (Fleet Activity, HamAlert, etc.)
+           aren't part of "who's on air" and stay at full brightness. --- */
+        .cards-grid.spotlight .hotspot-card:not(.active) {
+            opacity: .5; filter: saturate(.7); transition: opacity .35s ease, filter .35s ease;
+        }
+        .hotspot-card { transition: opacity .35s ease, filter .35s ease; }
+
+        /* --- VU meter: replaces the RSSI/BER line while a call is
+           active, thin LED-bargraph style. --- */
+        .vu-meter { grid-column: 1 / -1; display: flex; gap: 2px; height: 7px; align-items: center; }
+        .vu-seg { flex: 1; height: 100%; border-radius: 1px; background: var(--panel-2); transition: background .07s linear; }
         .clocks { text-align: right; line-height: 1.4; }
         .clock-local { font-size: 13px; }
         .clock-utc   { font-size: 11px; color: var(--text-muted); }
@@ -1384,7 +1411,13 @@
 <body>
 
 <div class="top-bar">
-    <div class="dashboard-title">{{ settings.dashboard_name }}</div>
+    <div style="display:flex;align-items:center;gap:14px;min-width:0">
+        <div class="dashboard-title">{{ settings.dashboard_name }}</div>
+        <div class="fleet-status" id="fleet-status" style="display:none">
+            <span class="dot"></span>
+            <span id="fleet-status-text">—</span>
+        </div>
+    </div>
     <div style="display:flex;align-items:center;gap:16px">
         <div id="wx-card" style="display:none;cursor:pointer;padding:4px 8px;border-radius:7px;transition:background .15s"
              onclick="openForecast()" title="Click for 7-day forecast"
@@ -2024,6 +2057,7 @@ const BIG_CLOCK_POSITION = {{ settings.get('big_clock_position', 0) }};
 const SHOW_HAMALERT = {{ 'true' if settings.get('hamalert_enabled', False) else 'false' }};
 const HAMALERT_POSITION = {{ settings.get('hamalert_position', 0) }};
 const HAMALERT_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS
+const COURTESY_TONE_ENABLED = {{ 'true' if settings.get('beta_courtesy_tone', False) else 'false' }};
 
 // --- theme toggle (toolbar) ---
 function toggleDashboardTheme() {
@@ -2193,6 +2227,83 @@ function rssiBerMeterRow(rssiStr, berStr) {
             <span class="meter-val">${berStr}</span>
           </div>`;
     return `<div class="meter-row-combined">${rssiHalf}${berHalf}</div>`;
+}
+
+// --- VU meter (replaces the RSSI/BER line while a call is active) ---
+const VU_SEGMENTS = 20;
+let activeVu = {};  // ip -> { rssiPct } for hotspots currently showing a VU meter
+
+function vuMeterRow(ip) {
+    const segs = Array.from({ length: VU_SEGMENTS }, () => '<span class="vu-seg"></span>').join('');
+    return `<div class="vu-meter" id="vu-${ip}">${segs}</div>`;
+}
+
+// Ticks faster than the 3s poll cycle, same "look up by id, update in
+// place" pattern as the tx-time/last-heard timer tick below -- innerHTML
+// gets fully replaced every poll, so anything animating between polls has
+// to be driven by a persistent loop querying the DOM by id, not a
+// per-render setInterval that would get torn down with the old markup.
+// Anchored to each hotspot's own real RSSI reading (rssiBarPct), not
+// fully decorative -- a weak-signal call visibly tops out lower than a
+// strong one, jittered for a "live" look rather than a static bar.
+setInterval(() => {
+    const now = Date.now();
+    Object.keys(activeVu).forEach(ip => {
+        const el = document.getElementById('vu-' + ip);
+        if (!el) return;
+        const rssiPct = activeVu[ip].rssiPct;
+        const base = rssiPct === null ? 0.5 : Math.max(0.15, Math.min(1, rssiPct / 100));
+        const phase = now / 260 + ip.length;  // per-ip offset so simultaneous calls don't sync up
+        const level = Math.max(0, Math.min(1, base * (0.55 + Math.abs(Math.sin(phase)) * 0.55 + Math.random() * 0.12)));
+        const segs = el.querySelectorAll('.vu-seg');
+        const lit = Math.round(level * segs.length);
+        segs.forEach((seg, i) => {
+            if (i >= lit) { seg.style.background = 'var(--panel-2)'; return; }
+            const pct = i / segs.length;
+            seg.style.background = pct > 0.85 ? 'var(--danger)' : pct > 0.65 ? 'var(--caution)' : 'var(--good)';
+        });
+    });
+}, 110);
+
+// --- courtesy tone (beta only, off by default) ---
+let toneFiredCalls = {};  // ip -> last active_call already toned for
+
+function playCourtesyTone() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = ctx.currentTime;
+        // Two quick tones, same spirit as a real repeater's courtesy beep.
+        [[880, now, 0.09], [1320, now + 0.1, 0.11]].forEach(([freq, start, dur]) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.0001, start);
+            gain.gain.exponentialRampToValueAtTime(0.15, start + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(start);
+            osc.stop(start + dur + 0.02);
+        });
+    } catch (e) {
+        // Browsers block AudioContext until the page has seen a user
+        // gesture -- silently no-op rather than throw on the first poll
+        // after load, same degrade-gracefully contract as every other
+        // best-effort feature in this app.
+    }
+}
+
+function maybeCourtesyTone(hs) {
+    if (!COURTESY_TONE_ENABLED || !hs.is_active || !hs.active_call) return;
+    if (toneFiredCalls[hs.ip] === hs.active_call) return;  // already fired for this call
+    toneFiredCalls[hs.ip] = hs.active_call;
+    playCourtesyTone();
+}
+
+function clearStaleTones(data) {
+    data.forEach(hs => {
+        if (!hs.is_active && toneFiredCalls[hs.ip]) delete toneFiredCalls[hs.ip];
+    });
 }
 
 // --- TX timer ---
@@ -2613,14 +2724,14 @@ function renderCards(data) {
                 ? `<div class="stats-grid">
                      <div>Mode: <span class="stat-val">${hs.mode}</span></div>
                      ${hs.frequency && hs.frequency !== 'N/A' ? `<div>Freq: <span class="stat-val">${hs.frequency}${hs.duplex && hs.duplex !== 'N/A' ? ' (' + hs.duplex + ')' : ''}</span></div>` : ''}
-                     ${rssiBerMeterRow(hs.rssi, hs.ber)}
+                     ${hs.is_active ? vuMeterRow(hs.ip) : rssiBerMeterRow(hs.rssi, hs.ber)}
                      ${hs.bm_status_text
                          ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
                    </div>`
                 : `<div class="stats-grid">
                      <div>Mode: <span class="stat-val">${hs.mode}</span></div>
                      ${hs.frequency && hs.frequency !== 'N/A' ? `<div>Freq: <span class="stat-val">${hs.frequency}${hs.duplex && hs.duplex !== 'N/A' ? ' (' + hs.duplex + ')' : ''}</span></div>` : ''}
-                     ${rssiBerMeterRow(hs.rssi, hs.ber)}
+                     ${hs.is_active ? vuMeterRow(hs.ip) : rssiBerMeterRow(hs.rssi, hs.ber)}
                      <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
                      <div>CPU:  <span class="stat-val">${hs.cpu}</span></div>
                      ${hs.color_code ? `<div>Color Code: <span class="stat-val">${hs.color_code}</span></div>` : ''}
@@ -2681,6 +2792,32 @@ function renderCards(data) {
           </div>
         </div>`;
     }).join('');
+
+    // Fleet status pill (toolbar) + spotlight dimming -- both derived from
+    // this same poll's data, no separate fetch needed.
+    const onlineCount = data.filter(hs => hs.status !== 'Offline').length;
+    const activeCount = data.filter(hs => hs.is_active).length;
+    const fleetStatusEl = document.getElementById('fleet-status');
+    if (fleetStatusEl) {
+        fleetStatusEl.style.display = data.length ? 'flex' : 'none';
+        fleetStatusEl.classList.toggle('has-active', activeCount > 0);
+        const textEl = document.getElementById('fleet-status-text');
+        if (textEl) {
+            textEl.innerHTML = `<b>${onlineCount}</b>/${data.length} online <span class="sep">·</span> <b>${activeCount}</b> active now`;
+        }
+    }
+    const cardsOuter = document.getElementById('cards-outer');
+    if (cardsOuter) cardsOuter.classList.toggle('spotlight', activeCount > 0);
+
+    // VU meter tracking -- which hotspots the fast tick loop (above) should
+    // animate, and the real RSSI reading each one anchors to.
+    data.forEach(hs => {
+        if (hs.is_active) {
+            activeVu[hs.ip] = { rssiPct: rssiBarPct(hs.rssi) };
+        } else if (activeVu[hs.ip]) {
+            delete activeVu[hs.ip];
+        }
+    });
 
     // Update browser-local timer state — only reset browserStart when the
     // server reports a genuinely new event (tx_start or last_heard changed).
@@ -2743,8 +2880,10 @@ function renderCards(data) {
             prevOfflineSince[ip] = null;
         }
         maybeNotify(hs);
+        maybeCourtesyTone(hs);
     });
     clearStaleNotifs(data);
+    clearStaleTones(data);
 }
 
 // --- camera cards (RTSP / Bambu Labs A1) ---

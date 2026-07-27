@@ -279,6 +279,8 @@ def api_settings_post():
         settings["show_toolbar"] = bool(data["show_toolbar"])
     if "use_beta_dashboard" in data:
         settings["use_beta_dashboard"] = bool(data["use_beta_dashboard"])
+    if "beta_courtesy_tone" in data:
+        settings["beta_courtesy_tone"] = bool(data["beta_courtesy_tone"])
     if "show_fleet_activity" in data:
         settings["show_fleet_activity"] = bool(data["show_fleet_activity"])
     if "fleet_activity_position" in data:

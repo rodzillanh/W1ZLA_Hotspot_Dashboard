@@ -243,7 +243,34 @@ templates/dashboard_beta.html
                            touching either dashboard template's color tokens.
                            Zero backend changes -- `dashboard_beta()` passes
                            the exact same `settings=load_settings()` kwarg
-                           `dashboard()` does.
+                           `dashboard()` does. `/` itself renders this
+                           template when `settings.use_beta_dashboard` is on
+                           (Settings -> General -> Appearance); `?view=beta`/
+                           `?view=classic` override that per-visit regardless
+                           of the saved setting, which is how the "Try new
+                           look"/"Back to classic" toolbar links work as a
+                           one-time peek without touching it. Beta-only
+                           extras layered on top of the reskin: a toolbar
+                           fleet-status pill (X/Y online, Z active now, live-
+                           pulsing once anything is), "spotlight" dimming of
+                           idle hotspot cards while any one is active (scoped
+                           to `.hotspot-card` specifically so it doesn't dim
+                           unrelated sentinel cards), a thin animated LED-
+                           bargraph VU meter that replaces the static RSSI/BER
+                           line on an active card (anchored to that hotspot's
+                           real `rssiBarPct`, not fully decorative -- driven
+                           by a persistent fast tick loop that looks elements
+                           up by id each tick, same pattern as the existing
+                           tx-time/last-heard timer tick, since `renderCards()`
+                           fully replaces the card markup every 3s poll and a
+                           per-render `setInterval` would get torn down with
+                           it), and an optional synthesized two-tone courtesy
+                           beep (`beta_courtesy_tone` setting, Web Audio, no
+                           audio file) on a new active call -- silently no-ops
+                           if the browser hasn't seen a user gesture yet
+                           (AudioContext autoplay restriction), same
+                           degrade-gracefully contract as every other
+                           best-effort feature in this app.
 templates/setup.html       Settings UI: General / Weather / Integrations /
                            Hotspots / Cameras / Favorites tabs
 templates/version.html     Changelog + feature list + module hash/version

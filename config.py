@@ -300,6 +300,9 @@ DEFAULT_SETTINGS = {
     # regardless of this persisted default). /beta stays available as its
     # own unconditional URL either way.
     "use_beta_dashboard": False,
+    # Beta dashboard only -- a short synthesized courtesy-tone beep (Web
+    # Audio, no audio file) when any hotspot's active call starts.
+    "beta_courtesy_tone": False,
     "links": [
         {"label": "Brandmeister", "url": "https://brandmeister.network"},
         {"label": "QRZ.com",      "url": "https://www.qrz.com"},
