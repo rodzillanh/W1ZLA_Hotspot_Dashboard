@@ -1774,7 +1774,11 @@
         <div class="metrics-card" id="digipi-card"
              style="order:{{ settings.get('digipi_position', 0) }}">
             <div class="metrics-header">
+                {% if settings.get('digipi_ip', '') %}
+                <a class="card-name" href="http://{{ settings.get('digipi_ip', '') }}" target="_blank" rel="noopener">📡 DigiPi</a>
+                {% else %}
                 <div class="card-name">📡 DigiPi</div>
+                {% endif %}
                 <span class="dp-state" id="dp-state-badge">—</span>
             </div>
             <div class="dp-top">
