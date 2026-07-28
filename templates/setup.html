@@ -403,7 +403,7 @@
                 <div class="toggle {{ 'on' if settings.get('use_beta_dashboard', False) else '' }}"
                      id="beta-dashboard-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
-            <div class="toggle-row" style="border-bottom:none">
+            <div class="toggle-row">
                 <span class="toggle-label">Play a courtesy tone on new activity (beta view only)
                     <span style="font-size:10px;color:var(--text-dim)">
                         (a short synthesized beep — same idea as a real repeater's courtesy tone — when
@@ -412,6 +412,16 @@
                 </span>
                 <div class="toggle {{ 'on' if settings.get('beta_courtesy_tone', False) else '' }}"
                      id="courtesy-tone-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row" style="border-bottom:none">
+                <span class="toggle-label">Dim inactive hotspot cards when one is active (beta view only)
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (the "spotlight" effect — cards with no active call fade back while a live one
+                        is on air; turn off to keep every card at full brightness)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('beta_spotlight_dimming', True) else '' }}"
+                     id="spotlight-dimming-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
         </div>
         <button class="btn btn-primary" onclick="saveAppearance()">Save appearance</button>
@@ -1568,6 +1578,7 @@ function saveAppearance() {
             show_toolbar:    document.getElementById('toolbar-toggle').classList.contains('on'),
             use_beta_dashboard: document.getElementById('beta-dashboard-toggle').classList.contains('on'),
             beta_courtesy_tone: document.getElementById('courtesy-tone-toggle').classList.contains('on'),
+            beta_spotlight_dimming: document.getElementById('spotlight-dimming-toggle').classList.contains('on'),
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');

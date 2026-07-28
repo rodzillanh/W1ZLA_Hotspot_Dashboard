@@ -304,6 +304,10 @@ DEFAULT_SETTINGS = {
     # Beta dashboard only -- a short synthesized courtesy-tone beep (Web
     # Audio, no audio file) when any hotspot's active call starts.
     "beta_courtesy_tone": False,
+    # Beta dashboard only -- dim/desaturate idle hotspot cards while any one
+    # is active, so the live card visually pops. On by default (existing
+    # behavior); a toggle since some users find the dimming distracting.
+    "beta_spotlight_dimming": True,
     "links": [
         {"label": "Brandmeister", "url": "https://brandmeister.network"},
         {"label": "QRZ.com",      "url": "https://www.qrz.com"},

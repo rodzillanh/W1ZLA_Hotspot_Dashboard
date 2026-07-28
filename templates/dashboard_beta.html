@@ -2074,6 +2074,7 @@ const HAMALERT_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS
 const SHOW_NOTIFICATIONS = SHOW_APRS_INBOX || SHOW_HAMALERT;
 const NOTIFICATIONS_POSITION = {{ settings.get('notifications_position', 0) }};
 const COURTESY_TONE_ENABLED = {{ 'true' if settings.get('beta_courtesy_tone', False) else 'false' }};
+const SPOTLIGHT_DIMMING_ENABLED = {{ 'true' if settings.get('beta_spotlight_dimming', True) else 'false' }};
 
 // --- theme toggle (toolbar) ---
 function toggleDashboardTheme() {
@@ -2819,7 +2820,7 @@ function renderCards(data) {
         }
     }
     const cardsOuter = document.getElementById('cards-outer');
-    if (cardsOuter) cardsOuter.classList.toggle('spotlight', activeCount > 0);
+    if (cardsOuter) cardsOuter.classList.toggle('spotlight', SPOTLIGHT_DIMMING_ENABLED && activeCount > 0);
 
     // VU meter tracking -- which hotspots the fast tick loop (above) should
     // animate, and the real RSSI reading each one anchors to. Paints
