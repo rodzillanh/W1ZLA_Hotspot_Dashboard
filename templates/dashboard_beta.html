@@ -146,8 +146,12 @@
         /* --- spotlight: idle hotspot cards dim while ANY hotspot is
            active, so the live one visually pops. Scoped to .hotspot-card
            specifically -- sentinel cards (Fleet Activity, HamAlert, etc.)
-           aren't part of "who's on air" and stay at full brightness. --- */
-        .cards-grid.spotlight .hotspot-card:not(.active) {
+           aren't part of "who's on air" and stay at full brightness.
+           :not(.favorite) is also exempted -- a currently-active favorite
+           gets cardClass 'favorite', not 'active' (renderCards() below),
+           so without this a live friend was getting dimmed right along
+           with the truly idle cards, the opposite of the intent here. --- */
+        .cards-grid.spotlight .hotspot-card:not(.active):not(.favorite) {
             opacity: .5; filter: saturate(.7); transition: opacity .35s ease, filter .35s ease;
         }
         .hotspot-card { transition: opacity .35s ease, filter .35s ease; }
