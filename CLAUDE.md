@@ -60,12 +60,17 @@ hf_conditions.py
                    way a QRZ/Brandmeister lookup client can
 
 license_quiz.py    The one module in this list that ISN'T a network
-                   client -- LicenseQuizPool loads extra_2024_2028.json
-                   (the bundled Extra/Element 4 question pool) once at
-                   startup and serves random questions from memory, no
-                   cache/TTL/fetch involved. See its docstring for the
-                   pool's source/license before ever touching the data
-                   file.
+                   client -- LicenseQuizPool loads all three bundled
+                   pools (technician_2026_2030.json, general_2023_2027
+                   .json, extra_2024_2028.json -- Technician/General/
+                   Extra, one JSON file each) once at startup and serves
+                   random questions from memory, no cache/TTL/fetch
+                   involved. `random_question(license_class)`/
+                   `count(license_class)` take which pool to draw from
+                   ("technician"/"general"/"extra", default "extra" for
+                   backward compat). See its docstring for each pool's
+                   source/license/errata-verification history before
+                   ever touching a data file.
 
 wspr_activity.py  WsprActivityClient: live WSPR beacon-spot counts from
                    wspr.live, localized to within RADIUS_METERS of
@@ -760,19 +765,73 @@ config for per-integration credentials; put it in
   2024-2028 Extra (Element 4) release, transcribed by
   https://github.com/russolsen/ham_radio_question_pool (Apache-2.0) into
   JSON/YAML/CSV. That export has 599 questions; NCVEC's own release
-  notes cite 603 for this cycle — a small, unreconciled discrepancy
-  between snapshots, called out rather than silently accepted. 27
-  questions referencing a circuit diagram figure were excluded (the
-  images aren't bundled), leaving the 572 in `extra_2024_2028.json`.
-  If this ever needs updating for the next pool cycle (2028), re-fetch
-  from one of those two sources — don't hand-edit or add questions from
-  training-data recall.
+  notes originally cited 603 for this cycle — flagged for a long time in
+  this file as a small, unreconciled discrepancy between snapshots,
+  rather than silently accepted. **Resolved** (see the "Technician and
+  General pools added" entry below): NCVEC's own 4th errata (Feb 4,
+  2026) confirms 4 questions were withdrawn after the original 603-count
+  release (E2A13, E4D05, E6D07, E9E10), leaving exactly the 599 the
+  export already reflected — both numbers were correct for different
+  points in the errata history, not a real conflict. 27 of the 599
+  reference a circuit diagram figure and are excluded (the images aren't
+  bundled), leaving the 572 in `extra_2024_2028.json`. If this ever
+  needs updating for the next pool cycle (2028), re-fetch from the
+  export AND cross-check the active-question-ID set against NCVEC's own
+  current errata PDF the same way — don't just trust the export
+  snapshot or hand-edit/add questions from training-data recall.
 - **`E0` is a real graded subelement in the current Extra pool** ("Safety"
   — RF exposure, tower/climbing safety, grounding), not a bonus/appendix
   section invented by the data export. Confirmed via a second, independent
   web source before trusting the E0 entries in the bundled data — don't
   assume subelement codes match older, more commonly-cited "E1-E9 only"
   descriptions of the Extra pool structure.
+- **Technician and General pools added (v3.52) using the same
+  export-plus-official-errata-PDF verification discipline as Extra, not
+  a repeat of trusting the export alone.** For each class, the full
+  active-question-ID set (all IDs in the export's JSON minus any marked
+  "Question Deleted" in NCVEC's own current PDF) was diffed against the
+  export -- a real, live diff, not a spot-check -- before bundling:
+  - **Technician (technician-2026-2030, effective 7/1/2026)**: the OLD
+    2022-2026 cycle is already in the export's own `outdated/` folder,
+    confirming the cycle had genuinely rolled over, not an assumption
+    from the calendar alone. 409 questions in the export; NCVEC issued a
+    Feb 19, 2026 wording revision to 4 questions (T1C01, T5A05, T7A09,
+    T0A10) -- fetched NCVEC's own revised PDF and confirmed word-for-
+    word, including correct-answer letters, that the export already has
+    the corrected text, not the original Dec 2025 wording (the export's
+    one GitHub commit postdates the revision). 12 of 409 reference an
+    unbundled figure, leaving 397.
+  - **General (general-2023-2027, effective through 6/30/2027)**: 432
+    questions at original release; NCVEC's own 6 rounds of errata
+    (most recent Feb 4, 2026) withdrew 9 (G1A04, G1C08, G1C09, G1C10,
+    G1E09, G6B09, G8C01, G9C06, G9D13) -- the full active-ID diff against
+    NCVEC's 6th-errata PDF matched the export's 423 exactly, zero missing
+    and zero extra. 5 of 423 reference an unbundled figure, leaving 418.
+  Both pools were trimmed to the same `{id, question, answers, correct}`
+  shape as `extra_2024_2028.json` (dropping the export's extra `refs`/
+  `correct_letter` fields, unused elsewhere in this app) before bundling
+  as `technician_2026_2030.json`/`general_2023_2027.json` at the repo
+  root -- same "not in `data/`" placement as Extra, for the same
+  `CONFIG_DIR` collision reason. `license_quiz.py`'s `SECTION_NAMES`
+  became a dict-of-dicts keyed by class; each class's own subelement
+  codes are globally unique (T-/G-/E-prefixed), which is what let the
+  License Quiz card's client-side `lqStats` in `localStorage` stay one
+  flat object across all three classes with zero risk of one class's
+  saved accuracy stats colliding with or overwriting another's --
+  deliberately not namespaced per-class. The card's new class `<select>`
+  (`#lq-class-select`) persists the user's last-picked class in its own
+  `localStorage` key (`lqSelectedClass`), same per-browser scoping as the
+  stats themselves, defaulting to `"extra"` so an existing install with
+  saved Extra-pool progress sees no behavior change until the user
+  actively switches. `/api/quiz_question` takes `?class=` (default
+  `extra` server-side too, via `license_quiz.DEFAULT_CLASS`) -- an
+  unrecognized value just yields `license_quiz.random_question()`
+  returning `None` (same 503 as a genuinely missing/corrupt pool file),
+  no separate validation needed. If either pool is ever revisited for
+  its next cycle, re-verify the exact same way: fetch the export, fetch
+  NCVEC's own current-errata PDF, and diff the full active-ID sets --
+  don't assume a single commit timestamp being "recent enough" is proof
+  the export is current, confirm it against the actual official text.
 - **License Quiz per-section accuracy stats live in browser
   `localStorage`, not `settings.json` or any other server-side store.**
   This app has no user accounts/login (already a documented tradeoff),

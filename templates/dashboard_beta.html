@@ -913,9 +913,12 @@
         .bp-footer a { color: var(--text-dim); }
 
         /* --- License Quiz card --- */
-        .lq-badge {
+        .lq-class-select {
             font-size: 10px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase;
-            padding: 2px 8px; border-radius: 9px; background: rgba(155,89,182,.18); color: #9b59b6;
+            padding: 2px 20px 2px 8px; border-radius: 9px; background: rgba(155,89,182,.18); color: #9b59b6;
+            border: none; cursor: pointer; appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'%3E%3Cpath fill='%239b59b6' d='M0 0l4 5 4-5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 7px center; background-size: 8px 5px;
         }
         .lq-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
         .lq-id { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; letter-spacing: .3px; }
@@ -1731,7 +1734,11 @@
              style="order:{{ settings.get('license_quiz_position', 0) }}">
             <div class="metrics-header">
                 <div class="card-name">🎓 License Quiz</div>
-                <span class="lq-badge">Extra</span>
+                <select class="lq-class-select" id="lq-class-select" onchange="lqChangeClass(this.value)">
+                    <option value="technician">Technician</option>
+                    <option value="general">General</option>
+                    <option value="extra">Extra</option>
+                </select>
             </div>
             <div class="lq-meta">
                 <span class="lq-id" id="lq-id">—</span>
@@ -1943,7 +1950,7 @@
             <div class="tour-item"><span class="tour-item-name">Fleet activity</span><span class="tour-item-desc">A chart of your fleet's call activity over time</span></div>
             <div class="tour-item"><span class="tour-item-name">HF Conditions / Band Activity</span><span class="tour-item-desc">Solar propagation data and live WSPR band activity</span></div>
             <div class="tour-item"><span class="tour-item-name">Big Ass Clock</span><span class="tour-item-desc">Digital, analog, or TIX-style clock with a second timezone</span></div>
-            <div class="tour-item"><span class="tour-item-name">License Quiz</span><span class="tour-item-desc">One random Extra-class practice question, rotating</span></div>
+            <div class="tour-item"><span class="tour-item-name">License Quiz</span><span class="tour-item-desc">One random Technician/General/Extra practice question, rotating</span></div>
         </div>
         <div class="tour-group">
             <div class="tour-group-title">Live map overlays</div>
@@ -3586,18 +3593,40 @@ if (SHOW_HF_CONDITIONS) {
 }
 
 // --- License Quiz card ---
-// Question pool lives server-side (license_quiz.py); this card only ever
-// holds one question at a time, fetched fresh rather than shipping the
-// whole ~570-question pool to the browser. Per-section accuracy stats are
+// Question pool lives server-side (license_quiz.py, three classes --
+// Technician/General/Extra); this card only ever holds one question at a
+// time, fetched fresh rather than shipping a whole ~400-600-question pool
+// to the browser. Per-section accuracy stats AND the selected class are
 // tracked client-side in localStorage -- this app has no user accounts,
-// so "your" progress can only mean "this browser's" progress.
-const LQ_SECTION_NAMES = {
-    E0: 'Safety', E1: "Commission's Rules", E2: 'Operating Procedures',
-    E3: 'Radio Wave Propagation', E4: 'Amateur Radio Practices', E5: 'Electrical Principles',
-    E6: 'Circuit Components', E7: 'Practical Circuits', E8: 'Signals & Emissions',
-    E9: 'Antennas & Transmission Lines',
+// so "your" progress (and which class you're studying) can only mean
+// "this browser's" progress. Section codes are globally unique across
+// classes (T-/G-/E-prefixed), so lqStats stays one flat object without
+// needing a class-keyed nesting -- switching classes never collides with
+// or overwrites another class's saved stats.
+const LQ_SECTION_NAMES_BY_CLASS = {
+    technician: {
+        T0: 'Safety', T1: "Commission's Rules", T2: 'Operating Procedures',
+        T3: 'Radio Wave Propagation', T4: 'Amateur Radio Practices', T5: 'Electrical Principles',
+        T6: 'Electronic & Electrical Components', T7: 'Practical Circuits', T8: 'Signals & Emissions',
+        T9: 'Antennas & Feed Lines',
+    },
+    general: {
+        G0: 'Electrical & RF Safety', G1: "Commission's Rules", G2: 'Operating Procedures',
+        G3: 'Radio Wave Propagation', G4: 'Amateur Radio Practices', G5: 'Electrical Principles',
+        G6: 'Circuit Components', G7: 'Practical Circuits', G8: 'Signals & Emissions',
+        G9: 'Antennas & Feed Lines',
+    },
+    extra: {
+        E0: 'Safety', E1: "Commission's Rules", E2: 'Operating Procedures',
+        E3: 'Radio Wave Propagation', E4: 'Amateur Radio Practices', E5: 'Electrical Principles',
+        E6: 'Circuit Components', E7: 'Practical Circuits', E8: 'Signals & Emissions',
+        E9: 'Antennas & Transmission Lines',
+    },
 };
-const LQ_SECTIONS = Object.keys(LQ_SECTION_NAMES);
+const LQ_DEFAULT_CLASS = 'extra';  // preserves pre-existing behavior for anyone with saved progress
+let lqCurrentClass = localStorage.getItem('lqSelectedClass') || LQ_DEFAULT_CLASS;
+if (!LQ_SECTION_NAMES_BY_CLASS[lqCurrentClass]) lqCurrentClass = LQ_DEFAULT_CLASS;
+let lqSectionsBuiltForClass = null;  // forces lqRenderStats() to rebuild the pip row on class change
 let lqCurrentItem = null;
 
 function lqLoadStats() {
@@ -3627,27 +3656,35 @@ function resetQuizStats() {
 function lqRenderStats() {
     const sectionsEl = document.getElementById('lq-sections');
     if (!sectionsEl) return;
-    if (sectionsEl.children.length === 0) {
-        LQ_SECTIONS.forEach(sec => {
+    const sectionNames = LQ_SECTION_NAMES_BY_CLASS[lqCurrentClass];
+    const sections = Object.keys(sectionNames);
+    // Rebuild the pip row from scratch on a class change (different
+    // section codes entirely, e.g. T0-T9 vs G0-G9) -- otherwise reuse
+    // the existing pips, same as before this card supported more than
+    // one class.
+    if (lqSectionsBuiltForClass !== lqCurrentClass) {
+        sectionsEl.innerHTML = '';
+        sections.forEach(sec => {
             const pip = document.createElement('div');
             pip.className = 'lq-section-pip';
             pip.id = 'lq-pip-' + sec;
             pip.textContent = sec;
             sectionsEl.appendChild(pip);
         });
+        lqSectionsBuiltForClass = lqCurrentClass;
     }
     let totalCorrect = 0, totalCount = 0;
-    LQ_SECTIONS.forEach(sec => {
+    sections.forEach(sec => {
         const s = lqStats[sec];
         const pip = document.getElementById('lq-pip-' + sec);
         if (!pip) return;
         if (!s || s.total === 0) {
             pip.removeAttribute('data-level');
-            pip.title = sec + ': ' + LQ_SECTION_NAMES[sec] + ' — no answers yet';
+            pip.title = sec + ': ' + sectionNames[sec] + ' — no answers yet';
         } else {
             const pct = Math.round(100 * s.correct / s.total);
             pip.dataset.level = pct >= 80 ? 'good' : pct >= 50 ? 'fair' : 'poor';
-            pip.title = sec + ': ' + LQ_SECTION_NAMES[sec] + ' — ' + s.correct + '/' + s.total + ' (' + pct + '%)';
+            pip.title = sec + ': ' + sectionNames[sec] + ' — ' + s.correct + '/' + s.total + ' (' + pct + '%)';
             totalCorrect += s.correct;
             totalCount += s.total;
         }
@@ -3656,6 +3693,14 @@ function lqRenderStats() {
     const accuracyEl = document.getElementById('lq-accuracy');
     if (answeredEl) answeredEl.textContent = totalCount;
     if (accuracyEl) accuracyEl.textContent = totalCount ? Math.round(100 * totalCorrect / totalCount) + '%' : '—';
+}
+
+function lqChangeClass(newClass) {
+    if (!LQ_SECTION_NAMES_BY_CLASS[newClass] || newClass === lqCurrentClass) return;
+    lqCurrentClass = newClass;
+    localStorage.setItem('lqSelectedClass', newClass);
+    lqRenderStats();
+    fetchQuizQuestion();
 }
 
 function lqAnswerClick(btn, item) {
@@ -3702,13 +3747,15 @@ function renderQuizQuestion(item) {
 
 function fetchQuizQuestion() {
     if (!SHOW_LICENSE_QUIZ) return;
-    fetch('/api/quiz_question')
+    fetch('/api/quiz_question?class=' + encodeURIComponent(lqCurrentClass))
         .then(r => r.json())
         .then(renderQuizQuestion)
         .catch(() => renderQuizQuestion({ error: true }));
 }
 
 if (SHOW_LICENSE_QUIZ) {
+    const lqClassSelect = document.getElementById('lq-class-select');
+    if (lqClassSelect) lqClassSelect.value = lqCurrentClass;
     lqRenderStats();
     fetchQuizQuestion();
     setInterval(fetchQuizQuestion, LICENSE_QUIZ_POLL_MS);

@@ -62,6 +62,12 @@ fi
 # without this, a commit that only touches one of these would make the
 # ${#CHANGED[@]} -eq 0 check below exit early as "nothing to do", before ever
 # reaching the copy commands that would actually update them.
+if ! diff -q "${SCRIPT_DIR}/technician_2026_2030.json" "${INSTALL_DIR}/technician_2026_2030.json" &>/dev/null; then
+    CHANGED+=("technician_2026_2030.json")
+fi
+if ! diff -q "${SCRIPT_DIR}/general_2023_2027.json" "${INSTALL_DIR}/general_2023_2027.json" &>/dev/null; then
+    CHANGED+=("general_2023_2027.json")
+fi
 if ! diff -q "${SCRIPT_DIR}/extra_2024_2028.json" "${INSTALL_DIR}/extra_2024_2028.json" &>/dev/null; then
     CHANGED+=("extra_2024_2028.json")
 fi
@@ -95,6 +101,8 @@ mkdir -p "$BACKUP_DIR"
 cp -r "${INSTALL_DIR}"/*.py          "$BACKUP_DIR/" 2>/dev/null || true
 cp -r "${INSTALL_DIR}/templates"     "$BACKUP_DIR/" 2>/dev/null || true
 cp    "${INSTALL_DIR}/requirements.txt" "$BACKUP_DIR/" 2>/dev/null || true
+cp    "${INSTALL_DIR}/technician_2026_2030.json" "$BACKUP_DIR/" 2>/dev/null || true
+cp    "${INSTALL_DIR}/general_2023_2027.json"     "$BACKUP_DIR/" 2>/dev/null || true
 cp    "${INSTALL_DIR}/extra_2024_2028.json" "$BACKUP_DIR/" 2>/dev/null || true
 cp    "${INSTALL_DIR}/README.md"            "$BACKUP_DIR/" 2>/dev/null || true
 success "Backup saved to ${BACKUP_DIR}"
@@ -104,9 +112,11 @@ info  "Your data in ${DATA_DIR} is untouched"
 header "Installing updates"
 cp "${SCRIPT_DIR}"/*.py                    "${INSTALL_DIR}/"
 cp "${SCRIPT_DIR}/requirements.txt"        "${INSTALL_DIR}/"
-# Bundled License Quiz question pool -- a plain data file, not a .py
-# module, so it needs its own explicit copy line or it's silently never
-# updated (same reasoning as install.sh's copy of it).
+# Bundled License Quiz question pools -- plain data files, not .py
+# modules, so each needs its own explicit copy line or it's silently
+# never updated (same reasoning as install.sh's copy of them).
+cp "${SCRIPT_DIR}/technician_2026_2030.json" "${INSTALL_DIR}/"
+cp "${SCRIPT_DIR}/general_2023_2027.json"    "${INSTALL_DIR}/"
 cp "${SCRIPT_DIR}/extra_2024_2028.json"    "${INSTALL_DIR}/"
 # Read at runtime by the Settings -> Version info tab's "View README"
 # popup (app.py's /readme route) -- same "needs its own explicit copy
@@ -283,6 +293,8 @@ echo -e "  If anything looks wrong, restore the backup:"
 echo -e "    ${BOLD}sudo systemctl stop ${APP_NAME}${NC}"
 echo -e "    ${BOLD}sudo cp ${BACKUP_DIR}/*.py ${INSTALL_DIR}/${NC}"
 echo -e "    ${BOLD}sudo cp -r ${BACKUP_DIR}/templates ${INSTALL_DIR}/${NC}"
+echo -e "    ${BOLD}sudo cp ${BACKUP_DIR}/technician_2026_2030.json ${INSTALL_DIR}/${NC}"
+echo -e "    ${BOLD}sudo cp ${BACKUP_DIR}/general_2023_2027.json ${INSTALL_DIR}/${NC}"
 echo -e "    ${BOLD}sudo cp ${BACKUP_DIR}/extra_2024_2028.json ${INSTALL_DIR}/${NC}"
 echo -e "    ${BOLD}sudo cp ${BACKUP_DIR}/README.md ${INSTALL_DIR}/${NC}"
 echo -e "    ${BOLD}sudo systemctl start ${APP_NAME}${NC}"

@@ -34,7 +34,7 @@ import storage_activity
 from update_check import UpdateChecker
 from camera_stream import CameraStreamManager
 from hf_conditions import HfConditionsClient
-from license_quiz import LicenseQuizPool
+from license_quiz import LicenseQuizPool, DEFAULT_CLASS as LICENSE_QUIZ_DEFAULT_CLASS
 from wspr_activity import WsprActivityClient, grid_to_latlon
 from aurora import AuroraClient
 from pota import PotaClient
@@ -877,12 +877,17 @@ def api_wsjtx_status():
 
 @app.route("/api/quiz_question")
 def api_quiz_question():
-    """One random question from the bundled Extra pool (license_quiz.py)
-    -- picked server-side rather than shipping the whole ~570-question
-    pool to the browser, matching every other card's small-payload-per-
-    poll pattern. Per-section accuracy stats are tracked client-side in
-    localStorage, not here -- this app has no user accounts."""
-    q = license_quiz.random_question()
+    """One random question from the bundled Technician/General/Extra pool
+    (license_quiz.py, ?class=technician|general|extra, default extra for
+    backward compat) -- picked server-side rather than shipping a whole
+    ~400-600-question pool to the browser, matching every other card's
+    small-payload-per-poll pattern. Per-section accuracy stats are tracked
+    client-side in localStorage, not here -- this app has no user
+    accounts. An unrecognized class value just yields an empty pool
+    (license_quiz.random_question() returns None), same 503 as a missing
+    pool file -- no separate validation needed."""
+    license_class = request.args.get("class", LICENSE_QUIZ_DEFAULT_CLASS)
+    q = license_quiz.random_question(license_class)
     if q is None:
         return jsonify({"error": "unavailable"}), 503
     return jsonify(q)

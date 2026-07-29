@@ -137,9 +137,11 @@ mkdir -p "$INSTALL_DIR"
 # Copy all Python files and templates
 cp "${SOURCE_DIR}"/*.py         "$INSTALL_DIR/"
 cp "${SOURCE_DIR}/requirements.txt" "$INSTALL_DIR/"
-# Bundled License Quiz question pool -- a plain data file, not a .py
-# module, so it needs its own explicit copy line (same reason templates/
-# needs one) or it silently never reaches INSTALL_DIR.
+# Bundled License Quiz question pools -- plain data files, not .py
+# modules, so each needs its own explicit copy line (same reason
+# templates/ needs one) or it silently never reaches INSTALL_DIR.
+cp "${SOURCE_DIR}/technician_2026_2030.json" "$INSTALL_DIR/"
+cp "${SOURCE_DIR}/general_2023_2027.json" "$INSTALL_DIR/"
 cp "${SOURCE_DIR}/extra_2024_2028.json" "$INSTALL_DIR/"
 # The Settings -> Version info tab's "View README" popup reads this at
 # runtime (app.py's /readme route) -- same "needs its own explicit copy

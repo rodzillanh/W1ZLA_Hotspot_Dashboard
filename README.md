@@ -948,27 +948,39 @@ module of its own, just data baked into the template.
 ## License Quiz card
 
 Optional dashboard card (Settings → Cards → "Show License Quiz card",
-off by default) — one random Amateur Extra (Element 4) practice question
-at a time, auto-rotating to a new one every ~10 minutes, or on demand via
-"New Question". Pool data is bundled server-side (`license_quiz.py`,
-`extra_2024_2028.json`) and never sent to the browser in bulk —
+off by default) — one random practice question at a time from any of the
+three US amateur license classes (Technician, General, Extra — picked
+via the dropdown in the card's header), auto-rotating to a new one every
+~10 minutes, or on demand via "New Question". Pool data is bundled
+server-side (`license_quiz.py`) and never sent to the browser in bulk —
 each poll fetches exactly one question.
 
-- **The current 2024-2028 pool** (572 questions, 27 diagram-based
-  questions excluded since the referenced figures aren't bundled),
-  sourced from a machine-readable export of
-  [NCVEC's official public-domain release](https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release)
-  — see `license_quiz.py`'s docstring for the exact source and license.
+- **All three current pools**, each sourced from a machine-readable
+  export of NCVEC's official public-domain release and cross-checked
+  question-for-question against NCVEC's own current (most-recent-errata)
+  PDF before bundling — see `license_quiz.py`'s docstring for the exact
+  sources, licenses, and per-pool verification notes:
+  - **Technician** ([2026-2030](https://ncvec.org/index.php/2026-2030-technician-question-pool), effective July 1, 2026): 397 questions
+    (12 diagram-based questions excluded since the referenced figures
+    aren't bundled).
+  - **General** ([2023-2027](https://ncvec.org/index.php/2023-2027-general-question-pool-release), effective through June 30, 2027): 418
+    questions (5 diagram-based excluded).
+  - **Extra** ([2024-2028](https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release), effective through June 30, 2028): 572
+    questions (27 diagram-based excluded).
 - **Click an answer to reveal** correct (green) / wrong (red); the other
   choices dim. Two-column layout keeps the card's height in line with
   the others regardless of answer length.
-- **Per-section accuracy tracker** — a 9-pip row (E0 Safety, E1-E9) that
-  colors green/yellow/red per subelement group once you've answered at
-  least one question from it, with rollup "Answered"/"Accuracy" stats
-  and a reset button. This is stored in the browser's **localStorage**,
-  not on the server — this app has no user accounts, so "your" progress
-  can only mean "this browser's" progress. Different devices viewing
-  the same dashboard get independent stats.
+- **Per-section accuracy tracker** — a 10-pip row (subelement 0 through
+  9 for whichever class is selected) that colors green/yellow/red per
+  subelement group once you've answered at least one question from it,
+  with rollup "Answered"/"Accuracy" stats and a reset button. This is
+  stored in the browser's **localStorage**, not on the server — this app
+  has no user accounts, so "your" progress (and which class you're
+  currently studying) can only mean "this browser's". Different devices
+  viewing the same dashboard get independent stats and can each study a
+  different class. Subelement codes are unique per class (T-/G-/E-
+  prefixed), so switching classes never overwrites another class's saved
+  stats.
 - Same drag-and-drop **Card order** placement as every other extra card.
 
 ## Big Ass Clock card
