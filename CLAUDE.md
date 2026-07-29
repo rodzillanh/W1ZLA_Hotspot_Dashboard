@@ -244,7 +244,11 @@ templates/dashboard.html   Main UI: cards + live map (Leaflet). One big
                            degrade-gracefully contract as every other
                            best-effort feature in this app.
 templates/setup.html       Settings UI: General / Weather / Integrations /
-                           Hotspots / Cameras / Favorites tabs
+                           Hotspots / Cameras / Favorites tabs. Shares
+                           dashboard.html's "instrument panel" color tokens
+                           (own independent file/`:root` block, not a
+                           shared partial -- see the setup.html reskin
+                           gotcha before touching either theme block)
 templates/version.html     Changelog + feature list + module hash/version
                            info (shown at /version)
 templates/readme.html      Renders README.md client-side via marked.js
@@ -1980,6 +1984,35 @@ config for per-integration credentials; put it in
   again, this same before-you-promote check (diff every function name AND
   every element id between the two files) is the right way to confirm
   nothing unique to the original would be silently lost in the swap.
+- **`setup.html`'s reskin to match the dashboard (v3.54) was a pure
+  token swap, not a rewrite -- confirmed BEFORE building anything that
+  every single color reference in the file's ~2000 lines of CSS already
+  went through a `var(--...)`, with zero stray hardcoded hex outside the
+  `:root`/`[data-theme="light"]` blocks themselves.** That's what made
+  it safe to just replace those two token blocks with the dashboard's
+  own palette (graphite panels, amber `--accent`, cyan `--live`) and get
+  every tab (General, Weather, Integrations, Hotspots, Cameras,
+  Favorites, Cards, Backup/Restore, Version) re-themed for free, the
+  same "keep the aliases, don't rename 700 call sites" approach the
+  dashboard reskin itself used. Two of setup.html's own pre-existing
+  token names don't exist in the dashboard's palette and were re-aliased
+  rather than dropped: `--amber` (warn-box text, credential badges, star
+  icons) -> `var(--caution)`, `--row-bg` (toggle-group/drag-row/cat-row
+  backgrounds) -> `var(--panel-2)`. A handful of hover-tint/background
+  `rgba()` literals were hardcoded to the OLD hex values (button hovers,
+  the warn-box background/border, the credentials badge) -- these don't
+  auto-update just by changing the token block, so each was repointed to
+  the matching `-dim` token (`--accent-dim`/`--live-dim`/`--danger-dim`/
+  `--caution-dim`) or, for the one that needed a specific border opacity
+  no `-dim` token matches, `color-mix(in srgb, var(--caution) 35%,
+  transparent)` -- the same `color-mix()` pattern the dashboard file
+  already uses elsewhere, not a new technique. Two plain black
+  `rgba(0,0,0,...)` overlay/shadow values were left untouched -- they're
+  theme-agnostic dimming effects, not part of the color identity. If
+  this page is ever visually touched again, re-run the same check first
+  (grep for hex/rgba literals outside the token blocks) before assuming
+  a palette change is still a clean swap -- it only stays this cheap as
+  long as no one introduces a hardcoded color into the component CSS.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

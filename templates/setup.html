@@ -4,33 +4,62 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings — {{ settings.dashboard_name }}</title>
     <style>
+        /* "Instrument panel" tokens -- same palette as dashboard.html
+           (graphite panels, amber --accent, cyan --live), reused verbatim
+           rather than redefined, so this page doesn't drift from the
+           dashboard's identity. --amber and --row-bg are this file's own
+           pre-existing token names, kept and re-aliased onto the new
+           primitives (--caution/--panel-2) rather than renamed everywhere
+           they're used -- see CLAUDE.md's setup.html reskin gotcha before
+           touching either theme block. */
         :root {
-            --bg:          #121212;
-            --card-bg:     #1e1e1e;
-            --card-border: #2d2d2d;
-            --text:        #e0e0e0;
-            --text-muted:  #888;
-            --text-dim:    #555;
-            --accent:      #2ecc71;
-            --link:        #5bc0de;
-            --input-bg:    #2a2a2a;
-            --row-bg:      #252525;
-            --danger:      #c0392b;
-            --amber:       #f39c12;
+            --bg:          #12151a;
+            --panel:       #1a1e25;
+            --panel-2:     #20252d;
+            --border:      #2b313b;
+            --text:        #eef0f2;
+            --text-muted:  #9aa2ad;
+            --text-dim:    #5b6470;
+            --accent:      #ffb648;
+            --accent-dim:  rgba(255,182,72,.14);
+            --live:        #4fd8c4;
+            --live-dim:    rgba(79,216,196,.14);
+            --caution:     #f0c419;
+            --caution-dim: rgba(240,196,25,.14);
+            --danger:      #f2545b;
+            --danger-dim:  rgba(242,84,91,.14);
+            --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, "Roboto Mono", monospace;
+
+            --card-bg:     var(--panel);
+            --card-border: var(--border);
+            --link:        var(--live);
+            --input-bg:    var(--panel-2);
+            --row-bg:      var(--panel-2);
+            --amber:       var(--caution);
         }
         [data-theme="light"] {
-            --bg:          #f0f2f5;
-            --card-bg:     #ffffff;
-            --card-border: #dde1e7;
-            --text:        #1a1a1a;
-            --text-muted:  #666;
-            --text-dim:    #aaa;
-            --accent:      #27ae60;
-            --link:        #2980b9;
-            --input-bg:    #f5f5f5;
-            --row-bg:      #f9f9f9;
-            --danger:      #e74c3c;
-            --amber:       #e67e22;
+            --bg:          #eef1f4;
+            --panel:       #ffffff;
+            --panel-2:     #f4f6f9;
+            --border:      #dde2e8;
+            --text:        #1b1f26;
+            --text-muted:  #5b6470;
+            --text-dim:    #98a1ab;
+            --accent:      #c97a12;
+            --accent-dim:  rgba(201,122,18,.12);
+            --live:        #0e8f7d;
+            --live-dim:    rgba(14,143,125,.12);
+            --caution:     #a8720a;
+            --caution-dim: rgba(168,114,10,.12);
+            --danger:      #c93a44;
+            --danger-dim:  rgba(201,58,68,.1);
+
+            --card-bg:     var(--panel);
+            --card-border: var(--border);
+            --link:        var(--live);
+            --input-bg:    var(--panel-2);
+            --row-bg:      var(--panel-2);
+            --amber:       var(--caution);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -194,11 +223,11 @@
             transition: background .15s;
         }
         .btn-primary { color: var(--accent); border-color: var(--accent); }
-        .btn-primary:hover { background: rgba(46,204,113,.08); }
+        .btn-primary:hover { background: var(--accent-dim); }
         .btn-info    { color: var(--link);   border-color: var(--link); }
-        .btn-info:hover { background: rgba(91,192,222,.08); }
+        .btn-info:hover { background: var(--live-dim); }
         .btn-danger  { color: var(--danger); border-color: var(--danger); }
-        .btn-danger:hover { background: rgba(192,57,43,.08); }
+        .btn-danger:hover { background: var(--danger-dim); }
         .btn-sm { padding: 3px 10px; font-size: 12px; }
         .status-txt { font-size: 12px; color: var(--text-muted); margin-left: 8px; }
         .badge { display: inline-block; background: var(--row-bg); border-radius: 4px;
@@ -234,8 +263,8 @@
 
         /* --- backup / restore --- */
         .warn-box {
-            display: flex; gap: 9px; background: rgba(243,156,18,.08);
-            border: 1px solid rgba(243,156,18,.35); border-radius: 7px;
+            display: flex; gap: 9px; background: var(--caution-dim);
+            border: 1px solid color-mix(in srgb, var(--caution) 35%, transparent); border-radius: 7px;
             padding: 10px 12px; font-size: 12.5px; color: var(--text-muted);
             line-height: 1.45; margin-bottom: 12px;
         }
@@ -253,7 +282,7 @@
         .cat-meta { font-size: 11px; color: var(--text-dim); }
         .cat-secret {
             font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
-            color: var(--amber); background: rgba(243,156,18,.16); padding: 1px 6px; border-radius: 8px;
+            color: var(--amber); background: var(--caution-dim); padding: 1px 6px; border-radius: 8px;
         }
         .file-drop {
             border: 1px dashed var(--card-border); border-radius: 7px;
