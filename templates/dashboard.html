@@ -788,12 +788,14 @@
 
         /* --- License Quiz card --- */
         .lq-class-select {
-            font-size: 10px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase;
-            padding: 2px 20px 2px 8px; border-radius: 9px; background: rgba(155,89,182,.18); color: #9b59b6;
-            border: none; cursor: pointer; appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'%3E%3Cpath fill='%239b59b6' d='M0 0l4 5 4-5z'/%3E%3C/svg%3E");
+            font-size: 11px; font-weight: 600; letter-spacing: .3px;
+            padding: 3px 22px 3px 8px; border-radius: 6px;
+            background-color: var(--input-bg); color: var(--text);
+            border: 1px solid var(--toolbar-border); cursor: pointer; appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'%3E%3Cpath fill='%23888' d='M0 0l4 5 4-5z'/%3E%3C/svg%3E");
             background-repeat: no-repeat; background-position: right 7px center; background-size: 8px 5px;
         }
+        .lq-class-select:hover { border-color: var(--link); }
         .lq-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
         .lq-id { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; letter-spacing: .3px; }
         .lq-stats-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
