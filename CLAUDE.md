@@ -209,71 +209,38 @@ camera_stream.py   CameraStreamManager: bridges RTSP (ffmpeg subprocess)
 
 templates/dashboard.html   Main UI: cards + live map (Leaflet). One big
                            inline <script> block, no build step, no
-                           frontend framework
-templates/dashboard_beta.html
-                           Served at `/beta` (`app.py`'s `dashboard_beta()`,
-                           right next to `dashboard()`) -- a from-scratch
-                           visual reskin ("instrument panel" identity:
-                           graphite panels, a warm amber brand accent used
-                           ONLY for identity, a separate cyan `--live` token
-                           meaning "on-air/connected right now", monospace
-                           for every data value) evaluated side-by-side with
-                           the classic dashboard before deciding whether to
-                           promote it. Started as a literal `cp` of
-                           dashboard.html, NOT a Jinja-inherited/shared
-                           partial -- this codebase has no template
-                           inheritance anywhere (setup.html/dashboard.html/
-                           version.html are already three independent full
-                           files, not fragments of one), and introducing it
-                           just for this would be a bigger, riskier refactor
-                           than accepting the duplication. Every fetch/
-                           render JS function's DATA-HANDLING logic is
-                           reused verbatim -- same `/api/*` routes, same
-                           `_SENTINEL_DEFS` card-order system, same Leaflet
-                           map subsystem -- only CSS (rewritten in place,
-                           not layered on top) and a handful of targeted
-                           template tweaks changed (a colored top-rail +
-                           dot-prefixed status chips on hotspot cards via
-                           CSS `::before` only, no JS; real RSSI/BER S-meter
-                           bars in `renderCards()`; HF Conditions' `.hf-pill`
-                           text badges swapped for dot+label `.cond-dot` plus
-                           decorative gauge bars under the 4 stat numbers).
-                           A same-named CSS custom property was sometimes
-                           reused in the original file for two UNRELATED
-                           meanings at once (`--tx-color` meant both "transmit
-                           timer" and "fair/warning" state) -- these couldn't
-                           be fixed with a simple alias and were repointed
-                           per call site instead; see the retheme's own
-                           reasoning in the file's `:root` comment before
-                           touching either dashboard template's color tokens.
-                           Zero backend changes -- `dashboard_beta()` passes
-                           the exact same `settings=load_settings()` kwarg
-                           `dashboard()` does. `/` itself renders this
-                           template when `settings.use_beta_dashboard` is on
-                           (Settings -> General -> Appearance); `?view=beta`/
-                           `?view=classic` override that per-visit regardless
-                           of the saved setting, which is how the "Try new
-                           look"/"Back to classic" toolbar links work as a
-                           one-time peek without touching it. Beta-only
-                           extras layered on top of the reskin: a toolbar
-                           fleet-status pill (X/Y online, Z active now, live-
-                           pulsing once anything is), "spotlight" dimming of
-                           idle hotspot cards while any one is active (scoped
-                           to `.hotspot-card` specifically so it doesn't dim
-                           unrelated sentinel cards), a thin animated LED-
-                           bargraph VU meter that replaces the static RSSI/BER
-                           line on an active card (anchored to that hotspot's
-                           real `rssiBarPct`, not fully decorative -- driven
-                           by a persistent fast tick loop that looks elements
-                           up by id each tick, same pattern as the existing
-                           tx-time/last-heard timer tick, since `renderCards()`
-                           fully replaces the card markup every 3s poll and a
-                           per-render `setInterval` would get torn down with
-                           it), and an optional synthesized two-tone courtesy
-                           beep (`beta_courtesy_tone` setting, Web Audio, no
-                           audio file) on a new active call -- silently no-ops
-                           if the browser hasn't seen a user gesture yet
-                           (AudioContext autoplay restriction), same
+                           frontend framework. This IS the "instrument
+                           panel" reskin -- graphite panel surfaces, a warm
+                           amber brand accent used ONLY for identity, a
+                           separate cyan `--live` token meaning "on-air/
+                           connected right now", monospace for every data
+                           value. See the "dashboard_beta.html promoted"
+                           gotcha below for how this file got here and
+                           what to know before touching its color tokens.
+                           Extras beyond the base card/map UI: a toolbar
+                           fleet-status pill (X/Y online, Z active now,
+                           live-pulsing once anything is), "spotlight"
+                           dimming of idle hotspot cards while any one is
+                           active (scoped to `.hotspot-card` specifically
+                           so it doesn't dim unrelated sentinel cards, and
+                           to `:not(.favorite)` too so an actively-
+                           transmitting friend doesn't get dimmed along
+                           with genuinely idle cards -- toggleable via
+                           `beta_spotlight_dimming`, on by default), a thin
+                           animated LED-bargraph VU meter that replaces the
+                           static RSSI/BER line on an active card (anchored
+                           to that hotspot's real `rssiBarPct`, not fully
+                           decorative -- driven by a persistent fast tick
+                           loop that looks elements up by id each tick,
+                           same pattern as the existing tx-time/last-heard
+                           timer tick, since `renderCards()` fully replaces
+                           the card markup every 3s poll and a per-render
+                           `setInterval` would get torn down with it), and
+                           an optional synthesized two-tone courtesy beep
+                           (`beta_courtesy_tone` setting, Web Audio, no
+                           audio file) on a new active call -- silently
+                           no-ops if the browser hasn't seen a user gesture
+                           yet (AudioContext autoplay restriction), same
                            degrade-gracefully contract as every other
                            best-effort feature in this app.
 templates/setup.html       Settings UI: General / Weather / Integrations /
@@ -1981,6 +1948,38 @@ config for per-integration credentials; put it in
   `settings.json` files that already have them -- don't resurrect them as
   live position sources if this is ever touched again, `notifications_position`
   is the only one either template's JS or `setup.html`'s drag list reads.
+
+- **`dashboard_beta.html`'s "instrument panel" reskin was promoted to be
+  THE dashboard (v3.53), retiring the classic look and the side-by-side
+  `/beta` split entirely -- not a new design, a straight promotion of
+  what had already been built and iterated on.** Verified safe before
+  doing it: diffed every top-level JS `function` name and every `id="..."`
+  attribute between `dashboard.html` and `dashboard_beta.html` and found
+  ZERO present in classic but missing from beta (beta was a strict
+  superset -- this session's own discipline of updating both files
+  together for every single change, all the way back to the Notifications
+  card merge and the License Quiz class dropdown, is exactly what made
+  this a safe mechanical swap rather than a risky one). What actually
+  changed: `templates/dashboard_beta.html`'s content became
+  `templates/dashboard.html`'s content (old file deleted); `app.py`'s
+  `dashboard()` route lost its `?view=`/`settings.use_beta_dashboard`
+  branching and just renders the one template now; `/beta` is kept as a
+  bare `redirect("/")` rather than removed outright, so an old bookmark
+  still lands somewhere real instead of 404ing; `setup.html`'s "Use the
+  new beta look by default" toggle and the "✨ Try new look"/"← Back to
+  classic" toolbar links are gone (nothing left to switch between). The
+  `beta_courtesy_tone`/`beta_spotlight_dimming` setting keys were
+  deliberately NOT renamed to drop the "beta_" prefix -- doing so would
+  be pure churn (breaks nothing to rename, but fixes nothing either) for
+  zero functional gain, so they keep their pre-promotion names
+  permanently; `use_beta_dashboard` itself was left in
+  `config.DEFAULT_SETTINGS` as an inert, unused key for the same backward-
+  compat-with-old-settings.json reason every other orphaned setting key
+  in this file is kept rather than deleted. If a similar "evaluate a
+  full-duplicate reskin side-by-side, then decide" effort is ever done
+  again, this same before-you-promote check (diff every function name AND
+  every element id between the two files) is the right way to confirm
+  nothing unique to the original would be silently lost in the swap.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

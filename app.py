@@ -277,8 +277,6 @@ def api_settings_post():
         settings["show_host_stats"] = bool(data["show_host_stats"])
     if "show_toolbar" in data:
         settings["show_toolbar"] = bool(data["show_toolbar"])
-    if "use_beta_dashboard" in data:
-        settings["use_beta_dashboard"] = bool(data["use_beta_dashboard"])
     if "beta_courtesy_tone" in data:
         settings["beta_courtesy_tone"] = bool(data["beta_courtesy_tone"])
     if "beta_spotlight_dimming" in data:
@@ -458,24 +456,16 @@ def api_settings_post():
 
 @app.route("/")
 def dashboard():
-    """Renders whichever template the "Use the new beta look" Settings
-    toggle (settings.use_beta_dashboard) prefers -- overridable per-visit
-    via ?view=classic / ?view=beta regardless of that persisted default,
-    which is how the "Try new look"/"Back to classic" toolbar links work
-    as a one-time peek without touching the saved setting."""
-    settings = load_settings()
-    view = request.args.get("view")
-    use_beta = settings.get("use_beta_dashboard", False) if view not in ("classic", "beta") else view == "beta"
-    template = "dashboard_beta.html" if use_beta else "dashboard.html"
-    return render_template(template, settings=settings)
+    return render_template("dashboard.html", settings=load_settings())
 
 @app.route("/beta")
-def dashboard_beta():
-    """Reskinned 'instrument panel' visual redesign, served side-by-side with
-    the classic dashboard -- same settings kwarg, same /api/* backend, zero
-    shared markup/JS (see CLAUDE.md for why this is a full duplicate rather
-    than a shared partial)."""
-    return render_template("dashboard_beta.html", settings=load_settings())
+def dashboard_beta_redirect():
+    """The "instrument panel" reskin (formerly a side-by-side /beta
+    alternate, evaluated long enough to be promoted to be THE dashboard
+    -- see CLAUDE.md) is just dashboard.html now. Kept as a redirect
+    rather than removed outright so any old bookmark/link to /beta still
+    lands somewhere real instead of 404ing."""
+    return redirect("/")
 
 @app.route("/api/favorites", methods=["GET"])
 def api_favorites_get():

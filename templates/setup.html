@@ -393,18 +393,8 @@
                 <div class="toggle {{ 'on' if settings.get('show_toolbar', True) else '' }}"
                      id="toolbar-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
-            <div class="toggle-row" style="border-bottom:none">
-                <span class="toggle-label">Use the new "beta" look by default
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (the redesigned "instrument panel" look — otherwise still reachable anytime via
-                        the "✨ Try new look" link, this just makes it what "/" shows)
-                    </span>
-                </span>
-                <div class="toggle {{ 'on' if settings.get('use_beta_dashboard', False) else '' }}"
-                     id="beta-dashboard-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
             <div class="toggle-row">
-                <span class="toggle-label">Play a courtesy tone on new activity (beta view only)
+                <span class="toggle-label">Play a courtesy tone on new activity
                     <span style="font-size:10px;color:var(--text-dim)">
                         (a short synthesized beep — same idea as a real repeater's courtesy tone — when
                         any hotspot's active call starts)
@@ -414,7 +404,7 @@
                      id="courtesy-tone-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row" style="border-bottom:none">
-                <span class="toggle-label">Dim inactive hotspot cards when one is active (beta view only)
+                <span class="toggle-label">Dim inactive hotspot cards when one is active
                     <span style="font-size:10px;color:var(--text-dim)">
                         (the "spotlight" effect — cards with no active call fade back while a live one
                         is on air; turn off to keep every card at full brightness)
@@ -1576,7 +1566,6 @@ function saveAppearance() {
             dashboard_name:  name,
             show_host_stats: document.getElementById('host-stats-toggle').classList.contains('on'),
             show_toolbar:    document.getElementById('toolbar-toggle').classList.contains('on'),
-            use_beta_dashboard: document.getElementById('beta-dashboard-toggle').classList.contains('on'),
             beta_courtesy_tone: document.getElementById('courtesy-tone-toggle').classList.contains('on'),
             beta_spotlight_dimming: document.getElementById('spotlight-dimming-toggle').classList.contains('on'),
         })

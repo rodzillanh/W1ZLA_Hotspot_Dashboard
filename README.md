@@ -18,7 +18,6 @@ qrz.py          optional QRZ.com lookup for the active caller's name/city/state/
 aslstats.py     optional AllStarLink node-to-callsign lookup for ASL3 nodes
 templates/
     dashboard.html
-    dashboard_beta.html
     setup.html
 Dockerfile
 docker-compose.yml      for the Compose Manager plugin / non-Unraid Docker hosts
@@ -255,29 +254,21 @@ all (not just missing a couple of newer keys) — an existing install's
 treated as "already seen," full stop, regardless of how long ago you set
 it up.
 
-## Beta dashboard (new look preview)
+## Dashboard look
 
-A redesigned "instrument panel" look is available side-by-side with the
-regular dashboard at **`/beta`** — same live data, same Settings, nothing
-to configure. It's a genuinely different visual identity (graphite panel
+The dashboard uses an "instrument panel" visual identity — graphite panel
 surfaces, a warm amber accent, a separate cyan color meaning "on-air right
-now", monospace treatment for callsigns/frequencies/timers) rather than a
-recolor. A "✨ Try new look" link on the regular dashboard's toolbar takes
-you there; "← Back to classic" goes back — both work as a one-time peek
-regardless of your saved preference below.
-
-**"Use the new beta look by default"** (Settings → General → Appearance)
-makes `/` itself render the beta look every time, instead of needing
-`/beta` or the toolbar link. Off by default — your dashboard keeps the
-classic look until you turn this on.
-
-The beta view has a few extras beyond the reskin itself:
+now", monospace treatment for callsigns/frequencies/timers. A few extras
+beyond the base card/map UI:
 
 - **Fleet status pill** in the toolbar — "X/Y online · Z active now,"
   turning live/pulsing the instant anything's on the air, without needing
   to scroll through cards to check.
 - **Spotlight dimming** — when any hotspot is active, the idle ones dim
-  slightly so the live one stands out.
+  slightly so the live one stands out (an actively-transmitting favorite
+  never dims). Toggle in Settings → General → Appearance ("Dim inactive
+  hotspot cards when one is active") if you'd rather every card stay at
+  full brightness — on by default.
 - **A live VU meter** on an active hotspot's card, replacing the RSSI/BER
   line while a call is in progress — anchored to that hotspot's real
   signal reading, not just decorative animation.

@@ -10,12 +10,13 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.52"
+APP_VERSION = "3.53"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
     "Lennon",           # v3.51 -- John Lennon (1940-1980)
     "Cobain",           # v3.52 -- Kurt Cobain (1967-1994)
+    "Petty",            # v3.53 -- Tom Petty (1950-2017)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -296,18 +297,20 @@ HOTSPOT_INFO_CHECK_CMD = (
 DEFAULT_SETTINGS = {
     "dashboard_name": "W1ZLA Hotspot Dashboard",
     "dark_mode": True,
-    # Which template "/" itself renders by default -- overridable per-visit
-    # via ?view=classic / ?view=beta (used by the "Try new look"/"Back to
-    # classic" toolbar links so those always work as a one-time peek
-    # regardless of this persisted default). /beta stays available as its
-    # own unconditional URL either way.
+    # Unused since the "instrument panel" reskin was promoted to be the
+    # only dashboard (v3.53) -- there's no separate classic/beta choice
+    # left to make. Kept only for backward compat with old settings.json
+    # files that already have it saved; nothing reads it anymore.
     "use_beta_dashboard": False,
-    # Beta dashboard only -- a short synthesized courtesy-tone beep (Web
-    # Audio, no audio file) when any hotspot's active call starts.
+    # A short synthesized courtesy-tone beep (Web Audio, no audio file)
+    # when any hotspot's active call starts. Key kept "beta_"-prefixed
+    # from before the reskin was promoted -- renaming would just be churn
+    # for no functional gain.
     "beta_courtesy_tone": False,
-    # Beta dashboard only -- dim/desaturate idle hotspot cards while any one
-    # is active, so the live card visually pops. On by default (existing
-    # behavior); a toggle since some users find the dimming distracting.
+    # Dim/desaturate idle hotspot cards while any one is active, so the
+    # live card visually pops. On by default (existing behavior); a
+    # toggle since some users find the dimming distracting. Same
+    # "beta_"-prefix-kept-for-no-reason-to-rename note as above.
     "beta_spotlight_dimming": True,
     "links": [
         {"label": "Brandmeister", "url": "https://brandmeister.network"},
