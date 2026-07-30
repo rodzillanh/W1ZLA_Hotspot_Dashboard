@@ -1360,19 +1360,6 @@
         .map-key-row b { color: var(--text); font-weight: 600; }
         .map-key-sep { border-top: 1px dashed var(--card-border); margin: 6px 0; }
         .map-key-note { color: var(--text-dim); font-size: 10px; margin-top: 6px; line-height: 1.4; }
-        /* Static text label over the Gulf -- styled like a place name
-           already printed on the map (italic, no box), with a dark halo
-           via multiple offset text-shadows rather than a single direction
-           so it stays legible on all three tile styles (light OSM water,
-           dark CartoDB water, and Esri satellite imagery), not just one
-           theme. */
-        .gulf-label {
-            font-style: italic; font-size: 13px; letter-spacing: 1.5px;
-            color: rgba(255,255,255,.92); white-space: nowrap; text-align: center;
-            text-shadow: -1px -1px 2px rgba(0,0,0,.75), 1px -1px 2px rgba(0,0,0,.75),
-                         -1px 1px 2px rgba(0,0,0,.75), 1px 1px 2px rgba(0,0,0,.75),
-                         0 0 6px rgba(0,0,0,.5);
-        }
         .map-legend {
             display: flex;
             gap: 16px;
@@ -3979,16 +3966,6 @@ function initMap() {
         attribution: 'Tiles © Esri',
         maxZoom: 18
     });
-
-    // A plain text label over the Gulf, styled like a place name already
-    // printed on the map rather than a UI element -- not tied to any tile
-    // layer, so it stays put across Standard/Dark/Satellite. Non-interactive
-    // (never intercepts a click meant for the map underneath it).
-    L.marker([25.5, -90.0], {
-        icon: L.divIcon({ className: 'gulf-label', html: 'Gulf of America', iconSize: [140, 20], iconAnchor: [70, 10] }),
-        interactive: false,
-        keyboard: false,
-    }).addTo(leafletMap);
 
     // leaflet.markercluster is a separate CDN script from Leaflet itself --
     // if it failed to load while Leaflet succeeded, fall back to a plain

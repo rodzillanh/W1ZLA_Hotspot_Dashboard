@@ -1085,10 +1085,6 @@ appear as pins — the QRZ subscription caveat above applies here too.
   Settings value, since the right height on a phone and a desktop
   monitor are very different and there's no per-user login here to key
   a shared preference off of.
-- A **"Gulf of America" text label** over the Gulf — static, always shown,
-  styled like a place name already printed on the map rather than a UI
-  element. Independent of which map style (Standard/Dark/Satellite) is
-  active.
 - **Grey line overlay** — a "Grey line" checkbox in the map legend
   toggles a day/night terminator overlay, useful for spotting greyline
   propagation windows. It's computed from real solar-position math
