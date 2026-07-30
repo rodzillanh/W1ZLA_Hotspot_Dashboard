@@ -2013,6 +2013,27 @@ config for per-integration credentials; put it in
   (grep for hex/rgba literals outside the token blocks) before assuming
   a palette change is still a clean swap -- it only stays this cheap as
   long as no one introduces a hardcoded color into the component CSS.
+- **`aprs_messaging.py`'s favorite-alert text used to silently truncate at
+  `MAX_MSG_LEN` (67 chars) with no indication -- a long hotspot name +
+  talkgroup + favorite label combination could genuinely lose the tail of
+  the message with nothing showing it was cut.** Found while evaluating
+  a third-party APRS client (CtrlAltDel-Irl/APRS-Messenger, which splits
+  overlong messages into multiple packets instead) -- full multi-part
+  splitting was considered and explicitly rejected as more complexity
+  than this app's one-shot "FYI" alerts need (message numbering/
+  reassembly makes sense for a back-and-forth chat client, less so for a
+  single outbound notification). Fixed two ways instead: (1) the
+  talkgroup is now ordered BEFORE the hotspot name in the message
+  (`"{call} active on {talkgroup} ({node})"`) -- if truncation still
+  happens, the more operationally useful info (what channel/net they're
+  on) survives instead of the hotspot's own name, which you already know
+  since you configured it; (2) a genuinely-too-long message now ends in
+  a plain ASCII `"..."` marker so it's visibly cut off rather than
+  silently dropped -- same "plain ASCII, not a Unicode character"
+  reasoning as the existing `-` separator in this file (7-bit-ASCII old
+  TNCs/handheld displays; aprslib encodes UTF-8 rather than erroring, so
+  a fancy ellipsis character would reach the air as mangled bytes
+  instead of failing loudly).
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

@@ -89,13 +89,21 @@ class AprsMessenger:
         call      = hotspot_status.get("active_call") or hotspot_status.get("favorite_label") or "Unknown"
         node      = hotspot_status.get("name") or "hotspot"
         talkgroup = hotspot_status.get("talkgroup")
-        # Plain ASCII separator, not a Unicode dot -- APRS messages are meant
-        # to be readable on old TNCs/handheld radio displays that assume
-        # 7-bit ASCII, and aprslib encodes this as UTF-8 rather than erroring,
-        # so a fancy character would silently reach the air as mangled bytes
-        # instead of failing loudly.
-        text = f"{call} active on {node} - {talkgroup}" if talkgroup else f"{call} active on {node}"
-        return text[:MAX_MSG_LEN]
+        # Talkgroup ordered before the hotspot name -- if this needs
+        # truncating below, the more operationally useful info (what
+        # channel/net they're on) survives instead of the hotspot's own
+        # name, which you already know since you configured it.
+        text = f"{call} active on {talkgroup} ({node})" if talkgroup else f"{call} active on {node}"
+        if len(text) > MAX_MSG_LEN:
+            # Plain ASCII "...", not a Unicode ellipsis -- same reasoning as
+            # the plain "-" separator above: APRS messages are meant to be
+            # readable on old TNCs/handheld radio displays that assume 7-bit
+            # ASCII, and aprslib encodes this as UTF-8 rather than erroring,
+            # so a fancy character would silently reach the air as mangled
+            # bytes instead of failing loudly. Marks that it was cut off,
+            # rather than silently dropping the tail like before.
+            text = text[:MAX_MSG_LEN - 3].rstrip() + "..."
+        return text
 
     def _send(self, text: str) -> None:
         try:
