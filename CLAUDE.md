@@ -2013,6 +2013,32 @@ config for per-integration credentials; put it in
   (grep for hex/rgba literals outside the token blocks) before assuming
   a palette change is still a clean swap -- it only stays this cheap as
   long as no one introduces a hardcoded color into the component CSS.
+- **The Live map's "Gulf of America" label (v3.55) is a plain static
+  `L.marker`/`divIcon` at a fixed coordinate, not a tile-layer change --
+  an Esri API-key-based approach (a real, different option: Esri's
+  Basemap Styles v2 service has a documented `worldview=
+  unitedStatesOfAmerica` parameter, confirmed live against the service's
+  own self-describing metadata endpoint, that does show this) was built,
+  verified working end-to-end, and then explicitly rejected by the user
+  in favor of this simpler approach -- don't resurrect the Esri
+  integration without being asked again. Two things were checked live
+  before picking the label's style: (1) fetched real tiles from this
+  app's own three existing map layers across zoom 4-8 -- the "Standard"
+  (OSM) layer shows no Gulf label at all in that range; the "Dark"
+  (CartoDB) layer, which is this app's own default whenever the
+  dashboard itself is in dark mode, DOES show one at zoom 5, but as
+  "Golfo de México" (Spanish), not English "Gulf of Mexico" and
+  certainly not "Gulf of America" -- so leaving this unlabeled wasn't
+  actually a no-op the way it might look from the Standard layer alone.
+  (2) The label's CSS uses a multi-directional `text-shadow` halo (not a
+  single offset shadow) specifically because it has to stay legible
+  against THREE different tile styles with very different backgrounds
+  (light OSM water, near-black CartoDB water, and whatever color
+  Satellite imagery happens to be at a given spot) -- a single-direction
+  shadow only worked well against one of those. The marker itself is
+  `interactive: false`/`keyboard: false` and not tied to any tile layer,
+  so it stays visible across Standard/Dark/Satellite/future layers
+  without needing to be added/removed in `setMapStyle()`.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
