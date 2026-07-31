@@ -175,6 +175,20 @@ satellites.py      SatelliteTracker: current position + upcoming pass
                    ignores the filter and returns the whole unfiltered
                    transmitter table instead of erroring).
 
+propagation.py     PropagationMapClient: live HF MUF (3000km path) world
+                   map for the Live map's optional "Propagation (MUF)"
+                   overlay, from prop.kc2g.com (free, no key -- same
+                   bot-protection-vs-real-outage trap as celestrak.org
+                   above, confirmed live). Crops the fetched SVG to just
+                   its world-map data region via a pure string edit on
+                   the `viewBox` attribute (no rasterization, no new
+                   image-processing dependency) -- see the module's own
+                   docstring and the Hard-won gotchas section for the
+                   exact pixel-to-lat/lon calibration this relies on,
+                   verified three independent ways against a real
+                   fetched map before trusting it enough to geo-register
+                   as a Leaflet imageOverlay.
+
 digipi.py          DigipiMonitor: SSH-polls a DigiPi's Direwolf log
                    (/run/direwolf.log, NOT a systemd service -- a plain
                    background process) for APRS activity. Deliberately a
@@ -2105,6 +2119,44 @@ config for per-integration credentials; put it in
   cited for the ISS's own visibility footprint), not a CSS-drawn shape
   -- it stays correctly sized as the map is panned/zoomed, which a
   fixed-pixel circle wouldn't.
+- **The HF Propagation (MUF) overlay (v3.56, `propagation.py`) started
+  as an open question -- "is prop.kc2g.com's map even a projection that
+  CAN be geo-registered onto Leaflet, or is it some azimuthal/great-
+  circle view centered on the observer that can't be?"** The `?grid=`
+  API parameter looked exactly like it might mean "re-center/re-project
+  around this station," which would have ruled out a direct overlay
+  entirely. Resolved with a real render (Chrome headless screenshot --
+  cairosvg was tried first and failed on a missing system libcairo in
+  this dev environment) of the SAME map fetched for two very different
+  grid squares (one in the US, one in Australia): identical world-map
+  geometry both times, only the reference marker/highlighted path
+  differed. Confirmed it's a plain equirectangular (Plate Carree) world
+  map, not observer-centered, three independent ways from the SVG's own
+  geometry (not eyeballed from the render):
+  1. The main-axes clipPath is a literal rectangle in the SVG's own pt
+     coordinate space: x 35.304688-1128.104687, y 24.14175-570.54175.
+  2. The 19 x-axis tick marks land exactly on -180,-160,...,180 (20-deg
+     steps); the 9 y-axis ticks land exactly on -80,-60,...,80. Both
+     axes compute to the identical 3.035556 pt/degree scale -- not
+     approximately equal, exactly equal, which is what makes an
+     imageOverlay (which needs one consistent scale) valid here at all.
+  3. Extrapolating that scale from the ticks out to the clipPath's own
+     edges lands on EXACTLY lat -90/+90, lon -180/+180 -- whole numbers,
+     not a rounding coincidence.
+  `propagation.py`'s `CROP_VIEWBOX` constants come directly from
+  finding #1; a cropped render (screenshot, again) confirmed coastlines
+  line up cleanly at every edge before this was trusted enough to ship.
+  Cropping itself is a plain string edit on the SVG's `viewBox`/`width`/
+  `height` attributes -- SVG's viewBox only changes which region maps to
+  the visible output, every path's own coordinates stay in the original
+  space, so this is a correct crop, not a rasterize-and-hope
+  approximation, and it avoids needing an SVG rendering dependency in
+  the shipped app entirely (Chrome-headless was only ever a one-time
+  research tool here, never part of the runtime path). **If KC2G ever
+  changes their figure size/margins/tick spacing, this whole
+  calibration needs re-deriving the same way** -- fetch a real map,
+  re-locate the clipPath rect and tick positions, don't adjust the
+  numbers by guessing from a visual diff.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

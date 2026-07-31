@@ -1177,6 +1177,12 @@ appear as pins — the QRZ subscription caveat above applies here too.
   default; PSK Reporter's own server actively rate-limits frequent
   polling, so this is cached 10 minutes server-side regardless of how
   long the checkbox has been on.
+- **Propagation (MUF)** — a "Propagation (MUF)" checkbox overlays a live
+  world map of Maximum Usable Frequency (3000km path) directly on the
+  Live map, from [KC2G PropNET](https://prop.kc2g.com)'s real ionosonde
+  network data (free, no key). Off by default; the map image is cached
+  15 minutes server-side, matching how often KC2G regenerates it.
+
 ## Fleet activity
 
 Optional — off by default (Settings → Cards → "Show fleet activity

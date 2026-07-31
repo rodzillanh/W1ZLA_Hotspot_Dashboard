@@ -109,9 +109,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.55 "Moon"</span>
+                <span class="release-version">v3.56 "Harrison"</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>HF Propagation (MUF) overlay on the Live map</span> — a new "Propagation (MUF)" checkbox in the map legend, alongside Grey line/Aurora/POTA/PSK Reporter. Live Maximum Usable Frequency contour map from KC2G PropNET's real ionosonde network, geo-registered directly onto the map (not a separate image) — off by default, same lazy-fetch-on-toggle pattern as the other optional overlays</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.55 "Moon"</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Satellites card + Live map ground-track overlay</span> — optional (Settings → Cards, off by default). Upcoming pass predictions (AOS time, max elevation, mode/frequency) for a small tracked-satellite list (ISS, SO-50, AO-91, PO-101 by default, editable in Settings → Cards), plus each satellite's current position, footprint, and ground track drawn live on the Live map. Real SGP4 orbital propagation from live CelesTrak orbital elements — needs a station grid square (Settings → Cards) for pass predictions specifically; positions/ground-track work without one</li>

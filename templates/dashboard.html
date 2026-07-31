@@ -1879,6 +1879,10 @@
             <input type="checkbox" id="psk-toggle" onchange="togglePsk()">
             PSK Reporter
         </label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="propagation-toggle" onchange="togglePropagation()">
+            Propagation (MUF)
+        </label>
         <select id="map-style-select" onchange="setMapStyle(this.value)"
                 style="background:var(--card-bg);color:var(--text);
                        border:1px solid var(--card-border);border-radius:5px;
@@ -4176,6 +4180,9 @@ function initMap() {
     document.getElementById('psk-toggle').checked = localStorage.getItem(PSK_KEY) === '1';
     if (document.getElementById('psk-toggle').checked) togglePsk();
 
+    document.getElementById('propagation-toggle').checked = localStorage.getItem(PROPAGATION_KEY) === '1';
+    if (document.getElementById('propagation-toggle').checked) togglePropagation();
+
     // Satellite positions may already have been fetched before this tab was
     // ever opened (fetchSatellites() runs on a timer regardless of which
     // tab is active) -- apply them immediately instead of waiting up to
@@ -4540,6 +4547,48 @@ function fmtAgoCompact(secs) {
     if (secs < 60) return secs + 's';
     if (secs < 3600) return Math.round(secs / 60) + 'm';
     return Math.round(secs / 3600) + 'h';
+}
+
+// --- map: HF propagation (MUF) overlay -- prop.kc2g.com's world MUF map,
+// served pre-cropped by /api/propagation_map.svg (see propagation.py for
+// the pixel-to-lat/lon calibration this relies on). Same lazy on/off-toggle
+// pattern as aurora/POTA/PSK above -- a real backend fetch, not free math
+// like grey-line, so it shouldn't run for a visitor who never opens the
+// checkbox. Unlike those, this is a single L.imageOverlay pointed straight
+// at the route -- the browser loads it as a plain image, no per-spot JSON
+// parsing needed.
+const PROPAGATION_KEY = 'w1zla_show_propagation';
+const PROPAGATION_BOUNDS = [[-90, -180], [90, 180]];
+let propagationLayer = null;
+let propagationTimer = null;
+
+function updatePropagation() {
+    if (!leafletMap) return;
+    if (propagationLayer) { leafletMap.removeLayer(propagationLayer); propagationLayer = null; }
+    // Cache-busted client-side so a manual re-check after the server's own
+    // 15-min cache window actually fetches a fresh image rather than the
+    // browser's own HTTP cache serving the old one.
+    propagationLayer = L.imageOverlay('/api/propagation_map.svg?t=' + Date.now(), PROPAGATION_BOUNDS, {
+        opacity: 0.55, interactive: false,
+    });
+    if (document.getElementById('propagation-toggle').checked) propagationLayer.addTo(leafletMap);
+}
+
+function togglePropagation() {
+    const on = document.getElementById('propagation-toggle').checked;
+    localStorage.setItem(PROPAGATION_KEY, on ? '1' : '0');
+    if (on) {
+        updatePropagation();
+        if (!propagationTimer) {
+            propagationTimer = setInterval(() => {
+                const panel = document.getElementById('panel-map');
+                if (panel && panel.classList.contains('active')) updatePropagation();
+            }, 900000);  // matches propagation.py's CACHE_TTL (15 min)
+        }
+    } else {
+        if (propagationLayer) { leafletMap.removeLayer(propagationLayer); propagationLayer = null; }
+        if (propagationTimer) { clearInterval(propagationTimer); propagationTimer = null; }
+    }
 }
 
 // --- map: ADIF QSO import -- persistent data (server-side qsos.json),

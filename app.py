@@ -45,6 +45,7 @@ from openspot import OpenSpot4Manager
 from wsjtx import WsjtxListener
 from hamalert import HamAlertListener
 from satellites import SatelliteTracker
+from propagation import PropagationMapClient
 
 import host_stats as host_stats_mod
 
@@ -58,6 +59,7 @@ hf_conditions   = HfConditionsClient()
 camera_manager  = CameraStreamManager()
 license_quiz    = LicenseQuizPool()
 satellite_tracker = SatelliteTracker()
+propagation_map    = PropagationMapClient()
 wspr_activity   = WsprActivityClient()
 aurora_client   = AuroraClient()
 pota_client     = PotaClient()
@@ -933,6 +935,21 @@ def api_satellites():
     qth = grid_to_latlon(settings.get("station_grid", ""))
     passes = satellite_tracker.passes(tracked, qth[0], qth[1]) if qth else []
     return jsonify({"positions": positions, "passes": passes, "has_observer": qth is not None})
+
+@app.route("/api/propagation_map.svg")
+def api_propagation_map():
+    """Live HF MUF (3000km path) world map for the Live map's optional
+    "Propagation (MUF)" overlay -- see propagation.py for the source and
+    the pixel-to-lat/lon calibration this relies on. Pre-cropped
+    server-side to just the world-map data region (no title/colorbar),
+    geo-registered as an L.imageOverlay with bounds [[-90,-180],[90,180]]
+    client-side. A 503 here (not a broken image) is deliberate -- an
+    <img>/imageOverlay src that 404s/500s just shows nothing, which reads
+    as "the overlay is empty" rather than "the fetch failed"."""
+    svg = propagation_map.get(load_settings().get("station_grid", ""))
+    if svg is None:
+        return jsonify({"error": "unavailable"}), 503
+    return Response(svg, mimetype="image/svg+xml")
 
 @app.route("/version")
 def version_page():
