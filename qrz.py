@@ -101,6 +101,16 @@ class QrzClient:
             return {
                 "name":      self._compose_name(cs),
                 "location":  self._compose_location(cs),
+                # city/state/country kept SEPARATE too (not just parsed back
+                # out of "location", which is lossy -- it drops country
+                # entirely whenever a state is present). Added for the
+                # Recent Contacts card, which wants a country flag and
+                # city/state as distinct fields, not one combined string.
+                # "location" itself is untouched -- every existing caller
+                # (hotspot card caller display, etc.) keeps working as-is.
+                "city":      _text(cs, "addr2"),
+                "state":     _text(cs, "state"),
+                "country":   _text(cs, "country"),
                 "image_url": _text(cs, "image"),
                 "lat":       _float(cs, "lat"),
                 "lon":       _float(cs, "lon"),

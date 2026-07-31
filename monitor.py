@@ -417,6 +417,12 @@ class FleetMonitor:
         lat      = qrz_info["lat"]       if qrz_info else None
         lon      = qrz_info["lon"]       if qrz_info else None
         source   = "qrz" if qrz_info else None
+        # city/state/country: QRZ-only (RadioID has no equivalent fields) --
+        # kept separate from "location" for the Recent Contacts card, which
+        # wants a country flag and city/state as distinct fields.
+        city     = qrz_info["city"]    if qrz_info else None
+        state    = qrz_info["state"]   if qrz_info else None
+        country  = qrz_info["country"] if qrz_info else None
 
         # RadioID.net fallback — free, no auth. Only fills gaps QRZ left,
         # since QRZ's data (when available) is generally more complete.
@@ -437,7 +443,8 @@ class FleetMonitor:
                 source   = "aprs"
 
         return {"name": name, "location": location, "image_url": image,
-                "lat": lat, "lon": lon, "source": source}
+                "lat": lat, "lon": lon, "source": source,
+                "city": city, "state": state, "country": country}
 
     @staticmethod
     def _apply_favorite_match(call: str) -> tuple[bool, str | None]:

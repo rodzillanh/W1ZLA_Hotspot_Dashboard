@@ -175,20 +175,6 @@ satellites.py      SatelliteTracker: current position + upcoming pass
                    ignores the filter and returns the whole unfiltered
                    transmitter table instead of erroring).
 
-propagation.py     PropagationMapClient: live HF MUF (3000km path) world
-                   map for the Live map's optional "Propagation (MUF)"
-                   overlay, from prop.kc2g.com (free, no key -- same
-                   bot-protection-vs-real-outage trap as celestrak.org
-                   above, confirmed live). Crops the fetched SVG to just
-                   its world-map data region via a pure string edit on
-                   the `viewBox` attribute (no rasterization, no new
-                   image-processing dependency) -- see the module's own
-                   docstring and the Hard-won gotchas section for the
-                   exact pixel-to-lat/lon calibration this relies on,
-                   verified three independent ways against a real
-                   fetched map before trusting it enough to geo-register
-                   as a Leaflet imageOverlay.
-
 digipi.py          DigipiMonitor: SSH-polls a DigiPi's Direwolf log
                    (/run/direwolf.log, NOT a systemd service -- a plain
                    background process) for APRS activity. Deliberately a
@@ -2119,44 +2105,98 @@ config for per-integration credentials; put it in
   cited for the ISS's own visibility footprint), not a CSS-drawn shape
   -- it stays correctly sized as the map is panned/zoomed, which a
   fixed-pixel circle wouldn't.
-- **The HF Propagation (MUF) overlay (v3.56, `propagation.py`) started
-  as an open question -- "is prop.kc2g.com's map even a projection that
-  CAN be geo-registered onto Leaflet, or is it some azimuthal/great-
-  circle view centered on the observer that can't be?"** The `?grid=`
-  API parameter looked exactly like it might mean "re-center/re-project
-  around this station," which would have ruled out a direct overlay
-  entirely. Resolved with a real render (Chrome headless screenshot --
-  cairosvg was tried first and failed on a missing system libcairo in
-  this dev environment) of the SAME map fetched for two very different
-  grid squares (one in the US, one in Australia): identical world-map
-  geometry both times, only the reference marker/highlighted path
-  differed. Confirmed it's a plain equirectangular (Plate Carree) world
-  map, not observer-centered, three independent ways from the SVG's own
-  geometry (not eyeballed from the render):
-  1. The main-axes clipPath is a literal rectangle in the SVG's own pt
-     coordinate space: x 35.304688-1128.104687, y 24.14175-570.54175.
-  2. The 19 x-axis tick marks land exactly on -180,-160,...,180 (20-deg
-     steps); the 9 y-axis ticks land exactly on -80,-60,...,80. Both
-     axes compute to the identical 3.035556 pt/degree scale -- not
-     approximately equal, exactly equal, which is what makes an
-     imageOverlay (which needs one consistent scale) valid here at all.
-  3. Extrapolating that scale from the ticks out to the clipPath's own
-     edges lands on EXACTLY lat -90/+90, lon -180/+180 -- whole numbers,
-     not a rounding coincidence.
-  `propagation.py`'s `CROP_VIEWBOX` constants come directly from
-  finding #1; a cropped render (screenshot, again) confirmed coastlines
-  line up cleanly at every edge before this was trusted enough to ship.
-  Cropping itself is a plain string edit on the SVG's `viewBox`/`width`/
-  `height` attributes -- SVG's viewBox only changes which region maps to
-  the visible output, every path's own coordinates stay in the original
-  space, so this is a correct crop, not a rasterize-and-hope
-  approximation, and it avoids needing an SVG rendering dependency in
-  the shipped app entirely (Chrome-headless was only ever a one-time
-  research tool here, never part of the runtime path). **If KC2G ever
-  changes their figure size/margins/tick spacing, this whole
-  calibration needs re-deriving the same way** -- fetch a real map,
-  re-locate the clipPath rect and tick positions, don't adjust the
-  numbers by guessing from a visual diff.
+- **The HF Propagation (MUF) overlay (added v3.56 as `propagation.py`,
+  a cropped/geo-registered prop.kc2g.com world MUF map) was removed
+  entirely in v3.57 -- the user tried it live and it just looked bad on
+  the map, same "built it, looked at it, decided against it" outcome as
+  the Gulf-of-America map label and the RainViewer precipitation radar
+  overlay elsewhere in this file.** The equirectangular-projection
+  verification work that went into it (Chrome-headless screenshot
+  comparison across two different `?grid=` values, exact clipPath/tick-
+  mark geometry confirming -90/-180 to 90/180 bounds) was real and
+  correct -- this wasn't a technical failure, purely a visual/product
+  judgment call. `propagation.py`, its `/api/propagation_map.svg` route,
+  and the Live map's "Propagation (MUF)" checkbox are all gone. If a
+  similar MUF/propagation-map overlay is ever revisited, the
+  projection-verification approach documented in git history for this
+  entry is still the right starting point -- but treat the visual
+  result as an open question again, not a foregone conclusion.
+- **The Recent Contacts card (v3.57) is frontend-only -- no new backend
+  module, no new route.** It reads the same `/api/qsos` (`qsos.json`)
+  the Live map's QSO layer already fetches, just sorted newest-first by
+  `logged_at` (falling back to `date` for older entries that predate
+  this field) and rendered as a `.msg-row` list, same component the
+  Notifications/Satellites cards already use. What DID need real
+  plumbing: `qsos.json` entries previously only carried enough fields to
+  plot a pin (call/band/mode/date/lat/lon/grid) -- city/state/country
+  and exact frequency existed upstream (QRZ's XML response, WSJT-X's own
+  UDP packet) but were being discarded before reaching storage. Fixed
+  across the whole chain: `qrz.py`'s `_lookup_remote()` now returns
+  `city`/`state`/`country` as separate keys alongside the existing
+  combined `location` string (which drops country whenever a state is
+  present -- too lossy for a flag lookup); `monitor.py`'s
+  `_lookup_caller()` passes them through; `wsjtx.py`'s `_handle_qso()`
+  now ALWAYS calls `lookup_caller_info()` (previously only as a position
+  fallback when the grid square was absent) since it's one QSO at a
+  time and QRZ's client caches per callsign anyway; `wsjtx.py`'s packet
+  parser also keeps `frequency_hz` (was extracted then discarded, only
+  `band` was kept). `app.py`'s ADIF importer deliberately did NOT get
+  the same always-on QRZ lookup treatment -- kept the existing
+  grid-absent-only conditional, since a bulk import can be hundreds of
+  QSOs and a synchronous QRZ round-trip per QSO could make a large
+  import slow/time out; it does gain `frequency_hz` (a plain
+  `_adif_freq_to_hz()` MHz-string-to-Hz conversion) and `logged_at` (a
+  spec-correct `QSO_DATE`+`TIME_ON` UTC-epoch parser,
+  `_adif_datetime_to_epoch()`, needed since QSO_DATE alone can't order
+  same-day contacts).
+- **A real bug caught by testing, not inspection, in the ADIF importer's
+  country resolution: the QRZ fallback was written but never actually
+  wired up.** `_adif_datetime_to_epoch`/city/state were read correctly
+  from `monitor.lookup_caller_info()`'s result in the grid-absent
+  branch, but the `qsos.append()` dict's `"country"` line still read
+  `(r.get("COUNTRY") or "").strip() or None` -- the QRZ-sourced country
+  variable was computed and then silently never referenced. Confirmed
+  live with a mocked `lookup_caller_info()` (patched to return a
+  synthetic `country: "ENGLAND"`) before believing the fix: the first
+  attempt still came back `null`, the corrected version (`... or
+  qrz_country`) came back `"ENGLAND"`. Same "verify against real
+  behavior, not against having written the line" discipline the
+  `card_order_tiebreak`/`_file_lock` concurrent-write bug elsewhere in
+  this file was caught with -- code that looks obviously correct on a
+  read-through can still be wired to nothing.
+- **Country name -> flag emoji (`COUNTRY_FLAGS` in `dashboard.html`) is
+  a plain ISO-3166 English-country-name table, deliberately NOT a DXCC
+  callsign-prefix guess.** This was an explicit scope decision after
+  evaluating three DXCC-table options and rejecting all of them:
+  `pyhamtools` (pulls in `redis`/`ephem`/`lxml`/`beautifulsoup4` --
+  architecturally mismatched for an app with zero other external
+  service dependencies), raw `cty.dat` from country-files.com (blocked,
+  HTTP 403 on a direct fetch), and `api.hamdb.org` (free/keyless/
+  confirmed live, but confirmed via its own `/about` page to cover only
+  5 countries -- US/Canada/Australia/Germany/Czech Republic -- not a
+  general solution). The table only covers common English country
+  names as QRZ/ADIF logs actually spell them, NOT the full ~340-entry
+  DXCC entity list (many DXCC entities are sub-national --
+  "ENGLAND"/"SCOTLAND"/"ASIATIC RUSSIA" -- and don't map to one ISO flag
+  anyway). An unmatched name just shows no flag, same
+  graceful-degradation contract as every other optional field here --
+  don't "fix" a missing flag by guessing a DXCC prefix mapping instead.
+- **The Satellites card's Live map overlay gained its own independent
+  on/off toggle (v3.57), separate from `show_satellites` (settings.json).**
+  Previously `updateSatellitesMap()` unconditionally added its layer to
+  the map whenever satellite data was fetched, with no way to turn just
+  the map drawing off while keeping the card's pass predictions. Now a
+  `localStorage`-backed `satellites-map-toggle` checkbox (same pattern
+  as grey-line/aurora/POTA/PSK) gates whether `updateSatellitesMap()`'s
+  built layer group actually gets `.addTo(leafletMap)` -- the group and
+  its per-satellite markers (`satelliteMarkers`, keyed by `norad_id`)
+  are still built every poll regardless, so `jumpToSatelliteOnMap()` (a
+  clickable satellite name in the Satellites card's pass rows, mirroring
+  the existing `jumpToNodeOnMap(ip)` pattern for hotspot cards) always
+  has a marker to find. Clicking a satellite name turns the map overlay
+  on first if it was off (checks the box, calls `toggleSatellitesMap()`)
+  before panning/opening its popup -- otherwise the marker would exist
+  in memory but never have been added to the map to pan to.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

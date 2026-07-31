@@ -1644,6 +1644,19 @@
             <div class="msg-empty" id="sat-no-qth" style="display:none">Set a station grid square in Settings → Cards to enable pass predictions.</div>
         </div>
         {% endif %}
+        {% if settings.get('show_recent_contacts', False) %}
+        <div class="metrics-card" id="recent-contacts-card"
+             style="order:{{ settings.get('recent_contacts_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">📻 Recent Contacts</div>
+                <span class="card-sub" id="rc-card-sub">—</span>
+            </div>
+            <div class="msg-scroll" id="rc-scroll">
+                <div id="rc-list"></div>
+            </div>
+            <div class="msg-empty" id="rc-empty" style="display:none">No logged QSOs yet -- import an ADIF log or enable live WSJT-X logging in Settings.</div>
+        </div>
+        {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
         <div class="metrics-card" id="hf-conditions-card"
              style="order:{{ settings.get('hf_conditions_position', 0) }}">
@@ -1879,10 +1892,12 @@
             <input type="checkbox" id="psk-toggle" onchange="togglePsk()">
             PSK Reporter
         </label>
+        {% if settings.get('show_satellites', False) %}
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
-            <input type="checkbox" id="propagation-toggle" onchange="togglePropagation()">
-            Propagation (MUF)
+            <input type="checkbox" id="satellites-map-toggle" onchange="toggleSatellitesMap()">
+            Satellites
         </label>
+        {% endif %}
         <select id="map-style-select" onchange="setMapStyle(this.value)"
                 style="background:var(--card-bg);color:var(--text);
                        border:1px solid var(--card-border);border-radius:5px;
@@ -2122,6 +2137,9 @@ const SATELLITES_POLL_MS = 15000;  // satellite position moves fast (~7.6km/s) -
                                     // shorter than most cards' poll interval, but
                                     // /api/satellites itself caches for 10s server-side
                                     // (see satellites.py), so this doesn't hammer it.
+const SHOW_RECENT_CONTACTS = {{ 'true' if settings.get('show_recent_contacts', False) else 'false' }};
+const RECENT_CONTACTS_POSITION = {{ settings.get('recent_contacts_position', 0) }};
+const RECENT_CONTACTS_POLL_MS = 20000;  // same cadence as the map's own fetchQsos() poll -- same qsos.json source
 const COURTESY_TONE_ENABLED = {{ 'true' if settings.get('beta_courtesy_tone', False) else 'false' }};
 const SPOTLIGHT_DIMMING_ENABLED = {{ 'true' if settings.get('beta_spotlight_dimming', True) else 'false' }};
 
@@ -2492,6 +2510,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     hfcond: '__hf_conditions__', bandplan: '__band_plan__', licensequiz: '__license_quiz__',
     wspractivity: '__wspr_activity__', digipi: '__digipi__', bigclock: '__big_clock__',
     notifications: '__notifications__', satellites: '__satellites__',
+    recentcontacts: '__recent_contacts__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -2623,10 +2642,13 @@ function renderCards(data) {
     if (SHOW_SATELLITES) {
         sentinels.push({ key: 'satellites', pos: Math.max(0, SATELLITES_POSITION) });
     }
+    if (SHOW_RECENT_CONTACTS) {
+        sentinels.push({ key: 'recentcontacts', pos: Math.max(0, RECENT_CONTACTS_POSITION) });
+    }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, hfcond, bandplan,
     // licensequiz, wspractivity, digipi, bigclock, notifications, satellites,
-    // THEN cameras), since
+    // recentcontacts, THEN cameras), since
     // computeCardOrders() below now relies on a stable sort to break ties
     // by insertion order, not by an independent alphabetical rule. Two
     // sentinels can easily tie on position (e.g. right after enabling
@@ -2662,6 +2684,8 @@ function renderCards(data) {
     if (notificationsCard && 'notifications' in sentinelOrders) notificationsCard.style.order = sentinelOrders.notifications;
     const satellitesCard = document.getElementById('satellites-card');
     if (satellitesCard && 'satellites' in sentinelOrders) satellitesCard.style.order = sentinelOrders.satellites;
+    const recentContactsCard = document.getElementById('recent-contacts-card');
+    if (recentContactsCard && 'recentcontacts' in sentinelOrders) recentContactsCard.style.order = sentinelOrders.recentcontacts;
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -3250,7 +3274,7 @@ function renderSatellitesCard(data) {
         return `
         <div class="msg-row ${overhead ? 'unread' : ''}">
             <div class="msg-top">
-                <span class="msg-from">${escapeHtml(p.name)}${overhead ? ' <span style="color:var(--live)">● overhead</span>' : ''}</span>
+                <a href="#" class="msg-from" onclick="jumpToSatelliteOnMap(${p.norad_id}); return false;">${escapeHtml(p.name)}</a>${overhead ? ' <span style="color:var(--live)">● overhead</span>' : ''}
                 <span class="msg-time">${overhead ? 'until ' + fmtPassWhen(p.los_epoch).replace('in ', '') : fmtPassWhen(p.aos_epoch)}</span>
             </div>
             <div class="msg-text">${escapeHtml(freqBits)} · max el ${p.max_elevation.toFixed(0)}°</div>
@@ -3258,11 +3282,30 @@ function renderSatellitesCard(data) {
     }).join('');
 }
 
+// Independent on/off toggle for the Live map's ground-track/footprint
+// overlay -- separate from show_satellites (settings.json), which only
+// gates whether satellite data is fetched at all (needed for the
+// Satellites card regardless of whether the map overlay is on). Same
+// localStorage-checkbox pattern as grey-line/aurora/POTA/PSK above.
+const SATELLITES_MAP_KEY = 'w1zla_show_satellites_map';
 let satellitesMapLayer = null;
+// Keyed by norad_id -> marker, so the Satellites card's clickable name
+// links (jumpToSatelliteOnMap) can find and pan to a specific satellite.
+// updateSatellitesMap() rebuilds this fresh every poll, same as
+// nodeMarkers is rebuilt by refreshMap() -- not persisted across polls.
+let satelliteMarkers = {};
+function toggleSatellitesMap() {
+    const on = document.getElementById('satellites-map-toggle').checked;
+    localStorage.setItem(SATELLITES_MAP_KEY, on ? '1' : '0');
+    updateSatellitesMap(lastSatPositions);
+}
 function updateSatellitesMap(positions) {
     if (!leafletMap) return;
     if (satellitesMapLayer) { leafletMap.removeLayer(satellitesMapLayer); satellitesMapLayer = null; }
+    satelliteMarkers = {};
     if (!positions || !positions.length) return;
+    const toggleEl = document.getElementById('satellites-map-toggle');
+    const showOnMap = toggleEl ? toggleEl.checked : false;
 
     const liveColor = getComputedStyle(document.documentElement).getPropertyValue('--live').trim() || '#4fd8c4';
     const group = L.layerGroup();
@@ -3290,17 +3333,36 @@ function updateSatellitesMap(positions) {
             L.polyline(segment, { color: liveColor, weight: 1.5, opacity: 0.6, dashArray: '2,4', interactive: false }).addTo(group);
         }
 
-        L.marker([sat.lat, sat.lon], {
+        const marker = L.marker([sat.lat, sat.lon], {
             icon: L.divIcon({
                 className: '', iconSize: [70, 34], iconAnchor: [35, 8],
                 html: `<div class="sat-marker-icon">🛰️</div><div class="sat-label">${escapeHtml(sat.name)}</div>`,
             }),
-            interactive: false, keyboard: false,
-        }).addTo(group);
+            keyboard: false,
+        }).bindPopup(`<b>${escapeHtml(sat.name)}</b><br>${sat.alt_km.toFixed(0)} km altitude`);
+        marker.addTo(group);
+        satelliteMarkers[sat.norad_id] = marker;
     });
 
     satellitesMapLayer = group;
-    group.addTo(leafletMap);
+    if (showOnMap) group.addTo(leafletMap);
+}
+
+function jumpToSatelliteOnMap(noradId) {
+    goToTab('map');
+    // Clicking a satellite name implies "show me where this is" -- turn
+    // the map overlay on first if it's currently off, so the marker being
+    // jumped to actually exists on the map to pan to/pop up.
+    const toggleEl = document.getElementById('satellites-map-toggle');
+    if (toggleEl && !toggleEl.checked) {
+        toggleEl.checked = true;
+        toggleSatellitesMap();
+    }
+    const marker = satelliteMarkers[noradId];
+    if (marker) {
+        leafletMap.setView(marker.getLatLng(), Math.max(leafletMap.getZoom(), 3));
+        marker.openPopup();
+    }
 }
 
 let lastSatPositions = null;
@@ -4180,13 +4242,16 @@ function initMap() {
     document.getElementById('psk-toggle').checked = localStorage.getItem(PSK_KEY) === '1';
     if (document.getElementById('psk-toggle').checked) togglePsk();
 
-    document.getElementById('propagation-toggle').checked = localStorage.getItem(PROPAGATION_KEY) === '1';
-    if (document.getElementById('propagation-toggle').checked) togglePropagation();
-
     // Satellite positions may already have been fetched before this tab was
     // ever opened (fetchSatellites() runs on a timer regardless of which
     // tab is active) -- apply them immediately instead of waiting up to
-    // SATELLITES_POLL_MS for the next poll to populate the map.
+    // SATELLITES_POLL_MS for the next poll to populate the map. The overlay
+    // itself has its own on/off toggle (independent of the Satellites card
+    // setting, which only controls whether data is fetched at all) --
+    // restore its checked state before the first render so a returning
+    // visitor who had it on doesn't have to re-check it every page load.
+    const satMapToggle = document.getElementById('satellites-map-toggle');
+    if (satMapToggle) satMapToggle.checked = localStorage.getItem(SATELLITES_MAP_KEY) === '1';
     if (SHOW_SATELLITES && lastSatPositions) updateSatellitesMap(lastSatPositions);
 
     refreshMap();
@@ -4549,48 +4614,6 @@ function fmtAgoCompact(secs) {
     return Math.round(secs / 3600) + 'h';
 }
 
-// --- map: HF propagation (MUF) overlay -- prop.kc2g.com's world MUF map,
-// served pre-cropped by /api/propagation_map.svg (see propagation.py for
-// the pixel-to-lat/lon calibration this relies on). Same lazy on/off-toggle
-// pattern as aurora/POTA/PSK above -- a real backend fetch, not free math
-// like grey-line, so it shouldn't run for a visitor who never opens the
-// checkbox. Unlike those, this is a single L.imageOverlay pointed straight
-// at the route -- the browser loads it as a plain image, no per-spot JSON
-// parsing needed.
-const PROPAGATION_KEY = 'w1zla_show_propagation';
-const PROPAGATION_BOUNDS = [[-90, -180], [90, 180]];
-let propagationLayer = null;
-let propagationTimer = null;
-
-function updatePropagation() {
-    if (!leafletMap) return;
-    if (propagationLayer) { leafletMap.removeLayer(propagationLayer); propagationLayer = null; }
-    // Cache-busted client-side so a manual re-check after the server's own
-    // 15-min cache window actually fetches a fresh image rather than the
-    // browser's own HTTP cache serving the old one.
-    propagationLayer = L.imageOverlay('/api/propagation_map.svg?t=' + Date.now(), PROPAGATION_BOUNDS, {
-        opacity: 0.55, interactive: false,
-    });
-    if (document.getElementById('propagation-toggle').checked) propagationLayer.addTo(leafletMap);
-}
-
-function togglePropagation() {
-    const on = document.getElementById('propagation-toggle').checked;
-    localStorage.setItem(PROPAGATION_KEY, on ? '1' : '0');
-    if (on) {
-        updatePropagation();
-        if (!propagationTimer) {
-            propagationTimer = setInterval(() => {
-                const panel = document.getElementById('panel-map');
-                if (panel && panel.classList.contains('active')) updatePropagation();
-            }, 900000);  // matches propagation.py's CACHE_TTL (15 min)
-        }
-    } else {
-        if (propagationLayer) { leafletMap.removeLayer(propagationLayer); propagationLayer = null; }
-        if (propagationTimer) { clearInterval(propagationTimer); propagationTimer = null; }
-    }
-}
-
 // --- map: ADIF QSO import -- persistent data (server-side qsos.json),
 // not an optional layer toggle like grey-line/aurora above, so this
 // has its own always-visible control (upload + stats + clear) rather than
@@ -4660,6 +4683,107 @@ function updateQsoStats(qsos) {
 
 function fetchQsos() {
     fetch('/api/qsos').then(r => r.json()).then(renderQsoLayer).catch(() => {});
+}
+
+// --- Recent Contacts card -- reads the same qsos.json the map's QSO
+// layer does (ADIF bulk import + wsjtx.py live logging), just a
+// newest-first list view instead of a map layer. Country name -> flag
+// emoji is a plain ISO-3166 name table, NOT a DXCC callsign-prefix guess
+// -- QRZ's own `country` field or an ADIF log's own COUNTRY field is the
+// only source (see app.py/qrz.py), no source means no flag shown rather
+// than a wrong guess. This table is a best-effort match against common
+// English country names as QRZ/ADIF logs actually spell them -- it does
+// NOT attempt to cover the full ~340-entry DXCC entity list (many DXCC
+// entities are sub-national, e.g. "ENGLAND"/"SCOTLAND"/"ASIATIC RUSSIA",
+// and don't map to a single ISO country flag anyway). An unmatched name
+// just shows no flag -- same graceful-degradation contract as every
+// other optional field on this card.
+const COUNTRY_FLAGS = {
+    'UNITED STATES OF AMERICA': 'US', 'UNITED STATES': 'US', 'USA': 'US',
+    'CANADA': 'CA', 'MEXICO': 'MX',
+    'ENGLAND': 'GB', 'SCOTLAND': 'GB', 'WALES': 'GB', 'NORTHERN IRELAND': 'GB',
+    'UNITED KINGDOM': 'GB', 'GREAT BRITAIN': 'GB', 'IRELAND': 'IE',
+    'GERMANY': 'DE', 'FEDERAL REPUBLIC OF GERMANY': 'DE', 'FRANCE': 'FR',
+    'ITALY': 'IT', 'SPAIN': 'ES', 'PORTUGAL': 'PT', 'NETHERLANDS': 'NL',
+    'BELGIUM': 'BE', 'LUXEMBOURG': 'LU', 'SWITZERLAND': 'CH', 'AUSTRIA': 'AT',
+    'DENMARK': 'DK', 'NORWAY': 'NO', 'SWEDEN': 'SE', 'FINLAND': 'FI',
+    'ICELAND': 'IS', 'POLAND': 'PL', 'CZECH REPUBLIC': 'CZ', 'SLOVAKIA': 'SK',
+    'HUNGARY': 'HU', 'ROMANIA': 'RO', 'BULGARIA': 'BG', 'GREECE': 'GR',
+    'TURKEY': 'TR', 'UKRAINE': 'UA', 'BELARUS': 'BY',
+    'ESTONIA': 'EE', 'LATVIA': 'LV', 'LITHUANIA': 'LT', 'MOLDOVA': 'MD', 'SLOVENIA': 'SI',
+    'CROATIA': 'HR', 'SERBIA': 'RS', 'BOSNIA-HERZEGOVINA': 'BA',
+    'MONTENEGRO': 'ME', 'NORTH MACEDONIA': 'MK', 'ALBANIA': 'AL',
+    'MALTA': 'MT', 'CYPRUS': 'CY', 'EUROPEAN RUSSIA': 'RU', 'ASIATIC RUSSIA': 'RU',
+    'RUSSIA': 'RU', 'KALININGRAD': 'RU',
+    'JAPAN': 'JP', 'CHINA': 'CN', 'REPUBLIC OF KOREA': 'KR', 'SOUTH KOREA': 'KR',
+    'DEMOCRATIC PEOPLES REP. OF KOREA': 'KP', 'TAIWAN': 'TW', 'HONG KONG': 'HK',
+    'PHILIPPINES': 'PH', 'THAILAND': 'TH', 'VIETNAM': 'VN', 'INDONESIA': 'ID',
+    'MALAYSIA': 'MY', 'SINGAPORE': 'SG', 'INDIA': 'IN', 'PAKISTAN': 'PK',
+    'BANGLADESH': 'BD', 'SRI LANKA': 'LK', 'NEPAL': 'NP',
+    'AUSTRALIA': 'AU', 'NEW ZEALAND': 'NZ',
+    'BRAZIL': 'BR', 'ARGENTINA': 'AR', 'CHILE': 'CL', 'COLOMBIA': 'CO',
+    'PERU': 'PE', 'VENEZUELA': 'VE', 'ECUADOR': 'EC', 'BOLIVIA': 'BO',
+    'URUGUAY': 'UY', 'PARAGUAY': 'PY',
+    'CUBA': 'CU', 'JAMAICA': 'JM', 'DOMINICAN REPUBLIC': 'DO', 'HAITI': 'HT',
+    'PUERTO RICO': 'PR', 'BAHAMAS': 'BS', 'TRINIDAD & TOBAGO': 'TT',
+    'GUATEMALA': 'GT', 'HONDURAS': 'HN', 'EL SALVADOR': 'SV', 'NICARAGUA': 'NI',
+    'COSTA RICA': 'CR', 'PANAMA': 'PA',
+    'SOUTH AFRICA': 'ZA', 'EGYPT': 'EG', 'MOROCCO': 'MA', 'ALGERIA': 'DZ',
+    'TUNISIA': 'TN', 'NIGERIA': 'NG', 'KENYA': 'KE', 'ISRAEL': 'IL',
+    'SAUDI ARABIA': 'SA', 'UNITED ARAB EMIRATES': 'AE', 'QATAR': 'QA',
+    'KUWAIT': 'KW', 'JORDAN': 'JO', 'LEBANON': 'LB', 'IRAN': 'IR', 'IRAQ': 'IQ',
+};
+
+function flagForCountry(name) {
+    if (!name) return '';
+    const iso2 = COUNTRY_FLAGS[name.trim().toUpperCase()];
+    if (!iso2) return '';
+    return String.fromCodePoint(...[...iso2].map(c => 127397 + c.charCodeAt(0)));
+}
+
+function renderRecentContactsCard(qsos) {
+    const listEl = document.getElementById('rc-list');
+    const emptyEl = document.getElementById('rc-empty');
+    const subEl = document.getElementById('rc-card-sub');
+    if (!listEl) return;
+
+    const sorted = (qsos || []).slice().sort((a, b) => {
+        const at = a.logged_at || 0, bt = b.logged_at || 0;
+        if (bt !== at) return bt - at;
+        return (b.date || '').localeCompare(a.date || '');
+    });
+
+    if (subEl) subEl.textContent = sorted.length ? `${sorted.length} logged` : '';
+    if (emptyEl) emptyEl.style.display = sorted.length ? 'none' : 'block';
+
+    const nowSec = Date.now() / 1000;
+    listEl.innerHTML = sorted.slice(0, 20).map(q => {
+        const flag = flagForCountry(q.country);
+        const locBits = [q.city, q.state || q.country].filter(Boolean).join(', ');
+        const modeBits = [q.band, q.mode].filter(Boolean).join(' ');
+        const freqBits = q.frequency_hz ? (q.frequency_hz / 1e6).toFixed(3) + ' MHz' : '';
+        const when = q.logged_at ? fmtAgoCompact(Math.max(0, nowSec - q.logged_at)) + ' ago'
+                   : (q.date || '');
+        const metaBits = [modeBits, freqBits, q.grid].filter(Boolean).join(' · ');
+        return `
+        <div class="msg-row">
+            <div class="msg-top">
+                <span class="msg-from">${flag ? flag + ' ' : ''}${escapeHtml(q.call || '?')}</span>
+                <span class="msg-time">${escapeHtml(when)}</span>
+            </div>
+            <div class="msg-text">${escapeHtml(locBits)}</div>
+            <div class="msg-to">${escapeHtml(metaBits)}</div>
+        </div>`;
+    }).join('');
+}
+
+function fetchRecentContacts() {
+    if (!SHOW_RECENT_CONTACTS) return;
+    fetch('/api/qsos').then(r => r.json()).then(renderRecentContactsCard).catch(() => {});
+}
+if (SHOW_RECENT_CONTACTS) {
+    fetchRecentContacts();
+    setInterval(fetchRecentContacts, RECENT_CONTACTS_POLL_MS);
 }
 
 function handleAdifFile(file) {

@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.56"
+APP_VERSION = "3.57"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -20,6 +20,7 @@ VERSION_CODENAMES = [
     "Hendrix",          # v3.54 -- Jimi Hendrix (1942-1970)
     "Moon",             # v3.55 -- Keith Moon (1946-1978)
     "Harrison",         # v3.56 -- George Harrison (1943-2001)
+    "Mercury",          # v3.57 -- Freddie Mercury (1946-1991)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -453,6 +454,12 @@ DEFAULT_SETTINGS = {
         {"norad_id": 43017, "name": "AO-91",  "mode": "FM",   "downlink_mhz": 145.960, "uplink_mhz": 435.250},
         {"norad_id": 43678, "name": "PO-101", "mode": "FM",   "downlink_mhz": 145.900, "uplink_mhz": 437.500},
     ],
+    # Recent Contacts card -- off by default. Reads the same qsos.json
+    # both the ADIF importer and wsjtx.py's live logger write to, newest
+    # first -- no separate data source, just a different view onto QSOs
+    # already on the Live map.
+    "show_recent_contacts": False,
+    "recent_contacts_position": 0,
     # Live WSJT-X QSO logging -- off by default. Listens for WSJT-X's own
     # UDP telemetry protocol (the same feed GridTracker/JTAlert use) and
     # appends each logged QSO to the same qsos.json the ADIF importer

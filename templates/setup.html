@@ -663,6 +663,15 @@
                 <div class="toggle {{ 'on' if settings.get('digipi_enabled', False) else '' }}"
                      id="digipi-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show Recent Contacts card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (newest-first list of logged QSOs -- ADIF import + live WSJT-X logging)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_recent_contacts', False) else '' }}"
+                     id="recent-contacts-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveCards()">Save cards</button>
         <span class="status-txt" id="cards-status"></span>
@@ -719,6 +728,7 @@
             {% set big_clock_pos = settings.get('big_clock_position', 0) if settings.get('show_big_clock', False) else -1 %}
             {% set notifications_pos = settings.get('notifications_position', 0) if (settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False)) else -1 %}
             {% set satellites_pos = settings.get('satellites_position', 0) if settings.get('show_satellites', False) else -1 %}
+            {% set recent_contacts_pos = settings.get('recent_contacts_position', 0) if settings.get('show_recent_contacts', False) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -789,6 +799,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🛰️ Satellites</span>
                     <span class="node-meta">pass prediction card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == recent_contacts_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__recent_contacts__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📻 Recent Contacts</span>
+                    <span class="node-meta">logged QSO card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -1687,6 +1704,7 @@ function saveCards() {
             show_big_clock: document.getElementById('big-clock-toggle').classList.contains('on'),
             show_satellites: document.getElementById('satellites-toggle').classList.contains('on'),
             hamalert_enabled: document.getElementById('hamalert-toggle').classList.contains('on'),
+            show_recent_contacts: document.getElementById('recent-contacts-toggle').classList.contains('on'),
         })
     }).then(() => {
         const el = document.getElementById('cards-status');
@@ -1850,6 +1868,7 @@ function saveCardOrder() {
     const bigClockIdx = sentinelIndex('__big_clock__');
     const notificationsIdx = sentinelIndex('__notifications__');
     const satellitesIdx = sentinelIndex('__satellites__');
+    const recentContactsIdx = sentinelIndex('__recent_contacts__');
     const cameraPositions = {};
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
@@ -1950,6 +1969,13 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ satellites_position: satellitesIdx })
+        }));
+    }
+    if (recentContactsIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ recent_contacts_position: recentContactsIdx })
         }));
     }
     if (Object.keys(cameraPositions).length > 0) {

@@ -109,12 +109,25 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.56 "Harrison"</span>
+                <span class="release-version">v3.57 "Mercury"</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
             </div>
             <ul class="change-list">
-                <li><span>HF Propagation (MUF) overlay on the Live map</span> — a new "Propagation (MUF)" checkbox in the map legend, alongside Grey line/Aurora/POTA/PSK Reporter. Live Maximum Usable Frequency contour map from KC2G PropNET's real ionosonde network, geo-registered directly onto the map (not a separate image) — off by default, same lazy-fetch-on-toggle pattern as the other optional overlays</li>
+                <li><span>Recent Contacts card</span> — a newest-first list of your logged QSOs (ADIF import + live WSJT-X logging), off by default. Shows a country flag (from QRZ's own lookup or the ADIF log's own COUNTRY field — never a guessed callsign-prefix DXCC lookup), city/state, band/mode, frequency, and grid square per contact</li>
+                <li><span>Satellites card links now jump to the map</span> — clicking a satellite's name in an upcoming-pass row switches to the Live map, turns on the satellite overlay if it was off, and pans/pops up that satellite's marker</li>
+                <li><span>Satellite Live map overlay has its own on/off toggle</span> — previously tied to the Satellites card setting; now a separate "Satellites" checkbox in the map legend, same lazy on/off pattern as Grey line/Aurora/POTA/PSK Reporter</li>
+                <li><span>Removed the HF Propagation (MUF) overlay</span> — added last release, but it just didn't look good on the map in practice. <code>propagation.py</code> and the "Propagation (MUF)" map checkbox are gone</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.56 "Harrison"</span>
+                <span class="release-date">July 2026</span>
+            </div>
+            <ul class="change-list">
+                <li><span>HF Propagation (MUF) overlay on the Live map</span> — a new "Propagation (MUF)" checkbox in the map legend, alongside Grey line/Aurora/POTA/PSK Reporter. Live Maximum Usable Frequency contour map from KC2G PropNET's real ionosonde network, geo-registered directly onto the map (not a separate image) — off by default, same lazy-fetch-on-toggle pattern as the other optional overlays. <em>Removed in v3.57 — didn't look good in practice.</em></li>
             </ul>
         </div>
 

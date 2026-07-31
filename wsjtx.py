@@ -176,6 +176,7 @@ def parse_packet(data: bytes) -> dict | None:
             "call": call,
             "grid": grid.strip(),
             "band": freq_to_band(frequency),
+            "frequency_hz": frequency,
             "mode": mode.strip().upper(),
             "date": f"{year:04d}{month:02d}{day:02d}",
             "my_grid": my_grid.strip(),
@@ -267,14 +268,18 @@ class WsjtxListener:
         try:
             from wspr_activity import grid_to_latlon  # local import avoids a hard dependency cycle at module load time
 
-            lat = lon = name = location = None
+            # Always attempt the QRZ/RadioID/APRS composition now, not just
+            # as a position fallback when the grid square is missing --
+            # name/city/state/country are display-only extras for the
+            # Recent Contacts card, worth fetching (QRZ's own client already
+            # caches per callsign) even when the grid square alone already
+            # gives us a usable position.
+            info = self._monitor.lookup_caller_info(parsed["call"])
+            name, location = info["name"], info["location"]
+            city, state, country = info["city"], info["state"], info["country"]
+
             latlon = grid_to_latlon(parsed["grid"]) if parsed["grid"] else None
-            if latlon is not None:
-                lat, lon = latlon
-            else:
-                info = self._monitor.lookup_caller_info(parsed["call"])
-                lat, lon = info["lat"], info["lon"]
-                name, location = info["name"], info["location"]
+            lat, lon = latlon if latlon is not None else (info["lat"], info["lon"])
             if lat is None or lon is None:
                 return  # can't plot without a position, same as the ADIF importer
 
@@ -293,15 +298,19 @@ class WsjtxListener:
                 "band": parsed["band"],
                 "mode": parsed["mode"],
                 "date": parsed["date"],
+                "grid": parsed["grid"] or None,
+                "frequency_hz": parsed["frequency_hz"],
                 "lat": lat, "lon": lon,
                 "qth_lat": qth_lat, "qth_lon": qth_lon,
                 "name": name, "location": location,
+                "city": city, "state": state, "country": country,
                 "source": "wsjtx",
                 "logged_at": time.time(),  # epoch seconds -- lets the map
                 # highlight a QSO as "just happened" for a while, then fade
                 # it back to the normal band-colored pin (dashboard.html's
-                # QSO_NEW_WINDOW_SEC). Bulk ADIF imports have no equivalent
-                # field -- there's no "just happened" for a historical log.
+                # QSO_NEW_WINDOW_SEC), and lets the Recent Contacts card
+                # sort by actual time. Bulk ADIF imports have their own
+                # equivalent derived from QSO_DATE+TIME_ON (app.py).
             })
         except Exception:
             pass

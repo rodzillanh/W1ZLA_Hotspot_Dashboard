@@ -45,7 +45,6 @@ from openspot import OpenSpot4Manager
 from wsjtx import WsjtxListener
 from hamalert import HamAlertListener
 from satellites import SatelliteTracker
-from propagation import PropagationMapClient
 
 import host_stats as host_stats_mod
 
@@ -59,7 +58,6 @@ hf_conditions   = HfConditionsClient()
 camera_manager  = CameraStreamManager()
 license_quiz    = LicenseQuizPool()
 satellite_tracker = SatelliteTracker()
-propagation_map    = PropagationMapClient()
 wspr_activity   = WsprActivityClient()
 aurora_client   = AuroraClient()
 pota_client     = PotaClient()
@@ -433,6 +431,13 @@ def api_settings_post():
                 "uplink_mhz": _optional_float(sat.get("uplink_mhz")),
             })
         settings["tracked_satellites"] = cleaned
+    if "show_recent_contacts" in data:
+        settings["show_recent_contacts"] = bool(data["show_recent_contacts"])
+    if "recent_contacts_position" in data:
+        try:
+            settings["recent_contacts_position"] = max(0, int(data["recent_contacts_position"]))
+        except (TypeError, ValueError):
+            pass
     if "wsjtx_enabled" in data:
         settings["wsjtx_enabled"] = bool(data["wsjtx_enabled"])
     if "wsjtx_port" in data:
@@ -553,6 +558,7 @@ _SENTINEL_DEFS = [
     ("__big_clock__", "show_big_clock", "big_clock_position", "🕐", "Big Ass Clock", "clock card"),
     ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
     ("__satellites__", "show_satellites", "satellites_position", "🛰️", "Satellites", "pass prediction card"),
+    ("__recent_contacts__", "show_recent_contacts", "recent_contacts_position", "📻", "Recent Contacts", "logged QSO card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -834,6 +840,37 @@ def api_psk_reporter():
 def api_qsos():
     return jsonify(load_qsos())
 
+def _adif_freq_to_hz(freq_mhz_str) -> "int | None":
+    """ADIF's FREQ field is a plain string in MHz (e.g. "14.074000")."""
+    if not freq_mhz_str:
+        return None
+    try:
+        return round(float(freq_mhz_str) * 1_000_000)
+    except (TypeError, ValueError):
+        return None
+
+def _adif_datetime_to_epoch(qso_date: str, time_on) -> "float | None":
+    """QSO_DATE is YYYYMMDD, TIME_ON is HHMM or HHMMSS -- both UTC per the
+    ADIF spec. Returns None (not a guess) if either is missing/malformed,
+    so a QSO without a usable timestamp just sorts after every QSO that
+    has one, rather than getting a fabricated time."""
+    if not qso_date or len(qso_date) != 8:
+        return None
+    time_on = (time_on or "").strip()
+    if len(time_on) == 4:
+        time_on += "00"
+    elif len(time_on) != 6:
+        return None
+    try:
+        dt = datetime.datetime(
+            int(qso_date[0:4]), int(qso_date[4:6]), int(qso_date[6:8]),
+            int(time_on[0:2]), int(time_on[2:4]), int(time_on[4:6]),
+            tzinfo=datetime.timezone.utc,
+        )
+        return dt.timestamp()
+    except ValueError:
+        return None
+
 @app.route("/api/import_adif", methods=["POST"])
 def api_import_adif():
     """Parses an uploaded ADIF log and replaces the stored QSO list
@@ -860,15 +897,23 @@ def api_import_adif():
         call = (r.get("CALL") or "").strip().upper()
         if not call:
             continue
-        lat = lon = name = location = None
+        lat = lon = name = location = city = state = qrz_country = None
         grid = (r.get("GRIDSQUARE") or "").strip()
         latlon = grid_to_latlon(grid) if grid else None
         if latlon is not None:
             lat, lon = latlon
         else:
+            # QRZ lookup only as a position FALLBACK here (unlike wsjtx.py's
+            # live one-at-a-time path, which now always looks up city/
+            # state/country too) -- a bulk import can be hundreds/thousands
+            # of QSOs, and doing a synchronous QRZ round-trip for every one
+            # regardless of whether the log already has a usable position
+            # would make a big import request slow or time out. Only pay
+            # that cost when the log genuinely lacks a grid square.
             info = monitor.lookup_caller_info(call)
             lat, lon = info["lat"], info["lon"]
             name, location = info["name"], info["location"]
+            city, state, qrz_country = info["city"], info["state"], info["country"]
         if lat is None or lon is None:
             continue  # can't plot without a position
 
@@ -878,14 +923,25 @@ def api_import_adif():
             qth = default_qth
         qth_lat, qth_lon = qth if qth is not None else (None, None)
 
+        qso_date = (r.get("QSO_DATE") or "").strip()
         qsos.append({
             "call": call,
             "band": (r.get("BAND") or "").strip().lower(),
             "mode": (r.get("MODE") or "").strip().upper(),
-            "date": (r.get("QSO_DATE") or "").strip(),
+            "date": qso_date,
+            "grid": grid or None,
+            "frequency_hz": _adif_freq_to_hz(r.get("FREQ")),
             "lat": lat, "lon": lon,
             "qth_lat": qth_lat, "qth_lon": qth_lon,
             "name": name, "location": location,
+            "city": city, "state": state,
+            # ADIF's own COUNTRY field (when the logging software already
+            # resolved DXCC) takes priority over QRZ's -- more likely to
+            # reflect what was actually true at QSO time, and doesn't cost
+            # an extra lookup for the common case where GRIDSQUARE already
+            # gave us a position.
+            "country": (r.get("COUNTRY") or "").strip() or qrz_country,
+            "logged_at": _adif_datetime_to_epoch(qso_date, r.get("TIME_ON")),
         })
 
     save_qsos(qsos)
@@ -935,21 +991,6 @@ def api_satellites():
     qth = grid_to_latlon(settings.get("station_grid", ""))
     passes = satellite_tracker.passes(tracked, qth[0], qth[1]) if qth else []
     return jsonify({"positions": positions, "passes": passes, "has_observer": qth is not None})
-
-@app.route("/api/propagation_map.svg")
-def api_propagation_map():
-    """Live HF MUF (3000km path) world map for the Live map's optional
-    "Propagation (MUF)" overlay -- see propagation.py for the source and
-    the pixel-to-lat/lon calibration this relies on. Pre-cropped
-    server-side to just the world-map data region (no title/colorbar),
-    geo-registered as an L.imageOverlay with bounds [[-90,-180],[90,180]]
-    client-side. A 503 here (not a broken image) is deliberate -- an
-    <img>/imageOverlay src that 404s/500s just shows nothing, which reads
-    as "the overlay is empty" rather than "the fetch failed"."""
-    svg = propagation_map.get(load_settings().get("station_grid", ""))
-    if svg is None:
-        return jsonify({"error": "unavailable"}), 503
-    return Response(svg, mimetype="image/svg+xml")
 
 @app.route("/version")
 def version_page():

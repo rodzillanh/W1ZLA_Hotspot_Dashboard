@@ -991,6 +991,10 @@ satellites, plus a live ground-track overlay on the **Live map**.
   ground track (roughly one orbit, centered on now) drawn directly on
   the Live map. Works independently of the station grid square — this
   part doesn't need an observer location, only the pass-time list does.
+  Has its own "Satellites" checkbox in the map legend (off by default),
+  separate from the card itself — clicking a satellite's name in the
+  pass list switches to the map, turns this overlay on if it was off,
+  and pans to that satellite.
 - **Tracked satellites** are editable in Settings → Cards → "Tracked
   satellites" (NORAD catalog ID + display name/mode/frequency per
   entry) — default list is ISS, SO-50, AO-91, and PO-101. Orbital data
@@ -1002,6 +1006,22 @@ satellites, plus a live ground-track overlay on the **Live map**.
   shipping. Satellite operational status changes over time (satellites
   go silent, decay, or get replaced), so the default list is
   intentionally small and editable rather than exhaustive.
+
+## Recent Contacts card
+
+Optional dashboard card (Settings → Cards → "Show Recent Contacts card",
+off by default) — a newest-first list of your logged QSOs, drawing on
+the same `qsos.json` the Live map's QSO layer already plots (ADIF bulk
+import and/or live WSJT-X logging — see the Live map section below).
+No separate data source or configuration; this is just a different view
+onto QSOs already being tracked.
+
+Each row shows: a country flag (when known), callsign, city/state, band
+and mode, frequency, grid square, and how long ago it was logged. The
+flag comes from QRZ's own `country` field (if a QRZ subscription is
+configured) or the ADIF log's own `COUNTRY` field — **not** a guessed
+callsign-prefix DXCC lookup, so a contact with neither source just shows
+no flag rather than a potentially wrong one.
 
 ## Big Ass Clock card
 
@@ -1177,12 +1197,6 @@ appear as pins — the QRZ subscription caveat above applies here too.
   default; PSK Reporter's own server actively rate-limits frequent
   polling, so this is cached 10 minutes server-side regardless of how
   long the checkbox has been on.
-- **Propagation (MUF)** — a "Propagation (MUF)" checkbox overlays a live
-  world map of Maximum Usable Frequency (3000km path) directly on the
-  Live map, from [KC2G PropNET](https://prop.kc2g.com)'s real ionosonde
-  network data (free, no key). Off by default; the map image is cached
-  15 minutes server-side, matching how often KC2G regenerates it.
-
 ## Fleet activity
 
 Optional — off by default (Settings → Cards → "Show fleet activity
