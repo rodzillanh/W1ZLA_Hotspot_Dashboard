@@ -4,15 +4,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>README — {{ settings.dashboard_name }}</title>
     <style>
+        /* Instrument-panel token palette -- same tokens/values as
+           dashboard.html/setup.html, a pure swap-in here (every color
+           reference in this file already goes through one of these
+           names, confirmed by grepping for stray hex/rgba before doing
+           this -- see CLAUDE.md's setup.html reskin gotcha for why that
+           check matters). --amber is kept as an alias to --caution for
+           the same reason setup.html's old --amber was -- unused in this
+           file's body today, but harmless to keep for anyone extending it. */
         :root {
-            --bg: #121212; --card-bg: #1e1e1e; --card-border: #2d2d2d;
-            --text: #e0e0e0; --text-muted: #888; --text-dim: #555;
-            --accent: #2ecc71; --link: #5bc0de; --amber: #f39c12;
+            --bg: #12151a; --card-bg: #1a1e25; --card-border: #2b313b;
+            --text: #eef0f2; --text-muted: #9aa2ad; --text-dim: #5b6470;
+            --accent: #ffb648; --link: #4fd8c4; --amber: #f0c419;
         }
         [data-theme="light"] {
-            --bg: #f0f2f5; --card-bg: #fff; --card-border: #dde1e7;
-            --text: #1a1a1a; --text-muted: #666; --text-dim: #aaa;
-            --accent: #27ae60; --link: #2980b9; --amber: #e67e22;
+            --bg: #eef1f4; --card-bg: #ffffff; --card-border: #dde2e8;
+            --text: #1b1f26; --text-muted: #5b6470; --text-dim: #98a1ab;
+            --accent: #c97a12; --link: #0e8f7d; --amber: #a8720a;
         }
         * { box-sizing: border-box; }
         html {
