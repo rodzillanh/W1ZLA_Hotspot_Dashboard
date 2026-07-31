@@ -432,7 +432,13 @@ class FleetMonitor:
         meaningful ranking identity, just not a real callsign). A
         hotspot type with neither (e.g. openspot4, which doesn't
         currently call this) just logs target=None, invisible to
-        top_targets()."""
+        top_targets().
+
+        `via` is the WPSD talkgroup this specific transmission was heard
+        on, shown alongside the callsign for context (not used for
+        ranking) -- ASL3 has no separate concept here (status.talkgroup
+        is never set for it; the linked node captured in active_call
+        already IS the "channel", so there's nothing distinct to add)."""
         if not load_settings().get("show_fleet_activity", False):
             return
         with self._lock:
@@ -442,7 +448,8 @@ class FleetMonitor:
             name, mode = status.name, status.mode
             target = status.active_call or None
             target_type = "callsign" if target else None
-        storage_activity.log_activity(ip, name, mode, target, target_type)
+            via = status.talkgroup or None
+        storage_activity.log_activity(ip, name, mode, target, target_type, via)
 
     def _lookup_caller(self, call: str) -> dict:
         """Compose caller info from QRZ, RadioID.net (name/location fallback),

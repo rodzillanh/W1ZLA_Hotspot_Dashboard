@@ -117,9 +117,23 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.59 "Reed"</span>
+                <span class="release-version">v3.60 "Winehouse"</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Recent Contacts callsigns are clickable</span> — link to QRZ if a subscription is configured, otherwise RadioID.net's public database search</li>
+                <li><span>Fixed country flags not showing for most Recent Contacts</span> — two real bugs: flag emoji don't render at all on Windows (switched to real SVG flag images), and the ADIF importer only looked up country when the log had no grid square, but most real logs have a grid square and no COUNTRY field, so it was blank almost every time — now always looked up</li>
+                <li><span>Top 5 Activity now ranks callsigns, not talkgroups/nodes</span> — fixed a wrong-scope bug from the initial build; WPSD rows also show the talkgroup that callsign was most recently heard on, and every row links to QRZ/RadioID like Recent Contacts</li>
+                <li><span>Decluttered the Notifications card</span> — each source (APRS/HamAlert/Fleet/Solar/Brandmeister) used to show its own header icon AND its own filter chip, saying the same thing twice. Now one row of pills does both jobs: click a source to isolate it, click it again for everything</li>
+                <li><span>Recent Contacts card redesign</span> — rebuilt to match the originally-approved mockup (a flag column, a bold callsign, a colored band/mode badge, one clean meta line) instead of the generic message-thread layout it first shipped with</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.59 "Reed"</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Three new Notifications sources</span> — fleet online/offline transition alerts (no new connection, just surfaces monitor.py's existing offline_since tracking), geomagnetic-storm alerts (Kp>=5 threshold crossing, from the HF Conditions card's existing hourly fetch), and Brandmeister favorite-activity alerts (a favorite callsign keying up ANYWHERE on the Brandmeister network, not just through this fleet) — each independently toggleable in Settings → Cards</li>

@@ -841,10 +841,11 @@ independent message/alert sources into one scrollable, time-sorted list —
 appears as soon as *any* is enabled, and each remains its own separate
 on/off toggle underneath. Position it anywhere in the same drag-and-drop
 **Card order** list (Settings → Hotspots), same as Fleet Activity/ASL
-Favorites/Camera cards. When two or more sources are enabled, filter chips
-let you narrow the list to one; with only one enabled, the card just shows
-that source's rows with no filter chips needed. Each row is tagged with a
-small icon so the source stays visible even in the combined "All" view.
+Favorites/Camera cards. Each enabled source shows as one pill in the card
+header (with a connection dot for sources that have a real connection to
+show) — click a pill to isolate that source's rows, click it again to go
+back to showing everything. Each row is also tagged with a small icon so
+the source stays visible even when showing all of them together.
 
 **APRS Messages** (Settings → Cards → "Show APRS Messages card", off by
 default) — the receiving half of APRS favorite alerts above: a persistent
@@ -1069,12 +1070,14 @@ source or backend query.
 
 Optional dashboard card (Settings → Cards → "Show Top 5 Activity card",
 off by default) — ranks **your own fleet's** most active callsigns (who
-transmitted, not which talkgroup/node it went through) over the last 24
-hours, as a simple bar-ranked list, each linking to QRZ (or RadioID.net
-if QRZ isn't configured) same as the Recent Contacts card. Needs "Show
-fleet activity card" enabled too — it reads the same activity log that
-card's chart is built from, just a different aggregate query (ranked
-totals instead of a time series).
+transmitted) over the last 24 hours, as a simple bar-ranked list, each
+linking to QRZ (or RadioID.net if QRZ isn't configured) same as the
+Recent Contacts card. WPSD entries also show the talkgroup that callsign
+was most recently heard on (e.g. "TG 3172"); AllStarLink has no separate
+concept here, since the linked node is already baked into the callsign
+itself. Needs "Show fleet activity card" enabled too — it reads the same
+activity log that card's chart is built from, just a different aggregate
+query (ranked totals instead of a time series).
 
 This is deliberately scoped to your own fleet, not a network-wide "what's
 busy right now" feed — Brandmeister/TGIF/AllStarLink/YSF were each

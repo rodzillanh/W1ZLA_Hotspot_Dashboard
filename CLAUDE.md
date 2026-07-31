@@ -2386,6 +2386,94 @@ config for per-integration credentials; put it in
     new path, new room name), this whole discovery process needs
     redoing the same way -- there's no vendor doc to fall back on.
 
+- **Country flags in Recent Contacts weren't showing for most rows --
+  two independent, real bugs, not one (v3.60), caught by the user, not
+  by inspection.** (1) **Windows does not render flag emoji at all** --
+  Segoe UI Emoji has no flag glyphs by design (a deliberate Microsoft
+  choice, unlike Apple/Google's emoji fonts), so a regional-indicator
+  pair like the US flag falls back to showing the literal letters "US"
+  as plain text instead of composing an icon. No choice of emoji
+  character fixes this -- it needed a real image instead. Fixed by
+  rendering an actual small SVG flag (`hjnilsson/country-flags` via
+  jsdelivr) keyed off the same ISO2 code the old emoji-generation logic
+  already computed -- confirmed live this CDN serves real flags before
+  using it, and it's the exact same CDN Brandmeister's own production
+  frontend uses for this exact purpose (noticed by chance while
+  reverse-engineering their Last Heard feed above). (2) **The ADIF
+  importer only ran the QRZ/RadioID country/city/state/name lookup when
+  GRIDSQUARE was absent** -- but most real-world ADIF logs DO have
+  GRIDSQUARE and DON'T populate COUNTRY (plenty of logging programs
+  never write it), so this "only look up when grid is missing"
+  shortcut left country (and therefore the flag) blank for nearly every
+  imported QSO in practice, not just an edge case. Fixed by always
+  running the lookup for name/city/state/country regardless of whether
+  GRIDSQUARE already gave a position -- matching wsjtx.py's live-logging
+  path, which already always enriches. Position resolution itself is
+  unchanged (grid still wins over a QRZ-derived position when both are
+  available) -- only the enrichment fields' lookup got less conditional.
+  `QrzClient.lookup()`'s own per-callsign cache plus its near-instant
+  short-circuit when QRZ isn't configured (`QrzClient.enabled`) keeps
+  this cheap even for a large bulk import.
+- **The Top 5 Activity card's first ship ranked by talkgroup/node, not
+  callsign -- a real, reported wrong-scope bug ("I was actually looking
+  for the top 5 call signs not the top 5 nodes"), fixed the same
+  session it shipped.** See the earlier Top 5 Activity gotcha entry
+  above for the full fix; this entry just adds what came after the
+  fix, in response to a follow-up ask for MORE context, not less: each
+  ranked callsign now also shows `via` -- the WPSD talkgroup that
+  callsign was MOST RECENTLY heard on (a new `via` column on
+  `activity_log`, resolved per-callsign with a correlated subquery
+  picking the latest row's `via`, not an aggregate/most-common value --
+  simpler and more useful at a glance). ASL3 deliberately gets no `via`
+  value at all -- `status.talkgroup` is never set for that hotspot
+  type, and the linked node captured in `active_call` already IS the
+  "channel" in the WPSD-talkgroup sense, so there's nothing distinct
+  left to show.
+- **The Notifications card's header-icon row and filter-chip row said
+  the same thing twice -- reported directly by the user with a
+  screenshot ("this card is kinda busy, the notification type seems
+  redundant"), fixed via a mockup-first redesign (same workflow as every
+  other card this project has built).** Each of the 5 possible sources
+  (APRS/HamAlert/Fleet/Solar/Brandmeister) used to render BOTH a
+  `.conn-item` in the header (icon + connection dot) AND a separate
+  `.filter-chip` below (icon + label, click to filter) -- two full rows
+  of near-duplicate source identity before a single notification ever
+  showed. Merged into one `.source-row` of `.source-pill`s that do both
+  jobs: the connection dot still lives on the pill (`#aprs-inbox-conn-
+  dot`/etc. -- same element IDs, so the existing JS that toggles
+  `.down`/sets `.title` on them needed zero changes), and clicking a
+  pill both shows which source it is AND filters to it
+  (`toggleNotifFilter()`, replacing `setNotifFilter()`) -- clicking the
+  ALREADY-selected pill again returns to showing every source, so there's
+  no separate "All" chip needed either. The old `notif_source_count > 1`
+  guard (which used to hide the filter-chip row entirely when only one
+  source was enabled, since filtering a single source to itself was
+  meaningless) is gone -- the source-row now always renders whenever at
+  least one source is enabled, since even a lone pill still usefully
+  shows that source's identity/connection state; clicking it is just a
+  harmless no-op toggle in that case. Verified live: Jinja-rendered the
+  card at zero/one/all-five sources enabled and confirmed the card
+  appears/disappears and the pill list matches in each case.
+- **The Recent Contacts card's actual shipped design didn't match the
+  mockup the user had already approved -- reported directly ("why
+  doesn't my recent contacts card look as good as the mockup"), root
+  cause was reusing `.msg-row` (the Notifications card's message-thread
+  layout) instead of building the mockup's own dedicated row shape.**
+  Fixed by adding real `.qso-row`/`.qso-flag`/`.qso-body`/`.qso-top`/
+  `.qso-call`/`.qso-band-badge`/`.qso-time`/`.qso-meta`/`.qso-grid` CSS
+  matching the mockup's actual property values (not approximated from
+  memory), plus a `.fresh` highlight on contacts logged within
+  `QSO_NEW_WINDOW_SEC` (the same 10-minute "just happened" window the
+  map's own QSO pins already use, reused rather than inventing a second
+  threshold). Fields added to the schema AFTER the original mockup
+  (operator name, RST, distance) had to be fit into this same layout
+  rather than the mockup's own markup verbatim, since the mockup
+  predates those fields entirely. **Lesson for next time a mockup gets
+  approved**: build the ACTUAL approved CSS/markup, don't reach for the
+  nearest existing component that "shape of" fits -- reuse only after
+  confirming the visual result actually matches what was shown and
+  agreed to, not just that it's plausible-looking.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
