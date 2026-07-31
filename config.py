@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.58"
+APP_VERSION = "3.59"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -22,6 +22,7 @@ VERSION_CODENAMES = [
     "Harrison",         # v3.56 -- George Harrison (1943-2001)
     "Mercury",          # v3.57 -- Freddie Mercury (1946-1991)
     "Cornell",          # v3.58 -- Chris Cornell (1964-2017)
+    "Reed",             # v3.59 -- Lou Reed (1942-2013)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -461,6 +462,21 @@ DEFAULT_SETTINGS = {
     # already on the Live map.
     "show_recent_contacts": False,
     "recent_contacts_position": 0,
+    # QSO Stats card -- off by default. Pure client-side aggregation over
+    # the same qsos.json Recent Contacts/the map already read -- no new
+    # data source, no new backend computation (see /api/qsos).
+    "show_qso_stats": False,
+    "qso_stats_position": 0,
+    # Top 5 activity card -- off by default. Ranks the fleet's own most
+    # active talkgroups/nodes over a trailing window (default 24h) --
+    # reuses storage_activity.py's existing activity_log (same opt-in
+    # show_fleet_activity gate for whether rows get logged at all), just
+    # a different aggregate query. Deliberately own-fleet only, not a
+    # network-wide "what's busy right now" feed -- see CLAUDE.md for the
+    # Brandmeister/TGIF/AllStarLink/YSF research that ruled that out as a
+    # clean REST-pollable option.
+    "show_top_activity": False,
+    "top_activity_position": 0,
     # Live WSJT-X QSO logging -- off by default. Listens for WSJT-X's own
     # UDP telemetry protocol (the same feed GridTracker/JTAlert use) and
     # appends each logged QSO to the same qsos.json the ADIF importer
@@ -512,12 +528,32 @@ DEFAULT_SETTINGS = {
     "hamalert_username": "",
     "hamalert_password": "",
     "hamalert_position": 0,
-    # Notifications card (merged APRS Messages + HamAlert display, v3.51) --
-    # aprs_inbox_enabled/hamalert_enabled above stay independent (each still
-    # gates its own connection); this only controls where the ONE merged
-    # card sits. aprs_inbox_position/hamalert_position are now unused dead
+    # Notifications card (merged APRS Messages + HamAlert display, v3.51,
+    # later joined by fleet/solar alerts) -- each source setting below
+    # stays independent (gates its own data source); notifications_position
+    # only controls where the ONE merged card sits.
+    # aprs_inbox_position/hamalert_position are now unused dead
     # settings, kept only for backward compat with old settings.json files.
     "notifications_position": 0,
+    # Fleet online/offline transition alerts in the Notifications card --
+    # off by default. No new connection/poll -- monitor.py already tracks
+    # offline_since for the card badges; this just surfaces the moment it
+    # flips as a notification event (see FleetMonitor.fleet_events()).
+    "fleet_alerts_enabled": False,
+    # Geomagnetic-storm alerts in the Notifications card -- off by default.
+    # No new connection/poll -- hf_conditions.py already fetches K-index
+    # hourly for the HF Conditions card; this just surfaces a Kp>=5
+    # threshold crossing as a notification event (see
+    # HfConditionsClient.alert_events()).
+    "solar_alerts_enabled": False,
+    # Brandmeister network-wide favorite-activity alerts in the
+    # Notifications card -- off by default. Persistent WebSocket to
+    # Brandmeister's own public "Last Heard" Socket.IO feed (no account/
+    # credentials needed, unlike HamAlert) -- see brandmeister_lastheard.py
+    # for how the live endpoint was found and verified. Notifies when a
+    # favorite callsign (favorites.json) keys up ANYWHERE on the
+    # Brandmeister network, not just through this fleet's own hotspots.
+    "brandmeister_alerts_enabled": False,
 }
 
 # --- Fleet activity ---

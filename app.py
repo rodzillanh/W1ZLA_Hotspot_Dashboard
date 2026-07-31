@@ -38,12 +38,14 @@ from license_quiz import LicenseQuizPool, DEFAULT_CLASS as LICENSE_QUIZ_DEFAULT_
 from wspr_activity import WsprActivityClient, grid_to_latlon
 from aurora import AuroraClient
 from pota import PotaClient
+from sota import SotaClient
 from psk_reporter import PskReporterClient
 from adif import parse_adif
 from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
 from wsjtx import WsjtxListener
 from hamalert import HamAlertListener
+from brandmeister_lastheard import BrandmeisterLastHeardListener
 from satellites import SatelliteTracker
 
 import host_stats as host_stats_mod
@@ -61,12 +63,14 @@ satellite_tracker = SatelliteTracker()
 wspr_activity   = WsprActivityClient()
 aurora_client   = AuroraClient()
 pota_client     = PotaClient()
+sota_client     = SotaClient()
 psk_reporter    = PskReporterClient()
 digipi_monitor  = DigipiMonitor()
 openspot_manager = OpenSpot4Manager(monitor)
 openspot_manager.reconcile(load_hotspots())  # eager start at boot, mirrors mqtt_pub's startup rebuild
 wsjtx_listener  = WsjtxListener(monitor)
 hamalert_listener = HamAlertListener()
+brandmeister_lh = BrandmeisterLastHeardListener()
 
 # Gates the Settings "Host power control" buttons -- only true on a
 # standalone install running directly on real Raspberry Pi hardware (see
@@ -184,6 +188,15 @@ def _rebuild_hamalert() -> None:
     )
 
 _rebuild_hamalert()
+
+def _rebuild_brandmeister_lh() -> None:
+    """configure() itself is a no-op unless enabled state actually
+    changed -- same pattern as _rebuild_aprs_inbox/_rebuild_hamalert
+    above. No credentials involved (the feed is public), just on/off."""
+    settings = load_settings()
+    brandmeister_lh.configure(settings.get("brandmeister_alerts_enabled", False))
+
+_rebuild_brandmeister_lh()
 
 import radioid as radioid_mod
 import aprs as aprs_mod
@@ -438,6 +451,20 @@ def api_settings_post():
             settings["recent_contacts_position"] = max(0, int(data["recent_contacts_position"]))
         except (TypeError, ValueError):
             pass
+    if "show_qso_stats" in data:
+        settings["show_qso_stats"] = bool(data["show_qso_stats"])
+    if "qso_stats_position" in data:
+        try:
+            settings["qso_stats_position"] = max(0, int(data["qso_stats_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "show_top_activity" in data:
+        settings["show_top_activity"] = bool(data["show_top_activity"])
+    if "top_activity_position" in data:
+        try:
+            settings["top_activity_position"] = max(0, int(data["top_activity_position"]))
+        except (TypeError, ValueError):
+            pass
     if "wsjtx_enabled" in data:
         settings["wsjtx_enabled"] = bool(data["wsjtx_enabled"])
     if "wsjtx_port" in data:
@@ -469,6 +496,12 @@ def api_settings_post():
             settings["notifications_position"] = max(0, int(data["notifications_position"]))
         except (TypeError, ValueError):
             pass
+    if "fleet_alerts_enabled" in data:
+        settings["fleet_alerts_enabled"] = bool(data["fleet_alerts_enabled"])
+    if "solar_alerts_enabled" in data:
+        settings["solar_alerts_enabled"] = bool(data["solar_alerts_enabled"])
+    if "brandmeister_alerts_enabled" in data:
+        settings["brandmeister_alerts_enabled"] = bool(data["brandmeister_alerts_enabled"])
     save_settings(settings)
     _settings_txn.__exit__(None, None, None)
     # Rebuilds below intentionally happen AFTER releasing the lock -- they
@@ -492,6 +525,8 @@ def api_settings_post():
         _rebuild_wsjtx()
     if any(k in data for k in ("hamalert_enabled", "hamalert_username", "hamalert_password")):
         _rebuild_hamalert()
+    if "brandmeister_alerts_enabled" in data:
+        _rebuild_brandmeister_lh()
     return jsonify({"ok": True})
 
 
@@ -556,9 +591,11 @@ _SENTINEL_DEFS = [
     ("__wspr_activity__", "show_wspr_activity", "wspr_activity_position", "📶", "Band Activity", "WSPR activity card"),
     ("__digipi__", "digipi_enabled", "digipi_position", "📡", "DigiPi", "APRS/Direwolf card"),
     ("__big_clock__", "show_big_clock", "big_clock_position", "🕐", "Big Ass Clock", "clock card"),
-    ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
+    ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled", "solar_alerts_enabled", "brandmeister_alerts_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
     ("__satellites__", "show_satellites", "satellites_position", "🛰️", "Satellites", "pass prediction card"),
     ("__recent_contacts__", "show_recent_contacts", "recent_contacts_position", "📻", "Recent Contacts", "logged QSO card"),
+    ("__qso_stats__", "show_qso_stats", "qso_stats_position", "📈", "QSO Stats", "logbook summary card"),
+    ("__top_activity__", "show_top_activity", "top_activity_position", "🏆", "Top 5 Activity", "fleet talkgroup/node ranking card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -768,6 +805,7 @@ def api_activity():
         "hotspots_total":          len(hotspots),
         "last_activity":           result["last_activity"],
         "dashboard_uptime_seconds": time.time() - START_TIME,
+        "top_targets":             storage_activity.top_targets(hours=hours, limit=5),
     })
 
 @app.route("/api/weather")
@@ -813,6 +851,16 @@ def api_pota_spots():
     "POTA spots" layer -- see pota.py. No per-user config needed, unlike
     most other overlays here."""
     data = pota_client.get()
+    if data is None:
+        return jsonify({"error": "unavailable"}), 503
+    return jsonify(data)
+
+@app.route("/api/sota_spots")
+def api_sota_spots():
+    """Live Summits on the Air activator spots for the Live map's optional
+    "SOTA spots" layer -- see sota.py. No per-user config needed, same as
+    POTA above."""
+    data = sota_client.get()
     if data is None:
         return jsonify({"error": "unavailable"}), 503
     return jsonify(data)
@@ -1221,6 +1269,29 @@ def api_aprs_inbox():
     status["messages"] = aprs_inbox.messages()
     return jsonify(status)
 
+@app.route("/api/fleet_events")
+def api_fleet_events():
+    """Recent fleet online/offline transitions for the Notifications
+    card -- monitor.py's own offline_since tracking, no new poll/
+    connection, just an event log of when it already flips."""
+    return jsonify({"events": monitor.fleet_events()})
+
+@app.route("/api/hf_alerts")
+def api_hf_alerts():
+    """Recent geomagnetic-storm (Kp>=5) threshold-crossing events for the
+    Notifications card -- hf_conditions.py's own hourly K-index fetch,
+    no new poll/connection, just an event log of when it crosses."""
+    return jsonify({"events": hf_conditions.alert_events()})
+
+@app.route("/api/brandmeister_lh")
+def api_brandmeister_lh():
+    """Favorite-callsign activity anywhere on the Brandmeister network
+    (not just this fleet's own hotspots) for the Notifications card --
+    see brandmeister_lastheard.py."""
+    status = brandmeister_lh.status()
+    status["events"] = brandmeister_lh.events()
+    return jsonify(status)
+
 
 @app.route("/api/test_hamalert", methods=["POST"])
 def test_hamalert():
@@ -1599,6 +1670,7 @@ def api_import_backup():
         _rebuild_aprs_inbox()
         _rebuild_wsjtx()
         _rebuild_hamalert()
+        _rebuild_brandmeister_lh()
 
     return jsonify({"ok": True, "result": result})
 

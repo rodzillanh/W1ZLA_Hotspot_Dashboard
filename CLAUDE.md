@@ -140,6 +140,34 @@ pota.py            PotaClient: live Parks on the Air activator spots
                    (after converting POTA's kHz-string frequency to Hz)
                    rather than a third duplicate band-edge table.
 
+sota.py            SotaClient: live Summits on the Air activator spots
+                   (api2.sota.org.uk, free/no-auth, confirmed live) for
+                   the Live map's "SOTA spots" overlay. Unlike pota.py
+                   above, SOTA's own spot feed carries only an
+                   association+summit code, no coordinates -- a SECOND
+                   lookup per distinct summit against
+                   api-db2.sota.org.uk/api/summits/{assoc}/{code} (also
+                   confirmed live) resolves a position, cached
+                   indefinitely per summit code since a mountain doesn't
+                   move, unlike the short-TTL spot list cache itself.
+
+brandmeister_lastheard.py
+                   BrandmeisterLastHeardListener: persistent WebSocket to
+                   Brandmeister's own public real-time "Last Heard"
+                   Socket.IO feed, for the Notifications card's
+                   "Brandmeister favorite alerts" -- notifies when a
+                   favorite callsign keys up ANYWHERE on the network, not
+                   just through this fleet's own hotspots (that narrower
+                   case is monitor.py's own favorite matching). The
+                   host/path/event-name/join-room/payload shape here were
+                   ALL found via live reverse-engineering of
+                   brandmeister.network's own bundled frontend JS plus
+                   direct protocol probing -- none of it is documented
+                   anywhere by Brandmeister. See the module's own
+                   docstring and the Hard-won gotchas section below for
+                   the full story before touching this if it ever stops
+                   working.
+
 psk_reporter.py    PskReporterClient: live PSK Reporter reception reports
                    (retrieve.pskreporter.info) for the Live map's "PSK
                    Reporter" overlay -- shows where YOUR OWN signal was
@@ -2225,6 +2253,123 @@ config for per-integration credentials; put it in
   writing a second haversine implementation -- only computed when a QSO
   has both its own position and a resolved QTH position, same graceful-
   omission contract as the line-back-to-QTH feature on the map itself.
+
+- **Five more optional cards/notification sources shipped together
+  (v3.59): QSO Stats, Top 5 Activity, SOTA spots, and three new
+  Notifications sources (fleet offline/online, geomagnetic-storm,
+  Brandmeister network-wide favorite activity).** Grouped here since
+  they share a few real patterns worth reusing:
+  - **"Surface a transition, not a state" is now a 3-times-repeated
+    pattern**, first established by the offline-detection feature much
+    earlier in this file: `monitor.py`'s fleet online/offline events
+    (`FleetMonitor._record_fleet_event`, called from `_record_failure`
+    and the three success paths) and `hf_conditions.py`'s geomagnetic
+    alerts (`_check_alert_transition`, comparing the new K-index against
+    the PREVIOUS cache before overwriting it) both fire an event only on
+    a threshold CROSSING, never on every single poll while the state
+    stays elevated/offline -- otherwise a multi-hour storm or outage
+    would spam the same alert forever. Both are plain bounded
+    `collections.deque` event logs read by a new `/api/fleet_events`/
+    `/api/hf_alerts` route -- no new persistent connection for either,
+    since the underlying data (offline_since, hourly K-index) was
+    already being tracked/fetched for existing cards.
+  - **The Notifications card's "how many sources are enabled" check
+    generalized from a hardcoded pair to a Jinja-computed count**
+    (`notif_source_count` in `dashboard.html`) once a third/fourth/fifth
+    source joined APRS+HamAlert -- the filter-chip row now shows
+    whenever 2+ of the (now five) sources are enabled, not just "both
+    APRS and HamAlert." `_SENTINEL_DEFS`' Notifications entry's
+    `enabled_key` tuple grew from 2 to 5 strings across this session
+    (`_overflow_sentinels()`'s existing `any()`-across-a-tuple handling
+    needed zero changes -- it was already written to handle any tuple
+    length, not just a pair).
+  - **`storage_activity.py`'s `activity_log` gained `target`/
+    `target_type` columns via the exact guarded-ALTER-TABLE migration
+    pattern this file already documented as a requirement for the Top 5
+    card, before ever building it** -- `_get_conn()` checks
+    `PRAGMA table_info` for the columns' presence on every connection
+    open (cheap, and safe to run unconditionally) rather than a one-time
+    startup migration, so an existing install's `activity.db` gains the
+    columns transparently the first time it's opened post-upgrade.
+    Verified live: seeded a real pre-migration `activity.db` file by
+    hand, confirmed `log_activity()`/`top_targets()` both work against
+    it without error. `monitor.py`'s `_log_activity()` sets `target`
+    from `status.talkgroup` (WPSD) or `status.active_call` (ASL3, NOT
+    `status.asl_node` -- that field is this hotspot's own static node
+    number, identical across every row from the same hotspot, so
+    ranking by it would just group by hotspot rather than by which
+    remote node/reflector was actually linked; `active_call` already
+    holds the resolved callsign or bare node number of whichever remote
+    node was keyed, a real ranking target).
+  - **The Brandmeister Last Heard live feed (`brandmeister_lastheard.py`)
+    required a real, multi-step reverse-engineering session --
+    Brandmeister documents none of this anywhere.** Worth recording the
+    full path since it's a good template for the next time this kind of
+    live protocol needs cracking:
+    1. Brandmeister's own OpenAPI spec (`api.brandmeister.network/
+       api-docs`) confirmed there's no REST equivalent -- real-time
+       last-heard activity only exists over a persistent connection,
+       matching what an EARLIER investigation in this file (for a
+       different, network-wide "top 5" card idea, ultimately NOT built
+       that way -- see the Top 5 Activity card above, which is own-fleet
+       only) had already concluded.
+    2. Guessing `api.brandmeister.network/socket.io/` got a clean 404 --
+       wrong host entirely, not a sandbox block (confirmed by the
+       response being a normal, well-formed 404 body, same "is this a
+       real app-level response or the sandbox's own firewall" check
+       this file has needed before).
+    3. Fetched `brandmeister.network`'s own bundled frontend JS
+       (`assets/index-*.js`, a modern minified SPA bundle) and searched
+       it directly for `socket.io` usage -- found the client connects via
+       a `fb.lh.host`/`fb.lh.path` config object whose actual VALUES
+       aren't literal strings anywhere in the 2.4MB bundle (almost
+       certainly injected at build time), so the exact host/path
+       couldn't be read out directly.
+    4. Found the real host by brute-force probing candidate subdomains
+       against the STANDARD Engine.IO polling handshake path
+       (`/socket.io/?EIO=4&transport=polling`) until one returned a real
+       Engine.IO open packet (`0{"sid":...,"pingInterval":25000,...}`)
+       instead of a 404/503 -- `ws.brandmeister.network` responded, but
+       only once the path was ALSO changed from the default
+       `/socket.io/` to `/lh/socket.io/` (found by trying a short list of
+       plausible last-heard-specific path variants against that one
+       host, since the JS confirmed a non-default `path:` option was
+       being passed).
+    5. With host+path confirmed, the actual event wiring (what to `emit`
+       after connecting, what event to `.on()` for live data) was read
+       directly out of the SAME bundled JS, not guessed -- multiple
+       different call sites in the bundle connect to `fb.lh.host` for
+       different scoped views (a specific repeater's history via
+       `emit('searchMongo',{query:{sql:...}})`, a specific station's
+       history the same way), but the homepage's own global ticker
+       widget does `e.on('connect',()=>e.emit('join','everything'))` --
+       joining a room literally named `"everything"` is what unlocks the
+       GLOBAL firehose; skipping this step was confirmed live to mean
+       zero events ever arrive, no error, just silence.
+    6. The live event shape (`42["mqtt",{"topic":"LH","payload":"<json
+       string>"}]`, with the inner JSON having `SourceCall`/`SourceName`/
+       `DestinationID`/`DestinationName`/`LinkTypeName`/`SessionID`/
+       `Start`/`Stop`/`RSSI`/`BER`/etc.) was confirmed against several
+       REAL live events captured during this session, not inferred from
+       the minified variable names alone (`_E`/`fE`/`hE`/etc. formatter
+       function calls in the JS gave hints, but the actual field names
+       came from the live JSON payloads themselves).
+    7. **The full round-trip was verified end-to-end before considering
+       this done**: captured a live `SourceCall` from the real firehose,
+       monkey-patched `favorites_set()` to return exactly that callsign,
+       ran the real `BrandmeisterLastHeardListener` class against it, and
+       confirmed a matching event landed in `.events()` with the right
+       fields -- then confirmed the same thing again through the actual
+       Flask app (`/api/settings` enabling it, `/api/brandmeister_lh`
+       reporting `connected: true`), not just the standalone module.
+    Implemented over plain `websocket-client` (already a project
+    dependency, per openspot.py) with hand-rolled Engine.IO/Socket.IO v4
+    framing (`0{...}`/`40`/`2`↔`3`/`42[...]`) rather than adding a new
+    `python-socketio` pip dependency -- same reasoning as openspot.py's
+    own custom framing over a full protocol library elsewhere in this
+    file. If Brandmeister ever changes their frontend build (new host,
+    new path, new room name), this whole discovery process needs
+    redoing the same way -- there's no vendor doc to fall back on.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

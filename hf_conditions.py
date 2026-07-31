@@ -13,11 +13,19 @@ import time
 import threading
 import urllib.request
 import xml.etree.ElementTree as ET
+from collections import deque
 
 FEED_URL  = "https://www.hamqsl.com/solarxml.php"
 CACHE_TTL = 3600
 TIMEOUT   = 10
 AGENT     = "hotspot-dashboard/1.0"
+
+# NOAA's G-scale calls Kp>=5 a G1 "minor" geomagnetic storm -- the
+# conventional threshold ham operators watch for (aurora propagation
+# possible, HF absorption/degradation likely). Used for the Notifications
+# card's solar-alert feed, not for anything on the HF Conditions card
+# itself, which just shows the raw value with no judgment applied.
+KP_ALERT_THRESHOLD = 5.0
 
 # Display order -- the feed's own <band> element order isn't guaranteed,
 # so bands are collected into a dict first and re-ordered against this.
@@ -29,18 +37,51 @@ class HfConditionsClient:
         self._lock = threading.Lock()
         self._cache = None
         self._cache_time = 0.0
+        # Geomagnetic-storm alert log for the Notifications card -- fires
+        # only on a threshold CROSSING (like monitor.py's fleet online/
+        # offline events), not every hourly refresh while K-index stays
+        # elevated, so a multi-hour storm doesn't spam the same alert
+        # over and over.
+        self._alert_events: deque = deque(maxlen=50)
 
     def get(self, force: bool = False) -> dict | None:
         with self._lock:
             if not force and self._cache is not None and (time.time() - self._cache_time) < CACHE_TTL:
                 return self._cache
+            previous = self._cache
 
         result = self._fetch()
         with self._lock:
             if result is not None:
+                self._check_alert_transition(previous, result)
                 self._cache = result
                 self._cache_time = time.time()
             return self._cache
+
+    def alert_events(self) -> list:
+        """Recent geomagnetic-storm alert transitions, newest first, for
+        the Notifications card."""
+        with self._lock:
+            return list(reversed(self._alert_events))
+
+    def _check_alert_transition(self, previous: dict | None, result: dict) -> None:
+        """Caller must already hold self._lock. No-ops on the very first
+        fetch ever (no prior K-index to compare against, so no
+        transition can be detected) -- same "own real data, not a
+        fabricated baseline" reasoning as every other integration here."""
+        if previous is None:
+            return
+        try:
+            old_k = float(previous.get("k_index"))
+            new_k = float(result.get("k_index"))
+        except (TypeError, ValueError):
+            return
+        was_elevated = old_k >= KP_ALERT_THRESHOLD
+        is_elevated = new_k >= KP_ALERT_THRESHOLD
+        if is_elevated and not was_elevated:
+            self._alert_events.append({"kind": "elevated", "k_index": new_k, "at": time.time()})
+        elif was_elevated and not is_elevated:
+            self._alert_events.append({"kind": "normal", "k_index": new_k, "at": time.time()})
 
     @staticmethod
     def _fetch() -> dict | None:

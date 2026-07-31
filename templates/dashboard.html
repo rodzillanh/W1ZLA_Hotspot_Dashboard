@@ -878,6 +878,15 @@
         .hf-source a { color: var(--text-dim); }
         .hf-unavailable { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
 
+        /* --- Top 5 Activity card -- ranked bar list --- */
+        .ta-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+        .ta-rank { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); width: 14px; flex-shrink: 0; text-align: right; }
+        .ta-bar-wrap { flex: 1; min-width: 0; }
+        .ta-label { font-size: 12.5px; color: var(--text); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ta-bar-track { height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
+        .ta-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+        .ta-count { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); flex-shrink: 0; min-width: 20px; text-align: right; }
+
         /* --- Band Plan card --- */
         .bp-legend { display: flex; gap: 5px; }
         .bp-legend-chip {
@@ -1598,7 +1607,8 @@
             </div>
         </div>
         {% endif %}
-        {% if settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) %}
+        {% set notif_source_count = (1 if settings.get('aprs_inbox_enabled', False) else 0) + (1 if settings.get('hamalert_enabled', False) else 0) + (1 if settings.get('fleet_alerts_enabled', False) else 0) + (1 if settings.get('solar_alerts_enabled', False) else 0) + (1 if settings.get('brandmeister_alerts_enabled', False) else 0) %}
+        {% if notif_source_count > 0 %}
         <div class="metrics-card" id="notifications-card"
              style="order:{{ settings.get('notifications_position', 0) }}">
             <div class="metrics-header">
@@ -1610,6 +1620,15 @@
                     {% if settings.get('hamalert_enabled', False) %}
                     <span class="conn-item">🔔 HamAlert<span class="conn-dot" id="hamalert-conn-dot"></span></span>
                     {% endif %}
+                    {% if settings.get('fleet_alerts_enabled', False) %}
+                    <span class="conn-item">📡 Fleet</span>
+                    {% endif %}
+                    {% if settings.get('solar_alerts_enabled', False) %}
+                    <span class="conn-item">☀️ Solar</span>
+                    {% endif %}
+                    {% if settings.get('brandmeister_alerts_enabled', False) %}
+                    <span class="conn-item">📶 BM<span class="conn-dot" id="brandmeister-lh-conn-dot"></span></span>
+                    {% endif %}
                 </div>
             </div>
             <div class="fleet-stats-grid" style="grid-template-columns:1fr 1fr">
@@ -1617,11 +1636,24 @@
                 <div>Last: <span class="stat-val" id="notif-last">—</span></div>
             </div>
             <div class="ha-diag" id="hamalert-diag" style="display:none"></div>
-            {% if settings.get('aprs_inbox_enabled', False) and settings.get('hamalert_enabled', False) %}
+            {% if notif_source_count > 1 %}
             <div class="filter-row">
                 <span class="filter-chip active" data-filter="all" onclick="setNotifFilter('all')">All</span>
+                {% if settings.get('aprs_inbox_enabled', False) %}
                 <span class="filter-chip" data-filter="aprs" onclick="setNotifFilter('aprs')">📨 APRS</span>
+                {% endif %}
+                {% if settings.get('hamalert_enabled', False) %}
                 <span class="filter-chip" data-filter="hamalert" onclick="setNotifFilter('hamalert')">🔔 HamAlert</span>
+                {% endif %}
+                {% if settings.get('fleet_alerts_enabled', False) %}
+                <span class="filter-chip" data-filter="fleet" onclick="setNotifFilter('fleet')">📡 Fleet</span>
+                {% endif %}
+                {% if settings.get('solar_alerts_enabled', False) %}
+                <span class="filter-chip" data-filter="solar" onclick="setNotifFilter('solar')">☀️ Solar</span>
+                {% endif %}
+                {% if settings.get('brandmeister_alerts_enabled', False) %}
+                <span class="filter-chip" data-filter="brandmeister" onclick="setNotifFilter('brandmeister')">📶 BM</span>
+                {% endif %}
             </div>
             {% endif %}
             <div class="msg-scroll" id="notif-scroll">
@@ -1655,6 +1687,34 @@
                 <div id="rc-list"></div>
             </div>
             <div class="msg-empty" id="rc-empty" style="display:none">No logged QSOs yet -- import an ADIF log or enable live WSJT-X logging in Settings.</div>
+        </div>
+        {% endif %}
+        {% if settings.get('show_qso_stats', False) %}
+        <div class="metrics-card" id="qso-stats-card"
+             style="order:{{ settings.get('qso_stats_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">📈 QSO Stats</div>
+                <span class="card-sub" id="qs-card-sub">—</span>
+            </div>
+            <div class="hf-stats-grid">
+                <div class="hf-stat"><div class="hf-stat-label">Contacts</div><div class="hf-stat-val" id="qs-total">—</div></div>
+                <div class="hf-stat"><div class="hf-stat-label">Countries</div><div class="hf-stat-val" id="qs-countries">—</div></div>
+                <div class="hf-stat"><div class="hf-stat-label">Grids</div><div class="hf-stat-val" id="qs-grids">—</div></div>
+                <div class="hf-stat"><div class="hf-stat-label">Bands</div><div class="hf-stat-val" id="qs-bands">—</div></div>
+            </div>
+            <div class="hf-footer" id="qs-topbands"></div>
+            <div class="msg-empty" id="qs-empty" style="display:none">No logged QSOs yet -- import an ADIF log or enable live WSJT-X logging in Settings.</div>
+        </div>
+        {% endif %}
+        {% if settings.get('show_top_activity', False) %}
+        <div class="metrics-card" id="top-activity-card"
+             style="order:{{ settings.get('top_activity_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">🏆 Top 5 Activity</div>
+                <span class="card-sub" id="ta-card-sub">—</span>
+            </div>
+            <div id="ta-list"></div>
+            <div class="msg-empty" id="ta-empty" style="display:none">No fleet activity logged yet -- enable "Show fleet activity card" in Settings → Cards to start tracking talkgroup/node activity.</div>
         </div>
         {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
@@ -1887,6 +1947,10 @@
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
             <input type="checkbox" id="pota-toggle" onchange="togglePota()">
             POTA spots
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="sota-toggle" onchange="toggleSota()">
+            SOTA spots
         </label>
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
             <input type="checkbox" id="psk-toggle" onchange="togglePsk()">
@@ -2129,7 +2193,13 @@ const SHOW_BIG_CLOCK = {{ 'true' if settings.get('show_big_clock', False) else '
 const BIG_CLOCK_POSITION = {{ settings.get('big_clock_position', 0) }};
 const SHOW_HAMALERT = {{ 'true' if settings.get('hamalert_enabled', False) else 'false' }};
 const HAMALERT_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS
-const SHOW_NOTIFICATIONS = SHOW_APRS_INBOX || SHOW_HAMALERT;
+const SHOW_FLEET_ALERTS = {{ 'true' if settings.get('fleet_alerts_enabled', False) else 'false' }};
+const FLEET_ALERTS_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS/HAMALERT_POLL_MS
+const SHOW_SOLAR_ALERTS = {{ 'true' if settings.get('solar_alerts_enabled', False) else 'false' }};
+const SOLAR_ALERTS_POLL_MS = 60000;  // hf_conditions.py's own cache is 1hr -- no reason to poll faster than this
+const SHOW_BRANDMEISTER_ALERTS = {{ 'true' if settings.get('brandmeister_alerts_enabled', False) else 'false' }};
+const BRANDMEISTER_ALERTS_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS/HAMALERT_POLL_MS
+const SHOW_NOTIFICATIONS = SHOW_APRS_INBOX || SHOW_HAMALERT || SHOW_FLEET_ALERTS || SHOW_SOLAR_ALERTS || SHOW_BRANDMEISTER_ALERTS;
 const NOTIFICATIONS_POSITION = {{ settings.get('notifications_position', 0) }};
 const SHOW_SATELLITES = {{ 'true' if settings.get('show_satellites', False) else 'false' }};
 const SATELLITES_POSITION = {{ settings.get('satellites_position', 0) }};
@@ -2140,6 +2210,11 @@ const SATELLITES_POLL_MS = 15000;  // satellite position moves fast (~7.6km/s) -
 const SHOW_RECENT_CONTACTS = {{ 'true' if settings.get('show_recent_contacts', False) else 'false' }};
 const RECENT_CONTACTS_POSITION = {{ settings.get('recent_contacts_position', 0) }};
 const RECENT_CONTACTS_POLL_MS = 20000;  // same cadence as the map's own fetchQsos() poll -- same qsos.json source
+const SHOW_QSO_STATS = {{ 'true' if settings.get('show_qso_stats', False) else 'false' }};
+const QSO_STATS_POSITION = {{ settings.get('qso_stats_position', 0) }};
+const QSO_STATS_POLL_MS = 20000;  // same cadence as Recent Contacts/the map -- same qsos.json source
+const SHOW_TOP_ACTIVITY = {{ 'true' if settings.get('show_top_activity', False) else 'false' }};
+const TOP_ACTIVITY_POSITION = {{ settings.get('top_activity_position', 0) }};
 const COURTESY_TONE_ENABLED = {{ 'true' if settings.get('beta_courtesy_tone', False) else 'false' }};
 const SPOTLIGHT_DIMMING_ENABLED = {{ 'true' if settings.get('beta_spotlight_dimming', True) else 'false' }};
 
@@ -2510,7 +2585,8 @@ const SENTINEL_KEY_TO_DATA_IP = {
     hfcond: '__hf_conditions__', bandplan: '__band_plan__', licensequiz: '__license_quiz__',
     wspractivity: '__wspr_activity__', digipi: '__digipi__', bigclock: '__big_clock__',
     notifications: '__notifications__', satellites: '__satellites__',
-    recentcontacts: '__recent_contacts__',
+    recentcontacts: '__recent_contacts__', qsostats: '__qso_stats__',
+    topactivity: '__top_activity__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -2645,10 +2721,16 @@ function renderCards(data) {
     if (SHOW_RECENT_CONTACTS) {
         sentinels.push({ key: 'recentcontacts', pos: Math.max(0, RECENT_CONTACTS_POSITION) });
     }
+    if (SHOW_QSO_STATS) {
+        sentinels.push({ key: 'qsostats', pos: Math.max(0, QSO_STATS_POSITION) });
+    }
+    if (SHOW_TOP_ACTIVITY) {
+        sentinels.push({ key: 'topactivity', pos: Math.max(0, TOP_ACTIVITY_POSITION) });
+    }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, hfcond, bandplan,
     // licensequiz, wspractivity, digipi, bigclock, notifications, satellites,
-    // recentcontacts, THEN cameras), since
+    // recentcontacts, qsostats, topactivity, THEN cameras), since
     // computeCardOrders() below now relies on a stable sort to break ties
     // by insertion order, not by an independent alphabetical rule. Two
     // sentinels can easily tie on position (e.g. right after enabling
@@ -2686,6 +2768,10 @@ function renderCards(data) {
     if (satellitesCard && 'satellites' in sentinelOrders) satellitesCard.style.order = sentinelOrders.satellites;
     const recentContactsCard = document.getElementById('recent-contacts-card');
     if (recentContactsCard && 'recentcontacts' in sentinelOrders) recentContactsCard.style.order = sentinelOrders.recentcontacts;
+    const qsoStatsCard = document.getElementById('qso-stats-card');
+    if (qsoStatsCard && 'qsostats' in sentinelOrders) qsoStatsCard.style.order = sentinelOrders.qsostats;
+    const topActivityCard = document.getElementById('top-activity-card');
+    if (topActivityCard && 'topactivity' in sentinelOrders) topActivityCard.style.order = sentinelOrders.topactivity;
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -3121,6 +3207,9 @@ function escapeHtml(text) {
 
 let notifAprsData = null;
 let notifHamAlertData = null;
+let notifFleetData = null;
+let notifSolarData = null;
+let notifBrandmeisterData = null;
 let notifFilter = 'all';
 
 function setNotifFilter(filter) {
@@ -3132,6 +3221,44 @@ function setNotifFilter(filter) {
 }
 
 function renderNotifRow(item, unread) {
+    if (item.source === 'brandmeister') {
+        const e = item.data;
+        const dest = [e.destination_name, e.destination_id].filter(Boolean).join(' · ');
+        return `
+        <div class="msg-row ${unread ? 'unread' : ''}">
+            <div class="msg-top">
+                <span class="notif-source" title="Brandmeister network activity">📶</span>
+                <a class="msg-from" href="https://www.qrz.com/db/${escapeHtml(e.callsign)}" target="_blank" rel="noopener">${escapeHtml(e.callsign)}</a>
+                ${e.name ? `<span class="msg-to">${escapeHtml(e.name)}</span>` : ''}
+                <span class="msg-time">${fmtAgoShort(e.at)}</span>
+            </div>
+            <div class="msg-text">Active on Brandmeister${dest ? ' -- ' + escapeHtml(dest) : ''}${e.link_type_name ? ' (' + escapeHtml(e.link_type_name) + ')' : ''}</div>
+        </div>`;
+    }
+    if (item.source === 'solar') {
+        const e = item.data;
+        return `
+        <div class="msg-row ${unread ? 'unread' : ''}">
+            <div class="msg-top">
+                <span class="notif-source" title="Geomagnetic storm alert">☀️</span>
+                <span class="msg-from">${e.kind === 'elevated' ? 'Geomagnetic storm' : 'Conditions normal'}</span>
+                <span class="msg-time">${fmtAgoShort(e.at)}</span>
+            </div>
+            <div class="msg-text">K-index ${e.k_index.toFixed(0)}${e.kind === 'elevated' ? ' -- G1+ minor storm, aurora/HF disturbance possible' : ' -- back below G1 threshold'}</div>
+        </div>`;
+    }
+    if (item.source === 'fleet') {
+        const e = item.data;
+        return `
+        <div class="msg-row ${unread ? 'unread' : ''}">
+            <div class="msg-top">
+                <span class="notif-source" title="Fleet status">📡</span>
+                <span class="msg-from">${escapeHtml(e.name)}</span>
+                <span class="msg-time">${fmtAgoShort(e.at)}</span>
+            </div>
+            <div class="msg-text">${e.kind === 'offline' ? '🔴 went offline' : '🟢 back online'}</div>
+        </div>`;
+    }
     if (item.source === 'aprs') {
         const m = item.data;
         return `
@@ -3168,6 +3295,15 @@ function renderNotifications() {
     }
     if (notifHamAlertData) {
         (notifHamAlertData.alerts || []).forEach(a => items.push({ source: 'hamalert', received_at: a.received_at, data: a }));
+    }
+    if (notifFleetData) {
+        (notifFleetData.events || []).forEach(e => items.push({ source: 'fleet', received_at: e.at, data: e }));
+    }
+    if (notifSolarData) {
+        (notifSolarData.events || []).forEach(e => items.push({ source: 'solar', received_at: e.at, data: e }));
+    }
+    if (notifBrandmeisterData) {
+        (notifBrandmeisterData.events || []).forEach(e => items.push({ source: 'brandmeister', received_at: e.at, data: e }));
     }
     items.sort((a, b) => (b.received_at || 0) - (a.received_at || 0));
 
@@ -3232,6 +3368,56 @@ if (SHOW_APRS_INBOX) {
 if (SHOW_HAMALERT) {
     fetchNotifHamAlert();
     setInterval(fetchNotifHamAlert, HAMALERT_POLL_MS);
+}
+
+function fetchNotifFleet() {
+    if (!SHOW_FLEET_ALERTS) return;
+    fetch('/api/fleet_events')
+        .then(r => r.json())
+        .then(data => {
+            notifFleetData = data;
+            renderNotifications();
+        })
+        .catch(() => {});
+}
+if (SHOW_FLEET_ALERTS) {
+    fetchNotifFleet();
+    setInterval(fetchNotifFleet, FLEET_ALERTS_POLL_MS);
+}
+
+function fetchNotifSolar() {
+    if (!SHOW_SOLAR_ALERTS) return;
+    fetch('/api/hf_alerts')
+        .then(r => r.json())
+        .then(data => {
+            notifSolarData = data;
+            renderNotifications();
+        })
+        .catch(() => {});
+}
+if (SHOW_SOLAR_ALERTS) {
+    fetchNotifSolar();
+    setInterval(fetchNotifSolar, SOLAR_ALERTS_POLL_MS);
+}
+
+function fetchNotifBrandmeister() {
+    if (!SHOW_BRANDMEISTER_ALERTS) return;
+    fetch('/api/brandmeister_lh')
+        .then(r => r.json())
+        .then(data => {
+            notifBrandmeisterData = data;
+            const dot = document.getElementById('brandmeister-lh-conn-dot');
+            if (dot) {
+                dot.classList.toggle('down', !data.connected);
+                dot.title = !data.enabled ? 'Disabled' : (data.connected ? 'Connected' : 'Connecting…');
+            }
+            renderNotifications();
+        })
+        .catch(() => {});
+}
+if (SHOW_BRANDMEISTER_ALERTS) {
+    fetchNotifBrandmeister();
+    setInterval(fetchNotifBrandmeister, BRANDMEISTER_ALERTS_POLL_MS);
 }
 
 // --- Satellites card + Live map ground-track overlay ---
@@ -4094,6 +4280,7 @@ const HOTSPOT_COLOR_PALETTE = ['#2ecc71', '#3498db', '#e67e22', '#9b59b6', '#f1c
 // configured. QSO_COLOR is declared near qsoCluster below (same file,
 // different section -- referenced here only in comments, not moved).
 const POTA_COLOR = '#00bcd4';
+const SOTA_COLOR = '#8d6e63';
 const PSK_COLOR   = '#aeea00';
 
 function hexToRgba(hex, alpha) {
@@ -4121,6 +4308,7 @@ function renderMapKey(nodes, hotspotColors) {
     const key = document.getElementById('map-key');
     if (!key) return;
     const potaOn = document.getElementById('pota-toggle')?.checked;
+    const sotaOn = document.getElementById('sota-toggle')?.checked;
     const pskOn  = document.getElementById('psk-toggle')?.checked;
     key.innerHTML = `
         <div class="map-key-title">Map key</div>
@@ -4137,6 +4325,11 @@ function renderMapKey(nodes, hotspotColors) {
         <div class="map-key-row">
             <span class="map-key-swatch" style="background:${POTA_COLOR}"></span>
             <b>POTA spots</b>
+        </div>` : ''}
+        ${sotaOn ? `
+        <div class="map-key-row">
+            <span class="map-key-swatch" style="background:${SOTA_COLOR}"></span>
+            <b>SOTA spots</b>
         </div>` : ''}
         ${pskOn ? `
         <div class="map-key-row">
@@ -4248,10 +4441,13 @@ function initMap() {
     document.getElementById('aurora-toggle').checked = localStorage.getItem(AURORA_KEY) === '1';
     if (document.getElementById('aurora-toggle').checked) toggleAurora();
 
-    // POTA/PSK Reporter -- same off-by-default, lazy-fetch-on-toggle
+    // POTA/SOTA/PSK Reporter -- same off-by-default, lazy-fetch-on-toggle
     // reasoning as Aurora oval above.
     document.getElementById('pota-toggle').checked = localStorage.getItem(POTA_KEY) === '1';
     if (document.getElementById('pota-toggle').checked) togglePota();
+
+    document.getElementById('sota-toggle').checked = localStorage.getItem(SOTA_KEY) === '1';
+    if (document.getElementById('sota-toggle').checked) toggleSota();
 
     document.getElementById('psk-toggle').checked = localStorage.getItem(PSK_KEY) === '1';
     if (document.getElementById('psk-toggle').checked) togglePsk();
@@ -4553,6 +4749,49 @@ function togglePota() {
     renderMapKey();
 }
 
+// --- map: SOTA (Summits on the Air) activator spots -- same lazy
+// on/off toggle pattern as POTA above. See sota.py -- unlike POTA's own
+// feed, SOTA spots need a per-summit position lookup, done server-side,
+// so the client side here is identical to POTA's otherwise.
+const SOTA_KEY = 'w1zla_show_sota';
+let sotaLayer = null;
+let sotaTimer = null;
+
+function updateSota() {
+    if (!leafletMap) return;
+    fetch('/api/sota_spots').then(r => r.json()).then(data => {
+        if (sotaLayer) { leafletMap.removeLayer(sotaLayer); sotaLayer = null; }
+        if (!data || data.error) return;
+        const group = L.layerGroup();
+        (data.spots || []).forEach(s => {
+            L.circleMarker([s.lat, s.lon], {
+                radius: 5, color: SOTA_COLOR, weight: 1, fillColor: SOTA_COLOR, fillOpacity: 0.85,
+            }).bindTooltip(`${escapeHtml(s.callsign || '?')} - ${escapeHtml(s.summit_code)}${s.summit_name ? ' (' + escapeHtml(s.summit_name) + ')' : ''}<br>${escapeHtml(s.frequency || '?')} ${escapeHtml(s.mode || '')}`).addTo(group);
+        });
+        sotaLayer = group;
+        if (document.getElementById('sota-toggle').checked) group.addTo(leafletMap);
+        renderMapKey();
+    }).catch(() => {});
+}
+
+function toggleSota() {
+    const on = document.getElementById('sota-toggle').checked;
+    localStorage.setItem(SOTA_KEY, on ? '1' : '0');
+    if (on) {
+        updateSota();
+        if (!sotaTimer) {
+            sotaTimer = setInterval(() => {
+                const panel = document.getElementById('panel-map');
+                if (panel && panel.classList.contains('active')) updateSota();
+            }, 120000);  // matches sota.py's CACHE_TTL
+        }
+    } else {
+        if (sotaLayer) { leafletMap.removeLayer(sotaLayer); sotaLayer = null; }
+        if (sotaTimer) { clearInterval(sotaTimer); sotaTimer = null; }
+    }
+    renderMapKey();
+}
+
 // --- map: PSK Reporter -- "where was MY signal actually heard", scoped
 // to settings.psk_reporter_callsign (see psk_reporter.py). Deliberately
 // NOT a worldwide feed like the removed WSPR spots overlay -- there's no
@@ -4805,6 +5044,57 @@ if (SHOW_RECENT_CONTACTS) {
     setInterval(fetchRecentContacts, RECENT_CONTACTS_POLL_MS);
 }
 
+// --- QSO Stats card -- pure client-side aggregation over the same
+// qsos.json Recent Contacts/the map already read, no new backend query.
+// Grids are counted at 4-character Maidenhead precision (e.g. "FN42"),
+// the standard grid-square-award granularity -- not the 6-character
+// precision some logs store, which would wildly overcount "grids worked".
+function renderQsoStatsCard(qsos) {
+    const subEl = document.getElementById('qs-card-sub');
+    const emptyEl = document.getElementById('qs-empty');
+    const totalEl = document.getElementById('qs-total');
+    const countriesEl = document.getElementById('qs-countries');
+    const gridsEl = document.getElementById('qs-grids');
+    const bandsEl = document.getElementById('qs-bands');
+    const topBandsEl = document.getElementById('qs-topbands');
+    if (!totalEl) return;
+
+    const list = qsos || [];
+    if (!list.length) {
+        if (subEl) subEl.textContent = '';
+        if (emptyEl) emptyEl.style.display = 'block';
+        totalEl.textContent = countriesEl.textContent = gridsEl.textContent = bandsEl.textContent = '—';
+        if (topBandsEl) topBandsEl.innerHTML = '';
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const countries = new Set(list.map(q => q.country).filter(Boolean));
+    const grids4 = new Set(list.map(q => (q.grid || '').toUpperCase().slice(0, 4)).filter(g => g.length === 4));
+    const bandCounts = {};
+    list.forEach(q => { if (q.band) bandCounts[q.band] = (bandCounts[q.band] || 0) + 1; });
+
+    totalEl.textContent = list.length;
+    countriesEl.textContent = countries.size || '—';
+    gridsEl.textContent = grids4.size || '—';
+    bandsEl.textContent = Object.keys(bandCounts).length || '—';
+
+    const topBands = Object.entries(bandCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    if (topBandsEl) {
+        topBandsEl.innerHTML = topBands.map(([band, n]) => `<span><b>${escapeHtml(band)}</b> ${n}</span>`).join('');
+    }
+    if (subEl) subEl.textContent = `${list.length} logged`;
+}
+
+function fetchQsoStats() {
+    if (!SHOW_QSO_STATS) return;
+    fetch('/api/qsos').then(r => r.json()).then(renderQsoStatsCard).catch(() => {});
+}
+if (SHOW_QSO_STATS) {
+    fetchQsoStats();
+    setInterval(fetchQsoStats, QSO_STATS_POLL_MS);
+}
+
 function handleAdifFile(file) {
     if (!file) return;
     const reader = new FileReader();
@@ -5000,6 +5290,47 @@ const FLEET_MAX_LINES = 6;
 
 function cssVar(name) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+const TOP_ACTIVITY_HOURS = 24;
+
+function renderTopActivity(topTargets) {
+    const listEl = document.getElementById('ta-list');
+    const emptyEl = document.getElementById('ta-empty');
+    const subEl = document.getElementById('ta-card-sub');
+    if (!listEl) return;
+
+    const top = topTargets || [];
+    if (!top.length) {
+        listEl.innerHTML = '';
+        if (emptyEl) emptyEl.style.display = 'block';
+        if (subEl) subEl.textContent = '';
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (subEl) subEl.textContent = `last ${TOP_ACTIVITY_HOURS}h`;
+
+    const maxCount = Math.max(...top.map(t => t.count));
+    listEl.innerHTML = top.map((t, i) => {
+        const pct = maxCount ? Math.round(t.count / maxCount * 100) : 0;
+        const typeLabel = t.target_type === 'talkgroup' ? 'TG' : 'Node';
+        return `
+        <div class="ta-row">
+            <span class="ta-rank">${i + 1}</span>
+            <div class="ta-bar-wrap">
+                <div class="ta-label">${escapeHtml(typeLabel)} ${escapeHtml(t.target)}</div>
+                <div class="ta-bar-track"><div class="ta-bar-fill" style="width:${pct}%"></div></div>
+            </div>
+            <span class="ta-count">${t.count}</span>
+        </div>`;
+    }).join('');
+}
+
+function fetchTopActivity() {
+    fetch(`/api/activity?hours=${TOP_ACTIVITY_HOURS}`)
+        .then(r => r.json())
+        .then(data => renderTopActivity(data.top_targets))
+        .catch(() => {});
 }
 
 function fetchFleetActivity() {
@@ -5382,6 +5713,7 @@ function refresh() {
             }
         });
     if (SHOW_FLEET_ACTIVITY) fetchFleetActivity();
+    if (SHOW_TOP_ACTIVITY) fetchTopActivity();
 }
 refresh();
 setInterval(refresh, POLL_MS);

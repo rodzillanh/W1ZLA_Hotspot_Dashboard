@@ -3,6 +3,7 @@ import re
 import time
 import threading
 import concurrent.futures
+from collections import deque
 from dataclasses import asdict
 
 import paramiko
@@ -33,12 +34,27 @@ class FleetMonitor:
         self._aprs          = AprsClient("")
         self._brandmeister  = BrandmeisterClient()
         self._aslstats      = AslStatsClient()
+        # Fleet online/offline transition log for the Notifications card --
+        # NOT a new poll/connection, just an event appended at the exact
+        # moments _record_failure()/the success paths below already flip
+        # status.offline_since between None and a timestamp. Bounded deque,
+        # same in-memory-only pattern as aprs_inbox.py's _messages -- these
+        # don't need to survive a restart.
+        self._fleet_events: deque = deque(maxlen=100)
 
     # --- public API ---
 
     def snapshot(self) -> dict:
         with self._lock:
             return {ip: asdict(status) for ip, status in self._data.items()}
+
+    def fleet_events(self) -> list:
+        """Recent online/offline transitions, newest first, for the
+        Notifications card. Call sites append under self._lock already
+        held (see _record_failure/_check_one_wpsd/_check_one_asl3/
+        apply_external_update) -- this just returns a snapshot copy."""
+        with self._lock:
+            return list(reversed(self._fleet_events))
 
     def set_qrz_client(self, client: QrzClient) -> None:
         """Hot-swap the QRZ client — called when credentials are saved in Settings."""
@@ -273,6 +289,8 @@ class FleetMonitor:
                 for field_name, value in updates.items():
                     setattr(status, field_name, value)
                 self._failures[ip] = 0
+                if status.offline_since is not None:
+                    self._record_fleet_event(ip, status.name, "online")
                 status.offline_since = None
         except Exception:
             self._record_failure(ip)
@@ -289,6 +307,8 @@ class FleetMonitor:
                 for field_name, value in updates.items():
                     setattr(status, field_name, value)
                 self._failures[ip] = 0
+                if status.offline_since is not None:
+                    self._record_fleet_event(ip, status.name, "online")
                 status.offline_since = None
         except Exception:
             self._record_failure(ip)
@@ -328,6 +348,8 @@ class FleetMonitor:
                 setattr(status, field_name, value)
             self._failures[ip] = 0
             status.status = "Online"
+            if status.offline_since is not None:
+                self._record_fleet_event(ip, status.name, "online")
             status.offline_since = None
 
     def mark_external_offline(self, ip: str) -> None:
@@ -362,6 +384,12 @@ class FleetMonitor:
         finally:
             client.close()
 
+    def _record_fleet_event(self, ip: str, name: str, kind: str) -> None:
+        """Appends one online/offline transition event. Caller must
+        already hold self._lock -- this is a plain (non-reentrant)
+        threading.Lock, so this method never acquires it itself."""
+        self._fleet_events.append({"ip": ip, "name": name, "kind": kind, "at": time.time()})
+
     def _record_failure(self, ip: str) -> None:
         with self._lock:
             self._failures[ip] = self._failures.get(ip, 0) + 1
@@ -375,6 +403,7 @@ class FleetMonitor:
                 status.status = "Offline"
                 if status.offline_since is None:
                     status.offline_since = time.time()
+                    self._record_fleet_event(ip, status.name, "offline")
 
     def _ensure_entry(self, hotspot: dict) -> None:
         ip = hotspot["ip"]
@@ -392,7 +421,16 @@ class FleetMonitor:
     def _log_activity(self, ip: str) -> None:
         """Record one completed transmission for the Fleet activity metrics
         card -- opt-in (see settings.show_fleet_activity), so skip the write
-        entirely when nobody will ever query it."""
+        entirely when nobody will ever query it.
+
+        Also captures target/target_type for the Top 5 activity card
+        (talkgroup for WPSD, linked node/callsign for ASL3, via
+        active_call -- ASL3 has no separate "which remote node was keyed"
+        field on HotspotStatus, but active_call already holds exactly
+        that, resolved to a callsign when known or the bare node number
+        otherwise, either way a meaningful ranking target). A hotspot
+        type with neither (e.g. openspot4, which doesn't currently call
+        this) just logs target=None, invisible to top_targets()."""
         if not load_settings().get("show_fleet_activity", False):
             return
         with self._lock:
@@ -400,7 +438,13 @@ class FleetMonitor:
             if status is None:
                 return
             name, mode = status.name, status.mode
-        storage_activity.log_activity(ip, name, mode)
+            if status.talkgroup:
+                target, target_type = status.talkgroup, "talkgroup"
+            elif status.active_call:
+                target, target_type = status.active_call, "asl_node"
+            else:
+                target, target_type = None, None
+        storage_activity.log_activity(ip, name, mode, target, target_type)
 
     def _lookup_caller(self, call: str) -> dict:
         """Compose caller info from QRZ, RadioID.net (name/location fallback),

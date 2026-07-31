@@ -40,26 +40,70 @@ def _get_conn() -> sqlite3.Connection:
     os.makedirs(config.CONFIG_DIR, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.executescript(_SCHEMA)
+    # CREATE TABLE IF NOT EXISTS is a no-op against an already-existing
+    # table on any real deployed install -- a genuine ALTER TABLE migration
+    # is needed for the target/target_type columns (Top 5 activity card),
+    # or existing users' history never gains them until the file is
+    # deleted. Guarded on "does the column already exist" rather than
+    # catching the duplicate-column error, so this is safe to run on
+    # every single connection open, not just once at startup.
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(activity_log)")}
+    if "target" not in cols:
+        conn.execute("ALTER TABLE activity_log ADD COLUMN target TEXT")
+    if "target_type" not in cols:
+        conn.execute("ALTER TABLE activity_log ADD COLUMN target_type TEXT")
     return conn
 
 
-def log_activity(hotspot_ip: str, hotspot_name: str, mode: str | None) -> None:
+def log_activity(hotspot_ip: str, hotspot_name: str, mode: str | None,
+                  target: str | None = None, target_type: str | None = None) -> None:
     """Insert one row for a just-completed transmission and prune anything
     older than RETENTION_SECONDS. Prune happens inline here rather than a
     separate thread -- inserts are infrequent (once per completed
-    transmission), so there's no meaningful cost to doing it every time."""
+    transmission), so there's no meaningful cost to doing it every time.
+
+    target/target_type (talkgroup number for WPSD, linked node/callsign
+    for ASL3) are optional and default to None -- a hotspot type with no
+    equivalent concept just never contributes to top_targets()."""
     now = time.time()
     with _lock:
         conn = _get_conn()
         try:
             conn.execute(
-                "INSERT INTO activity_log (ts, hotspot_ip, hotspot_name, mode) VALUES (?, ?, ?, ?)",
-                (now, hotspot_ip, hotspot_name, mode),
+                "INSERT INTO activity_log (ts, hotspot_ip, hotspot_name, mode, target, target_type) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (now, hotspot_ip, hotspot_name, mode, target, target_type),
             )
             conn.execute("DELETE FROM activity_log WHERE ts < ?", (now - RETENTION_SECONDS,))
             conn.commit()
         finally:
             conn.close()
+
+
+def top_targets(hours: int = 24, limit: int = 5) -> list:
+    """Most active talkgroups/nodes across the fleet in the trailing
+    `hours` window, ranked by transmission count -- own-fleet activity
+    only, not a network-wide feed (see CLAUDE.md for why a network-wide
+    version isn't built: no clean REST-pollable option was found for any
+    of Brandmeister/TGIF/AllStarLink/YSF)."""
+    cutoff = time.time() - hours * 3600
+    with _lock:
+        conn = _get_conn()
+        try:
+            rows = conn.execute(
+                """
+                SELECT target, target_type, COUNT(*) AS cnt
+                FROM activity_log
+                WHERE target IS NOT NULL AND ts >= ?
+                GROUP BY target, target_type
+                ORDER BY cnt DESC
+                LIMIT ?
+                """,
+                (cutoff, limit),
+            ).fetchall()
+        finally:
+            conn.close()
+    return [{"target": t, "target_type": tt, "count": cnt} for t, tt, cnt in rows]
 
 
 def query_activity(hours: int = 12, interval_minutes: int = 15) -> dict:

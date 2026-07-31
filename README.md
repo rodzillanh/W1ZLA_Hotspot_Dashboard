@@ -836,16 +836,15 @@ a proper APRS message.
 
 ## Notifications card
 
-Optional dashboard card (Settings → Cards) that merges two independent
-message/alert sources into one scrollable, time-sorted list — appears as
-soon as *either* is enabled, and both remain separate on/off toggles
-underneath. Position it anywhere in the same drag-and-drop **Card order**
-list (Settings → Hotspots), same as Fleet Activity/ASL Favorites/Camera
-cards. When both sources are enabled, filter chips (All / APRS / HamAlert)
+Optional dashboard card (Settings → Cards) that merges up to five
+independent message/alert sources into one scrollable, time-sorted list —
+appears as soon as *any* is enabled, and each remains its own separate
+on/off toggle underneath. Position it anywhere in the same drag-and-drop
+**Card order** list (Settings → Hotspots), same as Fleet Activity/ASL
+Favorites/Camera cards. When two or more sources are enabled, filter chips
 let you narrow the list to one; with only one enabled, the card just shows
 that source's rows with no filter chips needed. Each row is tagged with a
-small 📨 (APRS) or 🔔 (HamAlert) icon so the source stays visible even in
-the combined "All" view.
+small icon so the source stays visible even in the combined "All" view.
 
 **APRS Messages** (Settings → Cards → "Show APRS Messages card", off by
 default) — the receiving half of APRS favorite alerts above: a persistent
@@ -887,12 +886,36 @@ to QRZ), source (DX cluster / Reverse Beacon Network / POTA / SOTA /
 WWFF / PSK Reporter), frequency/mode, DXCC entity, and — when present —
 the specific trigger comment that matched (e.g. "New DXCC needed").
 
-Both sources share one connection-status readout in the card header
-(Connected / Connecting / Reconnecting per source) and one combined,
-capped/scrollable list — same pattern as the ASL Favorites card's row
-list — rather than growing the card forever.
-Position it anywhere in the same drag-and-drop **Card order** list
-(Settings → Hotspots), same as Fleet Activity/APRS Messages/etc.
+**Fleet alerts** (Settings → Cards → "Fleet online/offline alerts in
+Notifications", off by default) — no new connection or credentials at
+all: this dashboard already tracks when a hotspot goes offline (for the
+red "OFFLINE" badge on its card) and comes back; this setting just also
+surfaces that exact moment as a notification.
+
+**Solar alerts** (Settings → Cards → "Geomagnetic storm alerts in
+Notifications", off by default) — also no new connection: the HF
+Conditions card already fetches K-index hourly. This setting adds a
+notification whenever K-index crosses the NOAA G1 "minor storm"
+threshold (Kp≥5, the conventional level hams watch for aurora
+propagation / HF disturbance), in either direction — once when it
+crosses up, once when it drops back down — not a repeated alert every
+hour it stays elevated.
+
+**Brandmeister favorite alerts** (Settings → Cards → "Brandmeister
+favorite alerts in Notifications", off by default) — a persistent
+connection to Brandmeister's own public real-time "Last Heard" feed
+(no account needed, unlike HamAlert) that notifies when a favorite
+callsign (Settings → Favorites) keys up **anywhere on the Brandmeister
+network**, not just through this fleet's own hotspots — the network-wide
+counterpart to the fleet-scoped APRS favorite alerts above.
+
+All enabled sources share one connection-status readout in the card
+header (Connected / Connecting / Reconnecting per source, where the
+source has a real connection to be in) and one combined, capped/
+scrollable list — same pattern as the ASL Favorites card's row list —
+rather than growing the card forever. Position it anywhere in the same
+drag-and-drop **Card order** list (Settings → Hotspots), same as Fleet
+Activity/APRS Messages/etc.
 
 ## HF Conditions card
 
@@ -1030,6 +1053,35 @@ a QRZ subscription is configured) or the ADIF log's own `COUNTRY` field
 neither source just shows no flag rather than a potentially wrong one.
 Distance uses the same miles/km preference as the Weather card
 (Settings → Weather → "Temperature in °F").
+
+## QSO Stats card
+
+Optional dashboard card (Settings → Cards → "Show QSO Stats card", off
+by default) — a quick summary over the same logged QSOs Recent Contacts
+shows: total contacts, unique countries worked, unique grid squares
+worked (at 4-character Maidenhead precision — e.g. "FN42" — the
+standard grid-square-award granularity, not the finer 6-character
+precision some logs store), unique bands worked, and a small breakdown
+of your most-used bands. Pure client-side aggregation, no new data
+source or backend query.
+
+## Top 5 Activity card
+
+Optional dashboard card (Settings → Cards → "Show Top 5 Activity card",
+off by default) — ranks **your own fleet's** most active talkgroups
+(WPSD) and linked nodes (AllStarLink) over the last 24 hours, as a
+simple bar-ranked list. Needs "Show fleet activity card" enabled too —
+it reads the same activity log that card's chart is built from, just a
+different aggregate query (ranked totals instead of a time series).
+
+This is deliberately scoped to your own fleet, not a network-wide "what's
+busy right now" feed — Brandmeister/TGIF/AllStarLink/YSF were each
+investigated for a clean, free, REST-pollable "busiest talkgroups
+network-wide" endpoint and none had one (Brandmeister and TGIF's
+real-time activity both live behind a persistent Socket.IO connection
+rather than a periodic poll — see the Notifications card's Brandmeister
+favorite alerts above for the one place this dashboard *does* use a
+Brandmeister live connection, for a different, narrower purpose).
 
 ## Big Ass Clock card
 
@@ -1197,6 +1249,12 @@ appear as pins — the QRZ subscription caveat above applies here too.
   separately from every hotspot/QSO color (shown in the Map key). Free,
   no-auth public feed (`api.pota.app`), no configuration needed — just
   turn it on. Off by default, only polls while the checkbox is checked.
+- **SOTA spots** — same idea for Summits on the Air: a "SOTA spots"
+  checkbox plots current activator spots worldwide (`api2.sota.org.uk`,
+  free, no key). Each spot's summit position is resolved server-side
+  (SOTA's own spot feed doesn't include coordinates, only an
+  association+summit code) and cached indefinitely per summit, since a
+  mountain doesn't move. Off by default, only polls while checked.
 - **PSK Reporter** — a "PSK Reporter" checkbox plots where **your own**
   signal was actually heard, using your callsign (Settings →
   Integrations). Deliberately scoped to one callsign, not a worldwide

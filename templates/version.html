@@ -117,9 +117,22 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.58 "Cornell"</span>
+                <span class="release-version">v3.59 "Reed"</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Three new Notifications sources</span> — fleet online/offline transition alerts (no new connection, just surfaces monitor.py's existing offline_since tracking), geomagnetic-storm alerts (Kp>=5 threshold crossing, from the HF Conditions card's existing hourly fetch), and Brandmeister favorite-activity alerts (a favorite callsign keying up ANYWHERE on the Brandmeister network, not just through this fleet) — each independently toggleable in Settings → Cards</li>
+                <li><span>QSO Stats card</span> — contacts/countries/grids/bands worked, a pure client-side summary over the same logged QSOs Recent Contacts already shows</li>
+                <li><span>Top 5 Activity card</span> — your own fleet's most active talkgroups/nodes over the last 24h, backed by a new target/target_type column on the existing Fleet Activity log (needs "Show fleet activity card" enabled too)</li>
+                <li><span>SOTA spots on the Live map</span> — a "SOTA spots" checkbox alongside POTA, same idea for Summits on the Air (api2.sota.org.uk, free, no key) — each spot's summit position is resolved and cached server-side, since SOTA's own feed only carries a summit code, not coordinates</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.58 "Cornell"</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Recent Contacts: signal report, operator name, and distance worked</span> — each row now shows RST sent/received (WSJT-X's own packet fields, or ADIF's RST_SENT/RST_RCVD), the other operator's name (ADIF's own NAME field or WSJT-X's, falling back to a QRZ lookup), and the great-circle distance to that contact (uses your existing miles/km preference from Settings → Weather)</li>
