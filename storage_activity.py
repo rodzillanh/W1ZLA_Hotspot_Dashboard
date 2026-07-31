@@ -81,11 +81,12 @@ def log_activity(hotspot_ip: str, hotspot_name: str, mode: str | None,
 
 
 def top_targets(hours: int = 24, limit: int = 5) -> list:
-    """Most active talkgroups/nodes across the fleet in the trailing
-    `hours` window, ranked by transmission count -- own-fleet activity
-    only, not a network-wide feed (see CLAUDE.md for why a network-wide
-    version isn't built: no clean REST-pollable option was found for any
-    of Brandmeister/TGIF/AllStarLink/YSF)."""
+    """Most active callsigns (who transmitted, not which talkgroup/node
+    they went through) across the fleet in the trailing `hours` window,
+    ranked by transmission count -- own-fleet activity only, not a
+    network-wide feed (see CLAUDE.md for why a network-wide version
+    isn't built: no clean REST-pollable option was found for any of
+    Brandmeister/TGIF/AllStarLink/YSF)."""
     cutoff = time.time() - hours * 3600
     with _lock:
         conn = _get_conn()

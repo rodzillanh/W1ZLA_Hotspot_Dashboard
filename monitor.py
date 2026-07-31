@@ -423,14 +423,16 @@ class FleetMonitor:
         card -- opt-in (see settings.show_fleet_activity), so skip the write
         entirely when nobody will ever query it.
 
-        Also captures target/target_type for the Top 5 activity card
-        (talkgroup for WPSD, linked node/callsign for ASL3, via
-        active_call -- ASL3 has no separate "which remote node was keyed"
-        field on HotspotStatus, but active_call already holds exactly
-        that, resolved to a callsign when known or the bare node number
-        otherwise, either way a meaningful ranking target). A hotspot
-        type with neither (e.g. openspot4, which doesn't currently call
-        this) just logs target=None, invisible to top_targets()."""
+        Also captures target/target_type for the Top 5 activity card --
+        WHO transmitted (active_call), not which talkgroup/node it went
+        through. active_call already holds the right value for both
+        hotspot types: for WPSD it's the caller's own resolved callsign;
+        for ASL3 it's the keyed linked node's resolved callsign, or its
+        bare node number when no callsign could be resolved (still a
+        meaningful ranking identity, just not a real callsign). A
+        hotspot type with neither (e.g. openspot4, which doesn't
+        currently call this) just logs target=None, invisible to
+        top_targets()."""
         if not load_settings().get("show_fleet_activity", False):
             return
         with self._lock:
@@ -438,12 +440,8 @@ class FleetMonitor:
             if status is None:
                 return
             name, mode = status.name, status.mode
-            if status.talkgroup:
-                target, target_type = status.talkgroup, "talkgroup"
-            elif status.active_call:
-                target, target_type = status.active_call, "asl_node"
-            else:
-                target, target_type = None, None
+            target = status.active_call or None
+            target_type = "callsign" if target else None
         storage_activity.log_activity(ip, name, mode, target, target_type)
 
     def _lookup_caller(self, call: str) -> dict:

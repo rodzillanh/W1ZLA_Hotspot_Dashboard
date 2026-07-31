@@ -1068,11 +1068,13 @@ source or backend query.
 ## Top 5 Activity card
 
 Optional dashboard card (Settings → Cards → "Show Top 5 Activity card",
-off by default) — ranks **your own fleet's** most active talkgroups
-(WPSD) and linked nodes (AllStarLink) over the last 24 hours, as a
-simple bar-ranked list. Needs "Show fleet activity card" enabled too —
-it reads the same activity log that card's chart is built from, just a
-different aggregate query (ranked totals instead of a time series).
+off by default) — ranks **your own fleet's** most active callsigns (who
+transmitted, not which talkgroup/node it went through) over the last 24
+hours, as a simple bar-ranked list, each linking to QRZ (or RadioID.net
+if QRZ isn't configured) same as the Recent Contacts card. Needs "Show
+fleet activity card" enabled too — it reads the same activity log that
+card's chart is built from, just a different aggregate query (ranked
+totals instead of a time series).
 
 This is deliberately scoped to your own fleet, not a network-wide "what's
 busy right now" feed — Brandmeister/TGIF/AllStarLink/YSF were each

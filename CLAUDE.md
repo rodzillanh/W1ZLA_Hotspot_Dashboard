@@ -2293,14 +2293,29 @@ config for per-integration credentials; put it in
     columns transparently the first time it's opened post-upgrade.
     Verified live: seeded a real pre-migration `activity.db` file by
     hand, confirmed `log_activity()`/`top_targets()` both work against
-    it without error. `monitor.py`'s `_log_activity()` sets `target`
-    from `status.talkgroup` (WPSD) or `status.active_call` (ASL3, NOT
-    `status.asl_node` -- that field is this hotspot's own static node
-    number, identical across every row from the same hotspot, so
-    ranking by it would just group by hotspot rather than by which
-    remote node/reflector was actually linked; `active_call` already
-    holds the resolved callsign or bare node number of whichever remote
-    node was keyed, a real ranking target).
+    it without error.
+  - **The Top 5 card's FIRST implementation ranked by talkgroup/node,
+    not callsign -- a real, reported wrong-scope bug, not a hypothetical
+    ("I was actually looking for the top 5 call signs not the top 5
+    nodes").** `monitor.py`'s `_log_activity()` originally preferred
+    `status.talkgroup` (WPSD) over `status.active_call`, so a WPSD
+    hotspot's rows ranked by *which talkgroup* was busiest, not *who*
+    transmitted -- easy to reach for by analogy with the map/Recent
+    Contacts world where talkgroup is often the more prominent field,
+    but wrong for what "top 5 activity" actually meant here. Fixed by
+    always setting `target = status.active_call` for every hotspot type
+    (dropping the talkgroup branch entirely) and `target_type` to a
+    fixed `"callsign"` -- `active_call` already holds the right value
+    either way: WPSD's own caller's resolved callsign, or ASL3's linked
+    node's resolved callsign (falling back to its bare node number only
+    when no callsign could be resolved, still a meaningful identity, just
+    not a real callsign). Do NOT resurrect the talkgroup-preference
+    branch if this is ever touched again -- verified live after the fix
+    with synthetic WPSD and ASL3 log_activity() calls that the ranked
+    output is callsigns (`W1ABC`, `W2ECR`), not talkgroup/node numbers.
+    The Top 5 card's rows are now clickable (QRZ if configured, else
+    RadioID.net), same pattern as Recent Contacts' callsigns -- a natural
+    fit once the ranking is genuinely callsign-based.
   - **The Brandmeister Last Heard live feed (`brandmeister_lastheard.py`)
     required a real, multi-step reverse-engineering session --
     Brandmeister documents none of this anywhere.** Worth recording the

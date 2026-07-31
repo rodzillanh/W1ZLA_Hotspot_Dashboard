@@ -468,13 +468,13 @@ DEFAULT_SETTINGS = {
     "show_qso_stats": False,
     "qso_stats_position": 0,
     # Top 5 activity card -- off by default. Ranks the fleet's own most
-    # active talkgroups/nodes over a trailing window (default 24h) --
-    # reuses storage_activity.py's existing activity_log (same opt-in
-    # show_fleet_activity gate for whether rows get logged at all), just
-    # a different aggregate query. Deliberately own-fleet only, not a
-    # network-wide "what's busy right now" feed -- see CLAUDE.md for the
-    # Brandmeister/TGIF/AllStarLink/YSF research that ruled that out as a
-    # clean REST-pollable option.
+    # active CALLSIGNS (who transmitted, not which talkgroup/node) over a
+    # trailing window (default 24h) -- reuses storage_activity.py's
+    # existing activity_log (same opt-in show_fleet_activity gate for
+    # whether rows get logged at all), just a different aggregate query.
+    # Deliberately own-fleet only, not a network-wide "what's busy right
+    # now" feed -- see CLAUDE.md for the Brandmeister/TGIF/AllStarLink/
+    # YSF research that ruled that out as a clean REST-pollable option.
     "show_top_activity": False,
     "top_activity_position": 0,
     # Live WSJT-X QSO logging -- off by default. Listens for WSJT-X's own

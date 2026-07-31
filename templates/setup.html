@@ -702,7 +702,7 @@
             <div class="toggle-row">
                 <span class="toggle-label">Show Top 5 Activity card
                     <span style="font-size:10px;color:var(--text-dim)">
-                        (your fleet's own most active talkgroups/nodes, last 24h -- needs "Show fleet activity card" on too)
+                        (your fleet's own most active callsigns, last 24h -- needs "Show fleet activity card" on too)
                     </span>
                 </span>
                 <div class="toggle {{ 'on' if settings.get('show_top_activity', False) else '' }}"
@@ -866,7 +866,7 @@
                 <div class="drag-row fleet-activity-row" draggable="true" data-ip="__top_activity__">
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🏆 Top 5 Activity</span>
-                    <span class="node-meta">fleet talkgroup/node ranking card</span>
+                    <span class="node-meta">fleet callsign activity ranking card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}

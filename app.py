@@ -595,7 +595,7 @@ _SENTINEL_DEFS = [
     ("__satellites__", "show_satellites", "satellites_position", "🛰️", "Satellites", "pass prediction card"),
     ("__recent_contacts__", "show_recent_contacts", "recent_contacts_position", "📻", "Recent Contacts", "logged QSO card"),
     ("__qso_stats__", "show_qso_stats", "qso_stats_position", "📈", "QSO Stats", "logbook summary card"),
-    ("__top_activity__", "show_top_activity", "top_activity_position", "🏆", "Top 5 Activity", "fleet talkgroup/node ranking card"),
+    ("__top_activity__", "show_top_activity", "top_activity_position", "🏆", "Top 5 Activity", "fleet callsign activity ranking card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
