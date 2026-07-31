@@ -926,7 +926,9 @@ def api_import_adif():
     expected). Position resolution: GRIDSQUARE first (direct, no lookup
     needed), falling back to the same QRZ/RadioID/APRS composition every
     other card uses (monitor.lookup_caller_info) when absent. A QSO with
-    neither is skipped -- nothing to plot it with.
+    neither is skipped -- nothing to plot it with. Name/city/state/
+    country enrichment always runs this lookup regardless of whether
+    GRIDSQUARE gave us a position -- see the comment at the call site.
 
     Each QSO also gets a "worked from" QTH position, so the map can draw a
     line back to the home station: MY_GRIDSQUARE on that specific record
@@ -945,23 +947,27 @@ def api_import_adif():
         call = (r.get("CALL") or "").strip().upper()
         if not call:
             continue
-        lat = lon = qrz_name = location = city = state = qrz_country = None
         grid = (r.get("GRIDSQUARE") or "").strip()
         latlon = grid_to_latlon(grid) if grid else None
+        # Always resolve name/city/state/country via QRZ/RadioID, not just
+        # when GRIDSQUARE is absent -- ADIF has no city/state fields at
+        # all, and in practice most real logs carry GRIDSQUARE but NOT
+        # COUNTRY (many logging programs never populate it), so the old
+        # "only look up when grid is missing" rule left country/flag
+        # blank for nearly every imported QSO, a real reported gap, not a
+        # hypothetical. Matches wsjtx.py's live path, which already always
+        # enriches regardless of grid. QrzClient.lookup() caches per
+        # callsign and short-circuits near-instantly when QRZ isn't
+        # configured (QrzClient.enabled), so this stays cheap for a large
+        # import when QRZ is off; when QRZ IS configured, repeated
+        # callsigns in a real log (common) hit the cache after the first.
+        info = monitor.lookup_caller_info(call)
         if latlon is not None:
             lat, lon = latlon
         else:
-            # QRZ lookup only as a position FALLBACK here (unlike wsjtx.py's
-            # live one-at-a-time path, which now always looks up city/
-            # state/country too) -- a bulk import can be hundreds/thousands
-            # of QSOs, and doing a synchronous QRZ round-trip for every one
-            # regardless of whether the log already has a usable position
-            # would make a big import request slow or time out. Only pay
-            # that cost when the log genuinely lacks a grid square.
-            info = monitor.lookup_caller_info(call)
             lat, lon = info["lat"], info["lon"]
-            qrz_name, location = info["name"], info["location"]
-            city, state, qrz_country = info["city"], info["state"], info["country"]
+        qrz_name, location = info["name"], info["location"]
+        city, state, qrz_country = info["city"], info["state"], info["country"]
         if lat is None or lon is None:
             continue  # can't plot without a position
 
