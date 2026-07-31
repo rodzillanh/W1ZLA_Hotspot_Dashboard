@@ -2209,6 +2209,9 @@ const SATELLITES_POLL_MS = 15000;  // satellite position moves fast (~7.6km/s) -
                                     // (see satellites.py), so this doesn't hammer it.
 const SHOW_RECENT_CONTACTS = {{ 'true' if settings.get('show_recent_contacts', False) else 'false' }};
 const RECENT_CONTACTS_POSITION = {{ settings.get('recent_contacts_position', 0) }};
+// Same "enabled" definition as qrz.py's QrzClient.enabled property --
+// both username and password set, not a separate on/off toggle.
+const QRZ_ENABLED = {{ 'true' if (settings.get('qrz_username', '') and settings.get('qrz_password', '')) else 'false' }};
 const RECENT_CONTACTS_POLL_MS = 20000;  // same cadence as the map's own fetchQsos() poll -- same qsos.json source
 const SHOW_QSO_STATS = {{ 'true' if settings.get('show_qso_stats', False) else 'false' }};
 const QSO_STATS_POSITION = {{ settings.get('qso_stats_position', 0) }};
@@ -5022,10 +5025,14 @@ function renderRecentContactsCard(qsos) {
         const when = q.logged_at ? fmtAgoCompact(Math.max(0, nowSec - q.logged_at)) + ' ago'
                    : (q.date || '');
         const metaBits = [modeBits, freqBits, q.grid, distBits, rstBits ? 'RST ' + rstBits : null].filter(Boolean).join(' · ');
+        const call = q.call || '?';
+        const lookupHref = QRZ_ENABLED
+            ? `https://www.qrz.com/db/${encodeURIComponent(call)}`
+            : `https://radioid.net/database/search?callsign=${encodeURIComponent(call)}`;
         return `
         <div class="msg-row">
             <div class="msg-top">
-                <span class="msg-from">${flag ? flag + ' ' : ''}${escapeHtml(q.call || '?')}</span>
+                <a class="msg-from" href="${lookupHref}" target="_blank" rel="noopener">${flag ? flag + ' ' : ''}${escapeHtml(call)}</a>
                 ${q.name ? `<span class="msg-to">${escapeHtml(q.name)}</span>` : ''}
                 <span class="msg-time">${escapeHtml(when)}</span>
             </div>
