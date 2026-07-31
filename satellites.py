@@ -325,6 +325,7 @@ class SatelliteTracker:
         passes = []
         in_pass = False
         aos_epoch = None
+        aos_azimuth = None
         max_el = -90.0
 
         t = start
@@ -342,6 +343,7 @@ class SatelliteTracker:
             if not in_pass and prev_el is not None and prev_el < 0 <= el:
                 in_pass = True
                 aos_epoch = t
+                aos_azimuth = az
                 max_el = el
             elif in_pass:
                 max_el = max(max_el, el)
@@ -356,6 +358,13 @@ class SatelliteTracker:
                             "aos_epoch": aos_epoch,
                             "los_epoch": t,
                             "max_elevation": round(max_el, 1),
+                            # Compass direction to look, not just "when" --
+                            # az here is the SAME value the horizon-crossing
+                            # check above already computed at AOS/LOS, just
+                            # also captured for display (PASS_STEP_SECONDS=30
+                            # granularity, plenty for a compass reading).
+                            "aos_azimuth": round(aos_azimuth, 0),
+                            "los_azimuth": round(az, 0),
                         })
                     in_pass = False
                     max_el = -90.0

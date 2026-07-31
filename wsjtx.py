@@ -157,11 +157,11 @@ def parse_packet(data: bytes) -> dict | None:
         grid = r.qstring()
         frequency = r.i64()
         mode = r.qstring()
-        r.qstring()  # report_sent, unused
-        r.qstring()  # report_recv, unused
+        report_sent = r.qstring()
+        report_recv = r.qstring()
         r.qstring()  # tx_power, unused
         r.qstring()  # comments, unused
-        r.qstring()  # name, unused
+        name = r.qstring()
         r.qdate()    # datetime_on, unused
         r.qstring()  # op_call, unused
         r.qstring()  # my_call, unused
@@ -180,6 +180,9 @@ def parse_packet(data: bytes) -> dict | None:
             "mode": mode.strip().upper(),
             "date": f"{year:04d}{month:02d}{day:02d}",
             "my_grid": my_grid.strip(),
+            "rst_sent": report_sent.strip(),
+            "rst_rcvd": report_recv.strip(),
+            "name": name.strip(),
         }
     except (struct.error, IndexError, UnicodeDecodeError):
         return None
@@ -275,7 +278,13 @@ class WsjtxListener:
             # caches per callsign) even when the grid square alone already
             # gives us a usable position.
             info = self._monitor.lookup_caller_info(parsed["call"])
-            name, location = info["name"], info["location"]
+            # WSJT-X's own logged "name" field (rare -- only populated if
+            # the other station's software sent one, e.g. via a free-text
+            # exchange) takes priority over QRZ's when present, same
+            # "what was actually logged at QSO time beats a lookup"
+            # priority as the ADIF importer's own COUNTRY field over QRZ's.
+            name = parsed["name"] or info["name"]
+            location = info["location"]
             city, state, country = info["city"], info["state"], info["country"]
 
             latlon = grid_to_latlon(parsed["grid"]) if parsed["grid"] else None
@@ -304,6 +313,8 @@ class WsjtxListener:
                 "qth_lat": qth_lat, "qth_lon": qth_lon,
                 "name": name, "location": location,
                 "city": city, "state": state, "country": country,
+                "rst_sent": parsed["rst_sent"] or None,
+                "rst_rcvd": parsed["rst_rcvd"] or None,
                 "source": "wsjtx",
                 "logged_at": time.time(),  # epoch seconds -- lets the map
                 # highlight a QSO as "just happened" for a while, then fade

@@ -897,7 +897,7 @@ def api_import_adif():
         call = (r.get("CALL") or "").strip().upper()
         if not call:
             continue
-        lat = lon = name = location = city = state = qrz_country = None
+        lat = lon = qrz_name = location = city = state = qrz_country = None
         grid = (r.get("GRIDSQUARE") or "").strip()
         latlon = grid_to_latlon(grid) if grid else None
         if latlon is not None:
@@ -912,7 +912,7 @@ def api_import_adif():
             # that cost when the log genuinely lacks a grid square.
             info = monitor.lookup_caller_info(call)
             lat, lon = info["lat"], info["lon"]
-            name, location = info["name"], info["location"]
+            qrz_name, location = info["name"], info["location"]
             city, state, qrz_country = info["city"], info["state"], info["country"]
         if lat is None or lon is None:
             continue  # can't plot without a position
@@ -933,14 +933,16 @@ def api_import_adif():
             "frequency_hz": _adif_freq_to_hz(r.get("FREQ")),
             "lat": lat, "lon": lon,
             "qth_lat": qth_lat, "qth_lon": qth_lon,
-            "name": name, "location": location,
+            # ADIF's own NAME/COUNTRY fields (when the logging software
+            # already captured them) take priority over QRZ's -- more
+            # likely to reflect what was actually true at QSO time, and
+            # doesn't cost an extra lookup for the common case where
+            # GRIDSQUARE already gave us a position.
+            "name": (r.get("NAME") or "").strip() or qrz_name, "location": location,
             "city": city, "state": state,
-            # ADIF's own COUNTRY field (when the logging software already
-            # resolved DXCC) takes priority over QRZ's -- more likely to
-            # reflect what was actually true at QSO time, and doesn't cost
-            # an extra lookup for the common case where GRIDSQUARE already
-            # gave us a position.
             "country": (r.get("COUNTRY") or "").strip() or qrz_country,
+            "rst_sent": (r.get("RST_SENT") or "").strip() or None,
+            "rst_rcvd": (r.get("RST_RCVD") or "").strip() or None,
             "logged_at": _adif_datetime_to_epoch(qso_date, r.get("TIME_ON")),
         })
 

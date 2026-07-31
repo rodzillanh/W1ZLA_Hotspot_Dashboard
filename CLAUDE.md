@@ -2197,6 +2197,34 @@ config for per-integration credentials; put it in
   on first if it was off (checks the box, calls `toggleSatellitesMap()`)
   before panning/opening its popup -- otherwise the marker would exist
   in memory but never have been added to the map to pan to.
+- **Recent Contacts gained signal report/operator name/distance worked,
+  and Satellite passes gained rise/set compass direction + uplink
+  frequency (v3.58) -- both were mostly "stop discarding data already
+  in hand" rather than new lookups.** `wsjtx.py`'s QSOLoggedPacket
+  parser was already reading past `report_sent`/`report_recv`/`name`
+  with a bare `r.qstring()  # ..., unused` -- these are now captured and
+  passed through (`rst_sent`/`rst_rcvd`/`name` in the QSO dict). ADIF's
+  equivalent fields (`RST_SENT`/`RST_RCVD`/`NAME`) get the exact same
+  "own-log-data-first, QRZ-fallback-second" priority the `COUNTRY` field
+  already established -- confirmed live with a synthetic ADIF record
+  before trusting it. `uplink_mhz` was already present on every pass
+  dict returned by `satellites.py`'s `_find_passes()` (from the tracked-
+  satellite config) -- the Satellites card just never rendered it
+  alongside `downlink_mhz`. The one piece that DID need new backend
+  work: AOS/LOS azimuth. `_elevation_azimuth()` was already computing
+  `az` every 30-second step to detect the horizon crossing, but only
+  `el` got used for that decision -- `az` was discarded immediately
+  after. Fixed by capturing it at the exact moment `in_pass` flips true
+  (`aos_azimuth`) and at the step where `el` finally goes negative
+  (`los_azimuth`), then converting degrees to a 16-point compass label
+  (`COMPASS_POINTS`) client-side in `dashboard.html`, same "send raw
+  data, format for display in JS" split as the RSSI/BER bars. Distance
+  worked reuses the map's own existing `distanceKm()`/`fmtDistance()`
+  helpers verbatim (already used for the map's hotspot-distance display,
+  itself keyed off `settings.weather_unit` for miles-vs-km) rather than
+  writing a second haversine implementation -- only computed when a QSO
+  has both its own position and a resolved QTH position, same graceful-
+  omission contract as the line-back-to-QTH feature on the map itself.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

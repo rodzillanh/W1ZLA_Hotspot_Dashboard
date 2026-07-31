@@ -980,8 +980,9 @@ Optional dashboard card (Settings → Cards → "Show Satellites card", off
 by default) — upcoming pass predictions for a small list of amateur radio
 satellites, plus a live ground-track overlay on the **Live map**.
 
-- **Pass predictions** — AOS time ("in 12 min"), max elevation, and
-  mode/downlink frequency for each tracked satellite's next passes over
+- **Pass predictions** — AOS time ("in 12 min"), max elevation,
+  mode/downlink/uplink frequency, and which direction to look (e.g.
+  "rises NW, sets SE") for each tracked satellite's next passes over
   your station, sorted soonest-first. A pass currently in progress is
   highlighted. Needs a **station grid square** set (Settings → Cards,
   same field the Band Activity card uses) — without one, the card shows
@@ -1016,12 +1017,19 @@ import and/or live WSJT-X logging — see the Live map section below).
 No separate data source or configuration; this is just a different view
 onto QSOs already being tracked.
 
-Each row shows: a country flag (when known), callsign, city/state, band
-and mode, frequency, grid square, and how long ago it was logged. The
-flag comes from QRZ's own `country` field (if a QRZ subscription is
-configured) or the ADIF log's own `COUNTRY` field — **not** a guessed
-callsign-prefix DXCC lookup, so a contact with neither source just shows
-no flag rather than a potentially wrong one.
+Each row shows: a country flag (when known), callsign, the other
+operator's name (when known), city/state, band and mode, frequency,
+signal report (RST sent/received), distance worked, grid square, and how
+long ago it was logged. Name/RST/distance and flag/city/state/country
+all degrade gracefully when the source data isn't there — an older
+logging app or a plain FT8 exchange with no free-text name won't have
+all of these, and the row just omits whatever's missing rather than
+showing a placeholder. The flag comes from QRZ's own `country` field (if
+a QRZ subscription is configured) or the ADIF log's own `COUNTRY` field
+— **not** a guessed callsign-prefix DXCC lookup, so a contact with
+neither source just shows no flag rather than a potentially wrong one.
+Distance uses the same miles/km preference as the Weather card
+(Settings → Weather → "Temperature in °F").
 
 ## Big Ass Clock card
 

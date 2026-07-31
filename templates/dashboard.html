@@ -3247,6 +3247,12 @@ function fmtPassWhen(aosEpoch) {
     return `in ${hrs}h ${remMin}m`;
 }
 
+const COMPASS_POINTS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+function compassDir(deg) {
+    if (deg == null) return '';
+    return COMPASS_POINTS[Math.round(((deg % 360) + 360) % 360 / 22.5) % 16];
+}
+
 function renderSatellitesCard(data) {
     const listEl = document.getElementById('sat-list');
     const emptyEl = document.getElementById('sat-empty');
@@ -3270,7 +3276,14 @@ function renderSatellitesCard(data) {
     const nowSec = Date.now() / 1000;
     listEl.innerHTML = passes.slice(0, 8).map(p => {
         const overhead = p.aos_epoch <= nowSec && nowSec <= p.los_epoch;
-        const freqBits = [p.mode, p.downlink_mhz ? `${p.downlink_mhz.toFixed(3)} MHz` : null].filter(Boolean).join(' · ');
+        const freqBits = [
+            p.mode,
+            p.downlink_mhz ? `↓${p.downlink_mhz.toFixed(3)}` : null,
+            p.uplink_mhz ? `↑${p.uplink_mhz.toFixed(3)}` : null,
+        ].filter(Boolean).join(' · ');
+        const dirBits = (p.aos_azimuth != null && p.los_azimuth != null)
+            ? `rises ${compassDir(p.aos_azimuth)} · sets ${compassDir(p.los_azimuth)}`
+            : '';
         return `
         <div class="msg-row ${overhead ? 'unread' : ''}">
             <div class="msg-top">
@@ -3278,6 +3291,7 @@ function renderSatellitesCard(data) {
                 <span class="msg-time">${overhead ? 'until ' + fmtPassWhen(p.los_epoch).replace('in ', '') : fmtPassWhen(p.aos_epoch)}</span>
             </div>
             <div class="msg-text">${escapeHtml(freqBits)} · max el ${p.max_elevation.toFixed(0)}°</div>
+            <div class="msg-to">${escapeHtml(dirBits)}</div>
         </div>`;
     }).join('');
 }
@@ -4762,13 +4776,18 @@ function renderRecentContactsCard(qsos) {
         const locBits = [q.city, q.state || q.country].filter(Boolean).join(', ');
         const modeBits = [q.band, q.mode].filter(Boolean).join(' ');
         const freqBits = q.frequency_hz ? (q.frequency_hz / 1e6).toFixed(3) + ' MHz' : '';
+        const rstBits = [q.rst_sent, q.rst_rcvd].filter(Boolean).join('/');
+        const distBits = (q.qth_lat != null && q.qth_lon != null && q.lat != null && q.lon != null)
+            ? fmtDistance(distanceKm(q.qth_lat, q.qth_lon, q.lat, q.lon))
+            : '';
         const when = q.logged_at ? fmtAgoCompact(Math.max(0, nowSec - q.logged_at)) + ' ago'
                    : (q.date || '');
-        const metaBits = [modeBits, freqBits, q.grid].filter(Boolean).join(' · ');
+        const metaBits = [modeBits, freqBits, q.grid, distBits, rstBits ? 'RST ' + rstBits : null].filter(Boolean).join(' · ');
         return `
         <div class="msg-row">
             <div class="msg-top">
                 <span class="msg-from">${flag ? flag + ' ' : ''}${escapeHtml(q.call || '?')}</span>
+                ${q.name ? `<span class="msg-to">${escapeHtml(q.name)}</span>` : ''}
                 <span class="msg-time">${escapeHtml(when)}</span>
             </div>
             <div class="msg-text">${escapeHtml(locBits)}</div>

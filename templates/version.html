@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.57 "Mercury"</span>
+                <span class="release-version">v3.58 "Cornell"</span>
                 <span class="release-date">July 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Recent Contacts: signal report, operator name, and distance worked</span> — each row now shows RST sent/received (WSJT-X's own packet fields, or ADIF's RST_SENT/RST_RCVD), the other operator's name (ADIF's own NAME field or WSJT-X's, falling back to a QRZ lookup), and the great-circle distance to that contact (uses your existing miles/km preference from Settings → Weather)</li>
+                <li><span>Satellite passes: rise/set compass direction and uplink frequency</span> — each upcoming pass now shows which direction to look for AOS/LOS (e.g. "rises NW, sets SE"), plus the uplink frequency alongside the downlink you already saw</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.57 "Mercury"</span>
+                <span class="release-date">July 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Recent Contacts card</span> — a newest-first list of your logged QSOs (ADIF import + live WSJT-X logging), off by default. Shows a country flag (from QRZ's own lookup or the ADIF log's own COUNTRY field — never a guessed callsign-prefix DXCC lookup), city/state, band/mode, frequency, and grid square per contact</li>
