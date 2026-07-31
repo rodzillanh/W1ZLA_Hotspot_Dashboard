@@ -832,6 +832,19 @@
         }
         .filter-chip.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
 
+        /* --- Satellites card + Live map overlay --- */
+        .card-sub { font-size: 10.5px; color: var(--text-dim); }
+        /* Icon marker only -- the footprint is a real L.circle (geographic
+           radius in meters), not a CSS-drawn shape, so it stays correctly
+           sized/positioned as the map pans and zooms. */
+        .sat-marker-icon { font-size: 16px; line-height: 1; text-align: center; pointer-events: none; }
+        .sat-label {
+            font-size: 10px; font-family: var(--font-mono); color: rgba(255,255,255,.92);
+            text-shadow: -1px -1px 2px rgba(0,0,0,.75), 1px -1px 2px rgba(0,0,0,.75),
+                         -1px 1px 2px rgba(0,0,0,.75), 1px 1px 2px rgba(0,0,0,.75);
+            white-space: nowrap; text-align: center; margin-top: 1px;
+        }
+
         /* --- HF Conditions card --- */
         .hf-updated { font-size: 10.5px; color: var(--text-dim); }
         .hf-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
@@ -1617,6 +1630,20 @@
             <div class="msg-empty" id="notif-empty">No notifications yet.</div>
         </div>
         {% endif %}
+        {% if settings.get('show_satellites', False) %}
+        <div class="metrics-card" id="satellites-card"
+             style="order:{{ settings.get('satellites_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">🛰️ Satellites</div>
+                <span class="card-sub" id="sat-card-sub">—</span>
+            </div>
+            <div class="msg-scroll" id="sat-scroll">
+                <div id="sat-list"></div>
+            </div>
+            <div class="msg-empty" id="sat-empty" style="display:none">No upcoming passes in the next 48h.</div>
+            <div class="msg-empty" id="sat-no-qth" style="display:none">Set a station grid square in Settings → Cards to enable pass predictions.</div>
+        </div>
+        {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
         <div class="metrics-card" id="hf-conditions-card"
              style="order:{{ settings.get('hf_conditions_position', 0) }}">
@@ -2085,6 +2112,12 @@ const SHOW_HAMALERT = {{ 'true' if settings.get('hamalert_enabled', False) else 
 const HAMALERT_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS
 const SHOW_NOTIFICATIONS = SHOW_APRS_INBOX || SHOW_HAMALERT;
 const NOTIFICATIONS_POSITION = {{ settings.get('notifications_position', 0) }};
+const SHOW_SATELLITES = {{ 'true' if settings.get('show_satellites', False) else 'false' }};
+const SATELLITES_POSITION = {{ settings.get('satellites_position', 0) }};
+const SATELLITES_POLL_MS = 15000;  // satellite position moves fast (~7.6km/s) --
+                                    // shorter than most cards' poll interval, but
+                                    // /api/satellites itself caches for 10s server-side
+                                    // (see satellites.py), so this doesn't hammer it.
 const COURTESY_TONE_ENABLED = {{ 'true' if settings.get('beta_courtesy_tone', False) else 'false' }};
 const SPOTLIGHT_DIMMING_ENABLED = {{ 'true' if settings.get('beta_spotlight_dimming', True) else 'false' }};
 
@@ -2454,7 +2487,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     fleet: '__fleet_activity__', aslfav: '__asl_favorites__',
     hfcond: '__hf_conditions__', bandplan: '__band_plan__', licensequiz: '__license_quiz__',
     wspractivity: '__wspr_activity__', digipi: '__digipi__', bigclock: '__big_clock__',
-    notifications: '__notifications__',
+    notifications: '__notifications__', satellites: '__satellites__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -2583,9 +2616,13 @@ function renderCards(data) {
     if (SHOW_NOTIFICATIONS) {
         sentinels.push({ key: 'notifications', pos: Math.max(0, NOTIFICATIONS_POSITION) });
     }
+    if (SHOW_SATELLITES) {
+        sentinels.push({ key: 'satellites', pos: Math.max(0, SATELLITES_POSITION) });
+    }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, hfcond, bandplan,
-    // licensequiz, wspractivity, digipi, bigclock, notifications, THEN cameras), since
+    // licensequiz, wspractivity, digipi, bigclock, notifications, satellites,
+    // THEN cameras), since
     // computeCardOrders() below now relies on a stable sort to break ties
     // by insertion order, not by an independent alphabetical rule. Two
     // sentinels can easily tie on position (e.g. right after enabling
@@ -2619,6 +2656,8 @@ function renderCards(data) {
     if (bigClockCard && 'bigclock' in sentinelOrders) bigClockCard.style.order = sentinelOrders.bigclock;
     const notificationsCard = document.getElementById('notifications-card');
     if (notificationsCard && 'notifications' in sentinelOrders) notificationsCard.style.order = sentinelOrders.notifications;
+    const satellitesCard = document.getElementById('satellites-card');
+    if (satellitesCard && 'satellites' in sentinelOrders) satellitesCard.style.order = sentinelOrders.satellites;
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -3165,6 +3204,117 @@ if (SHOW_APRS_INBOX) {
 if (SHOW_HAMALERT) {
     fetchNotifHamAlert();
     setInterval(fetchNotifHamAlert, HAMALERT_POLL_MS);
+}
+
+// --- Satellites card + Live map ground-track overlay ---
+// One /api/satellites poll feeds both the card (pass predictions) and the
+// map (current position + footprint + ground track) -- see satellites.py.
+function fmtPassWhen(aosEpoch) {
+    const secs = Math.round(aosEpoch - Date.now() / 1000);
+    if (secs <= 0) return 'now';
+    const mins = Math.round(secs / 60);
+    if (mins < 60) return `in ${mins} min`;
+    const hrs = Math.floor(mins / 60);
+    const remMin = mins % 60;
+    return `in ${hrs}h ${remMin}m`;
+}
+
+function renderSatellitesCard(data) {
+    const listEl = document.getElementById('sat-list');
+    const emptyEl = document.getElementById('sat-empty');
+    const noQthEl = document.getElementById('sat-no-qth');
+    const subEl = document.getElementById('sat-card-sub');
+    if (!listEl) return;
+
+    if (!data.has_observer) {
+        listEl.innerHTML = '';
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (noQthEl) noQthEl.style.display = 'block';
+        if (subEl) subEl.textContent = 'no station grid set';
+        return;
+    }
+    if (noQthEl) noQthEl.style.display = 'none';
+
+    const passes = data.passes || [];
+    if (subEl) subEl.textContent = passes.length ? `next ${Math.min(passes.length, 8)}` : '';
+    if (emptyEl) emptyEl.style.display = passes.length ? 'none' : 'block';
+
+    const nowSec = Date.now() / 1000;
+    listEl.innerHTML = passes.slice(0, 8).map(p => {
+        const overhead = p.aos_epoch <= nowSec && nowSec <= p.los_epoch;
+        const freqBits = [p.mode, p.downlink_mhz ? `${p.downlink_mhz.toFixed(3)} MHz` : null].filter(Boolean).join(' · ');
+        return `
+        <div class="msg-row ${overhead ? 'unread' : ''}">
+            <div class="msg-top">
+                <span class="msg-from">${escapeHtml(p.name)}${overhead ? ' <span style="color:var(--live)">● overhead</span>' : ''}</span>
+                <span class="msg-time">${overhead ? 'until ' + fmtPassWhen(p.los_epoch).replace('in ', '') : fmtPassWhen(p.aos_epoch)}</span>
+            </div>
+            <div class="msg-text">${escapeHtml(freqBits)} · max el ${p.max_elevation.toFixed(0)}°</div>
+        </div>`;
+    }).join('');
+}
+
+let satellitesMapLayer = null;
+function updateSatellitesMap(positions) {
+    if (!leafletMap) return;
+    if (satellitesMapLayer) { leafletMap.removeLayer(satellitesMapLayer); satellitesMapLayer = null; }
+    if (!positions || !positions.length) return;
+
+    const liveColor = getComputedStyle(document.documentElement).getPropertyValue('--live').trim() || '#4fd8c4';
+    const group = L.layerGroup();
+
+    positions.forEach(sat => {
+        L.circle([sat.lat, sat.lon], {
+            radius: sat.footprint_km * 1000, color: liveColor, weight: 1,
+            dashArray: '4,3', fillColor: liveColor, fillOpacity: 0.06, interactive: false,
+        }).addTo(group);
+
+        // Ground track can cross the antimeridian -- split into separate
+        // segments wherever consecutive points jump more than 180deg in
+        // longitude, rather than drawing one polyline that wraps the
+        // whole way around the map.
+        const track = sat.track || [];
+        let segment = [];
+        track.forEach((pt, i) => {
+            if (segment.length > 0 && Math.abs(pt[1] - segment[segment.length - 1][1]) > 180) {
+                L.polyline(segment, { color: liveColor, weight: 1.5, opacity: 0.6, dashArray: '2,4', interactive: false }).addTo(group);
+                segment = [];
+            }
+            segment.push(pt);
+        });
+        if (segment.length > 1) {
+            L.polyline(segment, { color: liveColor, weight: 1.5, opacity: 0.6, dashArray: '2,4', interactive: false }).addTo(group);
+        }
+
+        L.marker([sat.lat, sat.lon], {
+            icon: L.divIcon({
+                className: '', iconSize: [70, 34], iconAnchor: [35, 8],
+                html: `<div class="sat-marker-icon">🛰️</div><div class="sat-label">${escapeHtml(sat.name)}</div>`,
+            }),
+            interactive: false, keyboard: false,
+        }).addTo(group);
+    });
+
+    satellitesMapLayer = group;
+    group.addTo(leafletMap);
+}
+
+let lastSatPositions = null;
+function fetchSatellites() {
+    if (!SHOW_SATELLITES) return;
+    fetch('/api/satellites')
+        .then(r => r.json())
+        .then(data => {
+            renderSatellitesCard(data);
+            lastSatPositions = data.positions;
+            updateSatellitesMap(data.positions);
+        })
+        .catch(() => {});
+}
+
+if (SHOW_SATELLITES) {
+    fetchSatellites();
+    setInterval(fetchSatellites, SATELLITES_POLL_MS);
 }
 
 // --- DigiPi card ---
@@ -4025,6 +4175,12 @@ function initMap() {
 
     document.getElementById('psk-toggle').checked = localStorage.getItem(PSK_KEY) === '1';
     if (document.getElementById('psk-toggle').checked) togglePsk();
+
+    // Satellite positions may already have been fetched before this tab was
+    // ever opened (fetchSatellites() runs on a timer regardless of which
+    // tab is active) -- apply them immediately instead of waiting up to
+    // SATELLITES_POLL_MS for the next poll to populate the map.
+    if (SHOW_SATELLITES && lastSatPositions) updateSatellitesMap(lastSatPositions);
 
     refreshMap();
 }

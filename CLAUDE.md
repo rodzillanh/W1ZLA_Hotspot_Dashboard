@@ -155,6 +155,26 @@ psk_reporter.py    PskReporterClient: live PSK Reporter reception reports
                    here. See the Hard-won gotchas section for the
                    flowStartSeconds request-vs-response meaning trap.
 
+satellites.py      SatelliteTracker: current position + upcoming pass
+                   predictions for the Satellites card and the Live
+                   map's ground-track overlay. Orbital elements (TLEs)
+                   from celestrak.org (free, no key -- a bare `curl`
+                   with no User-Agent gets a 503 from their bot
+                   protection, a normal browser-style UA gets a clean
+                   200); real SGP4 propagation (the `sgp4` PyPI
+                   package, not hand-rolled orbital mechanics) plus a
+                   manual TEME->ECEF->geodetic conversion for position
+                   and ECEF->topocentric-ENU for observer-relative
+                   elevation/azimuth -- verified against a live
+                   ground-truth ISS position (api.wheretheiss.at)
+                   before trusting any of it; see the module's own
+                   docstring and the Hard-won gotchas section for the
+                   full verification story, including a real
+                   SatNOGS DB API gotcha (`satellite__norad_cat_id`,
+                   not the more obvious `norad_cat_id`, which silently
+                   ignores the filter and returns the whole unfiltered
+                   transmitter table instead of erroring).
+
 digipi.py          DigipiMonitor: SSH-polls a DigiPi's Direwolf log
                    (/run/direwolf.log, NOT a systemd service -- a plain
                    background process) for APRS activity. Deliberately a
@@ -2034,6 +2054,57 @@ config for per-integration credentials; put it in
   TNCs/handheld displays; aprslib encodes UTF-8 rather than erroring, so
   a fancy ellipsis character would reach the air as mangled bytes
   instead of failing loudly).
+- **Satellite tracking (v3.55, `satellites.py`) was verified against real
+  ground truth at every layer before being trusted, not assumed correct
+  from the math alone.** Three separate, real findings worth recording:
+  - **SatNOGS DB's transmitter API silently ignores the obvious query
+    parameter name.** `?norad_cat_id=<id>` doesn't error and doesn't
+    filter -- it returns the entire ~5000-row transmitter table
+    unfiltered, and the wrong-satellite response still LOOKED
+    plausible (real transmitter records, just for NORAD 965 instead of
+    the requested satellite) until cross-checking the response's own
+    `norad_cat_id` field caught the mismatch. The correct parameter is
+    `satellite__norad_cat_id`. If this is ever touched again, verify
+    the returned records' own `norad_cat_id`/`sat_id` field matches
+    what was requested -- don't trust a plausible-looking filtered-size
+    response as proof the filter actually worked.
+  - **The SGP4 position math (TEME->ECEF->geodetic, plus a GMST
+    approximation) was checked against a live ground-truth ISS position
+    from api.wheretheiss.at**: computed lat/lon/alt matched to within
+    ~0.005 deg (~500m) and ~25m altitude -- irrelevant error for "is
+    this satellite visible right now," but confirms the conversion
+    chain isn't silently wrong. The separate topocentric elevation/
+    azimuth math (used for pass prediction) was sanity-checked three
+    more ways: an observer directly under the satellite computes ~90deg
+    elevation with range equal to the satellite's own altitude; an
+    antipodal-ish observer computes a deeply negative elevation; an
+    observer offset by a few hundred km computes a plausible mid-range
+    elevation with range greater than (not equal to) altitude. All
+    three matched geometric expectations exactly before any of this
+    shipped.
+  - **`DEFAULT_SATELLITES` was built from a LIVE status check, not
+    recollection of "well-known easy sats"** -- AO-92 (FOX-1D) looked
+    like an obviously-safe default from general ham radio knowledge,
+    but a live SatNOGS DB query shows it's actually marked
+    `"re-entered"` right now. AO-85 (FOX-1A) is marked alive but its FM
+    transponder specifically is marked `"inactive"` in SatNOGS DB. Both
+    were dropped from the default list after finding this live, not
+    guessed. If this list is ever revisited, re-verify status AND
+    transponder-active-state the same way -- satellite operational
+    status genuinely changes over time, unlike e.g. a band plan's
+    frequency allocations.
+  Separately: the Live map's ground-track polyline splits into multiple
+  segments wherever consecutive points jump more than 180deg in
+  longitude (`updateSatellitesMap()` in dashboard.html) -- a satellite's
+  ground track crosses the antimeridian roughly once per orbit, and a
+  single unsplit polyline would draw one long incorrect line wrapping
+  the entire width of the map instead of two separate tracks at each
+  edge. The footprint circle is a real `L.circle` with a radius in
+  meters (`_footprint_radius_km()`'s tangent-line-from-altitude
+  geometry, sanity-checked against the ~2000-2300km figure commonly
+  cited for the ISS's own visibility footprint), not a CSS-drawn shape
+  -- it stays correctly sized as the map is panned/zoomed, which a
+  fixed-pixel circle wouldn't.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

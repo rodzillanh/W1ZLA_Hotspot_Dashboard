@@ -297,8 +297,8 @@ and **Version info**.
 - **Card order** — drag hotspot cards into whatever order you want them
   to appear on the dashboard (Cards tab). If the Fleet activity, ASL
   Favorites & Control, HF Conditions, Band Plan, License Quiz, Band
-  Activity, Big Ass Clock, or Notifications (APRS Messages + HamAlert)
-  card is enabled, it appears in the same drag list and can be moved to
+  Activity, Big Ass Clock, Notifications (APRS Messages + HamAlert), or
+  Satellites card is enabled, it appears in the same drag list and can be moved to
   any position among the hotspot cards, not just first. Every enabled
   camera card (Settings → Cameras) gets its own row in the same list
   too, one per camera.
@@ -973,6 +973,35 @@ each poll fetches exactly one question.
   prefixed), so switching classes never overwrites another class's saved
   stats.
 - Same drag-and-drop **Card order** placement as every other extra card.
+
+## Satellites card
+
+Optional dashboard card (Settings → Cards → "Show Satellites card", off
+by default) — upcoming pass predictions for a small list of amateur radio
+satellites, plus a live ground-track overlay on the **Live map**.
+
+- **Pass predictions** — AOS time ("in 12 min"), max elevation, and
+  mode/downlink frequency for each tracked satellite's next passes over
+  your station, sorted soonest-first. A pass currently in progress is
+  highlighted. Needs a **station grid square** set (Settings → Cards,
+  same field the Band Activity card uses) — without one, the card shows
+  a prompt instead of pass times.
+- **Live map overlay** — each tracked satellite's current position (🛰️
+  icon), visibility footprint (the area it's above the horizon for), and
+  ground track (roughly one orbit, centered on now) drawn directly on
+  the Live map. Works independently of the station grid square — this
+  part doesn't need an observer location, only the pass-time list does.
+- **Tracked satellites** are editable in Settings → Cards → "Tracked
+  satellites" (NORAD catalog ID + display name/mode/frequency per
+  entry) — default list is ISS, SO-50, AO-91, and PO-101. Orbital data
+  itself comes live from [CelesTrak](https://celestrak.org) (free, no
+  key); mode/frequency for satellites you add yourself can be looked up
+  at [SatNOGS DB](https://db.satnogs.org).
+- Real orbital mechanics (SGP4 propagation), not an approximation —
+  verified against a live ground-truth satellite position before
+  shipping. Satellite operational status changes over time (satellites
+  go silent, decay, or get replaced), so the default list is
+  intentionally small and editable rather than exhaustive.
 
 ## Big Ass Clock card
 

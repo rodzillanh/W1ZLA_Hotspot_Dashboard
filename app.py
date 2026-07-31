@@ -44,6 +44,7 @@ from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
 from wsjtx import WsjtxListener
 from hamalert import HamAlertListener
+from satellites import SatelliteTracker
 
 import host_stats as host_stats_mod
 
@@ -56,6 +57,7 @@ update_checker = UpdateChecker()
 hf_conditions   = HfConditionsClient()
 camera_manager  = CameraStreamManager()
 license_quiz    = LicenseQuizPool()
+satellite_tracker = SatelliteTracker()
 wspr_activity   = WsprActivityClient()
 aurora_client   = AuroraClient()
 pota_client     = PotaClient()
@@ -395,6 +397,40 @@ def api_settings_post():
             settings["big_clock_position"] = max(0, int(data["big_clock_position"]))
         except (TypeError, ValueError):
             pass
+    if "show_satellites" in data:
+        settings["show_satellites"] = bool(data["show_satellites"])
+    if "satellites_position" in data:
+        try:
+            settings["satellites_position"] = max(0, int(data["satellites_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "tracked_satellites" in data:
+        # norad_id gets interpolated into a CelesTrak URL (satellites.py) --
+        # validated as an int here for the same reason asl_node is checked
+        # with .isdigit() elsewhere, even though this is a read-only GET to
+        # a public API. Malformed entries are dropped individually rather
+        # than rejecting the whole list.
+        cleaned = []
+        for sat in data["tracked_satellites"] if isinstance(data["tracked_satellites"], list) else []:
+            if not isinstance(sat, dict):
+                continue
+            try:
+                norad_id = int(sat["norad_id"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            def _optional_float(v):
+                try:
+                    return float(v) if v not in (None, "") else None
+                except (TypeError, ValueError):
+                    return None
+            cleaned.append({
+                "norad_id": norad_id,
+                "name": str(sat.get("name") or "").strip()[:40],
+                "mode": str(sat.get("mode") or "").strip()[:20],
+                "downlink_mhz": _optional_float(sat.get("downlink_mhz")),
+                "uplink_mhz": _optional_float(sat.get("uplink_mhz")),
+            })
+        settings["tracked_satellites"] = cleaned
     if "wsjtx_enabled" in data:
         settings["wsjtx_enabled"] = bool(data["wsjtx_enabled"])
     if "wsjtx_port" in data:
@@ -514,6 +550,7 @@ _SENTINEL_DEFS = [
     ("__digipi__", "digipi_enabled", "digipi_position", "📡", "DigiPi", "APRS/Direwolf card"),
     ("__big_clock__", "show_big_clock", "big_clock_position", "🕐", "Big Ass Clock", "clock card"),
     ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
+    ("__satellites__", "show_satellites", "satellites_position", "🛰️", "Satellites", "pass prediction card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -881,6 +918,21 @@ def api_quiz_question():
     if q is None:
         return jsonify({"error": "unavailable"}), 503
     return jsonify(q)
+
+@app.route("/api/satellites")
+def api_satellites():
+    """Current positions (+ ground track, for the Live map overlay) and
+    upcoming passes (for the Satellites card) -- see satellites.py.
+    Observer position reuses settings.station_grid, same as
+    wspr_activity.py/psk_reporter.py; passes are omitted (not a 503)
+    when no station_grid is set, since positions/ground-track still work
+    without an observer location -- only pass prediction needs one."""
+    settings = load_settings()
+    tracked = settings.get("tracked_satellites") or []
+    positions = satellite_tracker.positions(tracked)
+    qth = grid_to_latlon(settings.get("station_grid", ""))
+    passes = satellite_tracker.passes(tracked, qth[0], qth[1]) if qth else []
+    return jsonify({"positions": positions, "passes": passes, "has_observer": qth is not None})
 
 @app.route("/version")
 def version_page():

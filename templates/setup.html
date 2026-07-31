@@ -636,6 +636,16 @@
                      id="big-clock-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show Satellites card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (upcoming pass predictions + a ground-track overlay on the Live map -- needs a
+                        station grid square above for pass times)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_satellites', False) else '' }}"
+                     id="satellites-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show HamAlert card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (personal DXCC/callsign/band alerts -- needs a HamAlert account, set up in Integrations)
@@ -659,6 +669,39 @@
     </div>
 
     <div class="section">
+        <div class="section-title">Tracked satellites
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                for the Satellites card + Live map overlay above
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            NORAD catalog ID is the only required field (orbital data is fetched live from
+            <a href="https://celestrak.org" target="_blank" style="color:var(--link)">CelesTrak</a>,
+            free, no key). Name/mode/frequency are just display labels — look them up at
+            <a href="https://db.satnogs.org" target="_blank" style="color:var(--link)">db.satnogs.org</a>
+            if you're adding one not in the default list.
+        </p>
+        <div id="satellites-list">
+            {% for sat in settings.get('tracked_satellites', []) %}
+            <div class="link-row drag-row" data-sat-row>
+                <input type="text" inputmode="numeric" placeholder="NORAD ID" style="width:80px" value="{{ sat.norad_id }}" data-field="norad_id">
+                <input type="text" placeholder="Name" style="width:80px" value="{{ sat.name }}" data-field="name">
+                <input type="text" placeholder="Mode" style="width:70px" value="{{ sat.mode }}" data-field="mode">
+                <input type="text" inputmode="decimal" placeholder="Down MHz" style="width:90px" value="{{ sat.downlink_mhz if sat.downlink_mhz is not none else '' }}" data-field="downlink_mhz">
+                <input type="text" inputmode="decimal" placeholder="Up MHz" style="width:90px" value="{{ sat.uplink_mhz if sat.uplink_mhz is not none else '' }}" data-field="uplink_mhz">
+                <button class="btn btn-danger btn-sm" onclick="this.closest('[data-sat-row]').remove()">✕</button>
+            </div>
+            {% endfor %}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <button class="btn btn-info"    onclick="addSatelliteRow()">+ Add satellite</button>
+            <button class="btn btn-primary" onclick="saveSatellites()">Save tracked satellites</button>
+            <span class="status-txt" id="satellites-status"></span>
+        </div>
+    </div>
+
+    <div class="section">
         <div class="section-title">Card order — drag to reorder</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
             Every card on the dashboard, hotspots included, in one drag list. To
@@ -675,6 +718,7 @@
             {% set digipi_pos = settings.get('digipi_position', 0) if settings.get('digipi_enabled', False) else -1 %}
             {% set big_clock_pos = settings.get('big_clock_position', 0) if settings.get('show_big_clock', False) else -1 %}
             {% set notifications_pos = settings.get('notifications_position', 0) if (settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False)) else -1 %}
+            {% set satellites_pos = settings.get('satellites_position', 0) if settings.get('show_satellites', False) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -738,6 +782,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🔔 Notifications</span>
                     <span class="node-meta">APRS + HamAlert inbox card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == satellites_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__satellites__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🛰️ Satellites</span>
+                    <span class="node-meta">pass prediction card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -1634,6 +1685,7 @@ function saveCards() {
             station_grid: document.getElementById('station-grid-input').value.trim(),
             digipi_enabled: document.getElementById('digipi-toggle').classList.contains('on'),
             show_big_clock: document.getElementById('big-clock-toggle').classList.contains('on'),
+            show_satellites: document.getElementById('satellites-toggle').classList.contains('on'),
             hamalert_enabled: document.getElementById('hamalert-toggle').classList.contains('on'),
         })
     }).then(() => {
@@ -1734,6 +1786,42 @@ function saveLinks() {
     });
 }
 
+// --- tracked satellites ---
+function addSatelliteRow() {
+    const row = document.createElement('div');
+    row.className = 'link-row drag-row';
+    row.setAttribute('data-sat-row', '');
+    row.innerHTML = `<input type="text" inputmode="numeric" placeholder="NORAD ID" style="width:80px" data-field="norad_id">
+        <input type="text" placeholder="Name" style="width:80px" data-field="name">
+        <input type="text" placeholder="Mode" style="width:70px" data-field="mode">
+        <input type="text" inputmode="decimal" placeholder="Down MHz" style="width:90px" data-field="downlink_mhz">
+        <input type="text" inputmode="decimal" placeholder="Up MHz" style="width:90px" data-field="uplink_mhz">
+        <button class="btn btn-danger btn-sm" onclick="this.closest('[data-sat-row]').remove()">✕</button>`;
+    document.getElementById('satellites-list').appendChild(row);
+}
+
+function saveSatellites() {
+    const rows = document.querySelectorAll('#satellites-list [data-sat-row]');
+    const tracked_satellites = Array.from(rows).map(r => {
+        const get = field => r.querySelector(`[data-field="${field}"]`).value.trim();
+        return {
+            norad_id: get('norad_id'),
+            name: get('name'),
+            mode: get('mode'),
+            downlink_mhz: get('downlink_mhz'),
+            uplink_mhz: get('uplink_mhz'),
+        };
+    }).filter(s => s.norad_id);
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ tracked_satellites })
+    }).then(() => {
+        document.getElementById('satellites-status').textContent = '✓ Saved';
+        setTimeout(() => document.getElementById('satellites-status').textContent = '', 2000);
+    });
+}
+
 // --- card order ---
 function saveCardOrder() {
     const rows   = document.querySelectorAll('#card-order-list .drag-row[data-ip]');
@@ -1761,6 +1849,7 @@ function saveCardOrder() {
     const digipiIdx = sentinelIndex('__digipi__');
     const bigClockIdx = sentinelIndex('__big_clock__');
     const notificationsIdx = sentinelIndex('__notifications__');
+    const satellitesIdx = sentinelIndex('__satellites__');
     const cameraPositions = {};
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
@@ -1854,6 +1943,13 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ notifications_position: notificationsIdx })
+        }));
+    }
+    if (satellitesIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ satellites_position: satellitesIdx })
         }));
     }
     if (Object.keys(cameraPositions).length > 0) {
