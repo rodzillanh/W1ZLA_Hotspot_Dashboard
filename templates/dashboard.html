@@ -1407,23 +1407,10 @@
             opacity: 0; transition: opacity .15s; pointer-events: none; z-index: 1000;
         }
         .map-resize-readout.visible { opacity: 1; }
-        /* Floating control for the "Import ADIF log" feature -- distinct
-           from the .map-legend checkboxes below, which are optional LAYER
-           toggles (off by default, no data of their own); this is
-           persistent data with an upload/clear action, so it gets its own
-           always-visible control rather than a legend checkbox. */
-        .qso-import-control {
-            position: absolute; top: 10px; left: 10px; z-index: 1000;
-            background: rgba(30,30,30,.8); backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-            border: 1px solid var(--card-border);
-            border-radius: 9px; padding: 10px 12px; font-size: 11.5px;
-            box-shadow: 0 4px 14px rgba(0,0,0,.35); min-width: 168px;
-        }
-        [data-theme="light"] .qso-import-control {
-            background: rgba(255,255,255,.8);
-            box-shadow: 0 4px 14px rgba(0,0,0,.12);
-        }
+        /* Import ADIF log controls (button/stats/clear/"show on map") now
+           live inside Quick Settings' "QSO Log" section (renderSettingsDrawer())
+           instead of a floating overlay on the map itself -- these are just
+           the reusable sub-element styles, no positioning of their own. */
         .qso-import-btn {
             border: 1px dashed var(--card-border); border-radius: 7px;
             padding: 8px 6px; text-align: center; color: var(--text-muted);
@@ -1433,11 +1420,6 @@
         .qso-stats {
             margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--card-border);
             color: var(--text-dim); line-height: 1.5;
-        }
-        .qso-show-row {
-            display: flex; align-items: center; gap: 6px; margin-top: 8px;
-            padding-top: 8px; border-top: 1px dashed var(--card-border);
-            color: var(--text-muted); cursor: pointer;
         }
         .qso-clear-btn {
             margin-top: 8px; width: 100%; padding: 5px; border-radius: 6px;
@@ -1466,8 +1448,10 @@
         /* Floating legend tying each hotspot's assigned color (and the
            fixed WSJT-X/FT8 color) back to a label -- built dynamically in
            JS (refreshMap()/renderQsoLayer()) since the hotspot list and
-           its color assignment aren't known at template-render time.
-           Same floating-card style as .qso-import-control. */
+           its color assignment aren't known at template-render time. The
+           only remaining floating overlay on the map now that ADIF
+           import controls moved into Quick Settings (see dashboard.html's
+           qsoLogSectionHtml()). */
         .map-key {
             position: absolute; left: 10px; bottom: 10px; z-index: 1000;
             background: rgba(30,30,30,.8); backdrop-filter: blur(4px);
@@ -2064,17 +2048,6 @@
     </div>
     <div class="map-resize-wrap">
         <div id="map"></div>
-        <div class="qso-import-control" id="qso-import-control">
-            <input type="file" id="adif-file-input" accept=".adi,.adif,.txt" style="display:none"
-                   onchange="handleAdifFile(this.files[0])">
-            <div class="qso-import-btn" onclick="document.getElementById('adif-file-input').click()">📂 Import ADIF log</div>
-            <div class="qso-stats" id="qso-stats" style="display:none"></div>
-            <label class="qso-show-row">
-                <input type="checkbox" id="qso-show-toggle" onchange="toggleQsoVisibility()" checked>
-                Show on map
-            </label>
-            <button class="qso-clear-btn" id="qso-clear-btn" style="display:none" onclick="clearQsoLog()">Clear imported log</button>
-        </div>
         <div class="map-key" id="map-key" style="display:none"></div>
         <div class="map-resize-readout" id="map-resize-readout">420px</div>
         <div class="map-resize-handle" id="map-resize-handle">
@@ -4514,6 +4487,10 @@ function initMap() {
         ? L.markerClusterGroup({ maxClusterRadius: 40 })
         : L.layerGroup();
     qsoLinesLayer = L.layerGroup();
+    // Quick Settings' QSO Log section (with #qso-show-toggle) only renders
+    // once mapInitialized is true -- render it now, before referencing that
+    // checkbox below, rather than waiting for the drawer to be opened.
+    renderSettingsDrawer();
     document.getElementById('qso-show-toggle').checked = localStorage.getItem(QSO_SHOW_KEY) !== '0';
     if (document.getElementById('qso-show-toggle').checked) {
         leafletMap.addLayer(qsoCluster);
@@ -4998,7 +4975,14 @@ const QSO_COLOR = '#ff3fa4';
 // such field, since there's no "just happened" for a historical log.
 const QSO_NEW_WINDOW_SEC = 600;  // 10 min
 
+// Last data fetchQsos() saw -- lets renderSettingsDrawer() repaint the
+// QSO Log stats box immediately on open/reopen (e.g. after a theme
+// toggle re-renders the whole drawer) rather than showing it blank
+// until the next 20s poll tick happens to land.
+let lastFetchedQsos = [];
+
 function renderQsoLayer(qsos) {
+    lastFetchedQsos = qsos || [];
     if (!qsoCluster) return;
     qsoCluster.clearLayers();
     if (qsoLinesLayer) qsoLinesLayer.clearLayers();
@@ -5028,6 +5012,11 @@ function renderQsoLayer(qsos) {
 function updateQsoStats(qsos) {
     const el = document.getElementById('qso-stats');
     const clearBtn = document.getElementById('qso-clear-btn');
+    // Both now live inside Quick Settings' "QSO Log" section, first built
+    // by initMap()'s own renderSettingsDrawer() call -- but this is also
+    // called from an independent poll cycle (fetchQsos(), on its own
+    // timer), so guard against it running before that first render.
+    if (!el || !clearBtn) return;
     if (!qsos || !qsos.length) {
         el.style.display = 'none';
         clearBtn.style.display = 'none';
@@ -5604,28 +5593,77 @@ function mapProxyToggleRow(checkboxId, toggleFnName, label) {
         </label>`;
 }
 
+// QSO Log (ADIF import/stats/clear + "show on map") used to be its own
+// always-visible floating control sitting directly on the map
+// (.qso-import-control) -- moved here entirely (not just proxied, since
+// unlike grey line/aurora/etc. there's no OTHER place these controls
+// still live) once it was pointed out that decluttering the map surface
+// this way made sense for an occasional bulk-action control, unlike the
+// legend checkboxes, which stay genuinely useful in-place while actively
+// looking at the map. #qso-stats/#qso-show-toggle/#qso-clear-btn/
+// #adif-file-input keep their exact IDs -- updateQsoStats()/
+// toggleQsoVisibility()/handleAdifFile() all reference them unchanged.
+// Nested under the same mapInitialized gate as the style/overlay
+// toggles below, matching a real pre-existing constraint this control
+// already had (renderQsoLayer() -- and therefore updateQsoStats() --
+// already silently no-ops before qsoCluster exists, i.e. before the map
+// has ever been initialized; this was never actually reachable before
+// that point either, since the control used to live physically ON the
+// map itself).
+function qsoLogSectionHtml() {
+    const showOn = localStorage.getItem(QSO_SHOW_KEY) !== '0';
+    return `
+        <div class="hs-drawer-section-title" style="margin-top:18px">QSO Log</div>
+        <div class="qso-import-btn" onclick="document.getElementById('adif-file-input').click()">📂 Import ADIF log</div>
+        <input type="file" id="adif-file-input" accept=".adi,.adif,.txt" style="display:none" onchange="handleAdifFile(this.files[0])">
+        <div class="qso-stats" id="qso-stats" style="display:none"></div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:8px 0 0;cursor:pointer">
+            <input type="checkbox" id="qso-show-toggle" ${showOn ? 'checked' : ''} onchange="toggleQsoVisibility()"> Show QSOs on map
+        </label>
+        <button class="qso-clear-btn" id="qso-clear-btn" style="display:none" onclick="clearQsoLog()">Clear imported log</button>`;
+}
+
 function renderSettingsDrawer() {
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-    const mapSection = mapInitialized ? `
-        <div class="hs-drawer-section-title" style="margin-top:18px">Live map</div>
-        <div class="stats-grid" style="margin-bottom:6px">
-            <div style="grid-column:1/-1">Style:
-                <select onchange="setMapStyle(this.value)" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:12px">
-                    <option value="standard" ${currentMapStyle === 'standard' ? 'selected' : ''}>Standard</option>
-                    <option value="dark" ${currentMapStyle === 'dark' ? 'selected' : ''}>Dark</option>
-                    <option value="satellite" ${currentMapStyle === 'satellite' ? 'selected' : ''}>Satellite</option>
-                </select>
+    let mapSection;
+    if (!mapInitialized) {
+        // Nothing here works yet -- setMapStyle()/toggleGreyline()/etc. all
+        // no-op before leafletMap exists, and QSO Log's own stats/clear
+        // controls have this exact same real precondition (see above) --
+        // an honest note instead of a broken control either way.
+        mapSection = `
+            <div class="hs-drawer-section-title" style="margin-top:18px">Live map</div>
+            <div class="hs-empty-note">Open the Live map tab once this session to enable map quick toggles.</div>`;
+    } else {
+        // Style/overlay toggles duplicate controls already sitting right
+        // on the map's own legend -- redundant (not just unreachable) while
+        // actually looking at the map, so this half is swapped for a
+        // pointer to the real thing instead. QSO Log has no such
+        // duplicate anywhere anymore (see above), so it always shows.
+        const onMapTab = document.getElementById('panel-map')?.classList.contains('active');
+        const styleAndOverlays = onMapTab
+            ? `<div class="hs-empty-note" style="margin-bottom:4px">You're on the Live map — use its own legend for style/overlay toggles.</div>`
+            : `
+            <div class="stats-grid" style="margin-bottom:6px">
+                <div style="grid-column:1/-1">Style:
+                    <select onchange="setMapStyle(this.value)" style="background:var(--panel-2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:12px">
+                        <option value="standard" ${currentMapStyle === 'standard' ? 'selected' : ''}>Standard</option>
+                        <option value="dark" ${currentMapStyle === 'dark' ? 'selected' : ''}>Dark</option>
+                        <option value="satellite" ${currentMapStyle === 'satellite' ? 'selected' : ''}>Satellite</option>
+                    </select>
+                </div>
             </div>
-        </div>
-        ${mapProxyToggleRow('greyline-toggle', 'toggleGreyline', 'Grey line')}
-        ${mapProxyToggleRow('aurora-toggle', 'toggleAurora', 'Aurora oval')}
-        ${mapProxyToggleRow('pota-toggle', 'togglePota', 'POTA spots')}
-        ${mapProxyToggleRow('sota-toggle', 'toggleSota', 'SOTA spots')}
-        ${mapProxyToggleRow('psk-toggle', 'togglePsk', 'PSK Reporter')}
-        ${mapProxyToggleRow('satellites-map-toggle', 'toggleSatellitesMap', 'Satellites overlay')}
-        ${mapProxyToggleRow('qso-show-toggle', 'toggleQsoVisibility', 'Logged QSOs')}`
-        : `<div class="hs-drawer-section-title" style="margin-top:18px">Live map</div>
-           <div class="hs-empty-note">Open the Live map tab once this session to enable style/overlay quick toggles.</div>`;
+            ${mapProxyToggleRow('greyline-toggle', 'toggleGreyline', 'Grey line')}
+            ${mapProxyToggleRow('aurora-toggle', 'toggleAurora', 'Aurora oval')}
+            ${mapProxyToggleRow('pota-toggle', 'togglePota', 'POTA spots')}
+            ${mapProxyToggleRow('sota-toggle', 'toggleSota', 'SOTA spots')}
+            ${mapProxyToggleRow('psk-toggle', 'togglePsk', 'PSK Reporter')}
+            ${mapProxyToggleRow('satellites-map-toggle', 'toggleSatellitesMap', 'Satellites overlay')}`;
+        mapSection = `
+            <div class="hs-drawer-section-title" style="margin-top:18px">Live map</div>
+            ${styleAndOverlays}
+            ${qsoLogSectionHtml()}`;
+    }
 
     document.getElementById('settings-drawer').innerHTML = `
         <div class="hs-drawer-header">
@@ -5648,6 +5686,11 @@ function renderSettingsDrawer() {
             ${mapSection}
             <a href="/setup" style="display:block;text-align:center;font-size:12px;color:var(--link);text-decoration:none;padding:16px 0 2px">More settings →</a>
         </div>`;
+
+    // QSO Log's stats box would otherwise stay blank/hidden until the
+    // next 20s fetchQsos() poll -- refresh it immediately from the last
+    // known data so reopening the drawer doesn't show stale/empty stats.
+    if (mapInitialized) updateQsoStats(lastFetchedQsos);
 }
 
 function openSettingsDrawer() {

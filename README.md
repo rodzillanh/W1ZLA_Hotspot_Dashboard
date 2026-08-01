@@ -286,12 +286,15 @@ beyond the base card/map UI:
 - **Quick Settings** — the toolbar's "⚙ Settings" link opens this first
   (one settings entry point, not a separate gear icon sitting next to
   it): theme, spotlight dimming, and courtesy tone, plus — once the Live
-  map tab has been opened at least once this session — map style and
-  every map overlay toggle (grey line, aurora, POTA, SOTA, PSK Reporter,
-  Satellites, logged QSOs). Everything saves instantly, same as the full
-  Settings page; the map toggles proxy directly to the map legend's own
-  checkboxes rather than tracking a second copy of that state, so the two
-  never disagree. A "More settings →" link at the bottom goes to the full
+  map tab has been opened at least once this session — map style, every
+  map overlay toggle (grey line, aurora, POTA, SOTA, PSK Reporter,
+  Satellites), and the ADIF QSO log tools (import, stats, "show on map",
+  clear). Everything saves instantly, same as the full Settings page; the
+  overlay toggles proxy directly to the map legend's own checkboxes
+  rather than tracking a second copy of that state, so the two never
+  disagree — while you're actually on the Live map tab, that section
+  shows a short note pointing at the legend instead of duplicating it
+  there. A "More settings →" link at the bottom goes to the full
   `/setup` page for everything not covered here.
 
 ## Dashboard customization
@@ -1234,9 +1237,11 @@ appear as pins — the QRZ subscription caveat above applies here too.
   you turn it off. A genuinely different signal than the single
   "Aurora: N" number on the HF Conditions card — this is the actual
   geographic model, not a single index value.
-- **ADIF QSO import** — a floating "Import ADIF log" control on the map
-  lets you upload a `.adi`/`.adif` log file exported from your logging
-  software; each worked station gets plotted as a pin in one fixed color
+- **ADIF QSO import** — an "Import ADIF log" control in Quick Settings'
+  "Live map" section (⚙ Settings → once the Live map tab has been opened
+  once this session) lets you upload a `.adi`/`.adif` log file exported
+  from your logging software; each worked station gets plotted as a pin
+  in one fixed color
   (shown in the Map key as "FT8/FT4 (WSJT-X)"), distinct from every
   hotspot's own color — band/mode are still shown in the pin's tooltip,
   just not encoded as a separate color scheme. Unlike the layer

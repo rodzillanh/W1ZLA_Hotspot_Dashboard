@@ -2630,6 +2630,48 @@ config for per-integration credentials; put it in
   marker uses a plain white/dark-bordered dot with no existing
   established color to match, since the main map's own QSO-to-QTH lines
   were never drawn with a distinct marker AT the QTH end to begin with.
+- **The Live map's own floating "Import ADIF log" control
+  (`.qso-import-control`) was retired in v3.64 -- moved into Quick
+  Settings' "Live map" section instead of duplicating it there**, once it
+  was pointed out that Quick Settings already had a proxy row for
+  logged-QSO visibility right next to the very control this was a proxy
+  *of*. Unlike grey line/aurora/POTA/SOTA/PSK/Satellites (each a genuine
+  legend checkbox still worth reaching for while actually looking at the
+  map), the import/stats/clear controls had no other reason to stay
+  pinned to the map surface, so they moved wholesale
+  (`qsoLogSectionHtml()`) rather than getting a second proxied copy --
+  `#qso-stats`/`#qso-show-toggle`/`#qso-clear-btn`/`#adif-file-input` kept
+  their exact element IDs, so `updateQsoStats()`/`toggleQsoVisibility()`/
+  `handleAdifFile()` needed zero changes, just a new home for the markup.
+  This didn't introduce a new precondition -- `renderQsoLayer()` (and
+  therefore `updateQsoStats()`, called at its end) already silently
+  no-ops via `if (!qsoCluster) return` before the map's ever been
+  initialized, so nesting the whole QSO Log section under the same
+  `mapInitialized` gate as the style/overlay toggles just makes an
+  existing constraint explicit, not a new limitation for the control's
+  reachability (it could only ever physically be clicked after visiting
+  the map tab once anyway, back when it lived on the map itself).
+  Because `initMap()` itself directly references `#qso-show-toggle`
+  (`document.getElementById('qso-show-toggle').checked = ...`, to seed
+  it from `localStorage` on first init) and that element no longer
+  exists in static HTML at all, `initMap()` now calls
+  `renderSettingsDrawer()` itself, immediately after setting
+  `mapInitialized = true` and before that reference -- if you ever add
+  another element that lives only inside a lazily-built drawer section
+  but gets referenced directly from outside the drawer's own render
+  path, it needs this same "render the section before touching it"
+  ordering, not just a null-guard. `renderSettingsDrawer()` also went
+  tab-aware in the same change: it checks
+  `document.getElementById('panel-map')?.classList.contains('active')`
+  and swaps the style/overlay toggles for a short note pointing at the
+  map's own legend specifically while already on the Live map tab (true
+  duplication only happens there) -- the QSO Log section itself has no
+  such swap, since it has nowhere else to be shown regardless of which
+  tab is active. A `let lastFetchedQsos` global (set inside
+  `renderQsoLayer()`) lets `renderSettingsDrawer()` repaint the stats box
+  immediately from the last-known poll result whenever the drawer
+  re-renders (theme toggle, tab switch, reopen) instead of leaving it
+  blank until the next 20s `fetchQsos()` tick happens to land.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
