@@ -1323,7 +1323,12 @@
            as the mockup approved before building. --- */
         .hs-drawer-backdrop {
             position: fixed; inset: 0; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none;
-            transition: opacity .22s ease; z-index: 300;
+            /* Leaflet's own internal panes go up to z-index 700 (popupPane) --
+               300 was silently getting buried under the Live map's tiles/
+               markers/popups whenever a drawer was opened while on the Map
+               tab (a real, reported bug: "the map blocks the slide out").
+               1000 clears every Leaflet pane with real margin. */
+            transition: opacity .22s ease; z-index: 1000;
         }
         .hs-drawer-backdrop.open { opacity: 1; pointer-events: auto; }
         .hs-drawer {
@@ -1331,7 +1336,7 @@
             background: var(--panel); border-left: 1px solid var(--border);
             box-shadow: -12px 0 32px rgba(0,0,0,.35);
             transform: translateX(100%); transition: transform .24s cubic-bezier(.2,.7,.3,1);
-            z-index: 301; display: flex; flex-direction: column;
+            z-index: 1001; display: flex; flex-direction: column;
         }
         .hs-drawer.open { transform: translateX(0); }
         .hs-drawer-header { padding: 16px 18px 14px; border-bottom: 1px solid var(--border); }
