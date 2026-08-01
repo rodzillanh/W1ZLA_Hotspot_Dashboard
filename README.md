@@ -276,6 +276,13 @@ beyond the base card/map UI:
   a courtesy tone on new activity") — a short synthesized beep, same idea
   as a real repeater's courtesy tone, when any hotspot's active call
   starts. Off by default.
+- **Click a hotspot card for its full detail drawer** — slides out
+  everything that's tracked but doesn't fit on the compact card: full
+  recent-talker history, Brandmeister status/static talkgroups, and WPSD
+  update status (AllStarLink cards get the complete linked-node list
+  instead). The existing links inside a card — its name, 📍 map, the
+  update badge, and any callsign — still do exactly what they did
+  before; only clicking the rest of the card opens the drawer.
 
 ## Dashboard customization
 

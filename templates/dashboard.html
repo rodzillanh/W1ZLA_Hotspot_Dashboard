@@ -397,8 +397,15 @@
             border: 1px solid var(--card-border);
             border-radius: 10px;
             padding: 20px;
-            transition: background .3s, border-color .3s;
+            cursor: pointer;
+            transition: background .3s, border-color .3s, box-shadow .15s;
         }
+        /* Whole-card click opens the detail drawer (openHotspotDrawer) --
+           existing links inside (name/map-pin/update-badge/callsigns) all
+           stopPropagation() and keep their own separate behavior, so this
+           hover cue is scoped to the card background, not a promise that
+           EVERY pixel does the same thing. */
+        .hotspot-card:hover { box-shadow: 0 0 0 1px var(--text-dim); }
         .hotspot-card.active {
             background: var(--card-active-bg);
             border-color: var(--card-active-border);
@@ -1305,6 +1312,68 @@
         }
         .modal-footer a { color: var(--link); }
 
+        /* --- hotspot card detail drawer -- click anywhere on a hotspot
+           card that isn't an existing link (name/map-pin/update-badge/
+           active or recent-call callsigns, all of which stopPropagation()
+           and keep their own behavior) to slide this out. Same mechanic
+           as the mockup approved before building. --- */
+        .hs-drawer-backdrop {
+            position: fixed; inset: 0; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none;
+            transition: opacity .22s ease; z-index: 300;
+        }
+        .hs-drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+        .hs-drawer {
+            position: fixed; top: 0; right: 0; height: 100vh; width: min(420px, 94vw);
+            background: var(--panel); border-left: 1px solid var(--border);
+            box-shadow: -12px 0 32px rgba(0,0,0,.35);
+            transform: translateX(100%); transition: transform .24s cubic-bezier(.2,.7,.3,1);
+            z-index: 301; display: flex; flex-direction: column;
+        }
+        .hs-drawer.open { transform: translateX(0); }
+        .hs-drawer-header { padding: 16px 18px 14px; border-bottom: 1px solid var(--border); }
+        .hs-drawer-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+        .hs-drawer-title { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: break-word; }
+        .hs-drawer-title .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex-shrink: 0; }
+        .hs-drawer-title .status-dot.live { background: var(--live); animation: pulse 1.6s ease-in-out infinite; }
+        .hs-drawer-title .status-dot.offline { background: var(--danger); animation: none; }
+        .hs-drawer-close {
+            width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+            background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted);
+            cursor: pointer; flex-shrink: 0;
+        }
+        .hs-drawer-close:hover { color: var(--text); border-color: var(--text-dim); }
+        .hs-drawer-sub { font-size: 11.5px; color: var(--text-dim); font-family: var(--font-mono); margin-bottom: 10px; overflow-wrap: break-word; }
+        .hs-drawer-stats { display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap; }
+        .hs-drawer-stats b { color: var(--text); font-family: var(--font-mono); font-weight: 600; }
+        .hs-drawer-body { flex: 1; overflow-y: auto; padding: 4px 18px 20px; }
+        .hs-drawer-section { margin-top: 18px; }
+        .hs-drawer-section-title {
+            font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px;
+            color: var(--text-dim); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+        }
+        .hs-drawer-section-title .count { font-family: var(--font-mono); font-weight: 400; color: var(--text-dim); }
+        .hs-talker-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+        .hs-talker-row:last-child { border-bottom: none; }
+        .hs-talker-call { color: var(--link); font-weight: 600; font-size: 13px; text-decoration: none; width: 76px; flex-shrink: 0; }
+        .hs-talker-meta { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hs-link-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+        .hs-link-row:last-child { border-bottom: none; }
+        .hs-link-row.keyed { background: var(--live-dim); border-radius: 6px; padding: 7px 8px; border-bottom: none; margin: 2px 0; }
+        .hs-link-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+        .hs-link-row.keyed .hs-link-dot { background: var(--live); animation: pulse 1.6s ease-in-out infinite; }
+        .hs-link-node { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); width: 52px; flex-shrink: 0; }
+        .hs-link-body { flex: 1; min-width: 0; }
+        .hs-link-call { font-weight: 600; font-size: 13px; color: var(--text); }
+        .hs-link-desc { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hs-link-mode { font-size: 9.5px; font-family: var(--font-mono); color: var(--text-dim); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; }
+        .hs-tg-chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+        .hs-tg-chip { font-size: 11px; font-family: var(--font-mono); background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px; padding: 3px 10px; color: var(--text-muted); }
+        .hs-bm-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+        .hs-bm-status b { color: var(--good); }
+        .hs-update-note { font-size: 11.5px; color: var(--text-dim); background: var(--panel-2); border-radius: 6px; padding: 8px 10px; line-height: 1.5; margin-top: 4px; }
+        .hs-update-note b { color: var(--accent); }
+        .hs-empty-note { font-size: 12px; color: var(--text-dim); padding: 4px 0; }
+
         /* --- map --- */
         .map-resize-wrap { position: relative; }
         #map { height: 420px; border-radius: 8px; }
@@ -2040,6 +2109,10 @@
         </div>
     </div>
 </div>
+
+<!-- Hotspot card detail drawer -- see openHotspotDrawer()/closeHotspotDrawer() -->
+<div class="hs-drawer-backdrop" id="hs-drawer-backdrop" onclick="closeHotspotDrawer()"></div>
+<div class="hs-drawer" id="hs-drawer"></div>
 
 <!-- One-time "what's available" feature tour -- see checkOnboarding()/
      dismissOnboardingTour() in the script below. Reopenable anytime from
@@ -2816,10 +2889,11 @@ function renderCards(data) {
             ? hs.dashboard_outdated_repos.join(', ') : 'unknown component';
         const updateBadge = hs.dashboard_update_available
             ? `<a class="update-badge" href="http://${hs.ip}/admin/update.php" target="_blank" rel="noopener"
+                  onclick="event.stopPropagation()"
                   title="Update available: ${outdatedList} — WebCode installed: ${hs.dashboard_version || '?'} (${hs.dashboard_version_date || 'unknown date'}) — click to open the update page">⬆ update</a>`
             : '';
         const mapPin = (hs.lat !== undefined && hs.lat !== null)
-            ? `<a class="map-jump-btn" onclick="event.preventDefault(); jumpToNodeOnMap('${hs.ip}')" href="#">📍 map</a>`
+            ? `<a class="map-jump-btn" onclick="event.preventDefault(); event.stopPropagation(); jumpToNodeOnMap('${hs.ip}')" href="#">📍 map</a>`
             : '';
         const uptimeBadge = (hs.uptime && hs.uptime !== 'Unknown')
             ? `<span class="card-uptime" title="Uptime: ${hs.uptime}">⏱ ${fmtUptime(hs.uptime)}</span>`
@@ -2849,7 +2923,7 @@ function renderCards(data) {
                  <img class="caller-photo" src="${hs.caller_image}"
                       alt="${hs.active_call}"
                       onerror="this.parentNode.remove()"
-                      onclick="openPhoto('${hs.active_call}','${hs.caller_name || ''}','${hs.caller_location || ''}','${hs.caller_image}')">
+                      onclick="event.stopPropagation(); openPhoto('${hs.active_call}','${hs.caller_name || ''}','${hs.caller_location || ''}','${hs.caller_image}')">
                  <div class="photo-hint">tap to enlarge</div>
                </div>`
             : '';
@@ -2864,7 +2938,7 @@ function renderCards(data) {
         } else if (hs.is_active) {
             infoBlock = `<div class="active-label" ${activeColor}>📡 ACTIVE:
                  <a class="active-call-link" href="https://www.qrz.com/db/${hs.active_call}"
-                    target="_blank" rel="noopener" ${activeColor}>${hs.active_call}</a>${friendLabel}
+                    target="_blank" rel="noopener" onclick="event.stopPropagation()" ${activeColor}>${hs.active_call}</a>${friendLabel}
                </div>
                ${(hs.caller_name || hs.caller_location)
                    ? `<div class="caller-info">${[hs.caller_name, hs.caller_location].filter(Boolean).join(' — ')}</div>`
@@ -2873,7 +2947,7 @@ function renderCards(data) {
         } else if (isLastHeard) {
             infoBlock = `<div class="listening">Last heard:
                  <a class="recent-call" href="https://www.qrz.com/db/${hs.active_call}"
-                    target="_blank" rel="noopener">${hs.active_call}</a>
+                    target="_blank" rel="noopener" onclick="event.stopPropagation()">${hs.active_call}</a>
                </div>
                ${(hs.caller_name || hs.caller_location)
                    ? `<div class="caller-info">${[hs.caller_name, hs.caller_location].filter(Boolean).join(' — ')}</div>`
@@ -2887,7 +2961,7 @@ function renderCards(data) {
             ? `<div class="recent-row">Recent:
                  ${hs.history.map(h =>
                      `<a class="recent-call" href="https://www.qrz.com/db/${h.call}"
-                         target="_blank" rel="noopener"
+                         target="_blank" rel="noopener" onclick="event.stopPropagation()"
                          title="${[h.name, h.location].filter(Boolean).join(' — ')}">${h.call}</a>`
                  ).join('')}
                </div>`
@@ -2939,7 +3013,7 @@ function renderCards(data) {
                        ? `<div class="card-tg">Linked:</div>` + hs.asl_linked_nodes.map(n => {
                            const dotClass = n.keyed ? 'keyed' : 'idle-link';
                            const nameHtml = n.callsign
-                               ? `<a class="recent-call" href="https://www.qrz.com/db/${n.callsign}" target="_blank" rel="noopener"${n.keyed ? ' style="color:var(--live)"' : ''}>${n.callsign}</a> <span class="node-num">${n.node}</span>`
+                               ? `<a class="recent-call" href="https://www.qrz.com/db/${n.callsign}" target="_blank" rel="noopener" onclick="event.stopPropagation()"${n.keyed ? ' style="color:var(--live)"' : ''}>${n.callsign}</a> <span class="node-num">${n.node}</span>`
                                : `<span class="recent-call" style="color:var(--text-dim)">Node ${n.node}</span>`;
                            const descText = [n.description, n.location].filter(Boolean).join(' · ') || (!n.callsign ? 'Node not in database' : '');
                            const descHtml = descText ? `<span class="desc">${descText}</span>` : '';
@@ -2954,9 +3028,9 @@ function renderCards(data) {
             : '';
 
         return `
-        <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}">
+        <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}" onclick="openHotspotDrawer('${hs.ip}')">
           <div class="card-header">
-            <a class="card-name" href="http://${hs.ip}" target="_blank" rel="noopener">${hs.name}${chipHtml}</a>
+            <a class="card-name" href="http://${hs.ip}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${hs.name}${chipHtml}</a>
             <div class="card-header-right">${updateBadge}${mapPin}${uptimeBadge}</div>
           </div>
           ${identityLine}
@@ -5198,6 +5272,127 @@ function showHotspotCard(ip) {
     setTimeout(() => card.classList.remove('map-highlight'), 1300);
 }
 
+// --- hotspot card detail drawer -- everything the compact card doesn't
+// have room for: full talker history (history), full ASL link topology
+// (asl_linked_nodes), Brandmeister status/static TGs, WPSD update status.
+// Reads lastApiData (the most recent /api/data response, already kept
+// around for ASL Favorites lookups) rather than a separate fetch -- the
+// card that was clicked already has this data in hand.
+function openHotspotDrawer(ip) {
+    const hs = (lastApiData || []).find(h => h.ip === ip);
+    if (!hs) return;
+    const isAsl = hs.type === 'asl3';
+    const isOffline = hs.status === 'Offline';
+    const dotClass = isOffline ? 'offline' : (hs.is_active ? 'live' : '');
+
+    const identityBits = [
+        (hs.hotspot_callsign && hs.hotspot_callsign !== 'N/A') ? hs.hotspot_callsign : '',
+        (hs.frequency && hs.frequency !== 'N/A')
+            ? hs.frequency + (hs.duplex && hs.duplex !== 'N/A' ? ` (${hs.duplex})` : '') : '',
+        (hs.hotspot_location && hs.hotspot_location !== 'N/A') ? hs.hotspot_location : '',
+    ].filter(Boolean);
+    if (isAsl && hs.asl_node) identityBits.unshift('Node ' + hs.asl_node);
+    const subLine = [ip, ...identityBits].join(' · ');
+
+    let talkersHtml = '';
+    if (!isAsl) {
+        const history = hs.history || [];
+        talkersHtml = `
+        <div class="hs-drawer-section" style="margin-top:10px">
+            <div class="hs-drawer-section-title">Recent talkers <span class="count">(${history.length})</span></div>
+            ${history.length ? history.map(h => `
+                <div class="hs-talker-row">
+                    <a class="hs-talker-call" href="https://www.qrz.com/db/${encodeURIComponent(h.call)}" target="_blank" rel="noopener">${escapeHtml(h.call)}</a>
+                    <span class="hs-talker-meta">${escapeHtml([h.name, h.location].filter(Boolean).join(' · ') || '—')}</span>
+                </div>`).join('') : '<div class="hs-empty-note">No talkers logged yet this session.</div>'}
+        </div>`;
+    }
+
+    let linkedHtml = '';
+    if (isAsl) {
+        const nodes = hs.asl_linked_nodes || [];
+        linkedHtml = `
+        <div class="hs-drawer-section" style="margin-top:10px">
+            <div class="hs-drawer-section-title">Linked nodes <span class="count">(${nodes.length})</span></div>
+            ${nodes.length ? nodes.map(n => {
+                const callHtml = n.callsign
+                    ? `<a class="hs-link-call" href="https://www.qrz.com/db/${encodeURIComponent(n.callsign)}" target="_blank" rel="noopener" style="text-decoration:none;${n.keyed ? 'color:var(--live)' : ''}">${escapeHtml(n.callsign)}</a>`
+                    : `<span class="hs-link-call" style="color:var(--text-dim)">Node ${escapeHtml(n.node)}</span>`;
+                const desc = [n.description, n.location].filter(Boolean).join(' · ') || (!n.callsign ? 'Node not in database' : '');
+                return `
+                <div class="hs-link-row ${n.keyed ? 'keyed' : ''}">
+                    <span class="hs-link-dot"></span>
+                    <span class="hs-link-node">${escapeHtml(n.node)}</span>
+                    <div class="hs-link-body">
+                        ${callHtml}
+                        ${desc ? `<div class="hs-link-desc">${escapeHtml(desc)}</div>` : ''}
+                    </div>
+                    <span class="hs-link-mode">${escapeHtml(n.mode || '')}</span>
+                </div>`;
+            }).join('') : '<div class="hs-empty-note">No linked nodes right now.</div>'}
+        </div>`;
+    }
+
+    let bmHtml = '';
+    if (!isAsl) {
+        if (hs.bm_status_text || (hs.bm_static_tgs && hs.bm_static_tgs.length)) {
+            bmHtml = `
+            <div class="hs-drawer-section">
+                <div class="hs-drawer-section-title">Brandmeister</div>
+                ${hs.bm_status_text ? `<div class="hs-bm-status">Status: <b>${escapeHtml(hs.bm_status_text)}</b></div>` : ''}
+                ${(hs.bm_static_tgs && hs.bm_static_tgs.length) ? `
+                <div class="hs-tg-chip-row">
+                    ${hs.bm_static_tgs.map(t => `<span class="hs-tg-chip">TG ${escapeHtml(String(t.talkgroup))}${t.slot ? ' · TS' + escapeHtml(String(t.slot)) : ''}</span>`).join('')}
+                </div>` : ''}
+            </div>`;
+        } else {
+            bmHtml = `
+            <div class="hs-drawer-section">
+                <div class="hs-drawer-section-title">Brandmeister</div>
+                <div class="hs-empty-note">No Brandmeister ID configured for this hotspot.</div>
+            </div>`;
+        }
+    }
+
+    let updateHtml = '';
+    if (!isAsl && hs.dashboard_update_available !== null && hs.dashboard_update_available !== undefined) {
+        updateHtml = `
+        <div class="hs-drawer-section">
+            <div class="hs-drawer-section-title">Update status</div>
+            ${hs.dashboard_update_available
+                ? `<div class="hs-update-note"><b>${escapeHtml((hs.dashboard_outdated_repos || []).join(', ') || 'A component')}</b> ${(hs.dashboard_outdated_repos || []).length > 1 ? 'are' : 'is'} behind.</div>`
+                : `<div class="hs-empty-note">Up to date${hs.dashboard_version ? ` (WebCode ${escapeHtml(hs.dashboard_version)}${hs.dashboard_version_date ? ', ' + escapeHtml(hs.dashboard_version_date) : ''})` : ''}.</div>`}
+        </div>`;
+    }
+
+    document.getElementById('hs-drawer').innerHTML = `
+        <div class="hs-drawer-header">
+            <div class="hs-drawer-title-row">
+                <div class="hs-drawer-title"><span class="status-dot ${dotClass}"></span>${escapeHtml(hs.name)}</div>
+                <div class="hs-drawer-close" onclick="closeHotspotDrawer()">✕</div>
+            </div>
+            <div class="hs-drawer-sub">${escapeHtml(subLine)}</div>
+            <div class="hs-drawer-stats">
+                <span>Uptime <b>${escapeHtml(fmtUptime(hs.uptime))}</b></span>
+                <span>Temp <b>${escapeHtml(hs.temperature)}</b></span>
+                <span>CPU <b>${escapeHtml(hs.cpu)}</b></span>
+            </div>
+        </div>
+        <div class="hs-drawer-body">
+            ${talkersHtml}
+            ${linkedHtml}
+            ${bmHtml}
+            ${updateHtml}
+        </div>`;
+    document.getElementById('hs-drawer').classList.add('open');
+    document.getElementById('hs-drawer-backdrop').classList.add('open');
+}
+
+function closeHotspotDrawer() {
+    document.getElementById('hs-drawer').classList.remove('open');
+    document.getElementById('hs-drawer-backdrop').classList.remove('open');
+}
+
 function refreshMap() {
     if (!mapInitialized) return;
     // Only do the (relatively expensive) marker/line rebuild while the map
@@ -5750,8 +5945,12 @@ function refresh() {
         .then(data => {
             renderCards(data);
             refreshMap();
+            // lastApiData is used both by renderAslFavorites() below and
+            // by openHotspotDrawer() (card click -> detail drawer) -- kept
+            // unconditional now that a second consumer needs it regardless
+            // of whether ASL Favorites is enabled.
+            lastApiData = data;
             if (SHOW_ASL_FAVORITES) {
-                lastApiData = data;
                 renderAslFavorites();
             }
         });

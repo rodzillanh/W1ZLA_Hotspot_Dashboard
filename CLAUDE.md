@@ -2473,6 +2473,47 @@ config for per-integration credentials; put it in
   nearest existing component that "shape of" fits -- reuse only after
   confirming the visual result actually matches what was shown and
   agreed to, not just that it's plausible-looking.
+- **Hotspot card detail drawer (v3.61) -- built after THREE separate
+  mockup rounds (generic placeholder cards, then real card CSS copied in,
+  then a `stopPropagation()` demo with a toast confirming which action
+  actually fired), each one requested by the user before building for
+  real.** The core interaction question the whole feature turned on:
+  making the ENTIRE card clickable (`openHotspotDrawer('${hs.ip}')` on
+  the outer `.hotspot-card` div) without breaking any of its existing
+  nested links (card name -> the hotspot's own web UI, 📍 map pin,
+  the update badge, the active/last-heard/recent-history callsigns ->
+  QRZ, ASL3's linked-node callsigns). Plain DOM event bubbling solves
+  this cleanly: every one of those existing elements got
+  `onclick="event.stopPropagation()"` added (the map-jump-btn already had
+  an onclick for `event.preventDefault()`, so stopPropagation was added
+  alongside it, not as a second handler), which stops the click from
+  ever reaching the card's own listener -- no new event-delegation
+  library or per-element class-based exclusion logic needed. `.hotspot-
+  card` also gained `cursor: pointer` and a subtle hover box-shadow, kept
+  as a SEPARATE rule from the existing `.active`/`.favorite`/`.offline`
+  border-color states so the two don't fight over the `border-color`
+  property.
+  `openHotspotDrawer(ip)` reads `lastApiData` (the most recent `/api/data`
+  poll) rather than a new fetch -- that global previously only got
+  populated `if (SHOW_ASL_FAVORITES)` (it existed solely for that card's
+  own lookup need), which would have silently broken the drawer for
+  anyone without ASL Favorites enabled; fixed by making the assignment
+  unconditional in `refresh()`, since it now has two independent
+  consumers. Drawer content is genuinely type-aware, not a single
+  template: WPSD gets `history` (recent talkers) + `bm_status_text`/
+  `bm_static_tgs` (Brandmeister) + `dashboard_update_available`/
+  `dashboard_outdated_repos` (WPSD update status); ASL3 gets
+  `asl_linked_nodes` (the full link topology, with `keyed` nodes
+  highlighted the same live-pulsing-dot language used elsewhere) instead
+  -- these are real fields that already existed on `HotspotStatus` with
+  nowhere in the compact card to show in full, not new backend work.
+  One real data-shape gotcha surfaced while building this: `history`
+  entries (`{call, name, location, lat, lon}`) have NO timestamp field at
+  all, confirmed by re-reading `models.py` before writing the drawer's
+  render code -- the "Recent talkers" section can only show who and
+  where, never "X min ago" per talker. Don't add a fabricated relative
+  time here without first adding a real timestamp to `history` entries
+  server-side.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
