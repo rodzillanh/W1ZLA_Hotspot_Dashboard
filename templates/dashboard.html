@@ -1382,6 +1382,7 @@
         .hs-update-note { font-size: 11.5px; color: var(--text-dim); background: var(--panel-2); border-radius: 6px; padding: 8px 10px; line-height: 1.5; margin-top: 4px; }
         .hs-update-note b { color: var(--accent); }
         .hs-empty-note { font-size: 12px; color: var(--text-dim); padding: 4px 0; }
+        .qso-mini-map { height: 170px; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
 
         /* --- map --- */
         .map-resize-wrap { position: relative; }
@@ -1611,19 +1612,18 @@
             <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 1020.354 15.354z"/>
         </svg>
     </button>
-    <button class="theme-toggle-btn" id="quick-settings-btn" onclick="openSettingsDrawer()"
-            title="Quick settings" aria-label="Quick settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-    </button>
     <a class="update-indicator" id="update-indicator" href="/setup#version" title="Update available">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M13 2 3 14h7l-1 8 11-14h-7l1-8z" fill="#FFCC4D" stroke="#664500" stroke-width="1" stroke-linejoin="round"/>
         </svg>
     </a>
-    <a class="settings-link" href="/setup">⚙ Settings</a>
+    <!-- Opens Quick Settings first (the common toggles), not straight to
+         /setup -- avoids two separate "settings" entry points sitting
+         next to each other (a real, reported point of confusion: a
+         gear icon here AND a gear icon for Quick Settings). The drawer's
+         own "More settings →" link is the way down to the full page.
+         href stays a real fallback for no-JS/failure cases. -->
+    <a class="settings-link" href="/setup" onclick="event.preventDefault(); openSettingsDrawer();">⚙ Settings</a>
 </div>
 
 <div class="sysbar" id="sysbar" style="display:none">
@@ -5436,9 +5436,61 @@ function closeHotspotDrawer() { closeAllDrawers(); }
 // RadioID link, same as the hotspot card's existing links; clicking the
 // rest of the row opens this instead. lastRenderedContacts is set by
 // renderRecentContactsCard() each poll.
+//
+// Includes a real embedded mini map (not a placeholder) -- built ONCE
+// the first time this drawer opens (ensureQsoDrawerSkeleton), reused on
+// every later open by just moving its marker/line rather than
+// destroying and recreating the Leaflet map instance, which Leaflet
+// doesn't handle well against a container that's about to be wiped by
+// innerHTML. Always uses the dark CARTO tiles regardless of the
+// dashboard's own light/dark theme or the main map's style selector --
+// a small preview reads better on one consistent background than
+// trying to sync a third style toggle to it.
+let qsoMiniMap = null, qsoMiniMarker = null, qsoMiniQthMarker = null, qsoMiniLine = null;
+
+function ensureQsoDrawerSkeleton() {
+    if (qsoMiniMap) return;
+    document.getElementById('qso-drawer').innerHTML = `
+        <div class="hs-drawer-header">
+            <div class="hs-drawer-title-row">
+                <div class="hs-drawer-title">
+                    <span id="qso-d-flag"></span>
+                    <div>
+                        <a id="qso-d-call" href="#" target="_blank" rel="noopener" style="color:var(--link);font-size:20px;font-weight:700;text-decoration:none"></a>
+                        <div id="qso-d-name" style="font-size:12px;color:var(--text-muted);font-weight:400"></div>
+                    </div>
+                </div>
+                <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
+            </div>
+            <div class="hs-drawer-sub" id="qso-d-when"></div>
+        </div>
+        <div class="hs-drawer-body">
+            <div id="qso-mini-map" class="qso-mini-map"></div>
+            <button id="qso-d-viewmap-btn" style="width:100%;margin:10px 0 16px;padding:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:12.5px">📍 View on full map</button>
+            <div class="stats-grid" style="margin-bottom:14px">
+                <div>Band/Mode: <span class="stat-val" id="qso-d-bandmode"></span></div>
+                <div>Frequency: <span class="stat-val" id="qso-d-freq"></span></div>
+                <div>RST sent/rcvd: <span class="stat-val" id="qso-d-rst"></span></div>
+                <div>Grid: <span class="stat-val" id="qso-d-grid"></span></div>
+                <div>Distance: <span class="stat-val" id="qso-d-dist"></span></div>
+                <div>Logged via: <span class="stat-val" id="qso-d-source" style="font-family:inherit"></span></div>
+            </div>
+            <div class="hs-drawer-section-title">Location</div>
+            <div style="font-size:13px;color:var(--text)" id="qso-d-loc"></div>
+        </div>`;
+    qsoMiniMap = L.map('qso-mini-map', { zoomControl: false }).setView([0, 0], 2);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd', maxZoom: 19,
+    }).addTo(qsoMiniMap);
+}
+
 function openQsoDrawer(i) {
     const q = lastRenderedContacts[i];
     if (!q) return;
+    ensureQsoDrawerSkeleton();
+    closeAllDrawers();
+
     const flagHtml = flagImgHtml(q.country) || '📻';
     const call = q.call || '?';
     const lookupHref = QRZ_ENABLED
@@ -5450,41 +5502,78 @@ function openQsoDrawer(i) {
     const bandMode = [q.band, q.mode].filter(Boolean).join(' ') || '—';
     const freq = q.frequency_hz ? (q.frequency_hz / 1e6).toFixed(3) + ' MHz' : '—';
     const rst = (q.rst_sent || q.rst_rcvd) ? `${q.rst_sent || '—'} / ${q.rst_rcvd || '—'}` : '—';
-    const dist = (q.qth_lat != null && q.qth_lon != null && q.lat != null && q.lon != null)
-        ? fmtDistance(distanceKm(q.qth_lat, q.qth_lon, q.lat, q.lon)) : '—';
+    const hasPos = q.lat != null && q.lon != null;
+    const hasQth = q.qth_lat != null && q.qth_lon != null;
+    const dist = (hasQth && hasPos) ? fmtDistance(distanceKm(q.qth_lat, q.qth_lon, q.lat, q.lon)) : '—';
     const loc = [q.city, q.state || q.country].filter(Boolean).join(', ') || '—';
     const source = q.source === 'wsjtx' ? 'Live (WSJT-X)' : 'ADIF import';
-    const hasPos = q.lat != null && q.lon != null;
 
-    document.getElementById('qso-drawer').innerHTML = `
-        <div class="hs-drawer-header">
-            <div class="hs-drawer-title-row">
-                <div class="hs-drawer-title">${flagHtml}
-                    <div>
-                        <a href="${lookupHref}" target="_blank" rel="noopener" style="color:var(--link);font-size:20px;font-weight:700;text-decoration:none">${escapeHtml(call)}</a>
-                        ${q.name ? `<div style="font-size:12px;color:var(--text-muted);font-weight:400">${escapeHtml(q.name)}</div>` : ''}
-                    </div>
-                </div>
-                <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
-            </div>
-            <div class="hs-drawer-sub">${escapeHtml(when)}</div>
-        </div>
-        <div class="hs-drawer-body">
-            ${hasPos ? `<button class="btn-secondary" style="width:100%;margin-bottom:16px;padding:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:12.5px"
-                 onclick="closeAllDrawers(); goToTab('map'); leafletMap.setView([${q.lat},${q.lon}], Math.max(leafletMap.getZoom(), 6));">📍 View on map</button>` : ''}
-            <div class="stats-grid" style="margin-bottom:14px">
-                <div>Band/Mode: <span class="stat-val">${escapeHtml(bandMode)}</span></div>
-                <div>Frequency: <span class="stat-val">${escapeHtml(freq)}</span></div>
-                <div>RST sent/rcvd: <span class="stat-val">${escapeHtml(rst)}</span></div>
-                <div>Grid: <span class="stat-val">${escapeHtml(q.grid || '—')}</span></div>
-                <div>Distance: <span class="stat-val">${escapeHtml(dist)}</span></div>
-                <div>Logged via: <span class="stat-val" style="font-family:inherit">${escapeHtml(source)}</span></div>
-            </div>
-            <div class="hs-drawer-section-title">Location</div>
-            <div style="font-size:13px;color:var(--text)">${escapeHtml(loc)}</div>
-        </div>`;
+    document.getElementById('qso-d-flag').innerHTML = flagHtml;
+    const callEl = document.getElementById('qso-d-call');
+    callEl.href = lookupHref;
+    callEl.textContent = call;
+    document.getElementById('qso-d-name').textContent = q.name || '';
+    document.getElementById('qso-d-when').textContent = when;
+    document.getElementById('qso-d-bandmode').textContent = bandMode;
+    document.getElementById('qso-d-freq').textContent = freq;
+    document.getElementById('qso-d-rst').textContent = rst;
+    document.getElementById('qso-d-grid').textContent = q.grid || '—';
+    document.getElementById('qso-d-dist').textContent = dist;
+    document.getElementById('qso-d-source').textContent = source;
+    document.getElementById('qso-d-loc').textContent = loc;
+
+    const viewBtn = document.getElementById('qso-d-viewmap-btn');
+    viewBtn.style.display = hasPos ? 'block' : 'none';
+    viewBtn.onclick = hasPos ? () => {
+        closeAllDrawers();
+        goToTab('map');
+        leafletMap.setView([q.lat, q.lon], Math.max(leafletMap.getZoom(), 6));
+    } : null;
+
+    // Mini map: a pin for the QSO itself (QSO_COLOR, matching the main
+    // map's own QSO pins) and, when a QTH position is known, a plain
+    // white "home" marker plus a dashed line back to it -- same shape as
+    // the main map's QSO-to-QTH lines, just in miniature.
+    if (hasPos) {
+        if (!qsoMiniMarker) {
+            qsoMiniMarker = L.circleMarker([q.lat, q.lon], {
+                radius: 6, color: QSO_COLOR, weight: 2, fillColor: QSO_COLOR, fillOpacity: 0.9,
+            }).addTo(qsoMiniMap);
+        } else {
+            qsoMiniMarker.setLatLng([q.lat, q.lon]);
+        }
+        if (hasQth) {
+            if (!qsoMiniQthMarker) {
+                qsoMiniQthMarker = L.circleMarker([q.qth_lat, q.qth_lon], {
+                    radius: 5, color: '#12151a', weight: 1.5, fillColor: '#ffffff', fillOpacity: 1,
+                }).addTo(qsoMiniMap);
+                qsoMiniLine = L.polyline([[q.qth_lat, q.qth_lon], [q.lat, q.lon]], {
+                    color: '#9aa2ad', weight: 1, dashArray: '3,4',
+                }).addTo(qsoMiniMap);
+            } else {
+                qsoMiniQthMarker.setLatLng([q.qth_lat, q.qth_lon]);
+                qsoMiniLine.setLatLngs([[q.qth_lat, q.qth_lon], [q.lat, q.lon]]);
+            }
+            qsoMiniMap.fitBounds([[q.qth_lat, q.qth_lon], [q.lat, q.lon]], { padding: [24, 24] });
+        } else {
+            if (qsoMiniQthMarker) { qsoMiniMap.removeLayer(qsoMiniQthMarker); qsoMiniQthMarker = null; }
+            if (qsoMiniLine) { qsoMiniMap.removeLayer(qsoMiniLine); qsoMiniLine = null; }
+            qsoMiniMap.setView([q.lat, q.lon], 5);
+        }
+    } else if (qsoMiniMarker) {
+        qsoMiniMap.removeLayer(qsoMiniMarker); qsoMiniMarker = null;
+        if (qsoMiniQthMarker) { qsoMiniMap.removeLayer(qsoMiniQthMarker); qsoMiniQthMarker = null; }
+        if (qsoMiniLine) { qsoMiniMap.removeLayer(qsoMiniLine); qsoMiniLine = null; }
+    }
+
     document.getElementById('qso-drawer').classList.add('open');
     document.getElementById('hs-drawer-backdrop').classList.add('open');
+    // The drawer slides in via CSS transform, not display:none, so the
+    // container technically already has real dimensions -- but Leaflet
+    // still needs an explicit invalidateSize() after becoming visible/
+    // resized or it can render a grey/misaligned tile grid (a well-known
+    // Leaflet gotcha, not specific to this drawer).
+    setTimeout(() => qsoMiniMap.invalidateSize(), 260);
 }
 
 // --- Quick Settings drawer -- the things people flip often, reachable
@@ -5499,6 +5588,22 @@ function openQsoDrawer(i) {
 // session) -- map-style/layer toggles are genuine no-ops before that
 // (setMapStyle() itself checks `if (!leafletMap) return`), so showing
 // them earlier would just be a broken control, not a real shortcut.
+// One row per map-legend checkbox this drawer can proxy -- returns ''
+// if that checkbox doesn't exist in the DOM at all (e.g. the Satellites
+// overlay checkbox only renders when settings.show_satellites is on),
+// rather than throwing on a null getElementById(). Always syncs the
+// REAL checkbox's .checked first, then calls its real toggle function,
+// so the map legend and this drawer never disagree about which is true.
+function mapProxyToggleRow(checkboxId, toggleFnName, label) {
+    const real = document.getElementById(checkboxId);
+    if (!real) return '';
+    return `
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:5px 0;cursor:pointer">
+            <input type="checkbox" ${real.checked ? 'checked' : ''}
+                   onchange="document.getElementById('${checkboxId}').checked = this.checked; ${toggleFnName}();"> ${label}
+        </label>`;
+}
+
 function renderSettingsDrawer() {
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
     const mapSection = mapInitialized ? `
@@ -5512,14 +5617,13 @@ function renderSettingsDrawer() {
                 </select>
             </div>
         </div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:5px 0;cursor:pointer">
-            <input type="checkbox" ${document.getElementById('greyline-toggle').checked ? 'checked' : ''}
-                   onchange="document.getElementById('greyline-toggle').checked = this.checked; toggleGreyline();"> Grey line
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:5px 0;cursor:pointer">
-            <input type="checkbox" ${document.getElementById('aurora-toggle').checked ? 'checked' : ''}
-                   onchange="document.getElementById('aurora-toggle').checked = this.checked; toggleAurora();"> Aurora oval
-        </label>`
+        ${mapProxyToggleRow('greyline-toggle', 'toggleGreyline', 'Grey line')}
+        ${mapProxyToggleRow('aurora-toggle', 'toggleAurora', 'Aurora oval')}
+        ${mapProxyToggleRow('pota-toggle', 'togglePota', 'POTA spots')}
+        ${mapProxyToggleRow('sota-toggle', 'toggleSota', 'SOTA spots')}
+        ${mapProxyToggleRow('psk-toggle', 'togglePsk', 'PSK Reporter')}
+        ${mapProxyToggleRow('satellites-map-toggle', 'toggleSatellitesMap', 'Satellites overlay')}
+        ${mapProxyToggleRow('qso-show-toggle', 'toggleQsoVisibility', 'Logged QSOs')}`
         : `<div class="hs-drawer-section-title" style="margin-top:18px">Live map</div>
            <div class="hs-empty-note">Open the Live map tab once this session to enable style/overlay quick toggles.</div>`;
 

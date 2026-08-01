@@ -283,14 +283,16 @@ beyond the base card/map UI:
   instead). The existing links inside a card — its name, 📍 map, the
   update badge, and any callsign — still do exactly what they did
   before; only clicking the rest of the card opens the drawer.
-- **Quick Settings** — a gear icon in the toolbar (next to the
-  light/dark toggle, present on every tab) opens a drawer for theme,
-  spotlight dimming, and courtesy tone — plus, once the Live map tab has
-  been opened at least once this session, map style and the grey line/
-  aurora overlay toggles too. Everything in it saves instantly, same as
-  the full Settings page; it's just a faster way to reach the handful of
-  things people actually change often, with a "More settings →" link
-  down to `/setup` for everything else.
+- **Quick Settings** — the toolbar's "⚙ Settings" link opens this first
+  (one settings entry point, not a separate gear icon sitting next to
+  it): theme, spotlight dimming, and courtesy tone, plus — once the Live
+  map tab has been opened at least once this session — map style and
+  every map overlay toggle (grey line, aurora, POTA, SOTA, PSK Reporter,
+  Satellites, logged QSOs). Everything saves instantly, same as the full
+  Settings page; the map toggles proxy directly to the map legend's own
+  checkboxes rather than tracking a second copy of that state, so the two
+  never disagree. A "More settings →" link at the bottom goes to the full
+  `/setup` page for everything not covered here.
 
 ## Dashboard customization
 
@@ -1071,9 +1073,10 @@ Distance uses the same miles/km preference as the Weather card
 (Settings → Weather → "Temperature in °F").
 
 Click a row (not the callsign, which still opens QRZ/RadioID directly)
-to slide out the full detail: band/mode/frequency/RST/grid/distance/
-location, and a "View on map" button that jumps straight to that QSO's
-pin on the Live map.
+to slide out the full detail: a small live map centered on the contact
+(with a line back to your station's QTH when known), band/mode/
+frequency/RST/grid/distance/location, and a "View on full map" button
+for exploring further on the actual Live map.
 
 ## QSO Stats card
 

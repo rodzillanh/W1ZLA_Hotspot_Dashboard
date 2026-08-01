@@ -2576,6 +2576,60 @@ config for per-integration credentials; put it in
     deliberate, narrow exception, not a precedent for converting the
     others -- don't casually turn more of these into `let` without an
     equivalent real need to flip them client-side.
+- **Two settings entry points sitting next to each other (the toolbar's
+  gear-icon Quick Settings button and the pre-existing "⚙ Settings" text
+  link) was a real, reported point of confusion (v3.63) -- both used gear
+  iconography for two different destinations.** Fixed by removing the
+  separate gear button entirely and repointing the existing "⚙ Settings"
+  link's `onclick` to `openSettingsDrawer()` (`event.preventDefault()`
+  keeps the real `href="/setup"` as a working no-JS fallback) -- one
+  settings entry point now, common toggles first, the drawer's own
+  "More settings →" link one step deeper for everything else. This is
+  the same "merge two things that both say X" resolution already used
+  for the Notifications card's header-icon-row + filter-chip-row
+  overlap earlier in this file -- don't reintroduce a second parallel
+  settings affordance without applying the same merge instinct.
+- **Quick Settings' "Live map" section grew 5 more proxy toggles (POTA,
+  SOTA, PSK Reporter, Satellites overlay, logged-QSO visibility) via one
+  small helper, `mapProxyToggleRow(checkboxId, toggleFnName, label)`,
+  instead of hand-writing each one out like grey line/aurora originally
+  were.** The helper returns `''` if `document.getElementById(checkboxId)`
+  is null rather than throwing -- needed specifically because the
+  Satellites overlay checkbox (`#satellites-map-toggle`) only exists in
+  the DOM at all when `settings.show_satellites` is on (a Jinja `{% if
+  %}`), unlike grey line/aurora/POTA/SOTA/PSK/QSO-visibility, which are
+  all unconditionally rendered. Confirmed which was which by grepping
+  each checkbox's surrounding markup before assuming -- guessing this
+  wrong either way (guarding one that didn't need it, or not guarding
+  the one that did) would have been a real bug, not just defensive
+  overkill.
+- **The QSO detail drawer's mini map is a genuinely embedded second
+  Leaflet map instance, not a placeholder or an iframe of the main map
+  -- built once (`ensureQsoDrawerSkeleton()`), reused on every later
+  open.** Leaflet doesn't handle a container element being destroyed out
+  from under an existing map instance well, and `openQsoDrawer()`
+  otherwise fully replaces the drawer's `innerHTML` on every call (same
+  as the hotspot/settings drawers) -- so the skeleton (including the
+  `#qso-mini-map` div) is only ever written once, guarded by `if
+  (qsoMiniMap) return`, and every later call just moves the existing
+  marker/QTH-marker/line via `.setLatLng()`/`.setLatLngs()` rather than
+  recreating them. `qsoMiniMap.invalidateSize()` runs on a `setTimeout`
+  after the drawer's `.open` class is added -- a well-known Leaflet
+  gotcha (a map initialized/resized while its container's true on-screen
+  size hasn't settled yet can render a misaligned/grey tile grid) that
+  applies here even though the drawer uses a CSS `transform` slide
+  (not `display:none`), so the container technically already has real
+  dimensions -- the safe fix is the same either way. Deliberately always
+  uses the dark CARTO tile layer regardless of the dashboard's own
+  light/dark theme or the main map's own style selector -- a third style
+  toggle for one small preview would be more complexity than the value
+  it adds; a fixed, always-legible background was the simpler and
+  better call. The QSO pin reuses `QSO_COLOR` (`#ff3fa4`) verbatim from
+  the main map's own QSO layer for visual consistency (same "this is a
+  logged QSO" color everywhere) rather than picking a new one; the QTH
+  marker uses a plain white/dark-bordered dot with no existing
+  established color to match, since the main map's own QSO-to-QTH lines
+  were never drawn with a distinct marker AT the QTH end to begin with.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
