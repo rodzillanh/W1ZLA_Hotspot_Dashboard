@@ -2514,6 +2514,68 @@ config for per-integration credentials; put it in
   where, never "X min ago" per talker. Don't add a fabricated relative
   time here without first adding a real timestamp to `history` entries
   server-side.
+- **Two more drawers (v3.62), reusing the exact `.hs-drawer`/`.hs-drawer-
+  backdrop` mechanism from the hotspot card drawer above rather than each
+  inventing its own -- one shared backdrop, `closeAllDrawers()` closes
+  whichever of the three (`#hs-drawer`/`#qso-drawer`/`#settings-drawer`)
+  is open, and each `open*Drawer()` calls it first so opening one always
+  cleanly replaces another if one was already open.**
+  - **Recent Contacts row -> QSO detail drawer.** The user explicitly
+    asked for the callsign link to keep behaving exactly as it already
+    did (opens QRZ/RadioID) rather than being swallowed into the row's
+    new click-to-open-drawer behavior -- same `stopPropagation()`
+    pattern as the hotspot card's existing links, not a new mechanism.
+    `lastRenderedContacts` (set by `renderRecentContactsCard()` each
+    poll) lets `openQsoDrawer(i)` look up the full record by array index
+    without a second fetch, same shape as `lastApiData`/
+    `openHotspotDrawer(ip)`. The drawer's "View on map" button does a
+    plain `leafletMap.setView([lat,lon], ...)` rather than embedding a
+    second live Leaflet map instance inside the drawer -- deliberately
+    simpler than a real embedded map (which would need its own teardown
+    on drawer close to avoid a leaked map instance), and this is exactly
+    what an early mockup's own honest "map preview" placeholder caveat
+    already flagged as the real answer once actually built.
+    `q.source === 'wsjtx'` vs. anything else (including simply absent)
+    distinguishes "Live (WSJT-X)" from "ADIF import" in the drawer --
+    confirmed by grepping that only `wsjtx.py`'s `_handle_qso()` ever
+    sets a `source` key on a QSO record at all; the ADIF importer never
+    has and still doesn't, so its absence IS the "ADIF import" signal,
+    not a separate field to add.
+  - **Quick Settings drawer, answering a real design question asked
+    before building: does it make sense to include Live-map toggles in
+    a drawer reachable from every tab, unless the drawer is ALSO
+    reachable from the map tab itself?** Resolved by confirming the
+    toolbar (where the gear icon lives, alongside the existing theme
+    toggle) is persistent chrome rendered once, outside every
+    `.tab-panel` -- it does NOT get torn down/rebuilt when switching
+    tabs, so the drawer is already reachable from the Live map tab too,
+    same as from the dashboard cards tab. The remaining real constraint
+    wasn't reachability, it was FUNCTIONALITY: `setMapStyle()`/
+    `toggleGreyline()`/`toggleAurora()` all silently no-op before
+    `leafletMap` exists (confirmed by reading `setMapStyle()`'s own
+    `if (!leafletMap) return`), and `initMap()` only ever runs lazily,
+    the first time the Live map tab is opened (`mapInitialized` flag).
+    So the drawer's "Live map" section is gated on `mapInitialized`
+    specifically -- not on which tab is currently active -- showing a
+    real, working set of controls once the map has been opened at least
+    once this session, and a plain explanatory note (not a broken
+    dropdown) before that. Map style/grey line/aurora are NOT given a
+    second independently-tracked state in the drawer -- the drawer's own
+    controls directly call the map's existing `setMapStyle()`/
+    `toggleGreyline()`/`toggleAurora()` functions (and, for the two
+    checkbox-backed ones, first sync the real `#greyline-toggle`/
+    `#aurora-toggle` checkbox elements' `.checked` state before calling
+    them), so there is exactly one source of truth for these regardless
+    of which control -- the map legend's own checkbox, or the drawer's
+    copy -- the user last touched.
+    `SPOTLIGHT_DIMMING_ENABLED`/`COURTESY_TONE_ENABLED` had to change
+    from `const` to `let` -- every other similar `SHOW_*`/`*_ENABLED`
+    constant in this file is baked in once from Jinja at page load and
+    never changes without a reload, but these two specifically needed to
+    become live-toggleable from the drawer without one, so this is a
+    deliberate, narrow exception, not a precedent for converting the
+    others -- don't casually turn more of these into `let` without an
+    equivalent real need to flip them client-side.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

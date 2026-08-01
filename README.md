@@ -283,6 +283,14 @@ beyond the base card/map UI:
   instead). The existing links inside a card — its name, 📍 map, the
   update badge, and any callsign — still do exactly what they did
   before; only clicking the rest of the card opens the drawer.
+- **Quick Settings** — a gear icon in the toolbar (next to the
+  light/dark toggle, present on every tab) opens a drawer for theme,
+  spotlight dimming, and courtesy tone — plus, once the Live map tab has
+  been opened at least once this session, map style and the grey line/
+  aurora overlay toggles too. Everything in it saves instantly, same as
+  the full Settings page; it's just a faster way to reach the handful of
+  things people actually change often, with a "More settings →" link
+  down to `/setup` for everything else.
 
 ## Dashboard customization
 
@@ -1061,6 +1069,11 @@ a QRZ subscription is configured) or the ADIF log's own `COUNTRY` field
 neither source just shows no flag rather than a potentially wrong one.
 Distance uses the same miles/km preference as the Weather card
 (Settings → Weather → "Temperature in °F").
+
+Click a row (not the callsign, which still opens QRZ/RadioID directly)
+to slide out the full detail: band/mode/frequency/RST/grid/distance/
+location, and a "View on map" button that jumps straight to that QSO's
+pin on the Live map.
 
 ## QSO Stats card
 
