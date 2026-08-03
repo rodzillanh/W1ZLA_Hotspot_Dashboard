@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.66 "Staley"</span>
+                <span class="release-version">v3.67 "Ramone"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>New DVSwitch card</span> — a full status card for an ASL3 node's DVSwitch (Analog_Bridge) bridge(s): which configured bridge port is tuned to what, the two most recently heard callers with elapsed time, whether the vocoder has fallen back to software (a real detected event, not just configuration), and a small recent-activity sparkline. Configure one or more bridge ports per node in Settings → Hotspots, right next to the existing Fleet Activity toggle. Not yet part of the drag-and-drop Card order list</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.66 "Staley"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>DVSwitch (Analog_Bridge) as a 6th Fleet Activity mode</span> — an ASL3 hotspot that also runs a DVSwitch bridge can opt in per-node (Settings → Hotspots) to include its bridge traffic in the mode-breakdown bar, sourced over the same SSH connection already used for that node's AllStarLink status, no separate connection needed. One disclosed caveat: unlike DMR/D-Star/YSF/P25/NXDN, DVSwitch counts a newly-started transmission rather than a completed one, since Analog_Bridge's own log has no confirmed end-of-transmission line to detect completion from</li>

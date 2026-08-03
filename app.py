@@ -241,6 +241,13 @@ def api_data():
         entry["lat"]  = hs.get("lat")
         entry["lon"]  = hs.get("lon")
         entry["type"] = hs.get("type", "wpsd")
+        # DVSwitch card -- dvswitch_enabled/dvswitch_ports come straight from
+        # hotspots.json (static config, same reason type/lat/lon do); the
+        # sparkline is the one piece not already on the live snapshot, since
+        # it's a activity_log query rather than in-memory poll state.
+        if hs.get("dvswitch_enabled"):
+            entry["dvswitch_enabled"] = True
+            entry["dvswitch_sparkline"] = storage_activity.dvswitch_sparkline(ip)
     ordered_ips = [h["ip"] for h in hotspots]
     # Return as an ARRAY so the browser preserves order — JS objects keyed by
     # IP strings get silently re-sorted by some engines (especially for
@@ -707,6 +714,17 @@ def setup():
             # don't run -- opt-in, same "absent means off" checkbox
             # convention as "enabled" above, not assumed from asl_node alone.
             new_hotspot["dvswitch_enabled"] = "dvswitch_enabled" in request.form
+            # DVSwitch card only -- one or more Analog_Bridge instance ports
+            # (multi-bridge is a real, confirmed setup, addressed by port via
+            # /tmp/ABInfo_<port>.json -- see CLAUDE.md). Free-text, comma/
+            # newline separated, same convention as openspot4_extra_pass
+            # below; re-validated digits-only here since these are
+            # interpolated into a shell string over SSH
+            # (config.build_asl_status_cmd) and /setup has no auth.
+            raw_ports = request.form.get("dvswitch_ports", "")
+            ports = [p.strip() for p in re.split(r"[,\n]+", raw_ports) if p.strip().isdigit()]
+            if ports:
+                new_hotspot["dvswitch_ports"] = ",".join(ports)
         elif node_type == "openspot4":
             new_hotspot["type"] = "openspot4"
             # "pass" (already set unconditionally above) is the primary
@@ -1601,6 +1619,15 @@ def api_import_backup():
             asl_node = str(h.get("asl_node", "")).strip()
             if asl_node and not asl_node.isdigit():
                 h.pop("asl_node", None)
+            # Same re-validation for DVSwitch card ports -- also
+            # shell-interpolated over SSH (config.build_asl_status_cmd).
+            raw_ports = str(h.get("dvswitch_ports", "")).strip()
+            if raw_ports:
+                ports = [p.strip() for p in re.split(r"[,\n]+", raw_ports) if p.strip().isdigit()]
+                if ports:
+                    h["dvswitch_ports"] = ",".join(ports)
+                else:
+                    h.pop("dvswitch_ports", None)
             imported.append(h)
         if mode == "replace":
             hotspots = imported

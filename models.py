@@ -86,6 +86,22 @@ class HotspotStatus:
     # Keys: node, callsign/description/location (None if not resolved via
     # aslstats.py), mode ("T"/"R"/"L"/"C"), keyed (bool)
     asl_linked_nodes: List[dict] = field(default_factory=list)
+    # DVSwitch (Analog_Bridge) card -- only populated for ASL3 hotspots with
+    # dvswitch_enabled set (see monitor.py's _check_one_asl3/_check_dvswitch_tx).
+    # dvswitch_bridges: one entry per configured port, {port, tuned, mode} --
+    # tuned/mode come from that instance's own /tmp/ABInfo_<port>.json
+    # ("tuned" is its last_tune field, None if not currently tuned to
+    # anything -- see CLAUDE.md for what's confirmed vs. assumed about that
+    # field's idle-state shape). dvswitch_vocoder is "software"/"hardware"/
+    # None (unknown -- no DVSwitch log output seen at all yet), based on a
+    # real confirmed log line ("Using software MBE decoder...") rather than
+    # config alone. dvswitch_heard mirrors `history`'s shape but WITH a real
+    # timestamp per entry (unlike `history`, which has none) -- {call,
+    # dmr_id, dst, seen_at}, call falls back to the bare DMR ID when the
+    # log line's own call= field is absent.
+    dvswitch_bridges: List[dict] = field(default_factory=list)
+    dvswitch_vocoder: Optional[str] = None
+    dvswitch_heard: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)

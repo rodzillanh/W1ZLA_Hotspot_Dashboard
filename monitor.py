@@ -1,4 +1,5 @@
 """SSH polling and MMDVM log parsing for the hotspot fleet."""
+import json
 import re
 import time
 import threading
@@ -316,8 +317,9 @@ class FleetMonitor:
         ip       = hotspot["ip"]
         node     = hotspot.get("asl_node", "")
         dvswitch = hotspot.get("dvswitch_enabled", False)
+        dvswitch_ports = self._dvswitch_port_list(hotspot)
         try:
-            cmd = config.build_asl_status_cmd(node, dvswitch_enabled=dvswitch)
+            cmd = config.build_asl_status_cmd(node, dvswitch_enabled=dvswitch, dvswitch_ports=dvswitch_ports)
             output = self._ssh_exec(hotspot, cmd, config.SSH_TIMEOUT).splitlines()
             updates = self._parse_asl_output(ip, node, output)
             with self._lock:
@@ -329,23 +331,65 @@ class FleetMonitor:
                     self._record_fleet_event(ip, status.name, "online")
                 status.offline_since = None
             if dvswitch:
-                self._check_dvswitch_tx(ip, output)
+                sections = self._split_dvswitch_sections(output)
+                self._check_dvswitch_tx(ip, sections)
+                with self._lock:
+                    status = self._data[ip]
+                    status.dvswitch_bridges = self._parse_dvswitch_bridges(sections, dvswitch_ports)
+                    status.dvswitch_vocoder = self._parse_dvswitch_vocoder(sections)
         except Exception:
             self._record_failure(ip)
 
-    def _check_dvswitch_tx(self, ip: str, output: list[str]) -> None:
-        """Scans the DVSwitch (Analog_Bridge) log tail appended onto this
-        hotspot's SSH output (see config.build_asl_status_cmd's
-        dvswitch_enabled param) for the one confirmed-real DVSwitch log
-        line, "Begin TX: ...". There's no confirmed end-of-transmission
-        line for DVSwitch the way every other mode has one (see
-        config.DVSWITCH_BEGIN_TX_PATTERN's own comment) -- so this logs one
-        Fleet Activity row per NEWLY SEEN start line (different from the
-        last one recorded for this hotspot), not per completed
-        transmission. A real, disclosed difference in what's being
-        counted for this mode specifically, not a hidden shortcut."""
-        last_tx_line = None
+    @staticmethod
+    def _dvswitch_port_list(hotspot: dict) -> list[str]:
+        """hotspots.json stores dvswitch_ports as one comma/newline
+        separated string (same free-text-then-split convention as
+        aprs_inbox's multi-line settings fields elsewhere in this app,
+        not a JSON list) -- app.py's /setup handler is the primary
+        digits-only gate; this re-splits/re-filters defensively, same
+        spirit as config.build_asl_status_cmd's own re-validation."""
+        raw = hotspot.get("dvswitch_ports", "") or ""
+        return [p.strip() for p in re.split(r"[,\n]+", raw) if p.strip().isdigit()]
+
+    @staticmethod
+    def _split_dvswitch_sections(output: list[str]) -> dict[str, list[str]]:
+        """Splits the DVSwitch portion of an ASL3 hotspot's combined SSH
+        output (log tail / vocoder grep / one ABInfo.json per configured
+        port, all one shell string -- see config.build_asl_status_cmd)
+        back into named sections by the echo'd markers each part is
+        wrapped in. ABInfo sections are keyed "abinfo:<port>" since there
+        can be more than one configured bridge."""
+        sections: dict[str, list[str]] = {}
+        current_key = None
         for line in output:
+            stripped = line.strip()
+            if stripped == config.DVSWITCH_TAIL_MARKER:
+                current_key = "tail"
+                sections[current_key] = []
+            elif stripped == config.DVSWITCH_VOCODER_MARKER:
+                current_key = "vocoder"
+                sections[current_key] = []
+            elif stripped.startswith(config.DVSWITCH_ABINFO_MARKER):
+                current_key = "abinfo:" + stripped[len(config.DVSWITCH_ABINFO_MARKER):]
+                sections[current_key] = []
+            elif current_key is not None:
+                sections[current_key].append(line)
+        return sections
+
+    def _check_dvswitch_tx(self, ip: str, sections: dict[str, list[str]]) -> None:
+        """Scans the DVSwitch (Analog_Bridge) log tail for the confirmed-real
+        "Begin TX: ..." line -- confirmed live against a real device (not
+        just an old GitHub issue quote), including a real call= field this
+        app initially treated as unconfirmed. There's no confirmed
+        end-of-transmission line for DVSwitch in THIS log the way every
+        other mode has one (see config.DVSWITCH_BEGIN_TX_PATTERN's own
+        comment) -- so this logs one Fleet Activity row, and one Last Heard
+        entry, per NEWLY SEEN start line (different from the last one
+        recorded for this hotspot), not per completed transmission. A
+        real, disclosed difference in what's being counted for this mode
+        specifically, not a hidden shortcut."""
+        last_tx_line = None
+        for line in sections.get("tail", []):
             if re.search(config.DVSWITCH_BEGIN_TX_PATTERN, line):
                 last_tx_line = line.strip()
         if last_tx_line is None:
@@ -355,7 +399,76 @@ class FleetMonitor:
                 return
             self._dvswitch_last_tx[ip] = last_tx_line
             name = self._data[ip].name
+
+        call_match = re.search(config.DVSWITCH_TX_CALL_PATTERN, last_tx_line)
+        src_match  = re.search(config.DVSWITCH_TX_SRC_PATTERN,  last_tx_line)
+        dst_match  = re.search(config.DVSWITCH_TX_DST_PATTERN,  last_tx_line)
+        # call= is confirmed present on at least some real devices/versions
+        # (see config.py's comment) -- prefer it, but fall back to the bare
+        # DMR ID rather than attempting a new lookup: radioid.py's client
+        # only resolves callsign -> info, not DMR ID -> callsign, and this
+        # app doesn't guess at an unverified reverse-lookup API shape.
+        dmr_id = src_match.group(1) if src_match else None
+        call   = call_match.group(1) if call_match else dmr_id
+        if call is not None:
+            heard_entry = {
+                "call": call, "dmr_id": dmr_id,
+                "dst": dst_match.group(1) if dst_match else None,
+                "seen_at": time.time(),
+            }
+            with self._lock:
+                status = self._data[ip]
+                heard = [heard_entry] + [h for h in status.dvswitch_heard if h["call"] != call]
+                status.dvswitch_heard = heard[:config.MAX_HISTORY]
+
         storage_activity.log_activity(ip, name, "DVSwitch")
+
+    @staticmethod
+    def _parse_dvswitch_bridges(sections: dict[str, list[str]], ports: list[str]) -> list[dict]:
+        """One entry per configured Analog_Bridge instance port, read from
+        that instance's own /tmp/ABInfo_<port>.json (confirmed real fields,
+        via DVSwitch's own official dashboard source -- see CLAUDE.md).
+        "tuned" is that JSON's own last_tune field, passed through as-is;
+        this app has NOT verified what that field looks like when nothing
+        is tuned (empty string vs. absent vs. a sentinel value) against a
+        real device yet -- None here just means "couldn't read/parse a
+        tuned value," not a confirmed distinct idle state. Missing/
+        unreadable ABInfo.json (DVSwitch not running, wrong port, no
+        permission) degrades to tuned=None/mode=None rather than raising,
+        same contract as every other integration in this app."""
+        bridges = []
+        for port in ports:
+            raw = "\n".join(sections.get("abinfo:" + port, [])).strip()
+            tuned = None
+            mode  = None
+            if raw:
+                try:
+                    data = json.loads(raw)
+                    tuned = data.get("last_tune") or None
+                    mode  = (data.get("tlv") or {}).get("ambe_mode") or None
+                except (ValueError, TypeError, AttributeError):
+                    pass
+            bridges.append({"port": port, "tuned": tuned, "mode": mode})
+        return bridges
+
+    @staticmethod
+    def _parse_dvswitch_vocoder(sections: dict[str, list[str]]) -> str | None:
+        """"software" only when the confirmed-real fallback message is
+        actually seen ("Using software MBE decoder..." -- see
+        config.DVSWITCH_SOFTWARE_FALLBACK_PATTERN's own comment for why
+        there's no confirmed positive "hardware working" message to key
+        off instead). "hardware" means "no fallback message seen," not a
+        verified-working hardware confirmation. None means no DVSwitch log
+        output was read at all (both sections empty) -- e.g. Analog_Bridge
+        isn't running or the log path is wrong -- kept distinct from
+        "hardware" so the card can show "unknown" rather than falsely
+        implying a healthy hardware vocoder."""
+        if not sections.get("tail") and not sections.get("vocoder"):
+            return None
+        for line in sections.get("vocoder", []):
+            if config.DVSWITCH_SOFTWARE_FALLBACK_PATTERN in line:
+                return "software"
+        return "hardware"
 
     def _check_one_openspot4(self, hotspot: dict) -> None:
         """openspot.py's persistent WebSocket worker pushes live field

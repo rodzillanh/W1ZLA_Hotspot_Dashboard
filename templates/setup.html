@@ -1279,7 +1279,8 @@
                         data-openspot4-extra-pass="{{ hs.get('openspot4_extra_pass', '') }}"
                         data-enabled="{{ hs.get('enabled', True) }}"
                         data-dvswitch-enabled="{{ hs.get('dvswitch_enabled', False) }}"
-                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.dvswitchEnabled)">
+                        data-dvswitch-ports="{{ hs.get('dvswitch_ports', '') }}"
+                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.dvswitchEnabled, this.dataset.dvswitchPorts)">
                     Edit
                 </button>
                 <form action="/api/delete_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
@@ -1342,10 +1343,16 @@
                  <input type="text" id="hs-aslnode" placeholder="e.g. 59929"></div>
             <div style="display:flex;align-items:flex-end">
                 <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-                    <input type="checkbox" id="hs-dvswitch-enabled">
+                    <input type="checkbox" id="hs-dvswitch-enabled" onchange="onDvswitchToggle()">
                     This node also runs DVSwitch (Analog_Bridge)
                     <span style="font-size:10px;color:var(--text-dim)">(adds a 6th "DVSwitch" mode to the Fleet Activity card)</span>
                 </label>
+            </div>
+            <div style="grid-column:1/-1;display:none" id="hs-dvswitch-ports-wrap">
+                <label>DVSwitch card bridge port(s)
+                    <span style="font-size:10px;color:var(--text-dim)">(optional — enables the separate DVSwitch card below; one or more Analog_Bridge instance ports, comma or newline separated. Each instance writes its own status to /tmp/ABInfo_&lt;port&gt;.json, which is how multiple bridges on one node are told apart)</span>
+                </label>
+                <textarea id="hs-dvswitch-ports" rows="2" placeholder="e.g. 31000, 31001"></textarea>
             </div>
         </div>
         <div class="form-grid" style="margin-bottom:10px;display:none" id="hs-openspot4-fields">
@@ -1380,6 +1387,7 @@
                 <input type="hidden" name="openspot4_extra_pass" id="form-openspot4-extra-pass">
                 <input type="checkbox" name="enabled" id="form-enabled" style="display:none">
                 <input type="checkbox" name="dvswitch_enabled" id="form-dvswitch-enabled" style="display:none">
+                <input type="hidden" name="dvswitch_ports" id="form-dvswitch-ports">
                 <button class="btn btn-primary" onclick="submitHotspot(event)">Save hotspot</button>
             </form>
             <button class="btn btn-danger btn-sm" onclick="clearHotspotForm()" style="margin-left:auto">Clear</button>
@@ -2097,9 +2105,10 @@ function submitHotspot(e) {
     document.getElementById('form-openspot4-extra-pass').value = document.getElementById('hs-openspot4-extra-pass').value;
     document.getElementById('form-enabled').checked = document.getElementById('hs-enabled-toggle').classList.contains('on');
     document.getElementById('form-dvswitch-enabled').checked = document.getElementById('hs-dvswitch-enabled').checked;
+    document.getElementById('form-dvswitch-ports').value = document.getElementById('hs-dvswitch-ports').value;
 }
 
-function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, openspot4ExtraPass, enabled, dvswitchEnabled) {
+function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, openspot4ExtraPass, enabled, dvswitchEnabled, dvswitchPorts) {
     document.getElementById('hs-name').value    = name;
     document.getElementById('hs-ip').value      = ip;
     document.getElementById('hs-orig-ip').value = ip;
@@ -2113,7 +2122,9 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, opensp
     document.getElementById('hs-openspot4-extra-pass').value = (openspot4ExtraPass && openspot4ExtraPass !== 'None') ? openspot4ExtraPass : '';
     document.getElementById('hs-enabled-toggle').classList.toggle('on', enabled !== 'False');
     document.getElementById('hs-dvswitch-enabled').checked = dvswitchEnabled === 'True';
+    document.getElementById('hs-dvswitch-ports').value = (dvswitchPorts && dvswitchPorts !== 'None') ? dvswitchPorts : '';
     onHotspotTypeChange();
+    onDvswitchToggle();
     resetHsPasswordVisibility();
     document.getElementById('hotspot-form-title').textContent = 'Edit hotspot';
     document.getElementById('hs-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2121,14 +2132,24 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, opensp
 }
 
 function clearHotspotForm() {
-    ['hs-name','hs-ip','hs-orig-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-openspot4-extra-pass'].forEach(id => document.getElementById(id).value = '');
+    ['hs-name','hs-ip','hs-orig-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-openspot4-extra-pass','hs-dvswitch-ports'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('hs-type').value = 'wpsd';
     document.getElementById('hs-enabled-toggle').classList.add('on');
     document.getElementById('hs-dvswitch-enabled').checked = false;
     onHotspotTypeChange();
+    onDvswitchToggle();
     resetHsPasswordVisibility();
     document.getElementById('hotspot-form-title').textContent = 'Add hotspot';
     document.getElementById('test-result').textContent = '';
+}
+
+// Shows/hides the DVSwitch card's bridge-ports field alongside the
+// checkbox that gates it -- separate from onHotspotTypeChange() (which
+// gates the whole ASL fields block on node type) since this is a second,
+// nested toggle within that block.
+function onDvswitchToggle() {
+    document.getElementById('hs-dvswitch-ports-wrap').style.display =
+        document.getElementById('hs-dvswitch-enabled').checked ? '' : 'none';
 }
 
 // Re-masks the SSH/device password field -- called whenever the form is

@@ -124,6 +124,33 @@ def top_targets(hours: int = 24, limit: int = 5) -> list:
     return [{"target": t, "target_type": tt, "count": cnt, "via": via} for t, tt, cnt, via in rows]
 
 
+def dvswitch_sparkline(hotspot_ip: str, minutes: int = 180, buckets: int = 14) -> list:
+    """Compact recent-activity bucket counts for one ASL3 hotspot's
+    DVSwitch traffic -- backs the DVSwitch card's footer sparkline, a
+    small glanceable trend rather than the detailed Fleet Activity chart.
+    Reuses the exact same activity_log rows _check_dvswitch_tx() already
+    writes with mode="DVSwitch" -- no new data source, no new column,
+    just a shorter/differently-bucketed read of what's already there."""
+    now      = time.time()
+    interval = max(1, (minutes * 60) // buckets)
+    start    = now - buckets * interval
+    with _lock:
+        conn = _get_conn()
+        try:
+            rows = conn.execute(
+                "SELECT ts FROM activity_log WHERE hotspot_ip = ? AND mode = 'DVSwitch' AND ts >= ?",
+                (hotspot_ip, start),
+            ).fetchall()
+        finally:
+            conn.close()
+    counts = [0] * buckets
+    for (ts,) in rows:
+        idx = int((ts - start) // interval)
+        if 0 <= idx < buckets:
+            counts[idx] += 1
+    return counts
+
+
 def query_activity(hours: int = 12, interval_minutes: int = 15) -> dict:
     """Bucketed activity counts over the trailing `hours` window, plus a
     mode breakdown and the most recent activity row. Always returns a full

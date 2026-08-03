@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.66"
+APP_VERSION = "3.67"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -30,6 +30,7 @@ VERSION_CODENAMES = [
     "Berry",            # v3.64 -- Chuck Berry (1926-2017)
     "Bennington",       # v3.65 -- Chester Bennington (1976-2017)
     "Staley",           # v3.66 -- Layne Staley (1967-2002)
+    "Ramone",           # v3.67 -- Joey Ramone (1951-2001)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -102,18 +103,47 @@ SSH_STATUS_CMD = (
 # DIGIPI_LOG_TAIL_LINES above.
 DVSWITCH_LOG_PATH        = "/var/log/dvswitch/Analog_Bridge.log"
 DVSWITCH_LOG_TAIL_LINES  = 20
-# The ONE DVSwitch log line format actually confirmed real (a directly
-# quoted example from a real GitHub issue, DVSwitch/Analog_Bridge#5):
-# "Begin TX: src=9268283 rpt=26045440 dst=40 slot=2 cc=1 metadata=..."
-# There is NO confirmed end-of-transmission line for DVSwitch (unlike every
-# other mode's END_OF_TRANSMISSION_MARKERS above) -- monitor.py logs one
-# Fleet Activity row per NEWLY SEEN start line instead of per completed
+# The "Begin TX:" line format, CONFIRMED against a real live device (a
+# user's own SSH session, not just an old GitHub issue quote) --
+# "Begin TX: src=3100486 rpt=310048611 dst=603 slot=2 cc=0 call=W1ZLA".
+# The trailing field varies: a 2020 GitHub issue quote showed
+# "metadata=<n>" instead of "call=<callsign>" in that position -- both are
+# real, just different Analog_Bridge versions/configs; monitor.py checks
+# for call= first and falls back to the bare src= DMR ID, never assumes
+# metadata= means anything. There is still NO confirmed end-of-transmission
+# line in THIS log (Analog_Bridge.log) -- monitor.py logs one Fleet
+# Activity row per NEWLY SEEN start line instead of per completed
 # transmission, a real disclosed asymmetry, not an oversight. See
 # CLAUDE.md for the full research trail before touching this.
 DVSWITCH_BEGIN_TX_PATTERN = r"Begin TX:"
+DVSWITCH_TX_SRC_PATTERN   = r"\bsrc=(\d+)"
+DVSWITCH_TX_DST_PATTERN   = r"\bdst=(\S+)"
+DVSWITCH_TX_CALL_PATTERN  = r"\bcall=(\S+)"
+# A real, confirmed-live vocoder fallback event (same user's SSH session):
+# "DV3000 not found at 127.0.0.1:2460 (Reset failed)" followed by "Using
+# software MBE decoder version 1.2.3" -- there's no confirmed *success*
+# message ("DV3000 found"/"Using hardware..."), so monitor.py's
+# _parse_dvswitch_vocoder() only ever asserts "software" when this
+# fallback text is actually seen; absence of it is treated as "hardware,
+# no fallback message seen" (not a positive hardware-health confirmation),
+# and a total absence of DVSwitch log output at all is its own separate
+# "unknown" state -- see models.py's HotspotStatus.dvswitch_vocoder.
+DVSWITCH_SOFTWARE_FALLBACK_PATTERN = "Using software"
+
+# Section markers this app's own SSH command echoes between the DVSwitch
+# sub-commands below, so monitor.py can reliably split one combined
+# command's output back into named sections (tail / vocoder grep / one
+# ABInfo.json per configured port) rather than guessing by line position --
+# the ASL/host-stats/DVSwitch output all lands in one shell string, per one
+# `_ssh_exec()` connect/exec/close cycle (see build_asl_status_cmd).
+DVSWITCH_TAIL_MARKER    = "===DVSWITCH_TAIL==="
+DVSWITCH_VOCODER_MARKER = "===DVSWITCH_VOCODER==="
+DVSWITCH_ABINFO_MARKER  = "===DVSWITCH_ABINFO==="  # this app appends the port number right after, e.g. "===DVSWITCH_ABINFO===31000"
 
 
-def build_asl_status_cmd(node: str, dvswitch_enabled: bool = False) -> str:
+def build_asl_status_cmd(
+    node: str, dvswitch_enabled: bool = False, dvswitch_ports: list[str] | None = None
+) -> str:
     """SSH command for an ASL3 (AllStarLink) hotspot: same generic Linux
     temp/uptime/CPU as WPSD, plus `rpt xnode` -- which dumps app_rpt's
     dialplan variables, including RPT_ALINKS (per-linked-node keyed state,
@@ -142,12 +172,33 @@ def build_asl_status_cmd(node: str, dvswitch_enabled: bool = False) -> str:
     Analog_Bridge.ini itself despite the name suggesting one) -- see
     CLAUDE.md for the full research trail and its real, disclosed gaps
     (no confirmed end-of-transmission line, unlike every other mode here).
+
+    `dvswitch_ports` (DVSwitch card only, independent of the Fleet Activity
+    mode above) is a list of Analog_Bridge instance ports configured for
+    this hotspot -- confirmed real that multiple instances can run on one
+    node, each addressed by its own port via /tmp/ABInfo_<port>.json (see
+    Analog_Bridge.ini's own [USRP] section comment and dvswitch.sh's
+    getABInfoFileName()). Each port gets its own `cat` appended, wrapped in
+    an echo'd marker so monitor.py can split the combined output back into
+    per-port sections -- same one-shot-connection reasoning as the log
+    tail above, not a separate SSH call per port. Non-digit ports are
+    silently skipped (defensive re-validation; app.py's /setup handler is
+    the primary gate, same pattern as `node` above).
     """
     if not node.isdigit():
         raise ValueError(f"invalid ASL node number: {node!r}")
     cmd = _LINUX_HOST_STATS_CMD + f'sudo asterisk -rx "rpt xnode {node}"'
     if dvswitch_enabled:
-        cmd += f"; tail -n {DVSWITCH_LOG_TAIL_LINES} {DVSWITCH_LOG_PATH} 2>/dev/null"
+        cmd += (
+            f"; echo {DVSWITCH_TAIL_MARKER}"
+            f"; tail -n {DVSWITCH_LOG_TAIL_LINES} {DVSWITCH_LOG_PATH} 2>/dev/null"
+            f"; echo {DVSWITCH_VOCODER_MARKER}"
+            f'; grep -m1 "{DVSWITCH_SOFTWARE_FALLBACK_PATTERN}" {DVSWITCH_LOG_PATH} 2>/dev/null'
+        )
+        for port in (dvswitch_ports or []):
+            if not port.isdigit():
+                continue
+            cmd += f"; echo {DVSWITCH_ABINFO_MARKER}{port}; cat /tmp/ABInfo_{port}.json 2>/dev/null"
     return cmd
 
 

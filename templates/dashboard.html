@@ -1365,6 +1365,38 @@
         .hs-talker-row:last-child { border-bottom: none; }
         .hs-talker-call { color: var(--link); font-weight: 600; font-size: 13px; text-decoration: none; width: 76px; flex-shrink: 0; }
         .hs-talker-meta { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* --- DVSwitch card -- reuses .metrics-card/.linked-item/
+           .hs-talker-row wholesale (same footprint/tokens as every other
+           card here), just adds the header badge/footer bits those don't
+           already have. */
+        .dvs-badge {
+            font-size: 10.5px; font-family: var(--font-mono); font-weight: 600;
+            color: var(--live); background: var(--live-dim);
+            border: 1px solid color-mix(in srgb, var(--live) 40%, var(--border));
+            border-radius: 20px; padding: 3px 10px; white-space: nowrap;
+        }
+        .dvs-badge.idle {
+            color: var(--text-dim); background: transparent; border-color: var(--border);
+        }
+        .dvs-section-title {
+            font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+            color: var(--text-dim); margin: 14px 0 8px;
+        }
+        .dvs-section-title:first-of-type { margin-top: 0; }
+        .dvs-heard-ago { font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+        .dvs-footer {
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--card-border);
+        }
+        .dvs-vocoder { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+        .dvs-vocoder .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+        .dvs-vocoder.hw .dot { background: var(--live); }
+        .dvs-vocoder.sw .dot { background: var(--caution); }
+        .dvs-vocoder-tag {
+            font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim);
+            border: 1px solid var(--card-border); border-radius: 3px; padding: 0 4px; margin-left: 2px;
+        }
         .hs-link-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--border); }
         .hs-link-row:last-child { border-bottom: none; }
         .hs-link-row.keyed { background: var(--live-dim); border-radius: 6px; padding: 7px 8px; border-bottom: none; margin: 2px 0; }
@@ -2005,6 +2037,11 @@
         {% endif %}
         <div id="cards" style="display:contents"></div>
         <div id="camera-cards" style="display:contents"></div>
+        <!-- One card per ASL3 hotspot with DVSwitch enabled -- dynamic
+             (0-N), so unlike every other optional card here it isn't
+             wired into the Card order drag list/computeCardOrders() yet;
+             renders right after the hotspot/camera cards for now. -->
+        <div id="dvswitch-cards" style="display:contents"></div>
     </div>
 </div>
 
@@ -3145,6 +3182,127 @@ function renderCards(data) {
     });
     clearStaleNotifs(data);
     clearStaleTones(data);
+}
+
+// --- DVSwitch card -- one per ASL3 hotspot with dvswitch_enabled, dynamic
+// (0-N), rebuilt from scratch every /api/data poll (same "full re-render,
+// no persisted DOM" shape as renderCards() itself uses for hotspot cards --
+// this doesn't hold a live stream/connection the way camera cards do, so
+// there's no teardown cost to worry about). Not yet wired into the Card
+// order drag list/computeCardOrders() -- see the #dvswitch-cards comment
+// in the template for why.
+function renderDvswitchCards(data) {
+    const container = document.getElementById('dvswitch-cards');
+    const dvsHotspots = data.filter(hs => hs.dvswitch_enabled);
+    if (!dvsHotspots.length) {
+        container.innerHTML = '';
+        return;
+    }
+    container.innerHTML = dvsHotspots.map(hs => dvswitchCardHtml(hs)).join('');
+}
+
+function dvswitchCardHtml(hs) {
+    const bridges = hs.dvswitch_bridges || [];
+    const tunedCount = bridges.filter(b => b.tuned).length;
+    const idleCount  = bridges.length - tunedCount;
+    // "Tuned" reflects ABInfo.json's own last_tune field being present --
+    // NOT a confirmed true link/connect state (see CLAUDE.md), so the
+    // badge/dot language says "tuned"/"idle", never "linked"/"connected".
+    const badgeText = bridges.length
+        ? `${tunedCount} TUNED · ${idleCount} IDLE`
+        : 'NO BRIDGES CONFIGURED';
+    const badgeClass = tunedCount > 0 ? '' : 'idle';
+
+    const bridgeChips = bridges.length
+        ? bridges.map(b => {
+            const stateClass = b.tuned ? 'keyed' : 'idle-link';
+            const desc = b.tuned
+                ? escapeHtml(b.mode ? `${b.mode} — ${b.tuned}` : b.tuned)
+                : 'Not tuned';
+            return `
+                <div class="linked-item ${stateClass}">
+                    <span class="dot"></span>
+                    <div class="info">
+                        <span class="node-num">:${escapeHtml(b.port)}</span>
+                        <span class="desc">${desc}</span>
+                    </div>
+                </div>`;
+        }).join('')
+        : '<div class="hs-empty-note">No bridge ports configured — add one in Settings → Hotspots.</div>';
+
+    const heard = (hs.dvswitch_heard || []).slice(0, 2);
+    const heardHtml = heard.length
+        ? heard.map(h => {
+            const call = h.call || h.dmr_id || '?';
+            const lookupHref = QRZ_ENABLED
+                ? `https://www.qrz.com/db/${encodeURIComponent(call)}`
+                : `https://radioid.net/database/search?callsign=${encodeURIComponent(call)}`;
+            const metaBits = [];
+            if (h.dst) metaBits.push('TG ' + escapeHtml(h.dst));
+            if (h.call && h.dmr_id) metaBits.push(escapeHtml(h.dmr_id));
+            else if (!h.call) metaBits.push('unresolved ID');
+            const agoSec = Math.max(0, Math.floor(Date.now() / 1000 - h.seen_at));
+            return `
+                <div class="hs-talker-row">
+                    <a class="hs-talker-call" href="${lookupHref}" target="_blank" rel="noopener">${escapeHtml(call)}</a>
+                    <span class="hs-talker-meta">${metaBits.join(' · ') || '—'}</span>
+                    <span class="dvs-heard-ago">${fmtAgoCompact(agoSec)} ago</span>
+                </div>`;
+        }).join('')
+        : '<div class="hs-empty-note">No DVSwitch activity logged yet this session.</div>';
+
+    // "software" is a real, confirmed-live detected fallback event, not
+    // just config -- "hardware" means no fallback message was seen, not a
+    // verified-working confirmation; null means no DVSwitch log output was
+    // read at all yet. See models.py's HotspotStatus.dvswitch_vocoder.
+    let vocoderClass = '', vocoderText = 'Vocoder: unknown', vocoderTag = 'no data yet';
+    if (hs.dvswitch_vocoder === 'software') {
+        vocoderClass = 'sw'; vocoderText = 'Software vocoder'; vocoderTag = 'fallback detected';
+    } else if (hs.dvswitch_vocoder === 'hardware') {
+        vocoderClass = 'hw'; vocoderText = 'Hardware AMBE'; vocoderTag = 'no fallback seen';
+    }
+
+    const sparkline = hs.dvswitch_sparkline || [];
+    const sparkSvg = sparkline.length ? sparklineSvg(sparkline) : '';
+
+    return `
+        <div class="metrics-card">
+            <div class="metrics-header">
+                <div class="card-name">📻 DVSwitch — ${escapeHtml(hs.name)}</div>
+                <div class="dvs-badge ${badgeClass}">${badgeText}</div>
+            </div>
+            <div class="dvs-section-title">Bridges (by port)</div>
+            <div class="split-linked">${bridgeChips}</div>
+            <div class="dvs-section-title">Last heard</div>
+            <div>${heardHtml}</div>
+            <div class="dvs-footer">
+                <div class="dvs-vocoder ${vocoderClass}">
+                    <span class="dot"></span>
+                    ${vocoderText} <span class="dvs-vocoder-tag">${vocoderTag}</span>
+                </div>
+                ${sparkSvg}
+            </div>
+        </div>`;
+}
+
+// Small inline-SVG trend line for the DVSwitch card's footer -- real data
+// (storage_activity.dvswitch_sparkline(), the same activity_log rows Fleet
+// Activity's own DVSwitch mode already writes), not decorative. Color
+// matches --danger, the same token FLEET_MODE_COLOR_VARS assigns to
+// DVSwitch in the Fleet Activity bar, so the two visually tie together.
+function sparklineSvg(counts) {
+    const w = 72, h = 20;
+    const max = Math.max(1, ...counts);
+    const step = w / Math.max(1, counts.length - 1);
+    const points = counts.map((c, i) => {
+        const x = (i * step).toFixed(1);
+        const y = (h - 2 - (c / max) * (h - 4)).toFixed(1);
+        return `${x},${y}`;
+    }).join(' ');
+    return `<svg class="dvs-sparkline" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <polyline points="${points}" fill="none" stroke="var(--danger)" stroke-width="1.5"
+                  stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>`;
 }
 
 // --- camera cards (RTSP / Bambu Labs A1) ---
@@ -6270,6 +6428,7 @@ function refresh() {
         .then(r => r.json())
         .then(data => {
             renderCards(data);
+            renderDvswitchCards(data);
             refreshMap();
             // lastApiData is used both by renderAslFavorites() below and
             // by openHotspotDrawer() (card click -> detail drawer) -- kept

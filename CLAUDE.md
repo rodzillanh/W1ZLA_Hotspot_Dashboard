@@ -2828,6 +2828,92 @@ config for per-integration credentials; put it in
     `--danger` (the one token in the "instrument panel" palette not
     already used in this array) rather than inventing a new color.
 
+- **The DVSwitch CARD (v3.67, distinct from the Fleet Activity mode above)
+  turned an "unconfirmed, likely fabricated" finding into a confirmed one
+  -- a real user directly SSH'd into their own device and pasted real,
+  live `Analog_Bridge.log` output, which is a stronger source than
+  anything either research pass before it had found.** That live paste
+  confirmed three things at once: (1) `call=<callsign>` on the `Begin TX:`
+  line IS real (the earlier research had traced it to a suspicious,
+  minutes-old GitHub account and flagged it as likely fabricated -- both
+  can be true: that specific account was still untrustworthy, but the
+  field itself turned out to be real on at least some Analog_Bridge
+  versions); (2) a genuine LIVE vocoder-degradation signal exists at
+  Analog_Bridge startup (`DV3000 not found... (Reset failed)` -> `Using
+  software MBE decoder version 1.2.3`), upgrading what was previously
+  scoped as "config intent only, no live health signal exists" to a real
+  detected-fallback state; (3) `PTT off (keyed for 2527 ms)` lines exist
+  but their correlation to a specific `Begin TX:` event was never
+  confirmed -- deliberately NOT used for a transmission-duration field in
+  this card, since assuming a 1:1 pairing without confirming it would be
+  exactly the kind of unverified inference this project's research
+  discipline exists to avoid. **Lesson**: when a live user capture
+  contradicts an earlier, more heavily-researched-but-secondhand
+  conclusion, the live capture wins -- don't keep treating the secondhand
+  research as more authoritative just because more effort went into it.
+- **`monitor.py`'s DVSwitch parsing now composes THREE distinct SSH
+  sub-commands onto the one existing ASL3 connection** (log tail, a
+  targeted `grep -m1 "Using software"` for the vocoder line, and one
+  `cat /tmp/ABInfo_<port>.json` per configured bridge port), each wrapped
+  in an `echo`'d marker (`config.DVSWITCH_TAIL_MARKER`/`_VOCODER_MARKER`/
+  `_ABINFO_MARKER`) so `_split_dvswitch_sections()` can reliably split one
+  combined command's output back into named sections, rather than
+  guessing by line position the way the simpler Begin-TX-only version
+  (Fleet Activity mode) got away with. The vocoder line needed its OWN
+  `grep` over the whole log file, not just a read of the existing 20-line
+  tail -- the fallback message only ever appears once, at Analog_Bridge
+  process startup, and would scroll out of a short tail almost
+  immediately once any real transmission activity accumulates.
+- **Multi-bridge support (multiple Analog_Bridge instances on one ASL3
+  node, each addressed by its own port) is confirmed real** -- from
+  Analog_Bridge.ini's own `[USRP]` section comment ("make two ini files
+  ... launch each instance with its own ini file") and `dvswitch.sh`'s
+  real source (each instance writes its own `/tmp/ABInfo_<port>.json`).
+  `dvswitch_ports` (hotspots.json) is a comma/newline-separated string,
+  same free-text-then-split convention as `openspot4_extra_pass`
+  elsewhere in this app, not a JSON list -- parsed independently in THREE
+  places that all need to agree (`app.py`'s `/setup` POST handler,
+  `/api/import_backup`, and `monitor.py`'s `_dvswitch_port_list()`), each
+  re-validating digits-only since these are shell-interpolated over SSH.
+- **`last_tune`'s exact idle-state shape (empty string? absent key? a
+  sentinel value?) was NEVER verified against a real device** -- the
+  "tuned"/"idle" bridge-chip distinction only checks truthiness
+  (`b.tuned` in dashboard.html's `dvswitchCardHtml()`), which happens to
+  handle an absent key, `null`, and `""` all correctly as "idle" -- but if
+  a real device turns out to use some other non-empty sentinel (e.g. the
+  literal string `"none"` or `"0"`) for "nothing tuned," this would
+  misreport it as tuned. Re-verify against a real `/tmp/ABInfo_<port>.json`
+  capture before trusting this distinction further, same "confirm against
+  the real thing" discipline as everywhere else in this file -- this is a
+  real, disclosed gap, not an oversight.
+- **`dvswitch_vocoder` is intentionally a 3-state field
+  (`"software"`/`"hardware"`/`None`), not a boolean** -- collapsing
+  `None` (no DVSwitch log output read at all -- Analog_Bridge not
+  running, wrong log path, permission issue) into `"hardware"` would
+  falsely imply a healthy hardware vocoder when the real situation is
+  "no data." `_parse_dvswitch_vocoder()` only returns `None` when BOTH the
+  tail section AND the vocoder-grep section came back empty; if the tail
+  has real content but the grep found no fallback message, that's a
+  genuine (if inherently unprovable-as-positive) "hardware, no fallback
+  seen" result, kept distinct from true "unknown."
+- **The DVSwitch card is NOT yet wired into the Card order drag list /
+  `computeCardOrders()`, unlike every other optional card in this app --
+  a deliberate scope cut, not an oversight.** It's fundamentally a
+  dynamic 0-N list (one card per ASL3 hotspot with `dvswitch_enabled`,
+  which can change any time a hotspot is added/edited), architecturally
+  closer to Cameras' dynamic-list sentinel scheme than to a single
+  toggle-based sentinel card like Fleet Activity -- properly integrating
+  it would mean generalizing `computeCardOrders()`'s sentinels array to
+  accept dynamically-generated entries (not just a fixed `_SENTINEL_DEFS`
+  list) plus a parallel entry in setup.html's Cards-tab drag list and a
+  new per-hotspot position setting, mirroring cameras'
+  `__camera__<id>`/`/api/reorder_cameras` shape. `renderDvswitchCards()`
+  instead just renders every DVSwitch-enabled hotspot's card into its own
+  `#dvswitch-cards` container, positioned right after the hotspot/camera
+  cards in DOM order. If this becomes a real complaint, generalize
+  `computeCardOrders()` properly rather than bolting on a second,
+  parallel special case.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

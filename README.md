@@ -556,6 +556,51 @@ tell them apart — it only sees "this node is keyed," same as any other
 ASL3 monitoring tool (AllScan included). Not something pollable/fixable
 via SSH; a protocol ceiling, not a bug.
 
+## DVSwitch card
+
+A separate, optional card for an ASL3 node that also runs a DVSwitch
+(Analog_Bridge) audio bridge — distinct from the DVSwitch mode on the
+**Fleet Activity** card above; that's just an activity count, this is a
+full status card. Turn it on the same place as the Fleet Activity mode
+(Settings → Hotspots → edit the ASL3 node → "This node also runs DVSwitch
+(Analog_Bridge)"), then list one or more **bridge ports** (comma or
+newline separated — Analog_Bridge supports running multiple instances on
+one node, each identified by its own port). All of this reuses the same
+SSH connection/credentials already configured for that node — no separate
+login or remote-access setup needed.
+
+The card shows:
+
+- **Header badge** — how many configured bridges are currently tuned to
+  something vs. idle.
+- **Bridge chips** — one per configured port, with the talkgroup/reflector
+  it's currently tuned to when tuned. "Tuned" reflects whether
+  Analog_Bridge's own live status file has a value set, not a fully
+  verified connect/link state — see the caveat below.
+- **Last heard** — the two most recent callers heard through any of this
+  node's bridges, with elapsed time. Callsign links go to QRZ if
+  configured, RadioID.net otherwise, same as every other clickable
+  callsign in this app.
+- **Vocoder line** — whether Analog_Bridge is using its hardware AMBE chip
+  or has fallen back to a software vocoder, based on a real log line
+  logged the moment that fallback happens (not just what's configured to
+  be tried).
+- **Sparkline** — a small recent-activity trend, reusing the same logged
+  data the Fleet Activity card's DVSwitch mode already writes.
+
+**Two honest caveats, not hidden anywhere else in this app's docs:**
+Analog_Bridge's own log has no confirmed "transmission ended" line, so
+"Last heard" shows time since a transmission started, not how long it
+lasted. And the exact value Analog_Bridge's status file uses to mean
+"nothing currently tuned" was never confirmed against a real device beyond
+one live test — if a bridge that's actually idle ever shows as tuned (or
+vice versa), that's the mostly likely reason; the underlying status data
+itself is otherwise real, not simulated.
+
+This card isn't yet part of the drag-and-drop **Card order** list the way
+every other optional card is — it always renders right after your hotspot
+cards for now.
+
 ## openSPOT 4 (SharkRF) nodes
 
 A third node type alongside WPSD/Pi-Star and ASL3, added in v3.38 —
