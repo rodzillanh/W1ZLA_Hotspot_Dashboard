@@ -15,6 +15,8 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from collections import deque
 
+import storage_notifications
+
 FEED_URL  = "https://www.hamqsl.com/solarxml.php"
 CACHE_TTL = 3600
 TIMEOUT   = 10
@@ -43,6 +45,12 @@ class HfConditionsClient:
         # elevated, so a multi-hour storm doesn't spam the same alert
         # over and over.
         self._alert_events: deque = deque(maxlen=50)
+        # Reseed from disk so a restart doesn't lose alert history --
+        # appends oldest-to-newest (see _check_alert_transition), so
+        # replaying the oldest-first persisted list through the same
+        # .append() reproduces live insertion order.
+        for payload in storage_notifications.recent("solar", self._alert_events.maxlen):
+            self._alert_events.append(payload)
 
     def get(self, force: bool = False) -> dict | None:
         with self._lock:
@@ -79,9 +87,13 @@ class HfConditionsClient:
         was_elevated = old_k >= KP_ALERT_THRESHOLD
         is_elevated = new_k >= KP_ALERT_THRESHOLD
         if is_elevated and not was_elevated:
-            self._alert_events.append({"kind": "elevated", "k_index": new_k, "at": time.time()})
+            event = {"kind": "elevated", "k_index": new_k, "at": time.time()}
+            self._alert_events.append(event)
+            storage_notifications.log_notification("solar", event["at"], event, self._alert_events.maxlen)
         elif was_elevated and not is_elevated:
-            self._alert_events.append({"kind": "normal", "k_index": new_k, "at": time.time()})
+            event = {"kind": "normal", "k_index": new_k, "at": time.time()}
+            self._alert_events.append(event)
+            storage_notifications.log_notification("solar", event["at"], event, self._alert_events.maxlen)
 
     @staticmethod
     def _fetch() -> dict | None:

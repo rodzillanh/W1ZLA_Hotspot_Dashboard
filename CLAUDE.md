@@ -2672,6 +2672,51 @@ config for per-integration credentials; put it in
   immediately from the last-known poll result whenever the drawer
   re-renders (theme toggle, tab switch, reopen) instead of leaving it
   blank until the next 20s `fetchQsos()` tick happens to land.
+- **Notifications card history now survives a restart (`storage_notifications.py`,
+  new module) -- each of the 5 independent sources (`aprs_inbox.py`,
+  `hamalert.py`, `monitor.py`'s fleet online/offline events, `hf_conditions.py`'s
+  geomagnetic-storm alerts, `brandmeister_lastheard.py`) still owns its own
+  in-memory `deque(maxlen=N)` exactly as before -- this only adds a SQLite-
+  backed shadow copy each source reseeds itself from at construction time,
+  same "own db file, connection-per-call" shape as `storage_activity.py`,
+  kept as a separate file/table since it's a different concern (external
+  notification events, not fleet talker activity).** Deliberately did NOT
+  add one shared "last 25-50 total" cutoff across all five sources --
+  each keeps its OWN existing cap (50 for aprs/hamalert/solar/brandmeister,
+  100 for fleet events) as its own independent SQLite prune limit too, so
+  a chatty source can never crowd out a quiet one's history. Every
+  per-source payload is stored as an opaque JSON blob (`log_notification(source,
+  at, payload, limit)` / `recent(source, limit)`) rather than columns,
+  since the five sources' entry dicts have genuinely different shapes
+  (aprs: `from`/`to`/`message_text`/...; fleet: `ip`/`name`/`kind`/...;
+  etc.) -- a single `source`/`at`/`payload` table avoids either five
+  separate tables or one wide table NULL for four sources out of five on
+  every row. **The seeding order matters and had to match each source's
+  own insertion convention, not just "load them in DB order":**
+  aprs_inbox.py/hamalert.py insert new events via `appendleft()` (newest
+  at index 0), while monitor.py/hf_conditions.py/brandmeister_lastheard.py
+  use plain `append()` (newest at the end, reversed only when read via
+  their own `fleet_events()`/`alert_events()`/`events()` accessors) --
+  `recent()` always returns oldest-first specifically so every caller can
+  replay it through its OWN normal insert method (`appendleft()` for the
+  first two, `append()` for the other three) and land on the exact same
+  final deque state live traffic would have produced, without
+  `storage_notifications.py` itself needing to know which convention any
+  given source uses. `log_notification()`/`recent()` both swallow every
+  exception and return silently (`None`/`[]`) rather than raising --
+  `_record_fleet_event()`/`_check_alert_transition()` are called with
+  their module's own lock already held (documented in their own
+  docstrings), and a DB hiccup must never turn into a stuck lock or a
+  crashed listener thread, same degrade-gracefully contract as every
+  other integration in this project. One accepted, deliberate gap:
+  `brandmeister_lastheard.py`'s `_seen_sessions` dedupe cache (which
+  SessionIDs have already been recorded, to survive Brandmeister's own
+  periodic event rebroadcast) is NOT persisted -- only the `_events`
+  history is. A restart resets that dedupe window, so a still-ongoing
+  session's rebroadcast could in principle produce one duplicate row
+  right after a restart; this is a cosmetic/minor gap (an extra row, not
+  lost data) not worth the added complexity of persisting a second,
+  purely-internal cache alongside the user-visible one.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

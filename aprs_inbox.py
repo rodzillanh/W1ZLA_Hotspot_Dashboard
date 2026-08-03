@@ -59,6 +59,8 @@ from collections import deque
 
 import aprslib
 
+import storage_notifications
+
 APRS_IS_HOST = "rotate.aprs2.net"
 APRS_IS_PORT = 14580
 MAX_MESSAGES = 50
@@ -97,6 +99,12 @@ class AprsInbox:
         self._messages = deque(maxlen=MAX_MESSAGES)
         self._acked = deque(maxlen=200)  # (from, msgNo) pairs already acked, dedupes retries
         self._thread = None
+        # Reseed from disk so a restart doesn't lose message history --
+        # oldest-first replay through the same appendleft() a live message
+        # uses reproduces the exact newest-first deque state live traffic
+        # would have built up (see storage_notifications.recent()).
+        for payload in storage_notifications.recent("aprs", MAX_MESSAGES):
+            self._messages.appendleft(payload)
 
     @property
     def enabled(self) -> bool:
@@ -197,13 +205,15 @@ class AprsInbox:
                 return
             if msg_no:
                 self._acked.append(dedupe_key)
-            self._messages.appendleft({
+            entry = {
                 "from": sender,
                 "to": addresse,  # which specific SSID this was addressed to -- may differ from the base callsign
                 "message_text": msg_text,
                 "received_at": time.time(),
                 "acked": bool(msg_no),
-            })
+            }
+            self._messages.appendleft(entry)
+            storage_notifications.log_notification("aprs", entry["received_at"], entry, MAX_MESSAGES)
 
         if msg_no:
             # Ack FROM the exact SSID the message was addressed to, not the

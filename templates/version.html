@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
+                <span class="release-version">v3.65 "Bennington"</span>
+                <span class="release-date">August 2026</span>
+                <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Notifications card history survives a restart</span> — APRS Messages, HamAlert, fleet online/offline events, geomagnetic-storm alerts, and Brandmeister favorite activity now each keep their recent history in a small local database instead of only in memory, so an update/reboot/container recreate doesn't wipe what you'd already seen. Each source keeps its own existing cap (50, or 100 for fleet events) — a busy source can't crowd out a quiet one</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
                 <span class="release-version">v3.64 "Berry"</span>
                 <span class="release-date">July 2026</span>
-                <span class="release-tag">current</span>
             </div>
             <ul class="change-list">
                 <li><span>Map decluttered further</span> — the "Import ADIF log" control (upload, stats, "show on map", clear) moved off the Live map itself and into Quick Settings' "Live map" section, next to the style/overlay toggles it already lives beside there</li>

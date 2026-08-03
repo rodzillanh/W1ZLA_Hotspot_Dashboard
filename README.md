@@ -867,6 +867,13 @@ show) — click a pill to isolate that source's rows, click it again to go
 back to showing everything. Each row is also tagged with a small icon so
 the source stays visible even when showing all of them together.
 
+**History survives a restart** — each source keeps its own recent history
+(50 entries for APRS/HamAlert/geomagnetic alerts/Brandmeister favorites,
+100 for fleet online/offline events) in a small local database, not just
+in memory, so restarting the dashboard (an update, a reboot, a container
+recreate) doesn't wipe out what you'd already seen. Each source's history
+is capped independently — a busy source can't crowd out a quiet one.
+
 **APRS Messages** (Settings → Cards → "Show APRS Messages card", off by
 default) — the receiving half of APRS favorite alerts above: a persistent
 APRS-IS connection, logged in as the same callsign already set for

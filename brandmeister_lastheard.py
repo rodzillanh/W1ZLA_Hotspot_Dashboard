@@ -65,6 +65,7 @@ from collections import deque
 import websocket  # websocket-client, already a project dependency (see openspot.py)
 
 from storage import favorites_set
+import storage_notifications
 
 WS_URL = "wss://ws.brandmeister.network/lh/socket.io/?EIO=4&transport=websocket"
 RECV_TIMEOUT = 40  # comfortably above the handshake's own ~20-25s pingInterval
@@ -87,6 +88,12 @@ class BrandmeisterLastHeardListener:
         self._last_error: "str | None" = None
         self._events: deque = deque(maxlen=MAX_EVENTS)
         self._seen_sessions: deque = deque(maxlen=SEEN_SESSIONS_MAX)
+        # Reseed from disk so a restart doesn't lose event history --
+        # appends oldest-to-newest (see _handle_event), so replaying the
+        # oldest-first persisted list through the same .append()
+        # reproduces live insertion order.
+        for payload in storage_notifications.recent("brandmeister", MAX_EVENTS):
+            self._events.append(payload)
 
     def configure(self, enabled: bool) -> None:
         with self._lock:
@@ -180,13 +187,15 @@ class BrandmeisterLastHeardListener:
                     if session_id in self._seen_sessions:
                         return
                     self._seen_sessions.append(session_id)
-                self._events.append({
+                event = {
                     "callsign": source_call,
                     "name": data.get("SourceName") or None,
                     "destination_id": data.get("DestinationID"),
                     "destination_name": data.get("DestinationName") or None,
                     "link_type_name": data.get("LinkTypeName") or None,
                     "at": time.time(),
-                })
+                }
+                self._events.append(event)
         except Exception:
-            pass
+            return
+        storage_notifications.log_notification("brandmeister", event["at"], event, MAX_EVENTS)

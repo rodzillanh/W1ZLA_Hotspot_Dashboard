@@ -65,6 +65,8 @@ import threading
 import time
 from collections import deque
 
+import storage_notifications
+
 HAMALERT_HOST = "hamalert.org"
 HAMALERT_PORT = 7300
 MAX_ALERTS = 50          # ring buffer size -- same magnitude as aprs_inbox.py's own recent-messages cap
@@ -90,6 +92,10 @@ class HamAlertListener:
         self._connected = False
         self._last_alert_at = None
         self._last_error = None
+        # Reseed from disk so a restart doesn't lose alert history --
+        # same oldest-first replay through appendleft() as aprs_inbox.py.
+        for payload in storage_notifications.recent("hamalert", MAX_ALERTS):
+            self._alerts.appendleft(payload)
 
     def configure(self, enabled: bool, username: str, password: str) -> None:
         username = (username or "").strip()
@@ -264,3 +270,4 @@ class HamAlertListener:
         with self._lock:
             self._alerts.appendleft(alert)
             self._last_alert_at = alert["received_at"]
+        storage_notifications.log_notification("hamalert", alert["received_at"], alert, MAX_ALERTS)

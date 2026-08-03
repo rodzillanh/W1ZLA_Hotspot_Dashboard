@@ -17,6 +17,7 @@ from aprs import AprsClient
 from brandmeister import BrandmeisterClient
 from aslstats import AslStatsClient
 import storage_activity
+import storage_notifications
 
 
 class FleetMonitor:
@@ -41,6 +42,12 @@ class FleetMonitor:
         # same in-memory-only pattern as aprs_inbox.py's _messages -- these
         # don't need to survive a restart.
         self._fleet_events: deque = deque(maxlen=100)
+        # Reseed from disk so a restart doesn't lose this history -- fleet
+        # events append oldest-to-newest (unlike aprs/hamalert's
+        # appendleft), so replaying the oldest-first persisted list
+        # through the same .append() reproduces live insertion order.
+        for payload in storage_notifications.recent("fleet", self._fleet_events.maxlen):
+            self._fleet_events.append(payload)
 
     # --- public API ---
 
@@ -387,8 +394,18 @@ class FleetMonitor:
     def _record_fleet_event(self, ip: str, name: str, kind: str) -> None:
         """Appends one online/offline transition event. Caller must
         already hold self._lock -- this is a plain (non-reentrant)
-        threading.Lock, so this method never acquires it itself."""
-        self._fleet_events.append({"ip": ip, "name": name, "kind": kind, "at": time.time()})
+        threading.Lock, so this method never acquires it itself.
+
+        Persists to storage_notifications too, so a restart doesn't lose
+        this history -- called inline here (briefly under self._lock)
+        rather than restructuring the 4 call sites to persist after
+        releasing it, same "infrequent event, cheap enough to do inline"
+        reasoning storage_activity.log_activity() already uses for its
+        own inline prune. log_notification() never raises, so this can't
+        turn a transient DB hiccup into a held/corrupted fleet lock."""
+        event = {"ip": ip, "name": name, "kind": kind, "at": time.time()}
+        self._fleet_events.append(event)
+        storage_notifications.log_notification("fleet", event["at"], event, self._fleet_events.maxlen)
 
     def _record_failure(self, ip: str) -> None:
         with self._lock:
