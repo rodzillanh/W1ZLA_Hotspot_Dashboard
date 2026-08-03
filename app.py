@@ -703,6 +703,10 @@ def setup():
             # -- validate digits-only here too, since /setup has no auth.
             if asl_node.isdigit():
                 new_hotspot["asl_node"] = asl_node
+            # DVSwitch (Analog_Bridge) is an optional add-on many ASL3 nodes
+            # don't run -- opt-in, same "absent means off" checkbox
+            # convention as "enabled" above, not assumed from asl_node alone.
+            new_hotspot["dvswitch_enabled"] = "dvswitch_enabled" in request.form
         elif node_type == "openspot4":
             new_hotspot["type"] = "openspot4"
             # "pass" (already set unconditionally above) is the primary

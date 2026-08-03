@@ -5836,7 +5836,11 @@ const FLEET_LINE_DASHES  = [[], [6, 3], [2, 2], [8, 3, 2, 3], [1, 3]];
 // each other, and sharing colors made it look like the chart was plotting
 // by mode instead of by hotspot (especially with the chart's own legend
 // hidden, leaving only the mode legend visible as a color key).
-const FLEET_MODE_COLOR_VARS     = ['--accent', '--link', '--caution', '--fav-color', '--text-dim'];
+// 6th entry (--danger) added for DVSwitch -- FLEET_MODE_COLOR_VARS is
+// indexed positionally (mode_breakdown[i] % length), so a 6th mode with no
+// 6th color would silently land back on index 0 and collide with
+// whichever mode is currently busiest, not necessarily DMR.
+const FLEET_MODE_COLOR_VARS     = ['--accent', '--link', '--caution', '--fav-color', '--text-dim', '--danger'];
 const FLEET_HOTSPOT_COLOR_VARS  = ['--link', '--fav-color', '--accent', '--text-dim', '--caution'];
 // Past this many individual lines, the 5-color x 5-dash palette repeats and
 // the legend gets hard to scan -- the rest get folded into one "Other" line.

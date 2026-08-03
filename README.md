@@ -1316,7 +1316,8 @@ dashboard showing:
 - **Last activity** — how long ago and which hotspot last had a call,
   live-updating the same way the per-card "last heard" timers do.
 - **Mode breakdown** — a stacked bar + legend showing the share of
-  transmissions by mode (DMR/D-Star/YSF/P25/NXDN) over the selected time span.
+  transmissions by mode (DMR/D-Star/YSF/P25/NXDN, plus DVSwitch if
+  enabled — see below) over the selected time span.
 - **Activity chart** — a line chart of transmission counts over the selected
   time span, toggleable between **Per-hotspot** (one line per hotspot that
   had any activity in the window) and **Aggregate** (summed across the fleet).
@@ -1336,6 +1337,19 @@ automatically on each write — the table doesn't grow unbounded, and
 switching to a longer span never comes up empty because older rows were
 already pruned for the previous, shorter default. Turning the toggle off
 stops new writes but doesn't delete the existing `activity.db` file.
+
+**DVSwitch (Analog_Bridge)** — an ASL3 (AllStarLink) hotspot that also
+runs a DVSwitch bridge can opt in per-node (Settings → Hotspots → edit
+that node → "This node also runs DVSwitch (Analog_Bridge)") to add
+DVSwitch as a 6th mode in the breakdown above, sourced by tailing
+Analog_Bridge's own log (`/var/log/dvswitch/Analog_Bridge.log`) over the
+same SSH connection already used for that node's AllStarLink status —
+no separate connection or credentials needed. One caveat worth knowing:
+every other mode counts a *completed* transmission, but DVSwitch counts
+a *newly started* one instead — Analog_Bridge's log doesn't have a
+confirmed end-of-transmission line to detect completion from, so this is
+a deliberate, disclosed difference in what's being counted for this mode
+specifically, not a bug.
 
 ## Talkgroup / reflector display
 

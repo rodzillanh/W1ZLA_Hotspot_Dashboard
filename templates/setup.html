@@ -1266,7 +1266,7 @@
             <div class="drag-row" style="align-items:center">
                 <span style="flex-shrink:0{{ ';opacity:.5' if not hs.get('enabled', True) else '' }}">📡</span>
                 <span class="node-name"{{ ' style="opacity:.5"'|safe if not hs.get('enabled', True) else '' }}>{{ hs.name }}</span>
-                <span class="node-meta"{{ ' style="opacity:.5"'|safe if not hs.get('enabled', True) else '' }}>{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else (' · openSPOT4' if hs.get('type') == 'openspot4' else '') }}</span>
+                <span class="node-meta"{{ ' style="opacity:.5"'|safe if not hs.get('enabled', True) else '' }}>{{ hs.ip }}{{ ' · ASL' if hs.get('type') == 'asl3' else (' · openSPOT4' if hs.get('type') == 'openspot4' else '') }}{{ ' + DVSwitch' if hs.get('type') == 'asl3' and hs.get('dvswitch_enabled', False) else '' }}</span>
                 {% if not hs.get('enabled', True) %}<span class="badge">Disabled</span>{% endif %}
                 <form action="/api/toggle_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
                     <button class="btn btn-sm {{ 'btn-primary' if not hs.get('enabled', True) else 'btn-info' }}" type="submit">{{ 'Enable' if not hs.get('enabled', True) else 'Disable' }}</button>
@@ -1278,7 +1278,8 @@
                         data-asl-node="{{ hs.get('asl_node', '') }}"
                         data-openspot4-extra-pass="{{ hs.get('openspot4_extra_pass', '') }}"
                         data-enabled="{{ hs.get('enabled', True) }}"
-                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.openspot4ExtraPass, this.dataset.enabled)">
+                        data-dvswitch-enabled="{{ hs.get('dvswitch_enabled', False) }}"
+                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.dvswitchEnabled)">
                     Edit
                 </button>
                 <form action="/api/delete_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
@@ -1339,6 +1340,13 @@
                      <span style="font-size:10px;color:var(--text-dim)">(this node's own AllStarLink node number)</span>
                  </label>
                  <input type="text" id="hs-aslnode" placeholder="e.g. 59929"></div>
+            <div style="display:flex;align-items:flex-end">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="hs-dvswitch-enabled">
+                    This node also runs DVSwitch (Analog_Bridge)
+                    <span style="font-size:10px;color:var(--text-dim)">(adds a 6th "DVSwitch" mode to the Fleet Activity card)</span>
+                </label>
+            </div>
         </div>
         <div class="form-grid" style="margin-bottom:10px;display:none" id="hs-openspot4-fields">
             <div style="grid-column:1/-1;font-size:12px;color:var(--text-dim);margin-bottom:8px">
@@ -1371,6 +1379,7 @@
                 <input type="hidden" name="asl_node" id="form-aslnode">
                 <input type="hidden" name="openspot4_extra_pass" id="form-openspot4-extra-pass">
                 <input type="checkbox" name="enabled" id="form-enabled" style="display:none">
+                <input type="checkbox" name="dvswitch_enabled" id="form-dvswitch-enabled" style="display:none">
                 <button class="btn btn-primary" onclick="submitHotspot(event)">Save hotspot</button>
             </form>
             <button class="btn btn-danger btn-sm" onclick="clearHotspotForm()" style="margin-left:auto">Clear</button>
@@ -2087,9 +2096,10 @@ function submitHotspot(e) {
     document.getElementById('form-aslnode').value = document.getElementById('hs-aslnode').value;
     document.getElementById('form-openspot4-extra-pass').value = document.getElementById('hs-openspot4-extra-pass').value;
     document.getElementById('form-enabled').checked = document.getElementById('hs-enabled-toggle').classList.contains('on');
+    document.getElementById('form-dvswitch-enabled').checked = document.getElementById('hs-dvswitch-enabled').checked;
 }
 
-function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, openspot4ExtraPass, enabled) {
+function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, openspot4ExtraPass, enabled, dvswitchEnabled) {
     document.getElementById('hs-name').value    = name;
     document.getElementById('hs-ip').value      = ip;
     document.getElementById('hs-orig-ip').value = ip;
@@ -2102,6 +2112,7 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, opensp
     document.getElementById('hs-aslnode').value = (aslNode && aslNode !== 'None') ? aslNode : '';
     document.getElementById('hs-openspot4-extra-pass').value = (openspot4ExtraPass && openspot4ExtraPass !== 'None') ? openspot4ExtraPass : '';
     document.getElementById('hs-enabled-toggle').classList.toggle('on', enabled !== 'False');
+    document.getElementById('hs-dvswitch-enabled').checked = dvswitchEnabled === 'True';
     onHotspotTypeChange();
     resetHsPasswordVisibility();
     document.getElementById('hotspot-form-title').textContent = 'Edit hotspot';
@@ -2113,6 +2124,7 @@ function clearHotspotForm() {
     ['hs-name','hs-ip','hs-orig-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-openspot4-extra-pass'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('hs-type').value = 'wpsd';
     document.getElementById('hs-enabled-toggle').classList.add('on');
+    document.getElementById('hs-dvswitch-enabled').checked = false;
     onHotspotTypeChange();
     resetHsPasswordVisibility();
     document.getElementById('hotspot-form-title').textContent = 'Add hotspot';

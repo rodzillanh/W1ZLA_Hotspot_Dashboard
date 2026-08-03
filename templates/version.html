@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.65 "Bennington"</span>
+                <span class="release-version">v3.66 "Staley"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>DVSwitch (Analog_Bridge) as a 6th Fleet Activity mode</span> — an ASL3 hotspot that also runs a DVSwitch bridge can opt in per-node (Settings → Hotspots) to include its bridge traffic in the mode-breakdown bar, sourced over the same SSH connection already used for that node's AllStarLink status, no separate connection needed. One disclosed caveat: unlike DMR/D-Star/YSF/P25/NXDN, DVSwitch counts a newly-started transmission rather than a completed one, since Analog_Bridge's own log has no confirmed end-of-transmission line to detect completion from</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.65 "Bennington"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Notifications card history survives a restart</span> — APRS Messages, HamAlert, fleet online/offline events, geomagnetic-storm alerts, and Brandmeister favorite activity now each keep their recent history in a small local database instead of only in memory, so an update/reboot/container recreate doesn't wipe what you'd already seen. Each source keeps its own existing cap (50, or 100 for fleet events) — a busy source can't crowd out a quiet one</li>

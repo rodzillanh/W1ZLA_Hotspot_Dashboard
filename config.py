@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.65"
+APP_VERSION = "3.66"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -29,6 +29,7 @@ VERSION_CODENAMES = [
     "Cocker",           # v3.63 -- Joe Cocker (1944-2014)
     "Berry",            # v3.64 -- Chuck Berry (1926-2017)
     "Bennington",       # v3.65 -- Chester Bennington (1976-2017)
+    "Staley",           # v3.66 -- Layne Staley (1967-2002)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -89,7 +90,30 @@ SSH_STATUS_CMD = (
 )
 
 
-def build_asl_status_cmd(node: str) -> str:
+# DVSwitch (Analog_Bridge) bridge traffic, as an opt-in 6th mode alongside
+# DMR/D-Star/YSF/P25/NXDN on the Fleet Activity card -- confirmed real via
+# Analog_Bridge's own shipped systemd unit + logrotate config (not guessed):
+# `Environment=AnalogBridgeLogDir=/var/log/dvswitch` in analog_bridge.service,
+# and the logrotate config's own path confirms the resulting filename.
+# `Analog_Bridge.ini` itself has NO `[Log]` section despite the name --
+# only a bare `logLevel` under `[GENERAL]`; the sibling MMDVM_Bridge.ini
+# does have a real `[Log]` section, a different component. 20 lines is
+# generous for the default 5s poll interval, same reasoning as
+# DIGIPI_LOG_TAIL_LINES above.
+DVSWITCH_LOG_PATH        = "/var/log/dvswitch/Analog_Bridge.log"
+DVSWITCH_LOG_TAIL_LINES  = 20
+# The ONE DVSwitch log line format actually confirmed real (a directly
+# quoted example from a real GitHub issue, DVSwitch/Analog_Bridge#5):
+# "Begin TX: src=9268283 rpt=26045440 dst=40 slot=2 cc=1 metadata=..."
+# There is NO confirmed end-of-transmission line for DVSwitch (unlike every
+# other mode's END_OF_TRANSMISSION_MARKERS above) -- monitor.py logs one
+# Fleet Activity row per NEWLY SEEN start line instead of per completed
+# transmission, a real disclosed asymmetry, not an oversight. See
+# CLAUDE.md for the full research trail before touching this.
+DVSWITCH_BEGIN_TX_PATTERN = r"Begin TX:"
+
+
+def build_asl_status_cmd(node: str, dvswitch_enabled: bool = False) -> str:
     """SSH command for an ASL3 (AllStarLink) hotspot: same generic Linux
     temp/uptime/CPU as WPSD, plus `rpt xnode` -- which dumps app_rpt's
     dialplan variables, including RPT_ALINKS (per-linked-node keyed state,
@@ -107,10 +131,24 @@ def build_asl_status_cmd(node: str) -> str:
     `node` is interpolated into a shell string executed on the remote host,
     so the caller MUST validate it's digits-only first (see app.py's /setup
     handler) -- this re-validates defensively since /setup has no auth.
+
+    `dvswitch_enabled` appends a tail of DVSwitch's (Analog_Bridge) own log
+    onto this SAME one-shot SSH command/connection -- `_ssh_exec()` opens a
+    fresh connection, runs one command, and closes it every poll tick, with
+    no persistent session to attach a second command to, so this has to be
+    one more `;`-chained clause, not a separate call. Log path/directory
+    confirmed from Analog_Bridge's own real systemd unit and logrotate
+    config (`AnalogBridgeLogDir=/var/log/dvswitch`, no `[Log]` section in
+    Analog_Bridge.ini itself despite the name suggesting one) -- see
+    CLAUDE.md for the full research trail and its real, disclosed gaps
+    (no confirmed end-of-transmission line, unlike every other mode here).
     """
     if not node.isdigit():
         raise ValueError(f"invalid ASL node number: {node!r}")
-    return _LINUX_HOST_STATS_CMD + f'sudo asterisk -rx "rpt xnode {node}"'
+    cmd = _LINUX_HOST_STATS_CMD + f'sudo asterisk -rx "rpt xnode {node}"'
+    if dvswitch_enabled:
+        cmd += f"; tail -n {DVSWITCH_LOG_TAIL_LINES} {DVSWITCH_LOG_PATH} 2>/dev/null"
+    return cmd
 
 
 # DigiPi (KM6LYW's Raspberry Pi ham radio data hotspot) -- Direwolf isn't a

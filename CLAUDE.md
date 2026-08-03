@@ -2718,6 +2718,116 @@ config for per-integration credentials; put it in
   lost data) not worth the added complexity of persisting a second,
   purely-internal cache alongside the user-visible one.
 
+- **DVSwitch (Analog_Bridge) support on the Fleet Activity card was
+  investigated and built against a hard real constraint: DVSwitch's own
+  repos are closed-source, binary-only distributions -- confirmed live
+  via a real GitHub issue thread (`DVSwitch/Analog_Bridge#16`, someone
+  else asking the same question), NOT assumed from the repo just "looking
+  small."** `github.com/DVSwitch/Analog_Bridge`/`MMDVM_Bridge`/
+  `Analog_Reflector` are filesystem-mirror trees (default branch literally
+  named `bookworm`) of shipped `.ini`/`.sh`/systemd files plus precompiled
+  `bin/Analog_Bridge.{amd64,arm64,armhf,i386}` binaries -- no C++ source
+  to grep for log format strings the way this project's other
+  reverse-engineering efforts (openspot.py, digipi.py) could lean on.
+  Every fact below came from real shipped config/script files or real
+  third-party quotes, same "verify against the real thing" discipline as
+  everywhere else in this file -- and where that search came up empty,
+  the gap is disclosed here rather than papered over with a guess.
+  - **First, an important premise correction, found only by actually
+    reading the existing Fleet Activity code before proposing anything**:
+    there is NO existing per-mode, per-time-bucket stacked series --
+    what reads as "5 stacked modes" is `renderModeBreakdown()`'s single
+    horizontal bar, sized by each mode's % SHARE OF THE WHOLE WINDOW (no
+    x-axis at all), completely separate from the Chart.js line chart
+    (which plots aggregate-or-per-hotspot, never per-mode). DVSwitch was
+    added to the existing whole-window bar (the smaller of two possible
+    scopes, confirmed with the user before building) -- the Chart.js line
+    chart is untouched by this feature entirely.
+  - **`Analog_Bridge.ini` has NO `[Log]` section despite the name
+    suggesting one** -- confirmed by fetching the real file directly.
+    Logging level is a bare `logLevel` key under `[GENERAL]`; the log
+    DIRECTORY comes from an env var, `AnalogBridgeLogDir`, set in the
+    real shipped `systemd/analog_bridge.service` unit
+    (`Environment=AnalogBridgeLogDir=/var/log/dvswitch`), with the
+    resulting filename (`Analog_Bridge.log`) confirmed via the repo's own
+    `logrotate/Analog_Bridge` config. `config.DVSWITCH_LOG_PATH` hardcodes
+    this confirmed default (`/var/log/dvswitch/Analog_Bridge.log`) rather
+    than adding a per-hotspot override field -- same tradeoff already
+    made for DigiPi's `/run/direwolf.log`, accepting that a
+    nonstandard install (customized `AnalogBridgeLogDir`) won't work
+    without code changes, rather than adding config surface for a case
+    with no reported need yet.
+  - **The sibling `MMDVM_Bridge.ini` DOES have a real `[Log]` section**
+    (`DisplayLevel`/`FileLevel`/`FilePath`/`FileRoot`) -- a different
+    component (the network/TG-facing bridge, not the audio bridge this
+    feature reads from) with a different, MMDVMHost-style log config.
+    Don't confuse the two if this is ever extended to read MMDVM_Bridge
+    instead/also.
+  - **Only ONE DVSwitch log line format was ever confirmed real** -- a
+    directly-quoted `Begin TX: src=9268283 rpt=26045440 dst=40 slot=2
+    cc=1 metadata=26045499` from a real GitHub issue
+    (`DVSwitch/Analog_Bridge#5`). No end-of-transmission line, no bridge
+    connect/disconnect line, and no talkgroup/reflector-change line were
+    found anywhere after a genuine search (GitHub issue search, forum
+    search, blog search) -- none of these were fabricated to fill the
+    gap. **This is why DVSwitch activity is counted differently from
+    every other mode on this card**: DMR/D-Star/YSF/P25/NXDN all log one
+    Fleet Activity row on the END of a transmission (a start→end
+    transition detected by `config.END_OF_TRANSMISSION_MARKERS`);
+    DVSwitch, with no confirmed end marker, instead logs one row every
+    time `monitor.py`'s `_check_dvswitch_tx()` sees a NEW `Begin TX:`
+    line that's different from the last one recorded for that hotspot
+    (tracked in `FleetMonitor._dvswitch_last_tx`, an in-memory-only dict,
+    not persisted -- losing it on restart just means the very next poll's
+    already-seen line gets counted once more, a one-time cosmetic
+    over-count, not lost data). If DVSwitch's log format is ever
+    confirmed to include a real end-of-transmission line (re-verify
+    against a real device/log capture, not another web search), switching
+    to a start→end transition the way every other mode works would be a
+    real improvement worth making -- don't assume today's design is
+    final, it's an explicitly disclosed compromise forced by a real gap
+    in available information, not a preference.
+  - **A live JSON status file, `/tmp/ABInfo_<port>.json`, was found via
+    DVSwitch's own real `dvswitch.sh` control script source** (confirmed
+    real fields: `last_tune`, `tlv.ambe_mode`, `tlv.rx_port`/`tx_port`,
+    `digital.ts`, `mute`) as a materially more reliable alternative to
+    log-tailing -- offered to the user as the recommended option
+    (poll-and-diff the JSON, same transition-detection shape ASL3's own
+    `RPT_ALINKS` keyed-state parsing already uses) but NOT what was
+    built; the user explicitly chose the log-tail approach instead,
+    accepting its disclosed TX-start-only limitation. If DVSwitch
+    activity tracking is ever revisited, re-evaluate `/tmp/ABInfo_*.json`
+    polling as the stronger option -- its reachability/permissions from
+    an SSH session were never actually confirmed live, so that would need
+    checking first, but the field shapes themselves are real and sourced,
+    unlike the never-found end-of-transmission log line.
+  - **`dvswitch_enabled` (per-hotspot, ASL3 only, default `False`) is a
+    genuine opt-in, not inferred from `asl_node` being set** -- DVSwitch/
+    Analog_Bridge is an optional add-on most ASL3 installs don't run.
+    Follows the exact same "absent means off" checkbox convention as the
+    existing `enabled` field (`app.py`'s hotspot POST handler: `"enabled"
+    in request.form`), and the exact same visible-field/hidden-form-field
+    sync shape `setup.html` already uses for `asl_node`
+    (`hs-dvswitch-enabled` -> `form-dvswitch-enabled` in
+    `submitHotspot()`, restored in `editHotspot()`). No new validation
+    needed on import (`/api/import_backup`) -- unlike `asl_node`, a plain
+    bool isn't shell-interpolated, so it needs no digits-only check.
+  - **`config.build_asl_status_cmd()`'s new `dvswitch_enabled` param
+    appends the log tail onto the SAME one-shot SSH command string**
+    (`; tail -n 20 ...`), not a second connection -- confirmed from
+    `monitor.py`'s own `_ssh_exec()` that every poll opens a fresh
+    connection, runs exactly one command, and closes it immediately, with
+    no persistent session for a second command to attach to. This is the
+    same shape `rpt xnode` itself already uses alongside the shared
+    temp/uptime/CPU one-liner (`_LINUX_HOST_STATS_CMD`).
+  - **`FLEET_MODE_COLOR_VARS` needed a real 6th entry, not just "add
+    DVSwitch to the loop and it'll work"** -- it's indexed positionally
+    (`mode_breakdown[i] % length`), so a 6th mode with only 5 colors
+    would silently wrap back to index 0 and collide with whichever mode
+    happens to be busiest in the window, not necessarily DMR. Added
+    `--danger` (the one token in the "instrument panel" palette not
+    already used in this array) rather than inventing a new color.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

@@ -35,6 +35,16 @@ class FleetMonitor:
         self._aprs          = AprsClient("")
         self._brandmeister  = BrandmeisterClient()
         self._aslstats      = AslStatsClient()
+        # Last-seen DVSwitch "Begin TX:" line per hotspot ip -- there's no
+        # confirmed end-of-transmission line for DVSwitch (see
+        # config.DVSWITCH_BEGIN_TX_PATTERN), so a Fleet Activity row is
+        # logged when this changes (a new start seen), not on completion
+        # the way every other mode is. In-memory only, same as
+        # self._failures -- losing this on restart just means the next
+        # poll's first "Begin TX" line (even if actually already logged
+        # before restart) gets counted once more, a one-time, cosmetic
+        # over-count, not worth persisting for.
+        self._dvswitch_last_tx: dict[str, str] = {}
         # Fleet online/offline transition log for the Notifications card --
         # NOT a new poll/connection, just an event appended at the exact
         # moments _record_failure()/the success paths below already flip
@@ -303,10 +313,11 @@ class FleetMonitor:
             self._record_failure(ip)
 
     def _check_one_asl3(self, hotspot: dict) -> None:
-        ip   = hotspot["ip"]
-        node = hotspot.get("asl_node", "")
+        ip       = hotspot["ip"]
+        node     = hotspot.get("asl_node", "")
+        dvswitch = hotspot.get("dvswitch_enabled", False)
         try:
-            cmd = config.build_asl_status_cmd(node)
+            cmd = config.build_asl_status_cmd(node, dvswitch_enabled=dvswitch)
             output = self._ssh_exec(hotspot, cmd, config.SSH_TIMEOUT).splitlines()
             updates = self._parse_asl_output(ip, node, output)
             with self._lock:
@@ -317,8 +328,34 @@ class FleetMonitor:
                 if status.offline_since is not None:
                     self._record_fleet_event(ip, status.name, "online")
                 status.offline_since = None
+            if dvswitch:
+                self._check_dvswitch_tx(ip, output)
         except Exception:
             self._record_failure(ip)
+
+    def _check_dvswitch_tx(self, ip: str, output: list[str]) -> None:
+        """Scans the DVSwitch (Analog_Bridge) log tail appended onto this
+        hotspot's SSH output (see config.build_asl_status_cmd's
+        dvswitch_enabled param) for the one confirmed-real DVSwitch log
+        line, "Begin TX: ...". There's no confirmed end-of-transmission
+        line for DVSwitch the way every other mode has one (see
+        config.DVSWITCH_BEGIN_TX_PATTERN's own comment) -- so this logs one
+        Fleet Activity row per NEWLY SEEN start line (different from the
+        last one recorded for this hotspot), not per completed
+        transmission. A real, disclosed difference in what's being
+        counted for this mode specifically, not a hidden shortcut."""
+        last_tx_line = None
+        for line in output:
+            if re.search(config.DVSWITCH_BEGIN_TX_PATTERN, line):
+                last_tx_line = line.strip()
+        if last_tx_line is None:
+            return
+        with self._lock:
+            if self._dvswitch_last_tx.get(ip) == last_tx_line:
+                return
+            self._dvswitch_last_tx[ip] = last_tx_line
+            name = self._data[ip].name
+        storage_activity.log_activity(ip, name, "DVSwitch")
 
     def _check_one_openspot4(self, hotspot: dict) -> None:
         """openspot.py's persistent WebSocket worker pushes live field
