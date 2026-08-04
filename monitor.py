@@ -467,22 +467,28 @@ class FleetMonitor:
 
     @staticmethod
     def _parse_dvswitch_vocoder(sections: dict[str, list[str]]) -> str | None:
-        """"software" only when the confirmed-real fallback message is
-        actually seen ("Using software MBE decoder..." -- see
-        config.DVSWITCH_SOFTWARE_FALLBACK_PATTERN's own comment for why
-        there's no confirmed positive "hardware working" message to key
-        off instead). "hardware" means "no fallback message seen," not a
-        verified-working hardware confirmation. None means no DVSwitch log
-        output was read at all (both sections empty) -- e.g. Analog_Bridge
-        isn't running or the log path is wrong -- kept distinct from
-        "hardware" so the card can show "unknown" rather than falsely
-        implying a healthy hardware vocoder."""
+        """Both "software" and "hardware" are now confirmed-real, directly
+        detected log messages (see config.DVSWITCH_HARDWARE_VOCODER_PATTERN/
+        DVSWITCH_SOFTWARE_FALLBACK_PATTERN's own comments) -- "hardware" is
+        no longer just "absence of a fallback message," it's a genuine
+        positive match on "Using hardware AMBE vocoder". The SSH command's
+        own grep already resolves the "log has both an older fallback line
+        and a newer success line from a later restart" case (`tail -1`
+        picks the most recent), so this only ever needs to look at the
+        single line that made it through. None means no DVSwitch log
+        output was read at all (both sections empty, e.g. Analog_Bridge
+        isn't running / wrong log path) OR a non-empty vocoder section that
+        somehow matched neither pattern (shouldn't happen given the grep
+        itself only matches one of the two, but a real reason to default to
+        "unknown" here too rather than assume a specific state)."""
         if not sections.get("tail") and not sections.get("vocoder"):
             return None
         for line in sections.get("vocoder", []):
+            if config.DVSWITCH_HARDWARE_VOCODER_PATTERN in line:
+                return "hardware"
             if config.DVSWITCH_SOFTWARE_FALLBACK_PATTERN in line:
                 return "software"
-        return "hardware"
+        return None
 
     def _check_one_openspot4(self, hotspot: dict) -> None:
         """openspot.py's persistent WebSocket worker pushes live field

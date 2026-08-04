@@ -3270,15 +3270,17 @@ function dvswitchCardHtml(hs) {
         }).join('')
         : '<div class="hs-empty-note">No DVSwitch activity logged yet this session.</div>';
 
-    // "software" is a real, confirmed-live detected fallback event, not
-    // just config -- "hardware" means no fallback message was seen, not a
-    // verified-working confirmation; null means no DVSwitch log output was
-    // read at all yet. See models.py's HotspotStatus.dvswitch_vocoder.
+    // Both states are real, confirmed-live detected log events (not
+    // config-only): "software" from "Using software MBE decoder...",
+    // "hardware" from "Using hardware AMBE vocoder" -- a genuine positive
+    // match, not just "no fallback message seen" the way this used to be
+    // inferred. null means no DVSwitch log output was read at all yet.
+    // See models.py's HotspotStatus.dvswitch_vocoder.
     let vocoderClass = '', vocoderText = 'Vocoder: unknown', vocoderTag = 'no data yet';
     if (hs.dvswitch_vocoder === 'software') {
         vocoderClass = 'sw'; vocoderText = 'Software vocoder'; vocoderTag = 'fallback detected';
     } else if (hs.dvswitch_vocoder === 'hardware') {
-        vocoderClass = 'hw'; vocoderText = 'Hardware AMBE'; vocoderTag = 'no fallback seen';
+        vocoderClass = 'hw'; vocoderText = 'Hardware AMBE'; vocoderTag = 'confirmed';
     }
 
     const sparkline = hs.dvswitch_sparkline || [];

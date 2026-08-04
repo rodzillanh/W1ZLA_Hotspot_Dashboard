@@ -2853,7 +2853,7 @@ config for per-integration credentials; put it in
   research as more authoritative just because more effort went into it.
 - **`monitor.py`'s DVSwitch parsing now composes THREE distinct SSH
   sub-commands onto the one existing ASL3 connection** (log tail, a
-  targeted `grep -m1 "Using software"` for the vocoder line, and one
+  targeted grep for the vocoder line, and one
   `cat /tmp/ABInfo_<port>.json` per configured bridge port), each wrapped
   in an `echo`'d marker (`config.DVSWITCH_TAIL_MARKER`/`_VOCODER_MARKER`/
   `_ABINFO_MARKER`) so `_split_dvswitch_sections()` can reliably split one
@@ -2992,6 +2992,39 @@ config for per-integration credentials; put it in
   another notification source is ever added, use the same "...in
   Notifications" phrasing and put it in the second subgroup, not the
   first.
+
+- **A real "hardware AMBE vocoder working" success message is now
+  confirmed live (v3.71) -- the same user, same device, same day,
+  walked from a real software-fallback failure through a real config fix
+  to a real hardware success, all captured live over SSH.** After fixing
+  a duplicate/uncommented `address =` line in `Analog_Bridge.ini`'s
+  `[DV3000]` section (two active `address` keys in one section --
+  Analog_Bridge's ini parser was silently using the first, `127.0.0.1`,
+  ignoring the intended `/dev/ttyUSB0` line below it) and restarting
+  Analog_Bridge, the log showed `Connecting to DV3000 hardware......` ->
+  `Begin DV3000 decode` -> **`Using hardware AMBE vocoder`** -- directly
+  contradicting this file's own earlier claim ("there's no confirmed
+  *success* message"). `config.DVSWITCH_HARDWARE_VOCODER_PATTERN` now
+  matches this directly; `_parse_dvswitch_vocoder()`'s "hardware" result
+  is a genuine positive detection now, not an inference from "no fallback
+  message seen" -- the frontend's `dvs-vocoder-tag` text changed from
+  "no fallback seen" to "confirmed" to match.
+- **This same real sequence exposed a genuine bug in the vocoder grep
+  itself: `grep -m1` (first match) is wrong when a single day's
+  (not-yet-rotated) log can contain BOTH an older fallback line and a
+  newer success line, which is EXACTLY what happened here** -- the
+  earlier software-fallback message from before the config fix was still
+  in the same file as the new hardware-success message after it, and
+  `-m1` would have kept reporting the stale first-seen result forever
+  (until the daily log rotation happened to clear it) even though the
+  real current state had changed. Fixed by matching both patterns in one
+  `grep -E` and piping through `tail -1` to take the LAST (most recent)
+  match instead -- the same "want the newest, not the first, occurrence"
+  principle `_check_dvswitch_tx()`'s own Begin-TX-line scan already
+  applies to its 20-line tail, just needed applying to the vocoder grep
+  too once a real scenario surfaced that could contain more than one
+  match. `config.DVSWITCH_VOCODER_GREP_PATTERN` combines both patterns
+  for this single alternated grep.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

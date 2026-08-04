@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.70"
+APP_VERSION = "3.71"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -34,6 +34,7 @@ VERSION_CODENAMES = [
     "Vicious",          # v3.68 -- Sid Vicious (1957-1979)
     "Holly",            # v3.69 -- Buddy Holly (1936-1959)
     "Orbison",          # v3.70 -- Roy Orbison (1936-1988)
+    "Cash",             # v3.71 -- Johnny Cash (1932-2003)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -122,16 +123,26 @@ DVSWITCH_BEGIN_TX_PATTERN = r"Begin TX:"
 DVSWITCH_TX_SRC_PATTERN   = r"\bsrc=(\d+)"
 DVSWITCH_TX_DST_PATTERN   = r"\bdst=(\S+)"
 DVSWITCH_TX_CALL_PATTERN  = r"\bcall=(\S+)"
-# A real, confirmed-live vocoder fallback event (same user's SSH session):
-# "DV3000 not found at 127.0.0.1:2460 (Reset failed)" followed by "Using
-# software MBE decoder version 1.2.3" -- there's no confirmed *success*
-# message ("DV3000 found"/"Using hardware..."), so monitor.py's
-# _parse_dvswitch_vocoder() only ever asserts "software" when this
-# fallback text is actually seen; absence of it is treated as "hardware,
-# no fallback message seen" (not a positive hardware-health confirmation),
-# and a total absence of DVSwitch log output at all is its own separate
-# "unknown" state -- see models.py's HotspotStatus.dvswitch_vocoder.
+# Both directions of this are now confirmed live against the same real
+# device, same day: "DV3000 not found at 127.0.0.1:2460 (Reset failed)"
+# -> "Using software MBE decoder version 1.2.3" (before a config fix), and
+# after fixing Analog_Bridge.ini's [DV3000] section, "Connecting to DV3000
+# hardware......" -> "Begin DV3000 decode" -> "Using hardware AMBE
+# vocoder" (a real, confirmed SUCCESS message -- an earlier version of
+# this file said no such message was known to exist; it does).
+# monitor.py's _parse_dvswitch_vocoder() now asserts "hardware" only when
+# this success text is actually seen, not just "no fallback seen" --
+# a real, meaningfully stronger claim now that the positive text is known.
 DVSWITCH_SOFTWARE_FALLBACK_PATTERN = "Using software"
+DVSWITCH_HARDWARE_VOCODER_PATTERN  = "Using hardware AMBE vocoder"
+# grep's -m1 stops at the FIRST match in the file -- wrong here, since a
+# single (not-yet-rotated) day's log can genuinely contain BOTH an older
+# software-fallback line and a newer hardware-success line, e.g. right
+# after fixing a DV3000 config issue and restarting Analog_Bridge (a real
+# sequence observed live, not hypothetical). Matching both patterns and
+# taking the LAST line via `tail -1` in build_asl_status_cmd (not `-m1`)
+# reflects current state, not whichever happened first that day.
+DVSWITCH_VOCODER_GREP_PATTERN = f"{DVSWITCH_HARDWARE_VOCODER_PATTERN}|{DVSWITCH_SOFTWARE_FALLBACK_PATTERN}"
 
 # Section markers this app's own SSH command echoes between the DVSwitch
 # sub-commands below, so monitor.py can reliably split one combined
@@ -196,7 +207,12 @@ def build_asl_status_cmd(
             f"; echo {DVSWITCH_TAIL_MARKER}"
             f"; tail -n {DVSWITCH_LOG_TAIL_LINES} {DVSWITCH_LOG_PATH} 2>/dev/null"
             f"; echo {DVSWITCH_VOCODER_MARKER}"
-            f'; grep -m1 "{DVSWITCH_SOFTWARE_FALLBACK_PATTERN}" {DVSWITCH_LOG_PATH} 2>/dev/null'
+            # Matches BOTH the hardware-success and software-fallback lines,
+            # then `tail -1` picks whichever happened MOST RECENTLY -- not
+            # `grep -m1` (first match), which would keep reporting a stale
+            # earlier-that-day result once the file has both (see this
+            # constant's own comment above).
+            f'; grep -E "{DVSWITCH_VOCODER_GREP_PATTERN}" {DVSWITCH_LOG_PATH} 2>/dev/null | tail -1'
         )
         for port in (dvswitch_ports or []):
             if not port.isdigit():

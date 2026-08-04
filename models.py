@@ -97,9 +97,12 @@ class HotspotStatus:
     # for a static-TG bridge; only relevant for a dynamic-retuning setup
     # this app hasn't seen a real example of). None if neither is present.
     # dvswitch_vocoder is "software"/"hardware"/
-    # None (unknown -- no DVSwitch log output seen at all yet), based on a
-    # real confirmed log line ("Using software MBE decoder...") rather than
-    # config alone. dvswitch_heard mirrors `history`'s shape but WITH a real
+    # None (unknown -- no DVSwitch log output seen at all yet), based on
+    # real confirmed log lines for BOTH states ("Using software MBE
+    # decoder..." / "Using hardware AMBE vocoder") rather than config
+    # alone -- "hardware" is a genuine positive detection, not just
+    # "no fallback message seen". dvswitch_heard mirrors `history`'s shape
+    # but WITH a real
     # timestamp per entry (unlike `history`, which has none) -- {call,
     # dmr_id, dst, seen_at}, call falls back to the bare DMR ID when the
     # log line's own call= field is absent.
