@@ -2038,9 +2038,9 @@
         <div id="cards" style="display:contents"></div>
         <div id="camera-cards" style="display:contents"></div>
         <!-- One card per ASL3 hotspot with DVSwitch enabled -- dynamic
-             (0-N), so unlike every other optional card here it isn't
-             wired into the Card order drag list/computeCardOrders() yet;
-             renders right after the hotspot/camera cards for now. -->
+             (0-N), wired into the Card order drag list the same way
+             Cameras are (see renderCards()'s DVSwitch sentinels.push()
+             block and dvswitchCardHtml()'s own order: style). -->
         <div id="dvswitch-cards" style="display:contents"></div>
     </div>
 </div>
@@ -2703,6 +2703,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
+    if (key.startsWith('dvs-')) return '__dvswitch__' + key.slice(4);
     return SENTINEL_KEY_TO_DATA_IP[key] || key;
 }
 
@@ -2857,7 +2858,21 @@ function renderCards(data) {
             sentinels.push({ key: 'cam-' + cam.id, pos: Math.max(0, cam.position || 0) });
         });
     }
+    // DVSwitch cards -- dynamic 0-N like cameras above, but sourced from
+    // the SAME `data` array already in hand (dvswitch_enabled/
+    // dvswitch_position both come straight from /api/data), not a
+    // separate async fetch -- no race window to worry about the way
+    // cameras' own independent /api/cameras poll has.
+    data.filter(hs => hs.dvswitch_enabled).forEach(hs => {
+        sentinels.push({ key: 'dvs-' + hs.ip, pos: Math.max(0, hs.dvswitch_position || 0) });
+    });
     const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);
+    // renderDvswitchCards() (called separately, right after renderCards()
+    // in refresh()) needs these same DVSwitch entries' resolved order --
+    // stashed here since its own cards don't exist as DOM nodes yet at
+    // this point for a direct .style.order assignment the way the fixed
+    // sentinels/cameras get below.
+    lastSentinelOrders = sentinelOrders;
 
     const fleetCard = document.getElementById('fleet-activity-card');
     if (fleetCard && 'fleet' in sentinelOrders) fleetCard.style.order = sentinelOrders.fleet;
@@ -3188,9 +3203,13 @@ function renderCards(data) {
 // (0-N), rebuilt from scratch every /api/data poll (same "full re-render,
 // no persisted DOM" shape as renderCards() itself uses for hotspot cards --
 // this doesn't hold a live stream/connection the way camera cards do, so
-// there's no teardown cost to worry about). Not yet wired into the Card
-// order drag list/computeCardOrders() -- see the #dvswitch-cards comment
-// in the template for why.
+// there's no teardown cost to worry about). Wired into the Card order drag
+// list the same way Cameras are -- see renderCards()'s own DVSwitch
+// sentinels.push() block, which stashes the resolved order here since
+// these cards don't exist as DOM nodes yet at the point renderCards()
+// itself computes it.
+let lastSentinelOrders = {};
+
 function renderDvswitchCards(data) {
     const container = document.getElementById('dvswitch-cards');
     const dvsHotspots = data.filter(hs => hs.dvswitch_enabled);
@@ -3265,8 +3284,11 @@ function dvswitchCardHtml(hs) {
     const sparkline = hs.dvswitch_sparkline || [];
     const sparkSvg = sparkline.length ? sparklineSvg(sparkline) : '';
 
+    const sentinelKey = 'dvs-' + hs.ip;
+    const orderStyle = sentinelKey in lastSentinelOrders ? ` style="order:${lastSentinelOrders[sentinelKey]}"` : '';
+
     return `
-        <div class="metrics-card">
+        <div class="metrics-card"${orderStyle}>
             <div class="metrics-header">
                 <div class="card-name">📻 DVSwitch — ${escapeHtml(hs.name)}</div>
                 <div class="dvs-badge ${badgeClass}">${badgeText}</div>

@@ -597,9 +597,9 @@ one live test — if a bridge that's actually idle ever shows as tuned (or
 vice versa), that's the mostly likely reason; the underlying status data
 itself is otherwise real, not simulated.
 
-This card isn't yet part of the drag-and-drop **Card order** list the way
-every other optional card is — it always renders right after your hotspot
-cards for now.
+Like camera cards, its position is part of the same drag-and-drop
+**Card order** list as everything else (Settings → Hotspots) — drag it
+anywhere in that list to move it.
 
 ## openSPOT 4 (SharkRF) nodes
 

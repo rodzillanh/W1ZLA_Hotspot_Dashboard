@@ -2912,23 +2912,68 @@ config for per-integration credentials; put it in
   has real content but the grep found no fallback message, that's a
   genuine (if inherently unprovable-as-positive) "hardware, no fallback
   seen" result, kept distinct from true "unknown."
-- **The DVSwitch card is NOT yet wired into the Card order drag list /
-  `computeCardOrders()`, unlike every other optional card in this app --
-  a deliberate scope cut, not an oversight.** It's fundamentally a
-  dynamic 0-N list (one card per ASL3 hotspot with `dvswitch_enabled`,
-  which can change any time a hotspot is added/edited), architecturally
-  closer to Cameras' dynamic-list sentinel scheme than to a single
-  toggle-based sentinel card like Fleet Activity -- properly integrating
-  it would mean generalizing `computeCardOrders()`'s sentinels array to
-  accept dynamically-generated entries (not just a fixed `_SENTINEL_DEFS`
-  list) plus a parallel entry in setup.html's Cards-tab drag list and a
-  new per-hotspot position setting, mirroring cameras'
-  `__camera__<id>`/`/api/reorder_cameras` shape. `renderDvswitchCards()`
-  instead just renders every DVSwitch-enabled hotspot's card into its own
-  `#dvswitch-cards` container, positioned right after the hotspot/camera
-  cards in DOM order. If this becomes a real complaint, generalize
-  `computeCardOrders()` properly rather than bolting on a second,
-  parallel special case.
+- **The DVSwitch card WAS deliberately left out of the Card order drag
+  list at first ship (v3.67), then wired in for real in v3.70 -- exactly
+  the "generalize `computeCardOrders()` properly" path the original
+  scope-cut note said to take if it became a real ask.** Confirmed while
+  researching this that `computeCardOrders()` itself needed ZERO changes
+  -- it already takes an arbitrary `sentinels` array and is completely
+  agnostic to what a sentinel represents; only the callers needed new
+  code, mirroring Cameras' existing dynamic-list shape exactly (same
+  precedent the original note pointed at):
+  - **`app.py`**: `_overflow_sentinels()` gained a third block (after
+    `_SENTINEL_DEFS` and the camera block) iterating `hotspots` filtered
+    on `dvswitch_enabled`, reading each one's own `dvswitch_position`
+    field (default 0) rather than a `settings.get(...)` lookup -- there's
+    no `show_*` settings gate for this feature the way cameras have
+    `show_cameras`, since enablement is purely per-hotspot. A new
+    `/api/reorder_dvswitch` route mirrors `/api/reorder_cameras`'s exact
+    `{id: position}` shape, but loads/mutates/saves `hotspots.json`
+    (matched by `ip`) instead of `cameras.json` (matched by `id`) --
+    DVSwitch cards don't have their own separate config store the way
+    cameras do, position just lives on the same hotspot dict
+    `dvswitch_enabled` already does. `/api/data` now also echoes back
+    `dvswitch_position` per hotspot (straight passthrough from
+    hotspots.json, same as `lat`/`lon`/`type` already were) so the
+    frontend has it without a second fetch.
+  - **`dashboard.html`**: `sentinelDataIp()` gained a `dvs-` prefix
+    branch (parallel to `cam-`). `renderCards()`'s `sentinels.push()`
+    sequence gained a DVSwitch block, sourced from the SAME `data`
+    argument `renderCards(data)` already has synchronously -- a real,
+    deliberate improvement over how cameras have to do this: cameras
+    poll `/api/cameras` on their own independent 30s interval into a
+    module-level `cameras` array, which has a real (self-healing but
+    real) race window on first load if `renderCards()` fires before that
+    first fetch resolves; DVSwitch enablement/position both arrive on
+    the exact same `/api/data` response `renderCards(data)` is already
+    called with, so there's no equivalent race to reason about.
+    Resolved order gets stashed in a new module-level `lastSentinelOrders`
+    right after `computeCardOrders()` runs, since DVSwitch cards don't
+    exist as DOM nodes yet at that point for a direct `.style.order`
+    assignment the way the 13 fixed sentinels/cameras get -- unlike
+    those, `renderDvswitchCards()` is a SEPARATE function (called right
+    after `renderCards()` in `refresh()`) that fully rebuilds its own
+    `#dvswitch-cards` container from scratch every poll, so the order
+    value gets baked directly into each card's inline `style="order:N"`
+    at generation time instead.
+  - **`setup.html`**: a new inline Jinja interleave block
+    (`{% for hs2 in hotspots if hs2.get('dvswitch_enabled') and
+    hs2.get('dvswitch_position', 0) == loop.index0 %}`) placed in the
+    exact same relative template position cameras' own interleave block
+    occupies -- immediately after it, right before the real hotspot row
+    -- since `computeCardOrders()`'s stability-guarantee tiebreak (see
+    its own comment) depends on `sentinels.push()` order in
+    `dashboard.html` and template declaration order in `setup.html`
+    staying in sync; declaring DVSwitch anywhere else here would silently
+    desync the two files' tie-break behavior for genuinely tied
+    positions, the exact bug class the "card position doesn't save"
+    saga earlier in this file was about. `saveCardOrder()` gained a
+    `dvswitchPositions` object built the identical way `cameraPositions`
+    already is (`allIds.filter(id => id.startsWith('__dvswitch__'))`),
+    POSTed to the new `/api/reorder_dvswitch` route. The existing
+    `isSentinel`/`cardOrderTiebreak` logic needed ZERO changes -- both
+    are blanket `__`-prefix checks, already correctly generic across any
+    sentinel type including this new one.
 - **Settings → Cards' "Optional dashboard cards" section (v3.69) split
   into two labeled subgroups ("Dashboard cards" / "Notifications card
   sources") after growing to 17 undifferentiated toggles in one flat

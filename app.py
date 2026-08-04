@@ -248,6 +248,11 @@ def api_data():
         if hs.get("dvswitch_enabled"):
             entry["dvswitch_enabled"] = True
             entry["dvswitch_sparkline"] = storage_activity.dvswitch_sparkline(ip)
+            # Card order position -- same "floor at 0, no upper cap" rule
+            # every other sentinel/camera position already follows (see
+            # _overflow_sentinels()'s own docstring for why capping here
+            # would silently collapse distinct overflow positions together).
+            entry["dvswitch_position"] = hs.get("dvswitch_position", 0)
     ordered_ips = [h["ip"] for h in hotspots]
     # Return as an ARRAY so the browser preserves order — JS objects keyed by
     # IP strings get silently re-sorted by some engines (especially for
@@ -660,6 +665,20 @@ def _overflow_sentinels(settings: dict, hotspots: list, cameras: list) -> list:
                 items.append({
                     "data_ip": f"__camera__{cam['id']}", "icon": "📷", "name": cam["name"],
                     "meta": f"camera · {type_label}", "pos": pos,
+                })
+    # DVSwitch cards -- same dynamic-list shape as cameras above (0-N,
+    # tied to config entries rather than one settings.json toggle), but
+    # enablement/position live on the hotspot dict itself (dvswitch_enabled/
+    # dvswitch_position in hotspots.json), not a separate cameras.json-style
+    # store or a show_* settings gate -- there's nothing to gate on besides
+    # each hotspot's own flag.
+    for hs in hotspots:
+        if hs.get("dvswitch_enabled"):
+            pos = hs.get("dvswitch_position", 0)
+            if pos >= hotspot_count:
+                items.append({
+                    "data_ip": f"__dvswitch__{hs['ip']}", "icon": "📻",
+                    "name": f"DVSwitch — {hs['name']}", "meta": "DVSwitch card", "pos": pos,
                 })
 
     def sort_key(it):
@@ -1505,6 +1524,24 @@ def api_reorder_cameras():
             except (TypeError, ValueError):
                 pass
     save_cameras(cameras)
+    return jsonify({"ok": True})
+
+@app.route("/api/reorder_dvswitch", methods=["POST"])
+def api_reorder_dvswitch():
+    """Accepts {hotspot_ip: position, ...} -- same shape as
+    /api/reorder_cameras, but DVSwitch cards' identity/position live on
+    the hotspot dict itself (hotspots.json), not a separate cameras.json-
+    style store, since a DVSwitch card is always tied to one specific
+    ASL3 hotspot rather than being independently addressable config."""
+    positions = request.json or {}
+    hotspots = load_hotspots()
+    for hs in hotspots:
+        if hs["ip"] in positions:
+            try:
+                hs["dvswitch_position"] = max(0, int(positions[hs["ip"]]))
+            except (TypeError, ValueError):
+                pass
+    save_hotspots(hotspots)
     return jsonify({"ok": True})
 
 @app.route("/api/test_camera", methods=["POST"])

@@ -899,6 +899,13 @@
                     </div>
                     {% endfor %}
                 {% endif %}
+                {% for hs2 in hotspots if hs2.get('dvswitch_enabled') and hs2.get('dvswitch_position', 0) == loop.index0 %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__dvswitch__{{ hs2.ip }}">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📻 DVSwitch — {{ hs2.name }}</span>
+                    <span class="node-meta">DVSwitch card</span>
+                </div>
+                {% endfor %}
             <div class="drag-row" draggable="true" data-ip="{{ hs.ip }}">
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">{{ hs.name }}</span>
@@ -1979,6 +1986,12 @@ function saveCardOrder() {
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
     });
+    // DVSwitch cards -- same dynamic-list shape as cameras above, keyed by
+    // hotspot ip instead of a camera id (see /api/reorder_dvswitch).
+    const dvswitchPositions = {};
+    allIds.filter(id => id.startsWith('__dvswitch__')).forEach(key => {
+        dvswitchPositions[key.slice('__dvswitch__'.length)] = sentinelIndex(key);
+    });
 
     // Explicit relative-order tiebreak -- *_position only ever records
     // "how many hotspot rows precede this card", so two+ cards dragged to
@@ -2103,6 +2116,13 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(cameraPositions)
+        }));
+    }
+    if (Object.keys(dvswitchPositions).length > 0) {
+        saves.push(fetch('/api/reorder_dvswitch', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(dvswitchPositions)
         }));
     }
     Promise.all(saves).then(() => {
