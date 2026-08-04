@@ -2929,6 +2929,24 @@ config for per-integration credentials; put it in
   cards in DOM order. If this becomes a real complaint, generalize
   `computeCardOrders()` properly rather than bolting on a second,
   parallel special case.
+- **Settings → Cards' "Optional dashboard cards" section (v3.69) split
+  into two labeled subgroups ("Dashboard cards" / "Notifications card
+  sources") after growing to 17 undifferentiated toggles in one flat
+  list** -- purely a relabel/regroup via a new `.toggle-subhead` CSS
+  class, no settings keys, toggle element IDs, or `saveCards()` JS
+  changed (it already read every field by `getElementById`, not DOM
+  position, which is what made this safe to reorder freely). Also
+  renamed the two oldest notification-source toggles -- "Show APRS
+  Messages card" and "Show HamAlert card" -- to "APRS messages in
+  Notifications"/"HamAlert alerts in Notifications", matching the
+  "...in Notifications" phrasing the three newer sources (fleet/solar/
+  Brandmeister alerts) already used. Those two labels were stale relics
+  of the v3.51 Notifications-card merge (see that entry above) -- they
+  read like they still created their own separate cards, which stopped
+  being true the moment they became sources feeding one merged card. If
+  another notification source is ever added, use the same "...in
+  Notifications" phrasing and put it in the second subgroup, not the
+  first.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

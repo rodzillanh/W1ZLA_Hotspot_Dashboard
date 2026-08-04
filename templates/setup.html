@@ -144,6 +144,23 @@
             letter-spacing: .5px;
             margin-bottom: 12px;
         }
+        /* Lighter-weight heading for grouping WITHIN one .toggle-group --
+           e.g. splitting "Optional dashboard cards" into "Dashboard cards"
+           vs "Notifications card sources" so the two don't read as one
+           undifferentiated list of 17 toggles. Deliberately smaller/dimmer
+           than .section-title so it doesn't compete with the real section
+           heading above it. */
+        .toggle-subhead {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: .4px;
+            margin: 18px 0 6px;
+            padding-top: 14px;
+            border-top: 1px solid var(--card-border);
+        }
+        .toggle-subhead:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 
         /* --- form elements --- */
         label { font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 3px; }
@@ -542,6 +559,7 @@
             its position in the <a href="#" onclick="switchTab('hotspots', document.getElementById('tab-btn-hotspots')); return false;">Card order list</a> (Hotspots tab).
         </p>
         <div class="toggle-group">
+            <div class="toggle-subhead">Dashboard cards</div>
             <div class="toggle-row">
                 <span class="toggle-label">Show fleet activity card
                     <span style="font-size:10px;color:var(--text-dim)">
@@ -570,15 +588,6 @@
                 </span>
                 <div class="toggle {{ 'on' if settings.get('show_asl_favorites', False) else '' }}"
                      id="asl-favorites-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Show APRS Messages card
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (incoming APRS-IS messages to your callsign — set in Integrations)
-                    </span>
-                </span>
-                <div class="toggle {{ 'on' if settings.get('aprs_inbox_enabled', False) else '' }}"
-                     id="aprs-inbox-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
                 <span class="toggle-label">Show HF Conditions card
@@ -619,7 +628,8 @@
             <div class="toggle-row">
                 <span class="toggle-label">Station grid square
                     <span style="font-size:10px;color:var(--text-dim)">
-                        (Maidenhead locator, e.g. FN42 -- centers the Band Activity card's 500km radius)
+                        (Maidenhead locator, e.g. FN42 -- centers the Band Activity card's 500km radius,
+                        also used by the Satellites card below for pass times)
                     </span>
                 </span>
                 <input type="text" id="station-grid-input" placeholder="FN42" maxlength="6"
@@ -644,15 +654,6 @@
                 </span>
                 <div class="toggle {{ 'on' if settings.get('show_satellites', False) else '' }}"
                      id="satellites-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Show HamAlert card
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (personal DXCC/callsign/band alerts -- needs a HamAlert account, set up in Integrations)
-                    </span>
-                </span>
-                <div class="toggle {{ 'on' if settings.get('hamalert_enabled', False) else '' }}"
-                     id="hamalert-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
                 <span class="toggle-label">Show DigiPi card
@@ -682,6 +683,35 @@
                      id="qso-stats-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show Top 5 Activity card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (your fleet's own most active callsigns, last 24h -- needs "Show fleet activity card" on too)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_top_activity', False) else '' }}"
+                     id="top-activity-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+
+            <div class="toggle-subhead">Notifications card sources</div>
+            <div class="toggle-row">
+                <span class="toggle-label">APRS messages in Notifications
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (incoming APRS-IS messages to your callsign — set in Integrations)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('aprs_inbox_enabled', False) else '' }}"
+                     id="aprs-inbox-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">HamAlert alerts in Notifications
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (personal DXCC/callsign/band alerts -- needs a HamAlert account, set up in Integrations)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('hamalert_enabled', False) else '' }}"
+                     id="hamalert-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Fleet online/offline alerts in Notifications
                     <span style="font-size:10px;color:var(--text-dim)">
                         (adds an event to the Notifications card whenever a hotspot goes offline or comes back)
@@ -698,15 +728,6 @@
                 </span>
                 <div class="toggle {{ 'on' if settings.get('solar_alerts_enabled', False) else '' }}"
                      id="solar-alerts-toggle" onclick="this.classList.toggle('on')"></div>
-            </div>
-            <div class="toggle-row">
-                <span class="toggle-label">Show Top 5 Activity card
-                    <span style="font-size:10px;color:var(--text-dim)">
-                        (your fleet's own most active callsigns, last 24h -- needs "Show fleet activity card" on too)
-                    </span>
-                </span>
-                <div class="toggle {{ 'on' if settings.get('show_top_activity', False) else '' }}"
-                     id="top-activity-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
                 <span class="toggle-label">Brandmeister favorite alerts in Notifications
