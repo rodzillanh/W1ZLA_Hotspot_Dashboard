@@ -2875,17 +2875,33 @@ config for per-integration credentials; put it in
   places that all need to agree (`app.py`'s `/setup` POST handler,
   `/api/import_backup`, and `monitor.py`'s `_dvswitch_port_list()`), each
   re-validating digits-only since these are shell-interpolated over SSH.
-- **`last_tune`'s exact idle-state shape (empty string? absent key? a
-  sentinel value?) was NEVER verified against a real device** -- the
-  "tuned"/"idle" bridge-chip distinction only checks truthiness
-  (`b.tuned` in dashboard.html's `dvswitchCardHtml()`), which happens to
-  handle an absent key, `null`, and `""` all correctly as "idle" -- but if
-  a real device turns out to use some other non-empty sentinel (e.g. the
-  literal string `"none"` or `"0"`) for "nothing tuned," this would
-  misreport it as tuned. Re-verify against a real `/tmp/ABInfo_<port>.json`
-  capture before trusting this distinction further, same "confirm against
-  the real thing" discipline as everywhere else in this file -- this is a
-  real, disclosed gap, not an oversight.
+- **`last_tune` turned out to be the WRONG field for the common case,
+  confirmed by a real `/tmp/ABInfo_<port>.json` capture from the same
+  live device the Begin TX/vocoder findings above came from -- a genuine
+  bug caught within hours of shipping, not a hypothetical.** The original
+  version used `last_tune` as the sole tuned/idle signal, explicitly
+  flagging its idle-state shape as unverified. The real capture showed
+  `last_tune: ""` (empty) on a bridge that was, at that exact moment,
+  demonstrably active -- the same instance had just logged real `Begin
+  TX: ... dst=603 ... call=W1ZLA` transmissions. So the original code
+  would have shown this bridge as "idle" while it was genuinely
+  configured and relaying traffic -- confirmed wrong, not just
+  theoretically risky. `last_tune` is specific to setups that do DYNAMIC
+  reflector retuning (still unconfirmed shape, no real example seen) --
+  it's simply blank for a bridge with a fixed/static target talkgroup,
+  which is the common case. The real signal for that case is the
+  `digital` object: `digital.tg` (`"603"` in the real capture -- exactly
+  matches the same Begin TX line's own `dst=` value) and `digital.call`
+  (`"W1ZLA"` -- matches that line's `call=`, this bridge's own registered
+  callsign, not a live caller's). Fixed in `_parse_dvswitch_bridges()` to
+  prefer `digital.tg` (formatted as `"TG <n>"`), falling back to
+  `last_tune` only when `digital.tg` is absent -- for whatever the
+  dynamic-tuning shape eventually turns out to be, still unverified.
+  Independently useful cross-check from the same real capture:
+  `use_fallback: "true"` matched what the log-grep-based vocoder
+  detection had already found independently for this exact device --
+  two different data sources agreeing is good evidence the vocoder
+  detection approach itself is sound, not just lucky once.
 - **`dvswitch_vocoder` is intentionally a 3-state field
   (`"software"`/`"hardware"`/`None`), not a boolean** -- collapsing
   `None` (no DVSwitch log output read at all -- Analog_Bridge not

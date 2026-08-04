@@ -89,10 +89,14 @@ class HotspotStatus:
     # DVSwitch (Analog_Bridge) card -- only populated for ASL3 hotspots with
     # dvswitch_enabled set (see monitor.py's _check_one_asl3/_check_dvswitch_tx).
     # dvswitch_bridges: one entry per configured port, {port, tuned, mode} --
-    # tuned/mode come from that instance's own /tmp/ABInfo_<port>.json
-    # ("tuned" is its last_tune field, None if not currently tuned to
-    # anything -- see CLAUDE.md for what's confirmed vs. assumed about that
-    # field's idle-state shape). dvswitch_vocoder is "software"/"hardware"/
+    # tuned/mode come from that instance's own /tmp/ABInfo_<port>.json.
+    # "tuned" is "TG <n>" from that JSON's digital.tg field when present
+    # (confirmed live -- matches the exact dst= value seen in a real Begin
+    # TX line for the same bridge), falling back to the top-level
+    # last_tune field otherwise (confirmed live to be "" -- not useful --
+    # for a static-TG bridge; only relevant for a dynamic-retuning setup
+    # this app hasn't seen a real example of). None if neither is present.
+    # dvswitch_vocoder is "software"/"hardware"/
     # None (unknown -- no DVSwitch log output seen at all yet), based on a
     # real confirmed log line ("Using software MBE decoder...") rather than
     # config alone. dvswitch_heard mirrors `history`'s shape but WITH a real

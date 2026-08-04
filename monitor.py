@@ -426,16 +426,29 @@ class FleetMonitor:
     @staticmethod
     def _parse_dvswitch_bridges(sections: dict[str, list[str]], ports: list[str]) -> list[dict]:
         """One entry per configured Analog_Bridge instance port, read from
-        that instance's own /tmp/ABInfo_<port>.json (confirmed real fields,
-        via DVSwitch's own official dashboard source -- see CLAUDE.md).
-        "tuned" is that JSON's own last_tune field, passed through as-is;
-        this app has NOT verified what that field looks like when nothing
-        is tuned (empty string vs. absent vs. a sentinel value) against a
-        real device yet -- None here just means "couldn't read/parse a
-        tuned value," not a confirmed distinct idle state. Missing/
-        unreadable ABInfo.json (DVSwitch not running, wrong port, no
-        permission) degrades to tuned=None/mode=None rather than raising,
-        same contract as every other integration in this app."""
+        that instance's own /tmp/ABInfo_<port>.json.
+
+        CONFIRMED against a real live capture (not just DVSwitch's own
+        dashboard source, which is where the field names originally came
+        from): for a bridge with a fixed/static target talkgroup,
+        top-level `last_tune` is an empty string ("") even while the
+        bridge is actively configured and relaying real traffic --
+        `last_tune` is specific to setups that do DYNAMIC reflector
+        retuning (unconfirmed shape, no real example seen yet), not a
+        general "is this bridge tuned to anything" signal. The real,
+        confirmed-live signal for the common static-TG case is the
+        `digital` object: `digital.tg` (matches the exact same value seen
+        in a real Begin TX line's own dst= field) and `digital.call`
+        (likewise matches that line's call= field -- this node's own
+        registered callsign, not a live caller). Preferring digital.tg
+        over last_tune fixed a real bug: the original last_tune-only
+        version would have shown "idle" for a bridge that was
+        demonstrably active (real logged Begin TX transmissions) at the
+        exact same moment. Falls back to last_tune only when digital.tg is
+        absent, for whatever dynamic-tuning shape that turns out to be.
+        Missing/unreadable ABInfo.json (DVSwitch not running, wrong port,
+        no permission) degrades to tuned=None/mode=None rather than
+        raising, same contract as every other integration in this app."""
         bridges = []
         for port in ports:
             raw = "\n".join(sections.get("abinfo:" + port, [])).strip()
@@ -444,7 +457,8 @@ class FleetMonitor:
             if raw:
                 try:
                     data = json.loads(raw)
-                    tuned = data.get("last_tune") or None
+                    tg = (data.get("digital") or {}).get("tg")
+                    tuned = f"TG {tg}" if tg else (data.get("last_tune") or None)
                     mode  = (data.get("tlv") or {}).get("ambe_mode") or None
                 except (ValueError, TypeError, AttributeError):
                     pass

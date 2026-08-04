@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.67 "Ramone"</span>
+                <span class="release-version">v3.68 "Vicious"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed DVSwitch card showing "idle" for an active bridge</span> — the tuned/idle detection was reading the wrong status field for a bridge with a fixed target talkgroup (common case); now reads the field that's actually populated for that case, confirmed against a real device capture</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.67 "Ramone"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>New DVSwitch card</span> — a full status card for an ASL3 node's DVSwitch (Analog_Bridge) bridge(s): which configured bridge port is tuned to what, the two most recently heard callers with elapsed time, whether the vocoder has fallen back to software (a real detected event, not just configuration), and a small recent-activity sparkline. Configure one or more bridge ports per node in Settings → Hotspots, right next to the existing Fleet Activity toggle. Not yet part of the drag-and-drop Card order list</li>
