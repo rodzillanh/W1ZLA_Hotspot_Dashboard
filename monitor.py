@@ -333,10 +333,14 @@ class FleetMonitor:
             if dvswitch:
                 sections = self._split_dvswitch_sections(output)
                 self._check_dvswitch_tx(ip, sections)
+                live, dmr_linked, dstar_status = self._parse_dvswitch_mmdvm_live(sections)
                 with self._lock:
                     status = self._data[ip]
                     status.dvswitch_bridges = self._parse_dvswitch_bridges(sections, dvswitch_ports)
                     status.dvswitch_vocoder = self._parse_dvswitch_vocoder(sections)
+                    status.dvswitch_live = live
+                    status.dvswitch_dmr_linked = dmr_linked
+                    status.dvswitch_dstar_status = dstar_status
         except Exception:
             self._record_failure(ip)
 
@@ -371,6 +375,9 @@ class FleetMonitor:
                 sections[current_key] = []
             elif stripped.startswith(config.DVSWITCH_ABINFO_MARKER):
                 current_key = "abinfo:" + stripped[len(config.DVSWITCH_ABINFO_MARKER):]
+                sections[current_key] = []
+            elif stripped == config.DVSWITCH_MMDVM_MARKER:
+                current_key = "mmdvm"
                 sections[current_key] = []
             elif current_key is not None:
                 sections[current_key].append(line)
@@ -489,6 +496,65 @@ class FleetMonitor:
             if config.DVSWITCH_SOFTWARE_FALLBACK_PATTERN in line:
                 return "software"
         return None
+
+    @staticmethod
+    def _parse_dvswitch_mmdvm_live(sections: dict[str, list[str]]) -> tuple[dict | None, bool | None, str | None]:
+        """Scans the MMDVM_Bridge.log tail (config.DVSWITCH_MMDVM_* patterns
+        -- a DIFFERENT DVSwitch component's log than Analog_Bridge.log, see
+        their own comments) for real DMR/D-Star start/end lines and link-
+        status lines, scoped to DMR + D-Star only by design (YSF/P25/NXDN
+        write to their own separate gateway logs, not tailed here).
+
+        Returns (live, dmr_linked, dstar_status):
+          live: None if idle, else {"mode", "call", "target"} for whichever
+          transmission is currently open. Scanned fresh top-to-bottom every
+          poll -- no state carried across polls, matching every other
+          DVSwitch/WPSD log-tail parser in this file. If a still-ongoing
+          transmission's own START line has already scrolled out of the
+          tail window (long call + a lot of interleaved Talker Alias
+          lines), this under-reports idle rather than guessing -- a real,
+          accepted limitation of a stateless re-scan, not a bug.
+          dmr_linked: True/False/None (unknown -- no master connect/
+          disconnect line seen in this tail).
+          dstar_status: the raw quoted string from D-Star's own explicit
+          "link status set to ..." line, or None if not seen.
+
+        "network watchdog has expired" is treated as an end-of-transmission
+        event too (confirmed live: it fired mid-call, immediately followed
+        by a "late entry" resuming the SAME call a few ms later) -- this can
+        make `live` flicker None-then-set-again within milliseconds, well
+        under this app's 5s poll cadence, so no extra de-flicker logic was
+        needed for a real case that was actually observed."""
+        live: dict | None = None
+        dmr_linked: bool | None = None
+        dstar_status: str | None = None
+        for line in sections.get("mmdvm", []):
+            m = re.search(config.DVSWITCH_MMDVM_DMR_START_PATTERN, line)
+            if m:
+                live = {"mode": "DMR", "call": m.group(2).strip(), "target": m.group(3).strip()}
+                continue
+            if re.search(config.DVSWITCH_MMDVM_DMR_END_PATTERN, line):
+                if live and live.get("mode") == "DMR":
+                    live = None
+                continue
+            m = re.search(config.DVSWITCH_MMDVM_DSTAR_START_PATTERN, line)
+            if m:
+                live = {"mode": "D-Star", "call": m.group(1).strip(), "target": m.group(2).strip()}
+                continue
+            if re.search(config.DVSWITCH_MMDVM_DSTAR_END_PATTERN, line):
+                if live and live.get("mode") == "D-Star":
+                    live = None
+                continue
+            if re.search(config.DVSWITCH_MMDVM_DMR_LINKED_PATTERN, line):
+                dmr_linked = True
+                continue
+            if re.search(config.DVSWITCH_MMDVM_DMR_UNLINKED_PATTERN, line):
+                dmr_linked = False
+                continue
+            m = re.search(config.DVSWITCH_MMDVM_DSTAR_LINK_PATTERN, line)
+            if m:
+                dstar_status = m.group(1).strip()
+        return live, dmr_linked, dstar_status
 
     def _check_one_openspot4(self, hotspot: dict) -> None:
         """openspot.py's persistent WebSocket worker pushes live field

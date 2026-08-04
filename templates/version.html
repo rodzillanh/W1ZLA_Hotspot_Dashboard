@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.71 "Cash"</span>
+                <span class="release-version">v3.72 "Prince"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>DVSwitch card: real live RX/TX status</span> — a pulsing "RX DMR — W1ZLA → TG 603" indicator (or "Listening" when idle), plus DMR master / D-Star link status, sourced from a second DVSwitch log file with real start-and-end transmission markers. Scoped to DMR and D-Star only; YSF/P25/NXDN log elsewhere and aren't covered</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.71 "Cash"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>DVSwitch vocoder detection improved</span> — a real "Using hardware AMBE vocoder" success message is now confirmed and directly detected (previously "hardware" just meant "no fallback message seen"), and the underlying log search now correctly picks up the most recent state instead of possibly reporting a stale result from earlier the same day</li>

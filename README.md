@@ -587,15 +587,26 @@ The card shows:
   be tried).
 - **Sparkline** — a small recent-activity trend, reusing the same logged
   data the Fleet Activity card's DVSwitch mode already writes.
+- **Live RX/TX row** — a pulsing "RX DMR — W1ZLA → TG 603" style
+  indicator (or "Listening" when idle) for a transmission that's actually
+  in progress right now, plus DMR master / D-Star link status. Unlike
+  everything else on this card, this is sourced from a *second* DVSwitch
+  log file (`MMDVM_Bridge.log`, not `Analog_Bridge.log`) that has real
+  start-and-end transmission markers — scoped to DMR and D-Star only;
+  YSF/P25/NXDN each log to their own separate file and aren't covered.
 
-**Two honest caveats, not hidden anywhere else in this app's docs:**
+**Three honest caveats, not hidden anywhere else in this app's docs:**
 Analog_Bridge's own log has no confirmed "transmission ended" line, so
 "Last heard" shows time since a transmission started, not how long it
 lasted. And the exact value Analog_Bridge's status file uses to mean
 "nothing currently tuned" was never confirmed against a real device beyond
 one live test — if a bridge that's actually idle ever shows as tuned (or
 vice versa), that's the mostly likely reason; the underlying status data
-itself is otherwise real, not simulated.
+itself is otherwise real, not simulated. And the live RX/TX row is
+re-checked fresh on every poll with no memory of the previous one — if an
+unusually long transmission's own start line scrolls out of the recent
+log window before the call ends, the indicator can under-report idle
+rather than guess.
 
 Like camera cards, its position is part of the same drag-and-drop
 **Card order** list as everything else (Settings → Hotspots) — drag it

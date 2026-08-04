@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.71"
+APP_VERSION = "3.72"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -35,6 +35,7 @@ VERSION_CODENAMES = [
     "Holly",            # v3.69 -- Buddy Holly (1936-1959)
     "Orbison",          # v3.70 -- Roy Orbison (1936-1988)
     "Cash",             # v3.71 -- Johnny Cash (1932-2003)
+    "Prince",           # v3.72 -- Prince (1958-2016)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -144,15 +145,61 @@ DVSWITCH_HARDWARE_VOCODER_PATTERN  = "Using hardware AMBE vocoder"
 # reflects current state, not whichever happened first that day.
 DVSWITCH_VOCODER_GREP_PATTERN = f"{DVSWITCH_HARDWARE_VOCODER_PATTERN}|{DVSWITCH_SOFTWARE_FALLBACK_PATTERN}"
 
+# MMDVM_Bridge.log -- a DIFFERENT DVSwitch component's log than
+# Analog_Bridge.log above (confirmed real, same live device/session as
+# every other DVSwitch fact in this file): unlike Analog_Bridge.log, this
+# one has real, confirmed end-of-transmission lines with actual duration/
+# loss/BER, plus explicit link-status lines -- the two things
+# Analog_Bridge.log genuinely doesn't have. Scoped to DMR + D-Star only
+# (by user choice) -- YSF/P25/NXDN each write to their OWN separate log
+# file (YSFGateway-*.log/P25Gateway-*.log/NXDNGateway-*.log, confirmed via
+# a real `ls /var/log/mmdvm/`), not covered here.
+#
+# Path is DATE-STAMPED (MMDVM_Bridge-YYYY-MM-DD.log, confirmed via a real
+# `ls -la /var/log/mmdvm/` -- a same-named but empty `MMDVM_Bridge.log`
+# also exists there and is NOT the active file, don't tail that one) --
+# resolved the same dynamic "newest matching file" way WPSD's own
+# SSH_STATUS_CMD already does for its differently-pathed MMDVM-*.log.
+DVSWITCH_MMDVM_LOG_GLOB       = "/var/log/mmdvm/MMDVM_Bridge-*.log"
+DVSWITCH_MMDVM_TAIL_LINES     = 40
+# Real confirmed line shapes (quoted verbatim from a live capture):
+#   "DMR Slot 2, received network voice header from W1ZLA to TG 603"
+#   "DMR Slot 2, received network late entry from W1ZLA to TG 603"
+#   "DMR Slot 2, received network end of voice transmission, 2.6 seconds, 0% packet loss, BER: 0.0%"
+#   "DMR Slot 2, network watchdog has expired, 0.1 seconds, 0% packet loss, BER: 0.0%"
+#   "D-Star, received network header from W1ZLA   /INFO to CQCQCQ  "
+#   "D-Star, received network end of transmission, 2.5 seconds, 0% packet loss, BER: 0.0%"
+#   "DMR, Logged into the master successfully: tgif.network:62031"
+#   "DMR, Connection to the master has timed out, retrying connection"
+#   "DMR, Closing DMR Network" / "DMR, Opening DMR Network"
+#   'D-Star link status set to "Not linked          "'
+# "network watchdog has expired" is a REAL, confirmed-live edge case: it
+# fired mid-transmission (a brief network hiccup), immediately followed by
+# a "late entry" resuming the SAME transmission a few milliseconds later.
+# It shares the end-of-transmission line's own trailing shape (duration/
+# loss/BER), so it's matched as an end-like event too -- this means a live
+# RX indicator can flicker idle-then-active-again within milliseconds for
+# this case, invisible at this app's 5s poll cadence, so no special-casing
+# beyond treating both as "this slot went idle" was needed.
+DVSWITCH_MMDVM_DMR_START_PATTERN   = r"DMR Slot (\d+), received network (?:voice header|late entry) from (\S+) to (.+)"
+DVSWITCH_MMDVM_DMR_END_PATTERN     = r"DMR Slot (\d+), (?:received network end of voice transmission|network watchdog has expired), ([\d.]+) seconds"
+DVSWITCH_MMDVM_DSTAR_START_PATTERN = r"D-Star, received network header from (\S+)\s*/\S*\s+to\s+(.+)"
+DVSWITCH_MMDVM_DSTAR_END_PATTERN   = r"D-Star, received network end of transmission, ([\d.]+) seconds"
+DVSWITCH_MMDVM_DMR_LINKED_PATTERN   = r"DMR, Logged into the master successfully"
+DVSWITCH_MMDVM_DMR_UNLINKED_PATTERN = r"DMR, (?:Closing DMR Network|Connection to the master has timed out)"
+DVSWITCH_MMDVM_DSTAR_LINK_PATTERN   = r'D-Star link status set to "(.+?)"'
+
 # Section markers this app's own SSH command echoes between the DVSwitch
 # sub-commands below, so monitor.py can reliably split one combined
 # command's output back into named sections (tail / vocoder grep / one
-# ABInfo.json per configured port) rather than guessing by line position --
-# the ASL/host-stats/DVSwitch output all lands in one shell string, per one
-# `_ssh_exec()` connect/exec/close cycle (see build_asl_status_cmd).
+# ABInfo.json per configured port / MMDVM_Bridge.log tail) rather than
+# guessing by line position -- the ASL/host-stats/DVSwitch output all
+# lands in one shell string, per one `_ssh_exec()` connect/exec/close
+# cycle (see build_asl_status_cmd).
 DVSWITCH_TAIL_MARKER    = "===DVSWITCH_TAIL==="
 DVSWITCH_VOCODER_MARKER = "===DVSWITCH_VOCODER==="
 DVSWITCH_ABINFO_MARKER  = "===DVSWITCH_ABINFO==="  # this app appends the port number right after, e.g. "===DVSWITCH_ABINFO===31000"
+DVSWITCH_MMDVM_MARKER   = "===DVSWITCH_MMDVM==="
 
 
 def build_asl_status_cmd(
@@ -186,6 +233,11 @@ def build_asl_status_cmd(
     Analog_Bridge.ini itself despite the name suggesting one) -- see
     CLAUDE.md for the full research trail and its real, disclosed gaps
     (no confirmed end-of-transmission line, unlike every other mode here).
+    Also tails MMDVM_Bridge.log (a different DVSwitch component's log,
+    scoped to DMR + D-Star only) for live RX/TX state and link status --
+    see DVSWITCH_MMDVM_* constants' own comments for why that log needed
+    separate handling (date-stamped filename, real end-of-transmission
+    lines this one has that Analog_Bridge.log doesn't).
 
     `dvswitch_ports` (DVSwitch card only, independent of the Fleet Activity
     mode above) is a list of Analog_Bridge instance ports configured for
@@ -213,6 +265,14 @@ def build_asl_status_cmd(
             # earlier-that-day result once the file has both (see this
             # constant's own comment above).
             f'; grep -E "{DVSWITCH_VOCODER_GREP_PATTERN}" {DVSWITCH_LOG_PATH} 2>/dev/null | tail -1'
+            f"; echo {DVSWITCH_MMDVM_MARKER}"
+            # MMDVM_Bridge.log's own path is date-stamped (unlike
+            # Analog_Bridge.log's fixed name) -- same "newest matching
+            # file" resolution _LINUX_HOST_STATS_CMD's sibling
+            # SSH_STATUS_CMD already uses for WPSD's differently-pathed
+            # MMDVM-*.log, not a new pattern.
+            f'; M=$(ls -1tr {DVSWITCH_MMDVM_LOG_GLOB} 2>/dev/null | tail -1)'
+            f'; tail -n {DVSWITCH_MMDVM_TAIL_LINES} "$M" 2>/dev/null'
         )
         for port in (dvswitch_ports or []):
             if not port.isdigit():

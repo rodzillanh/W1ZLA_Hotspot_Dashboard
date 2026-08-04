@@ -109,6 +109,22 @@ class HotspotStatus:
     dvswitch_bridges: List[dict] = field(default_factory=list)
     dvswitch_vocoder: Optional[str] = None
     dvswitch_heard: List[dict] = field(default_factory=list)
+    # Live RX/TX state + link status, sourced from a DIFFERENT DVSwitch
+    # component's log than everything above (MMDVM_Bridge.log, not
+    # Analog_Bridge.log) -- confirmed real end-of-transmission lines with
+    # actual duration/loss/BER, unlike Analog_Bridge.log's start-only
+    # signal. Scoped to DMR + D-Star only (YSF/P25/NXDN write to their own
+    # separate gateway logs, not covered). dvswitch_live is None when
+    # idle, else {mode, call, target} for whichever DMR/D-Star
+    # transmission is currently open (re-scanned fresh from the log tail
+    # every poll, not tracked across polls -- same "no persistent state"
+    # shape as everything else this app tails). dvswitch_dmr_linked is
+    # True/False/None (unknown -- no DMR master connect/disconnect line
+    # seen yet); dvswitch_dstar_status is the raw quoted string from
+    # D-Star's own explicit "link status set to ..." line, or None.
+    dvswitch_live: Optional[dict] = None
+    dvswitch_dmr_linked: Optional[bool] = None
+    dvswitch_dstar_status: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)

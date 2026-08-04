@@ -1379,6 +1379,21 @@
         .dvs-badge.idle {
             color: var(--text-dim); background: transparent; border-color: var(--border);
         }
+        /* Live RX/TX row -- same "on air now" pulsing-dot language as
+           .linked-item.keyed/.hs-link-row.keyed elsewhere, sourced from a
+           genuinely different signal (MMDVM_Bridge.log's real start/end
+           lines) than the rest of this card. */
+        .dvs-live-row {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            font-size: 12px; color: var(--text-dim);
+            padding: 8px 10px; margin-bottom: 14px;
+            background: var(--panel-2); border-radius: 6px;
+        }
+        .dvs-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+        .dvs-live-row.active { color: var(--text); }
+        .dvs-live-row.active .dvs-live-dot { background: var(--live); animation: pulse 1.4s infinite; }
+        .dvs-live-text { font-weight: 600; }
+        .dvs-link-text { margin-left: auto; font-size: 11px; color: var(--text-dim); }
         .dvs-section-title {
             font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
             color: var(--text-dim); margin: 14px 0 8px;
@@ -3286,6 +3301,26 @@ function dvswitchCardHtml(hs) {
     const sparkline = hs.dvswitch_sparkline || [];
     const sparkSvg = sparkline.length ? sparklineSvg(sparkline) : '';
 
+    // Live RX/TX state -- sourced from MMDVM_Bridge.log, a DIFFERENT log
+    // than everything above (bridges/heard/vocoder all come from
+    // Analog_Bridge.log), scoped to DMR + D-Star only (YSF/P25/NXDN write
+    // to their own separate gateway logs, not tailed). Re-scanned fresh
+    // from the log tail every poll -- no "still probably active" guess
+    // carried between polls, so this can under-report idle for a still-
+    // ongoing call whose own start line has scrolled out of the tail (see
+    // monitor.py's _parse_dvswitch_mmdvm_live() for the full reasoning).
+    const live = hs.dvswitch_live;
+    const liveText = live
+        ? `RX ${escapeHtml(live.mode)} — ${escapeHtml(live.call)} → ${escapeHtml(live.target)}`
+        : 'Listening';
+    const liveClass = live ? 'active' : '';
+
+    const linkBits = [];
+    if (hs.dvswitch_dmr_linked === true) linkBits.push('DMR: Linked');
+    else if (hs.dvswitch_dmr_linked === false) linkBits.push('DMR: Not linked');
+    if (hs.dvswitch_dstar_status) linkBits.push('D-Star: ' + escapeHtml(hs.dvswitch_dstar_status.trim()));
+    const linkHtml = linkBits.length ? `<span class="dvs-link-text">${linkBits.join(' · ')}</span>` : '';
+
     const sentinelKey = 'dvs-' + hs.ip;
     const orderStyle = sentinelKey in lastSentinelOrders ? ` style="order:${lastSentinelOrders[sentinelKey]}"` : '';
 
@@ -3294,6 +3329,11 @@ function dvswitchCardHtml(hs) {
             <div class="metrics-header">
                 <div class="card-name">📻 DVSwitch — ${escapeHtml(hs.name)}</div>
                 <div class="dvs-badge ${badgeClass}">${badgeText}</div>
+            </div>
+            <div class="dvs-live-row ${liveClass}">
+                <span class="dvs-live-dot"></span>
+                <span class="dvs-live-text">${liveText}</span>
+                ${linkHtml}
             </div>
             <div class="dvs-section-title">Bridges (by port)</div>
             <div class="split-linked">${bridgeChips}</div>

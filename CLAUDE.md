@@ -3026,6 +3026,73 @@ config for per-integration credentials; put it in
   match. `config.DVSWITCH_VOCODER_GREP_PATTERN` combines both patterns
   for this single alternated grep.
 
+- **Live RX/TX state + link status for the DVSwitch card (v3.72) reads a
+  SECOND, genuinely different DVSwitch component's log --
+  `MMDVM_Bridge.log`, not `Analog_Bridge.log`** -- confirmed real via
+  another live capture from the same user/device, prompted by them
+  showing a screenshot of the OFFICIAL DVSwitch Dashboard's own "TRX
+  Info: RX DMR" indicator and asking whether the same thing was viable
+  here. It's viable, and the data turned out richer than
+  `Analog_Bridge.log` ever had:
+  - **Real, confirmed end-of-transmission lines with actual duration/
+    loss/BER** -- `Analog_Bridge.log` never had one of these (see the
+    Fleet Activity DVSwitch mode entries above, which is why THAT
+    feature counts transmission-starts, not completions). This log has
+    both: `"DMR Slot 2, received network voice header from W1ZLA to TG
+    603"` (start) paired with `"DMR Slot 2, received network end of
+    voice transmission, 2.6 seconds, 0% packet loss, BER: 0.0%"` (end),
+    and the D-Star equivalents (`"D-Star, received network header
+    from..."` / `"D-Star, received network end of transmission..."`).
+  - **Explicit link-status lines** -- D-Star has a direct, literal one:
+    `D-Star link status set to "Not linked          "`. DMR's is
+    implicit, inferred from which of four possible lines was seen most
+    recently: `"DMR, Logged into the master successfully: ..."` (linked)
+    vs. `"DMR, Closing DMR Network"` / `"DMR, Connection to the master
+    has timed out, retrying connection"` (not linked).
+  - **Deliberately scoped to DMR + D-Star only, by explicit user choice**
+    -- YSF/P25/NXDN each write to their OWN separate gateway log file
+    (`YSFGateway-*.log`/`P25Gateway-*.log`/`NXDNGateway-*.log`, confirmed
+    real via a live `ls /var/log/mmdvm/`, not tailed here). Covering
+    those too would mean tailing up to 3 more log files.
+  - **The path is DATE-STAMPED** (`MMDVM_Bridge-YYYY-MM-DD.log`, confirmed
+    via a real `ls -la /var/log/mmdvm/`) -- resolved with the exact same
+    "newest matching file via `ls -1tr | tail -1`" pattern
+    `config.SSH_STATUS_CMD` already uses for WPSD's own differently-
+    pathed `MMDVM-*.log`, not a new technique. A same-named but empty
+    `MMDVM_Bridge.log` (no date) also exists in that directory and is
+    NOT the active file -- confirmed live, don't tail that one by mistake
+    if this is ever touched.
+  - **A real edge case, confirmed live, not hypothetical**: `"DMR Slot 2,
+    network watchdog has expired, 0.1 seconds, ..."` fired mid-
+    transmission (a brief network hiccup) in the actual captured log,
+    immediately followed by a `"late entry"` line resuming the SAME
+    transmission a few milliseconds later. It shares the same trailing
+    "N.N seconds, X% packet loss, BER: X.X%" shape as a real end-of-
+    transmission line, so `_parse_dvswitch_mmdvm_live()` matches it as an
+    end-like event too -- this can make the live indicator flicker
+    idle-then-active-again within milliseconds, invisible at this app's
+    5s poll cadence, so no extra de-flicker logic was added for it.
+  - **`_parse_dvswitch_mmdvm_live()` is stateless -- re-scans the tail
+    fresh every poll, no state carried between polls**, same shape as
+    every other DVSwitch/WPSD log-tail parser in this file. Real,
+    accepted limitation: if a still-ongoing transmission's own START line
+    has already scrolled out of the (40-line) tail window by the time of
+    a given poll -- plausible for an unusually long call with a lot of
+    interleaved `DMR Talker Alias` lines in between -- this under-reports
+    idle rather than guessing. Not treated as a bug; a stateless re-scan
+    can't do better than what's actually visible in its own window.
+  - **Deliberately did NOT try to enrich the existing `dvswitch_heard`
+    list (sourced from `Analog_Bridge.log`'s `Begin TX:` lines) with this
+    log's real duration data.** The two logs' events aren't easily
+    correlated (end-of-transmission lines here carry no callsign, only
+    slot/duration/loss/BER, so matching one to a specific earlier
+    Begin-TX-sourced heard entry would need tracking "which call is
+    currently open per slot" state purely to attribute a duration after
+    the fact) -- scoped out to keep this an additive, independent
+    capability (a new live-status row) rather than risking the already-
+    working Last Heard list. Worth revisiting later if a real want for
+    accurate per-entry durations surfaces.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
