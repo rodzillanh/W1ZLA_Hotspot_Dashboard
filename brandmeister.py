@@ -18,19 +18,23 @@ Endpoints, all keyed by <id> = the hotspot's Brandmeister/CCS7 ID:
   GET /device/{id}/talkgroup  -- array of static talkgroup subscriptions
 
   POST   /device/{id}/talkgroup             -- add a static TG, body
-                                                {"talkgroup": <int>, "slot": <1|2>}
+                                                {"group": <int>, "slot": <1|2>}
   DELETE /device/{id}/talkgroup/{slot}/{group} -- remove one
 
 The two write endpoints DO need auth -- a per-user API key generated from
 the user's own Brandmeister dashboard (Profile Settings -> API Keys),
 sent as `Authorization: Bearer <key>`. Confirmed shape directly from the
 live OpenAPI spec above (no separate login/token-exchange endpoint --
-the generated key IS the bearer token). NOT live-tested against a real
-Brandmeister account (none available in this dev environment) -- if
-linking/unlinking ever fails in a way that doesn't match the error
-messages below, re-verify against a real key/device the same discipline
-as every other reverse-engineered integration in this project, don't
-assume the request shape is still right.
+the generated key IS the bearer token).
+
+CORRECTION (live-tested): the OpenAPI spec's schema summary described the
+POST body field as "talkgroup" -- wrong. A real POST with that key got
+back a real, live `HTTP 455 {"error":"The group field is required."}`
+from Brandmeister itself. The field is actually named `group` (matching
+the DELETE path's own `{group}` segment, which was right all along) --
+fixed below. If another write-shape mismatch like this ever turns up,
+trust the live error response over the OpenAPI summary, the same lesson
+learned here.
 """
 import time
 import threading
@@ -154,7 +158,8 @@ class BrandmeisterClient:
         repeater_id = str(repeater_id).strip()
         ok, message = self._write_request(
             "POST", f"{BM_BASE_URL}device/{repeater_id}/talkgroup", api_key,
-            body={"talkgroup": tg, "slot": slot},
+            # Live-tested field name -- see module docstring's correction.
+            body={"group": tg, "slot": slot},
         )
         if ok:
             self.invalidate(repeater_id)
