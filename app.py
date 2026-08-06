@@ -21,6 +21,7 @@ import qrz as qrz_mod
 from monitor import FleetMonitor
 from storage import load_hotspots, save_hotspots, load_settings, save_settings, \
                    load_favorites, save_favorites, load_asl_favorites, save_asl_favorites, \
+                   load_bm_tg_favorites, save_bm_tg_favorites, \
                    load_cameras, save_cameras, load_qsos, save_qsos, settings_transaction
 from weather import WeatherClient
 from qrz import QrzClient
@@ -53,6 +54,11 @@ import host_stats as host_stats_mod
 app        = Flask(__name__)
 monitor    = FleetMonitor()
 wx         = WeatherClient()
+# Separate from monitor.py's own private BrandmeisterClient (read-only,
+# used by the slow-check loop) -- this one handles the hotspot card
+# drawer's link/unlink talkgroup actions, which need the write endpoints
+# and a fresh post-write lookup() to hand back to monitor.apply_bm_static_tgs().
+bm_write_client = BrandmeisterClient()
 host_stats = HostStats()
 host_stats.start()
 update_checker = UpdateChecker()
@@ -521,6 +527,8 @@ def api_settings_post():
         settings["solar_alerts_enabled"] = bool(data["solar_alerts_enabled"])
     if "brandmeister_alerts_enabled" in data:
         settings["brandmeister_alerts_enabled"] = bool(data["brandmeister_alerts_enabled"])
+    if "brandmeister_api_key" in data:
+        settings["brandmeister_api_key"] = data["brandmeister_api_key"]
     save_settings(settings)
     _settings_txn.__exit__(None, None, None)
     # Rebuilds below intentionally happen AFTER releasing the lock -- they
@@ -594,6 +602,25 @@ def api_asl_favorites_post():
         for f in data if f.get("node", "").strip().isdigit()
     ]
     save_asl_favorites(cleaned)
+    return jsonify({"ok": True})
+
+@app.route("/api/bm_tg_favorites", methods=["GET"])
+def api_bm_tg_favorites_get():
+    return jsonify(load_bm_tg_favorites())
+
+@app.route("/api/bm_tg_favorites", methods=["POST"])
+def api_bm_tg_favorites_post():
+    """Accept full list of Brandmeister talkgroup quick-link favorites and
+    overwrite -- same shape/overwrite convention as ASL favorites above,
+    distinct list entirely (tg+slot, not a node number)."""
+    data = request.json or []
+    cleaned = []
+    for f in data:
+        tg = str(f.get("tg", "")).strip()
+        slot = str(f.get("slot", "")).strip()
+        if tg.isdigit() and slot in ("1", "2"):
+            cleaned.append({"tg": tg, "slot": slot, "label": f.get("label", "").strip()})
+    save_bm_tg_favorites(cleaned)
     return jsonify({"ok": True})
 
 # Canonical declaration order for every "extra card" sentinel -- must
@@ -783,6 +810,7 @@ def setup():
     return render_template("setup.html", hotspots=setup_hotspots,
                            settings=setup_settings, favorites=load_favorites(),
                            cameras=setup_cameras, asl_favorites=load_asl_favorites(),
+                           bm_tg_favorites=load_bm_tg_favorites(),
                            can_power_control=HOST_CAN_POWER_CONTROL,
                            host_is_standalone=HOST_IS_STANDALONE,
                            overflow_sentinels=_overflow_sentinels(setup_settings, setup_hotspots, setup_cameras),
@@ -1367,6 +1395,58 @@ def api_asl_connect():
         client.close()
 
 
+@app.route("/api/brandmeister_talkgroup", methods=["POST"])
+def api_brandmeister_talkgroup():
+    """Link/unlink a static Brandmeister talkgroup for a hotspot's own
+    Brandmeister/CCS7 device -- the hotspot card drawer's "Brandmeister
+    Talkgroups" section. Uses the confirmed-live v2 write endpoints
+    (see brandmeister.py's module docstring) rather than anything TGIF-
+    related -- TGIF has no working API to build against at all (even the
+    third-party WPSD-Dashboard project this was inspired by ships its own
+    TGIF Manager as non-functional, "does not work until TGIF's API is
+    made available")."""
+    data   = request.json or {}
+    ip     = data.get("ip", "").strip()
+    action = data.get("action", "").strip()
+
+    hotspot = next((h for h in load_hotspots() if h["ip"] == ip), None)
+    if hotspot is None:
+        return jsonify({"success": False, "message": "Unknown hotspot"}), 400
+    bm_id = (hotspot.get("brandmeister_id") or "").strip()
+    if not bm_id:
+        return jsonify({"success": False, "message": "No Brandmeister ID configured for this hotspot"}), 400
+
+    api_key = (load_settings().get("brandmeister_api_key") or "").strip()
+    if not api_key:
+        return jsonify({"success": False, "message": "No Brandmeister API key configured (Settings → Integrations)"}), 400
+
+    try:
+        tg   = int(data.get("tg"))
+        slot = int(data.get("slot"))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Invalid talkgroup number"}), 400
+    if slot not in (1, 2):
+        return jsonify({"success": False, "message": "Slot must be 1 or 2"}), 400
+
+    if action == "link":
+        ok, message = bm_write_client.set_static_talkgroup(bm_id, tg, slot, api_key)
+    elif action == "unlink":
+        ok, message = bm_write_client.remove_static_talkgroup(bm_id, tg, slot, api_key)
+    else:
+        return jsonify({"success": False, "message": "Invalid action"}), 400
+
+    if ok:
+        # Reflect the change immediately rather than waiting up to 30 min
+        # for the next run_slow_checks_forever() cycle to re-fetch it --
+        # invalidate() (called inside set_/remove_static_talkgroup on
+        # success) guarantees this lookup() hits the network, not a stale
+        # cached list.
+        info = bm_write_client.lookup(bm_id)
+        if info is not None:
+            monitor.apply_bm_static_tgs(ip, info["static_talkgroups"])
+    return jsonify({"success": ok, "message": message})
+
+
 @app.route("/api/test_qrz", methods=["POST"])
 def test_qrz():
     """Test QRZ credentials by attempting a login and looking up the user's own callsign."""
@@ -1715,7 +1795,7 @@ def api_camera_status():
 def api_export_backup():
     requested = set(
         c.strip() for c in
-        (request.args.get("categories") or "hotspots,favorites,asl_favorites,cameras,settings").split(",")
+        (request.args.get("categories") or "hotspots,favorites,asl_favorites,bm_tg_favorites,cameras,settings").split(",")
         if c.strip()
     )
     backup = {
@@ -1727,6 +1807,8 @@ def api_export_backup():
         backup["favorites"] = load_favorites()
     if "asl_favorites" in requested:
         backup["asl_favorites"] = load_asl_favorites()
+    if "bm_tg_favorites" in requested:
+        backup["bm_tg_favorites"] = load_bm_tg_favorites()
     if "cameras" in requested:
         backup["cameras"] = load_cameras()
     if "settings" in requested:
@@ -1812,6 +1894,25 @@ def api_import_backup():
             asl_favorites = list(by_node.values())
         save_asl_favorites(asl_favorites)
         result["asl_favorites"] = len(asl_favorites)
+
+    if isinstance(data.get("bm_tg_favorites"), list):
+        imported = [
+            {"tg": str(f.get("tg", "")).strip(), "slot": str(f.get("slot", "")).strip(), "label": f.get("label", "").strip()}
+            for f in data["bm_tg_favorites"]
+            if isinstance(f, dict) and str(f.get("tg", "")).strip().isdigit() and str(f.get("slot", "")).strip() in ("1", "2")
+        ]
+        if mode == "replace":
+            bm_tg_favorites = imported
+        else:
+            # Keyed by (tg, slot) together -- the same TG can legitimately
+            # be a separate favorite on TS1 and TS2, unlike ASL favorites'
+            # plain node-number key above.
+            by_key = {(f["tg"], f["slot"]): f for f in load_bm_tg_favorites()}
+            for f in imported:
+                by_key[(f["tg"], f["slot"])] = f
+            bm_tg_favorites = list(by_key.values())
+        save_bm_tg_favorites(bm_tg_favorites)
+        result["bm_tg_favorites"] = len(bm_tg_favorites)
 
     if isinstance(data.get("cameras"), list):
         imported = [

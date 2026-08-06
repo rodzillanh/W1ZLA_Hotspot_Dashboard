@@ -1291,6 +1291,40 @@
         <span class="status-txt" id="hamalert-status"></span>
     </div>
 
+    <div class="section">
+        <div class="section-title">Brandmeister
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — enables talkgroup link/unlink from each hotspot's card
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            A per-user Brandmeister API key lets this dashboard link/unlink
+            static talkgroups directly from a hotspot's own card (the gear
+            icon → Brandmeister Talkgroups section) — no need to log into
+            Brandmeister's own site to change what a hotspot follows.
+            Read-only status/talkgroup display (already shown on that same
+            card) works with no key at all; this only unlocks the
+            link/unlink controls.
+        </p>
+        <div class="form-grid one" style="margin-bottom:10px">
+            <div>
+                <label>Brandmeister API key</label>
+                <input type="password" id="bm-api-key" placeholder="••••••••"
+                       value="{{ settings.get('brandmeister_api_key', '') }}">
+            </div>
+        </div>
+        <p style="font-size:11px;color:var(--text-dim);margin-bottom:12px;line-height:1.5">
+            Generate one from your own
+            <a href="https://dashboard.brandmeister.network" target="_blank" rel="noopener">Brandmeister dashboard</a>
+            → your callsign (top right) → Profile Settings → API Keys → Add.
+            The key is only shown once when created — copy it somewhere safe
+            before leaving that page.
+        </p>
+        <button class="btn btn-primary" onclick="saveBrandmeisterKey()">Save Brandmeister key</button>
+        <span class="status-txt" id="bm-key-status"></span>
+    </div>
+
 </div>
 
 
@@ -1563,6 +1597,45 @@
     </div>
 
     <div class="section">
+        <div class="section-title">Talkgroup Favorites
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                one-tap quick-link chips in each hotspot card's drawer
+            </span>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            A short list of talkgroups you link often (Parrot, local nets, etc.) —
+            shown as one-tap chips in the Brandmeister Talkgroups section of a
+            hotspot card's drawer. Requires a Brandmeister API key
+            (Integrations tab) to actually use; this list itself saves either way.
+        </p>
+        <div id="tg-fav-list">
+            {% for f in bm_tg_favorites %}
+            <div class="drag-row tg-fav-row" style="align-items:center">
+                <span style="color:var(--amber);font-size:13px;flex-shrink:0">📶</span>
+                <input type="text" class="tg-fav-tg inp"
+                       value="{{ f.tg }}" placeholder="TG #" inputmode="numeric"
+                       style="width:80px">
+                <select class="tg-fav-slot inp" style="width:70px">
+                    <option value="1" {{ 'selected' if f.slot == '1' }}>TS1</option>
+                    <option value="2" {{ 'selected' if f.slot == '2' }}>TS2</option>
+                </select>
+                <input type="text" class="tg-fav-label inp"
+                       value="{{ f.label }}" placeholder="Label (optional)"
+                       style="flex:1">
+                <button class="btn btn-danger btn-sm"
+                        onclick="this.closest('.tg-fav-row').remove()">✕</button>
+            </div>
+            {% endfor %}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-info"    onclick="addTgFavorite()">+ Add talkgroup</button>
+            <button class="btn btn-primary" onclick="saveTgFavorites()">Save talkgroup favorites</button>
+            <span class="status-txt" id="tg-fav-status"></span>
+        </div>
+    </div>
+
+    <div class="section">
         <div class="section-title">Browser alerts</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
             Get a browser notification when a favorite callsign comes on the air —
@@ -1616,6 +1689,14 @@
                 <div class="cat-body">
                     <div class="cat-name">ASL Favorites</div>
                     <div class="cat-meta">{{ asl_favorites|length }} nodes</div>
+                </div>
+            </label>
+            <label class="cat-row">
+                <input type="checkbox" id="export-cat-bm_tg_favorites" checked>
+                <span class="cat-icon">📶</span>
+                <div class="cat-body">
+                    <div class="cat-name">Talkgroup Favorites</div>
+                    <div class="cat-meta">{{ bm_tg_favorites|length }} quick-link talkgroups</div>
                 </div>
             </label>
             <label class="cat-row">
@@ -2451,6 +2532,40 @@ function saveFriends() {
     });
 }
 
+function addTgFavorite() {
+    const row = document.createElement('div');
+    row.className        = 'drag-row tg-fav-row';
+    row.style.alignItems = 'center';
+    row.innerHTML = `<span style="color:var(--amber);font-size:13px;flex-shrink:0">📶</span>
+        <input type="text" class="tg-fav-tg inp" placeholder="TG #" inputmode="numeric" style="width:80px">
+        <select class="tg-fav-slot inp" style="width:70px">
+            <option value="1">TS1</option>
+            <option value="2" selected>TS2</option>
+        </select>
+        <input type="text" class="tg-fav-label inp" placeholder="Label (optional)" style="flex:1">
+        <button class="btn btn-danger btn-sm"
+                onclick="this.closest('.tg-fav-row').remove()">✕</button>`;
+    document.getElementById('tg-fav-list').appendChild(row);
+}
+
+function saveTgFavorites() {
+    const rows = document.querySelectorAll('#tg-fav-list .tg-fav-row');
+    const favs = Array.from(rows).map(r => ({
+        tg:    r.querySelector('.tg-fav-tg').value.trim(),
+        slot:  r.querySelector('.tg-fav-slot').value,
+        label: r.querySelector('.tg-fav-label').value.trim(),
+    })).filter(f => f.tg);
+    fetch('/api/bm_tg_favorites', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(favs)
+    }).then(() => {
+        const el = document.getElementById('tg-fav-status');
+        el.textContent = '✓ Saved';
+        setTimeout(() => el.textContent = '', 2000);
+    });
+}
+
 // --- notifications ---
 function requestNotifPermission() {
     const status = document.getElementById('notif-status');
@@ -2489,6 +2604,7 @@ const BACKUP_CATEGORY_META = {
     hotspots:      { icon: '📡', name: 'Hotspots' },
     favorites:     { icon: '⭐', name: 'Favorites' },
     asl_favorites: { icon: '📻', name: 'ASL Favorites' },
+    bm_tg_favorites: { icon: '📶', name: 'Talkgroup Favorites' },
     cameras:       { icon: '📷', name: 'Cameras' },
     settings:      { icon: '⚙️', name: 'Settings' },
 };
@@ -3006,6 +3122,25 @@ async function testHamAlert() {
     status.textContent = data.success ? '✓ ' + data.message : '✕ ' + data.message;
     status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
     setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
+}
+
+// --- Brandmeister API key (no standalone Test button -- the only
+// authenticated endpoints are the write ones, and firing a real
+// link/unlink just to validate a key would mutate a real device's
+// static talkgroups; the drawer's own link/unlink actions surface a
+// clear "API key rejected" message on first real use instead) ---
+function saveBrandmeisterKey() {
+    const status = document.getElementById('bm-key-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            brandmeister_api_key: document.getElementById('bm-api-key').value,
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
 }
 
 // --- APRS favorite alerts ---

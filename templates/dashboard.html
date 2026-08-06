@@ -1546,6 +1546,38 @@
         .hs-tg-chip { font-size: 11px; font-family: var(--font-mono); background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px; padding: 3px 10px; color: var(--text-muted); }
         .hs-bm-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
         .hs-bm-status b { color: var(--good); }
+
+        /* --- Brandmeister Talkgroups (link/unlink) -- upgrades the
+           read-only .hs-tg-chip-row above into something actionable when
+           a Brandmeister API key is configured (BM_WRITE_ENABLED). --- */
+        .hs-tg-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+        .hs-tg-row:last-child { border-bottom: none; }
+        .hs-tg-row.live-now { background: var(--live-dim); border-radius: 6px; padding: 7px 8px; border-bottom: none; margin: 2px 0; }
+        .hs-tg-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+        .hs-tg-row.live-now .hs-tg-dot { background: var(--live); animation: pulse 1.6s ease-in-out infinite; }
+        .hs-tg-num { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--text); width: 58px; flex-shrink: 0; }
+        .hs-tg-body { flex: 1; min-width: 0; }
+        .hs-tg-label { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hs-tg-slot { font-size: 9.5px; font-family: var(--font-mono); color: var(--text-dim); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; }
+        .hs-tg-unlink { padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text-muted); font-family: var(--font-mono); font-size: 10.5px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+        .hs-tg-unlink:hover { color: var(--danger); border-color: var(--danger); }
+        .hs-tg-unlink:disabled { opacity: .6; cursor: default; }
+        .hs-tg-quicklink { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
+        .hs-tg-quicklink input[type="text"] { flex: 1; min-width: 0; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; color: var(--text); font-family: var(--font-mono); font-size: 12px; }
+        .hs-tg-quicklink select { background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 6px; color: var(--text); font-family: var(--font-mono); font-size: 12px; flex-shrink: 0; }
+        .hs-tg-quicklink button { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent-dim); color: var(--accent); font-family: var(--font-mono); font-size: 11.5px; font-weight: 600; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+        .hs-tg-quicklink button:hover { background: var(--accent); color: var(--accent-ink); }
+        .hs-tg-quicklink button:disabled { opacity: .5; cursor: default; background: var(--accent-dim); color: var(--accent); }
+        .hs-tg-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 4px; }
+        .hs-tg-chip-btn { font-size: 11px; font-family: var(--font-mono); background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px; padding: 4px 11px; color: var(--text-muted); cursor: pointer; }
+        .hs-tg-chip-btn:hover { color: var(--accent); border-color: var(--accent); }
+        .hs-tg-chip-btn:disabled { opacity: .45; cursor: default; }
+        .hs-tg-source-note { font-size: 10.5px; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
+        .hs-tg-source-note a { color: var(--live); text-decoration: none; }
+        .hs-tg-source-note a:hover { text-decoration: underline; }
+        .hs-tg-nokey { font-size: 11.5px; color: var(--text-dim); margin-top: 10px; line-height: 1.5; }
+        .hs-tg-nokey a { color: var(--accent); text-decoration: none; font-weight: 600; }
+        .hs-tg-nokey a:hover { text-decoration: underline; }
         .hs-update-note { font-size: 11.5px; color: var(--text-dim); background: var(--panel-2); border-radius: 6px; padding: 8px 10px; line-height: 1.5; margin-top: 4px; }
         .hs-update-note b { color: var(--accent); }
         .hs-empty-note { font-size: 12px; color: var(--text-dim); padding: 4px 0; }
@@ -2524,6 +2556,10 @@ const SHOW_HOST_STATS    = {{ 'true' if settings.get('show_host_stats', True) el
 const DISTANCE_UNIT      = "{{ settings.get('weather_unit', 'F') }}";  // "F" -> miles, "C" -> km
 const DARK_MODE          = {{ 'true' if settings.dark_mode else 'false' }};
 const ONBOARDING_TOUR_SEEN = {{ 'true' if settings.get('onboarding_tour_seen', True) else 'false' }};
+// Gates the hotspot card drawer's Brandmeister link/unlink controls --
+// read-only status/talkgroup display works with no key at all (existing
+// bm_status_text/bm_static_tgs, unaffected by this flag).
+const BM_WRITE_ENABLED = {{ 'true' if settings.get('brandmeister_api_key') else 'false' }};
 // Secondary sort key for computeCardOrders() -- see setup.html's
 // saveCardOrder() and app.py's _overflow_sentinels() for why *_position
 // alone can't distinguish relative order among cards sharing the same
@@ -6162,22 +6198,58 @@ function openHotspotDrawer(ip) {
 
     let bmHtml = '';
     if (!isAsl && !isOpenSpot4) {
-        if (hs.bm_status_text || (hs.bm_static_tgs && hs.bm_static_tgs.length)) {
-            bmHtml = `
-            <div class="hs-drawer-section">
-                <div class="hs-drawer-section-title">Brandmeister</div>
-                ${hs.bm_status_text ? `<div class="hs-bm-status">Status: <b>${escapeHtml(hs.bm_status_text)}</b></div>` : ''}
-                ${(hs.bm_static_tgs && hs.bm_static_tgs.length) ? `
-                <div class="hs-tg-chip-row">
-                    ${hs.bm_static_tgs.map(t => `<span class="hs-tg-chip">TG ${escapeHtml(String(t.talkgroup))}${t.slot ? ' · TS' + escapeHtml(String(t.slot)) : ''}</span>`).join('')}
-                </div>` : ''}
-            </div>`;
-        } else {
+        const bmTgs = hs.bm_static_tgs || [];
+        if (!hs.bm_status_text && !bmTgs.length) {
             bmHtml = `
             <div class="hs-drawer-section">
                 <div class="hs-drawer-section-title">Brandmeister</div>
                 <div class="hs-empty-note">No Brandmeister ID configured for this hotspot.</div>
             </div>`;
+        } else {
+            const statusLine = hs.bm_status_text ? `<div class="hs-bm-status">Status: <b>${escapeHtml(hs.bm_status_text)}</b></div>` : '';
+            if (!BM_WRITE_ENABLED) {
+                // Read-only fallback -- unchanged from before this feature,
+                // just with a nudge toward the setting that unlocks the rest.
+                bmHtml = `
+                <div class="hs-drawer-section">
+                    <div class="hs-drawer-section-title">Brandmeister</div>
+                    ${statusLine}
+                    ${bmTgs.length ? `<div class="hs-tg-chip-row">${bmTgs.map(t => `<span class="hs-tg-chip">TG ${escapeHtml(String(t.talkgroup))}${t.slot ? ' · TS' + escapeHtml(String(t.slot)) : ''}</span>`).join('')}</div>` : ''}
+                    <div class="hs-tg-nokey">Add a Brandmeister API key in <a href="/setup#integrations">Settings → Integrations</a> to link/unlink talkgroups from here.</div>
+                </div>`;
+            } else {
+                const rows = bmTgs.map(t => {
+                    const tgNum = String(t.talkgroup);
+                    const slot  = (t.slot !== null && t.slot !== undefined) ? String(t.slot) : '';
+                    const fav   = bmTgFavorites.find(f => f.tg === tgNum && f.slot === slot);
+                    const live  = !!hs.is_active && String(hs.talkgroup || '') === tgNum;
+                    return `
+                    <div class="hs-tg-row ${live ? 'live-now' : ''}">
+                        <span class="hs-tg-dot"></span>
+                        <span class="hs-tg-num">${escapeHtml(tgNum)}</span>
+                        <div class="hs-tg-body"><div class="hs-tg-label">${fav && fav.label ? escapeHtml(fav.label) : (live ? 'On air now' : '—')}</div></div>
+                        ${slot ? `<span class="hs-tg-slot">TS${escapeHtml(slot)}</span>` : ''}
+                        <button class="hs-tg-unlink" data-tg="${escapeHtml(tgNum)}" data-slot="${escapeHtml(slot)}" onclick="unlinkTalkgroup(this)">Unlink</button>
+                    </div>`;
+                }).join('');
+                const chips = bmTgFavorites.map(f => {
+                    const already = bmTgs.some(t => String(t.talkgroup) === f.tg && String(t.slot || '') === f.slot);
+                    return `<button class="hs-tg-chip-btn" data-tg="${escapeHtml(f.tg)}" data-slot="${escapeHtml(f.slot)}" ${already ? 'disabled' : ''} onclick="quickLinkTalkgroup(this)">${escapeHtml(f.label || ('TG ' + f.tg))} · ${escapeHtml(f.tg)}</button>`;
+                }).join('');
+                bmHtml = `
+                <div class="hs-drawer-section">
+                    <div class="hs-drawer-section-title">Brandmeister Talkgroups <span class="count">(${bmTgs.length})</span></div>
+                    ${statusLine}
+                    ${rows || '<div class="hs-empty-note">No static talkgroups — hotspot follows whatever TG was last heard.</div>'}
+                    <div class="hs-tg-quicklink" style="margin-top:${bmTgs.length ? '10' : '4'}px">
+                        <input type="text" id="tg-link-input" placeholder="TG number…" inputmode="numeric">
+                        <select id="tg-link-slot"><option value="1">TS1</option><option value="2" selected>TS2</option></select>
+                        <button id="tg-link-btn" onclick="linkTalkgroup()">Link</button>
+                    </div>
+                    <span class="hs-test-result" id="tg-link-result" style="display:block;margin:-4px 0 10px;"></span>
+                    ${chips ? `<div class="hs-tg-chips">${chips}</div>` : ''}
+                </div>`;
+            }
         }
     }
 
@@ -6529,6 +6601,93 @@ function hotspotLinkAction(btn) {
             } else {
                 btn.textContent = linked ? 'Disconnect' : 'Connect';
             }
+        });
+}
+
+// --- Brandmeister talkgroup link/unlink (hotspot card drawer) ---
+function bmDrawerHotspot() {
+    return (lastApiData || []).find(h => h.ip === currentDrawerIp);
+}
+
+function linkTalkgroup() {
+    if (!currentDrawerIp) return;
+    const input  = document.getElementById('tg-link-input');
+    const slotEl = document.getElementById('tg-link-slot');
+    const result = document.getElementById('tg-link-result');
+    const btn    = document.getElementById('tg-link-btn');
+    const tg     = input.value.trim();
+    const slot   = slotEl.value;
+    if (!/^\d+$/.test(tg)) {
+        result.className = 'hs-test-result fail';
+        result.textContent = '✕ Enter a talkgroup number';
+        return;
+    }
+    const hs = bmDrawerHotspot();
+    if (hs && (hs.bm_static_tgs || []).some(t => String(t.talkgroup) === tg && String(t.slot || '') === slot)) {
+        result.className = 'hs-test-result fail';
+        result.textContent = '✕ Already linked on TS' + slot;
+        return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Linking…';
+    result.className = 'hs-test-result';
+    result.textContent = 'Sending to Brandmeister…';
+    fetch('/api/brandmeister_talkgroup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ip: currentDrawerIp, action: 'link', tg, slot})
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && hs) {
+                hs.bm_static_tgs = (hs.bm_static_tgs || []).concat([{talkgroup: tg, slot}]);
+                openHotspotDrawer(currentDrawerIp);
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'Link';
+                result.className = 'hs-test-result fail';
+                result.textContent = '✕ ' + (data.message || 'Failed');
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.textContent = 'Link';
+            result.className = 'hs-test-result fail';
+            result.textContent = '✕ Request failed';
+        });
+}
+
+function quickLinkTalkgroup(chipBtn) {
+    document.getElementById('tg-link-input').value = chipBtn.dataset.tg;
+    document.getElementById('tg-link-slot').value = chipBtn.dataset.slot;
+    linkTalkgroup();
+}
+
+function unlinkTalkgroup(btn) {
+    if (!currentDrawerIp) return;
+    const tg   = btn.dataset.tg;
+    const slot = btn.dataset.slot;
+    btn.disabled = true;
+    btn.textContent = 'Unlinking…';
+    fetch('/api/brandmeister_talkgroup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ip: currentDrawerIp, action: 'unlink', tg, slot})
+    })
+        .then(r => r.json())
+        .then(data => {
+            const hs = bmDrawerHotspot();
+            if (data.success && hs) {
+                hs.bm_static_tgs = (hs.bm_static_tgs || []).filter(t => !(String(t.talkgroup) === tg && String(t.slot || '') === slot));
+                openHotspotDrawer(currentDrawerIp);
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'Unlink';
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.textContent = 'Unlink';
         });
 }
 
@@ -7275,6 +7434,15 @@ function fetchAslFavorites() {
         });
 }
 
+// --- Brandmeister talkgroup favorites (quick-link chips) ---
+let bmTgFavorites = [];    // [{tg, slot, label}, ...] from /api/bm_tg_favorites
+
+function fetchBmTgFavorites() {
+    fetch('/api/bm_tg_favorites')
+        .then(r => r.json())
+        .then(data => { bmTgFavorites = data; });
+}
+
 function renderAslFavorites() {
     const select   = document.getElementById('asl-fav-hotspot-select');
     const tbody    = document.getElementById('asl-fav-tbody');
@@ -7584,6 +7752,7 @@ function aslDrawerQuickConnect(ip, action) {
 }
 
 if (SHOW_ASL_FAVORITES) fetchAslFavorites();
+if (BM_WRITE_ENABLED) fetchBmTgFavorites();
 
 // --- main poll loop ---
 function refresh() {

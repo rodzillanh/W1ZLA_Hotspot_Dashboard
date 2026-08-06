@@ -10,12 +10,27 @@ No API key/auth needed for the read-only GETs used here (auth is only
 required on the write endpoints -- POST/DELETE talkgroup subscriptions --
 which this dashboard doesn't use).
 
-Two endpoints, both keyed by <id> = the hotspot's Brandmeister/CCS7 ID:
+Endpoints, all keyed by <id> = the hotspot's Brandmeister/CCS7 ID:
   GET /device/{id}            -- basic info, including `statusText`
                                   (e.g. "DMO", not a simple online/offline
                                   flag -- shown as-is rather than guessed
                                   at)
   GET /device/{id}/talkgroup  -- array of static talkgroup subscriptions
+
+  POST   /device/{id}/talkgroup             -- add a static TG, body
+                                                {"talkgroup": <int>, "slot": <1|2>}
+  DELETE /device/{id}/talkgroup/{slot}/{group} -- remove one
+
+The two write endpoints DO need auth -- a per-user API key generated from
+the user's own Brandmeister dashboard (Profile Settings -> API Keys),
+sent as `Authorization: Bearer <key>`. Confirmed shape directly from the
+live OpenAPI spec above (no separate login/token-exchange endpoint --
+the generated key IS the bearer token). NOT live-tested against a real
+Brandmeister account (none available in this dev environment) -- if
+linking/unlinking ever fails in a way that doesn't match the error
+messages below, re-verify against a real key/device the same discipline
+as every other reverse-engineered integration in this project, don't
+assume the request shape is still right.
 """
 import time
 import threading
@@ -102,3 +117,57 @@ class BrandmeisterClient:
             "static_talkgroups": static_tgs,
         }
         return result, status, "ok"
+
+    def invalidate(self, repeater_id: str) -> None:
+        """Drop any cached lookup() result for this device -- called after
+        a successful write so the very next lookup() (used to reflect the
+        change back into monitor.py's live snapshot) hits the network
+        instead of returning what's now a stale cached list."""
+        with self._lock:
+            self._cache.pop(str(repeater_id).strip(), None)
+
+    def _write_request(self, method: str, url: str, api_key: str, body: Optional[dict] = None):
+        """Returns (ok: bool, message: str). Never raises -- same
+        degrade-gracefully contract as every other client in this app."""
+        try:
+            data = json.dumps(body).encode("utf-8") if body is not None else None
+            req = urllib.request.Request(url, data=data, method=method, headers={
+                "User-Agent":    config.BRANDMEISTER_AGENT,
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type":  "application/json",
+            })
+            with urllib.request.urlopen(req, timeout=config.BRANDMEISTER_TIMEOUT) as resp:
+                resp.read()
+            return True, "ok"
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", errors="replace")[:200]
+            if e.code == 401:
+                return False, "Brandmeister rejected the API key (401 Unauthorized)"
+            if e.code == 403:
+                return False, "API key doesn't have permission for this device (403 Forbidden)"
+            return False, f"Brandmeister returned HTTP {e.code}" + (f": {detail}" if detail else "")
+        except Exception as e:
+            return False, f"{type(e).__name__}: {e}"
+
+    def set_static_talkgroup(self, repeater_id: str, tg: int, slot: int, api_key: str):
+        """POST a new static talkgroup subscription. Returns (ok, message)."""
+        repeater_id = str(repeater_id).strip()
+        ok, message = self._write_request(
+            "POST", f"{BM_BASE_URL}device/{repeater_id}/talkgroup", api_key,
+            body={"talkgroup": tg, "slot": slot},
+        )
+        if ok:
+            self.invalidate(repeater_id)
+            message = f"Linked TG {tg} on TS{slot}"
+        return ok, message
+
+    def remove_static_talkgroup(self, repeater_id: str, tg: int, slot: int, api_key: str):
+        """DELETE an existing static talkgroup subscription. Returns (ok, message)."""
+        repeater_id = str(repeater_id).strip()
+        ok, message = self._write_request(
+            "DELETE", f"{BM_BASE_URL}device/{repeater_id}/talkgroup/{slot}/{tg}", api_key,
+        )
+        if ok:
+            self.invalidate(repeater_id)
+            message = f"Unlinked TG {tg} on TS{slot}"
+        return ok, message

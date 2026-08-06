@@ -613,6 +613,16 @@ class FleetMonitor:
     def apply_favorite_match(self, call: str) -> "tuple[bool, str | None]":
         return self._apply_favorite_match(call)
 
+    def apply_bm_static_tgs(self, ip: str, static_tgs: list) -> None:
+        """Called by app.py right after a successful Brandmeister
+        link/unlink so the hotspot card drawer reflects the change on the
+        very next /api/data poll (3s), instead of waiting for the next
+        run_slow_checks_forever() cycle (30 min) to re-fetch it. Same
+        "poke _data directly" shape as apply_external_update() above."""
+        with self._lock:
+            if ip in self._data:
+                self._data[ip].bm_static_tgs = static_tgs
+
     def log_activity(self, ip: str) -> None:
         self._log_activity(ip)
 
