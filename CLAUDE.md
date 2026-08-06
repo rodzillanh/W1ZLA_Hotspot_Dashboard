@@ -3241,6 +3241,57 @@ config for per-integration credentials; put it in
     is ever picked again, grep the existing `VERSION_CODENAMES` list first
     for the candidate surname, not just for whether the person is real.
 
+- **ASL Favorites' "ASL Control" sidebar (v3.75) is styled and laid out
+  closer to [AllScan](https://github.com/davidgsd/AllScan)'s node-control
+  panel (a local-node status strip, a keyed banner, denser per-node rows)
+  than the compact card, but is deliberately NOT a skin-copy of AllScan's
+  own look -- every token/class it uses is this app's own, same as every
+  other mockup-to-real-feature in this project.** Reuses the compact
+  card's existing state/functions wholesale rather than duplicating them:
+  `aslFavorites`/`aslSelectedHotspotIp`/`lastApiData` are the same
+  globals; `aslConnect()`/`addAslFavorite()` gained optional trailing id
+  params (`statusElId`, `nodeInputId`/`labelInputId`) so the sidebar can
+  point them at its own DOM elements -- every existing call site (no
+  extra args) is unchanged, defaulting back to the compact card's own
+  element ids. `saveAslFavorites()` now calls `renderAslDrawer()`
+  alongside `renderAslFavorites()` on every save, and the main poll
+  loop's `refresh()` does the same every 3s -- `renderAslDrawer()` itself
+  is a no-op (`if (!drawer.classList.contains('open')) return;`) whenever
+  the sidebar isn't open, the same "cheap to call unconditionally, real
+  work only happens if open" shape every other drawer-in-a-poll-loop
+  pattern in this app already uses.
+  - **The local-node status strip is genuinely new UI, not new data** --
+    the controlling hotspot's own `is_active`/`active_call`/
+    `temperature`/`uptime` were already in `lastApiData` every poll
+    (same fields the hotspot card drawer's own stats row reads); the
+    compact ASL Favorites card just never surfaced them, since it only
+    ever displays the FAVORITES' live state, never the controlling
+    node's own.
+  - **"Quick connect" (any node #, not just a saved favorite) reuses
+    `/api/asl_connect` directly, with no new endpoint** -- it's
+    `aslConnect(ip, node, 'connect', 'asl-drawer-status')` called with a
+    node that was never added to `aslFavorites` at all. This still
+    respects the compact card's "Keep existing connections" checkbox
+    (looked up by a fixed id, `asl-fav-keep-connections`, which is always
+    in the DOM regardless of whether the sidebar is open, since the card
+    itself never goes away) -- same behavior, not a second implementation
+    of the "disconnect others first" logic.
+  - **Deliberately did NOT add a "Monitor" (receive-only) button,
+    even though the mockup and AllScan itself both have one.** This app
+    only implements two AllStarLink ilink function codes today --
+    `ASL_ILINK_CONNECT = 3` and `ASL_ILINK_DISCONNECT = 11`, both
+    confirmed against a real node and against AllScan's own
+    `connect.php` before being trusted (see the ASL3 connect/disconnect
+    gotcha earlier in this file). A third "Monitor" mode needs the exact
+    same verification discipline -- read AllScan's real source (or test
+    against a live node) to confirm the actual function code -- before
+    `config.ASL_ILINK_MONITOR` and a third `/api/asl_connect` action get
+    added. Don't add a Monitor button that calls the existing
+    `connect`/`disconnect` actions with a guessed third value; that would
+    ship a feature that either silently no-ops or does something
+    unintended on a real node, exactly the class of mistake this
+    project's own AllStarLink gotchas already document avoiding once.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
