@@ -3338,8 +3338,27 @@ config for per-integration credentials; put it in
     e.g. the ilink codes above were -- if a real device ever shows
     AllScan living at a different path, fix this one spot plus the
     matching link in the ASL Control sidebar's local-node strip
-    (`asl-ctrl-allscan-link`), which was deliberately built to reuse the
-    exact same `http://<ip>/allscan` shape rather than a second guess.
+    (`asl-ctrl-allscan-btn`, see next entry), which was deliberately
+    built to reuse the exact same `http://<ip>/allscan` shape rather
+    than a second guess.
+  - **The sidebar's AllScan link (v3.81) went through a real mockup-
+    iteration cycle before landing on its current shape, worth noting
+    since it's the kind of thing that looks obviously fine on the first
+    try and isn't.** Originally a plain text link (`asl-ctrl-allscan-
+    link`) stacked under the local-node strip's uptime/temp figures --
+    the user flagged, from a live screenshot of the running app, that it
+    read as just another stat rather than an actionable link. Three
+    placements were mocked up (a header button, a pill next to the node
+    name, a full-width button below the strip); the user picked the
+    full-width button but asked for it smaller than shown. Landed on
+    `asl-ctrl-allscan-btn` -- a bordered, `--live`-tinted full-width
+    button (`padding: 6px`, `font-size: 11px`, deliberately smaller than
+    the mockup's `9px`/`12.5px`) sitting as its own element right after
+    `.asl-ctrl-localnode`, not inside it. If this ever needs revisiting,
+    a live screenshot from the user (like the one that caught this) is
+    worth more than reasoning about the markup alone -- the corner-link
+    version looked reasonable in isolation and only read as wrong once
+    seen rendered in the actual app.
 
 - **Brandmeister talkgroup link/unlink (v3.79) was built and shipped;
   TGIF link/unlink was investigated in the same session and deliberately
