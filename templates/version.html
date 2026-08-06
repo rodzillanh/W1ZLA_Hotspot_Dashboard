@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.75 "Scott"</span>
+                <span class="release-version">v3.76 "Bolan"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL Control sidebar: Monitor mode</span> — a receive-only link option (hear a node without your own audio going out to it), next to Connect/Disconnect on every favorite row and the Quick connect field. Uses AllStarLink ilink code 2, confirmed directly from AllScan's own <code>connect.php</code> source before being added. Also added the sidebar's own "Keep existing connections" toggle (same behavior as the compact card's, just reachable without leaving the sidebar) — unchecked, connecting to one node disconnects any other currently-connected favorite first</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.75 "Scott"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>ASL Favorites: "ASL Control" sidebar</span> — a new gear icon opens a wider control sidebar alongside the existing compact card. Adds a local-node status strip showing the controlling hotspot's own live state (keyed/idle, temp, uptime — never shown on the compact card, which only displays the favorites' state), and a "Quick connect" field for linking to any node number without saving it as a favorite first. The favorites list itself, and Connect/Disconnect, are unchanged — just reused in a denser layout with room to grow</li>

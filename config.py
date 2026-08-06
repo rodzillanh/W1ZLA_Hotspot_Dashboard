@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.75"
+APP_VERSION = "3.76"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -41,6 +41,7 @@ VERSION_CODENAMES = [
                         # while cutting v3.74
     "Vaughan",          # v3.74 -- Stevie Ray Vaughan (1954-1990)
     "Scott",            # v3.75 -- Bon Scott, AC/DC (1946-1980)
+    "Bolan",            # v3.76 -- Marc Bolan, T. Rex (1947-1977)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -325,6 +326,18 @@ OPENSPOT4_RECONNECT_BACKOFF = int(os.environ.get("OPENSPOT4_RECONNECT_BACKOFF", 
 # production tool) and against a real node (W1ZLA, node 59929).
 ASL_ILINK_CONNECT    = 3   # connect specified link, transceive (temporary)
 ASL_ILINK_DISCONNECT = 11  # disconnect specified link
+# Monitor = receive-only link (you hear the remote node, your own audio
+# doesn't go out to it). Confirmed directly from AllScan's connect.php
+# (fetched 2026-08, same file the two codes above were already verified
+# against) rather than recalled from memory -- that file's switch
+# statement maps button=='monitor' -> ilink 2 (non-permanent) / 12
+# (permanent). This app has no "permanent" connection concept anywhere
+# (every ASL3 link here is a session link), so only the non-permanent
+# code is used. AllScan also has a stricter "Local Monitor" mode (ilink
+# 8/12->18 permanent) that doesn't relay onward to other connected
+# links -- NOT implemented here; only plain Monitor was ever mocked up
+# and asked for.
+ASL_ILINK_MONITOR = 2
 
 
 def build_asl_ilink_cmd(local_node: str, ilink_code: int, remote_node: str) -> str:
@@ -337,7 +350,7 @@ def build_asl_ilink_cmd(local_node: str, ilink_code: int, remote_node: str) -> s
         raise ValueError(f"invalid ASL node number: {local_node!r}")
     if not remote_node.isdigit():
         raise ValueError(f"invalid ASL node number: {remote_node!r}")
-    if ilink_code not in (ASL_ILINK_CONNECT, ASL_ILINK_DISCONNECT):
+    if ilink_code not in (ASL_ILINK_CONNECT, ASL_ILINK_MONITOR, ASL_ILINK_DISCONNECT):
         raise ValueError(f"invalid ilink code: {ilink_code!r}")
     return f'sudo asterisk -rx "rpt cmd {local_node} ilink {ilink_code} {remote_node}"'
 

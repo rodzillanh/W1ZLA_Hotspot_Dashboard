@@ -3276,21 +3276,57 @@ config for per-integration credentials; put it in
     in the DOM regardless of whether the sidebar is open, since the card
     itself never goes away) -- same behavior, not a second implementation
     of the "disconnect others first" logic.
-  - **Deliberately did NOT add a "Monitor" (receive-only) button,
-    even though the mockup and AllScan itself both have one.** This app
-    only implements two AllStarLink ilink function codes today --
-    `ASL_ILINK_CONNECT = 3` and `ASL_ILINK_DISCONNECT = 11`, both
-    confirmed against a real node and against AllScan's own
-    `connect.php` before being trusted (see the ASL3 connect/disconnect
-    gotcha earlier in this file). A third "Monitor" mode needs the exact
-    same verification discipline -- read AllScan's real source (or test
-    against a live node) to confirm the actual function code -- before
-    `config.ASL_ILINK_MONITOR` and a third `/api/asl_connect` action get
-    added. Don't add a Monitor button that calls the existing
-    `connect`/`disconnect` actions with a guessed third value; that would
-    ship a feature that either silently no-ops or does something
-    unintended on a real node, exactly the class of mistake this
-    project's own AllStarLink gotchas already document avoiding once.
+  - **Monitor mode (v3.76) was added only after the code above was
+    directly fetched and read, not guessed.** `raw.githubusercontent.com/
+    davidgsd/AllScan/master/astapi/connect.php` was pulled fresh and its
+    `switch($button)` block read in full: `case 'monitor':` maps to ilink
+    `2` (non-permanent) / `12` (permanent) -- confirming `ASL_ILINK_MONITOR
+    = 2` is correct, not assumed from the "code 2 is probably Monitor"
+    guess this file's own earlier entry had explicitly flagged as
+    unverified. The same source also revealed codes this app does NOT
+    implement and deliberately isn't adding here: `13`/`12`/`18` are
+    "permanent" variants of Connect/Monitor/Local-Monitor (persist across
+    an Asterisk restart -- this app has no "permanent" concept anywhere),
+    `8`/`18` are "Local Monitor" (a stricter receive-only mode that
+    doesn't relay onward to other connected links, distinct from plain
+    Monitor), and `6` with `remotenode=0` is "disconnect all" (this app's
+    existing "Keep existing connections" logic achieves a similar effect
+    already, by disconnecting each of *this app's own* favorites
+    individually rather than one blanket ilink-6 call -- not the same
+    mechanism, kept as-is). **If Local Monitor, permanent links, or
+    disconnect-all are ever requested, re-fetch and re-read this same
+    file rather than assuming the pattern generalizes** -- confirmed once
+    for Monitor specifically, not for the whole `case` block.
+  - **`build_asl_ilink_cmd()`'s own validation guard
+    (`ilink_code not in (...)`) had to be updated too** -- easy to miss
+    since adding a new module-level constant doesn't itself widen a
+    separate allow-list check elsewhere. Caught by a live end-to-end test
+    (mocked SSH client, real `/api/asl_connect` call with
+    `action: "monitor"`, asserting the actual built command string
+    contains `ilink 2`) rather than trusting a green `py_compile` --
+    without the guard fix, every real Monitor click would have raised a
+    500 despite the route and JS both being correct.
+  - **The "Keep existing connections" toggle got its own copy in the
+    sidebar** (`#asl-drawer-keep-connections`), not shared with the
+    compact card's (`#asl-fav-keep-connections`) -- `aslConnect()` gained
+    a `keepCbId` param (same generalization pattern as `statusElId`
+    before it) so each surface's buttons point at its own checkbox.
+    Deliberately independent, not synced: this is a per-action modifier
+    read fresh at click time, not a persisted setting, so there's nothing
+    to keep in sync -- whichever surface you click Connect from, that
+    surface's own checkbox applies. Matches AllScan's own `connect.php`
+    too: `autodisc` there only affects the `case 'connect':` branch, not
+    `monitor`/`localmonitor`/`disconnect` -- this app's existing
+    `if (action === 'connect' && ...)` guard already matched that
+    real behavior before Monitor was even added, so it needed no change.
+  - **Monitor mode is sidebar-only, not added to the compact card's own
+    table** -- that table is a plain 2-column layout with a single
+    action button per row; adding a third button there would mean
+    redesigning it, and the whole point of the gear-icon pattern
+    elsewhere in this app is that the compact view stays simple while
+    the drawer/sidebar is where a deeper feature set lives. Don't add
+    Monitor to the card without deciding that tradeoff is worth it, not
+    as an oversight to quietly fix.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

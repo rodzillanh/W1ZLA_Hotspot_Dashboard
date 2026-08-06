@@ -1318,9 +1318,10 @@ def test_openspot4():
 
 @app.route("/api/asl_connect", methods=["POST"])
 def api_asl_connect():
-    """Connect or disconnect a link on an ASL3 hotspot -- the dashboard's
-    "ASL Favorites & Control" card. Uses `rpt cmd <node> ilink <code>
-    <remotenode>` (confirmed against a real node, and matches how AllScan
+    """Connect, monitor (receive-only), or disconnect a link on an ASL3
+    hotspot -- the dashboard's "ASL Favorites & Control" card and ASL
+    Control sidebar. Uses `rpt cmd <node> ilink <code> <remotenode>`
+    (confirmed against a real node, and matches how AllScan
     -- https://github.com/davidgsd/AllScan -- does the same thing), NOT the
     DTMF-simulated `rpt fun <node> *3<remotenode>` form, which requires
     replicating app_rpt's digit-collection state machine and proved
@@ -1338,6 +1339,7 @@ def api_asl_connect():
         return jsonify({"success": False, "message": "Invalid node number"}), 400
     ilink_code = {
         "connect":    config.ASL_ILINK_CONNECT,
+        "monitor":    config.ASL_ILINK_MONITOR,
         "disconnect": config.ASL_ILINK_DISCONNECT,
     }.get(action)
     if ilink_code is None:
