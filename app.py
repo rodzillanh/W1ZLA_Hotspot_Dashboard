@@ -477,6 +477,13 @@ def api_settings_post():
             settings["top_activity_position"] = max(0, int(data["top_activity_position"]))
         except (TypeError, ValueError):
             pass
+    if "show_awards" in data:
+        settings["show_awards"] = bool(data["show_awards"])
+    if "awards_position" in data:
+        try:
+            settings["awards_position"] = max(0, int(data["awards_position"]))
+        except (TypeError, ValueError):
+            pass
     if "wsjtx_enabled" in data:
         settings["wsjtx_enabled"] = bool(data["wsjtx_enabled"])
     if "wsjtx_port" in data:
@@ -608,6 +615,7 @@ _SENTINEL_DEFS = [
     ("__recent_contacts__", "show_recent_contacts", "recent_contacts_position", "📻", "Recent Contacts", "logged QSO card"),
     ("__qso_stats__", "show_qso_stats", "qso_stats_position", "📈", "QSO Stats", "logbook summary card"),
     ("__top_activity__", "show_top_activity", "top_activity_position", "🏆", "Top 5 Activity", "fleet callsign activity ranking card"),
+    ("__awards__", "show_awards", "awards_position", "🎖️", "Awards", "DXCC/WAS/WAC progress card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}

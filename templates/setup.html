@@ -691,6 +691,16 @@
                 <div class="toggle {{ 'on' if settings.get('show_top_activity', False) else '' }}"
                      id="top-activity-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show Awards card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (DXCC entities/next milestone, Worked All Continents, Worked All States, band x mode
+                        worked -- ranks the same logged QSOs against classic ham awards)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_awards', False) else '' }}"
+                     id="awards-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
 
             <div class="toggle-subhead">Notifications card sources</div>
             <div class="toggle-row">
@@ -797,6 +807,7 @@
             {% set recent_contacts_pos = settings.get('recent_contacts_position', 0) if settings.get('show_recent_contacts', False) else -1 %}
             {% set qso_stats_pos = settings.get('qso_stats_position', 0) if settings.get('show_qso_stats', False) else -1 %}
             {% set top_activity_pos = settings.get('top_activity_position', 0) if settings.get('show_top_activity', False) else -1 %}
+            {% set awards_pos = settings.get('awards_position', 0) if settings.get('show_awards', False) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -888,6 +899,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🏆 Top 5 Activity</span>
                     <span class="node-meta">fleet callsign activity ranking card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == awards_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__awards__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🎖️ Awards</span>
+                    <span class="node-meta">DXCC/WAS/WAC progress card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -1815,6 +1833,7 @@ function saveCards() {
             fleet_alerts_enabled: document.getElementById('fleet-alerts-toggle').classList.contains('on'),
             solar_alerts_enabled: document.getElementById('solar-alerts-toggle').classList.contains('on'),
             show_top_activity: document.getElementById('top-activity-toggle').classList.contains('on'),
+            show_awards: document.getElementById('awards-toggle').classList.contains('on'),
             brandmeister_alerts_enabled: document.getElementById('brandmeister-alerts-toggle').classList.contains('on'),
         })
     }).then(() => {
@@ -1982,6 +2001,7 @@ function saveCardOrder() {
     const recentContactsIdx = sentinelIndex('__recent_contacts__');
     const qsoStatsIdx = sentinelIndex('__qso_stats__');
     const topActivityIdx = sentinelIndex('__top_activity__');
+    const awardsIdx = sentinelIndex('__awards__');
     const cameraPositions = {};
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
@@ -2109,6 +2129,13 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ top_activity_position: topActivityIdx })
+        }));
+    }
+    if (awardsIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ awards_position: awardsIdx })
         }));
     }
     if (Object.keys(cameraPositions).length > 0) {

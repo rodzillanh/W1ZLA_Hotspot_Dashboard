@@ -137,6 +137,7 @@ class FleetMonitor:
                         "lat":       status.caller_lat,
                         "lon":       status.caller_lon,
                         "source":    status.caller_source,
+                        "symbol":    status.caller_symbol,
                         "is_active": True,
                         "node":      status.name,
                         "node_ip":   status.ip,
@@ -154,6 +155,7 @@ class FleetMonitor:
                             "lat":       h["lat"],
                             "lon":       h["lon"],
                             "source":    h.get("source"),
+                            "symbol":    h.get("symbol"),
                             "is_active": False,
                             "node":      status.name,
                             "node_ip":   status.ip,
@@ -740,14 +742,16 @@ class FleetMonitor:
         # APRS.fi — a live beacon position is more useful than QRZ's static
         # home-station coordinates, so it takes priority for lat/lon (but
         # never overrides name/location, which APRS doesn't provide).
+        symbol = None
         if aprs.enabled:
             aprs_info = aprs.lookup(call)
             if aprs_info:
                 lat, lon = aprs_info["lat"], aprs_info["lon"]
                 source   = "aprs"
+                symbol   = aprs_info.get("symbol")
 
         return {"name": name, "location": location, "image_url": image,
-                "lat": lat, "lon": lon, "source": source,
+                "lat": lat, "lon": lon, "source": source, "symbol": symbol,
                 "city": city, "state": state, "country": country}
 
     @staticmethod
@@ -776,6 +780,7 @@ class FleetMonitor:
                 "caller_lat":      None,
                 "caller_lon":      None,
                 "caller_source":   None,
+                "caller_symbol":   None,
                 "timeslot":        None,
                 "is_favorite":     False,
                 "favorite_label":  None,
@@ -884,6 +889,7 @@ class FleetMonitor:
                         "caller_lat":      caller_info["lat"],
                         "caller_lon":      caller_info["lon"],
                         "caller_source":   caller_info["source"],
+                        "caller_symbol":   caller_info["symbol"],
                         "tx_start":        time.time(),
                         "last_heard":      None,
                         "is_favorite":     is_favorite,
@@ -901,6 +907,7 @@ class FleetMonitor:
                             "lat":      caller_info["lat"],
                             "lon":      caller_info["lon"],
                             "source":   caller_info["source"],
+                            "symbol":   caller_info["symbol"],
                         })
                         updates["history"] = history[:config.MAX_HISTORY]
                 else:
@@ -1020,7 +1027,7 @@ class FleetMonitor:
                 # one, and looking it up would just waste an API call.
                 caller_info = self._lookup_caller(call) if has_real_callsign else {
                     "name": None, "location": None, "image_url": None,
-                    "lat": None, "lon": None, "source": None,
+                    "lat": None, "lon": None, "source": None, "symbol": None,
                 }
                 is_favorite, favorite_label = self._apply_favorite_match(call)
                 updates.update({
@@ -1032,6 +1039,7 @@ class FleetMonitor:
                     "caller_lat":      caller_info["lat"],
                     "caller_lon":      caller_info["lon"],
                     "caller_source":   caller_info["source"],
+                    "caller_symbol":   caller_info["symbol"],
                     "tx_start":        time.time(),
                     "last_heard":      None,
                     "is_favorite":     is_favorite,
@@ -1045,6 +1053,7 @@ class FleetMonitor:
                         "lat":      caller_info["lat"],
                         "lon":      caller_info["lon"],
                         "source":   caller_info["source"],
+                        "symbol":   caller_info["symbol"],
                     })
                     updates["history"] = history[:config.MAX_HISTORY]
             else:

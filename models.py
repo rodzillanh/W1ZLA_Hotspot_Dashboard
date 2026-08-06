@@ -31,6 +31,10 @@ class HotspotStatus:
     # Shown on the map popup so it's clear whether a pin is a live APRS beacon
     # or a static QRZ/RadioID home-station location.
     caller_source: Optional[str] = None
+    # Combined APRS symbol-table + symbol-code char (e.g. "/>" for a car),
+    # only ever set when caller_source == "aprs" -- see aprs.py's lookup().
+    # None for every other source, since QRZ/RadioID don't carry a symbol.
+    caller_symbol: Optional[str] = None
     # tx_start: Unix epoch when the current transmission began.
     # The dashboard JS computes elapsed time from this.
     tx_start: Optional[float] = None

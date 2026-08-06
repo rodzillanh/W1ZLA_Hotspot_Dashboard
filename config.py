@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.77"
+APP_VERSION = "3.78"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -43,6 +43,7 @@ VERSION_CODENAMES = [
     "Scott",            # v3.75 -- Bon Scott, AC/DC (1946-1980)
     "Bolan",            # v3.76 -- Marc Bolan, T. Rex (1947-1977)
     "Danko",            # v3.77 -- Rick Danko, The Band (1943-1999)
+    "Garcia",           # v3.78 -- Jerry Garcia, Grateful Dead (1942-1995)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -52,6 +53,7 @@ CONFIG_FILE  = os.path.join(CONFIG_DIR, "hotspots.json")
 SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 FAVORITES_FILE = os.path.join(CONFIG_DIR, "favorites.json")
 ASL_FAVORITES_FILE = os.path.join(CONFIG_DIR, "asl_favorites.json")
+BM_TG_FAVORITES_FILE = os.path.join(CONFIG_DIR, "bm_tg_favorites.json")
 CAMERAS_FILE = os.path.join(CONFIG_DIR, "cameras.json")
 QSOS_FILE    = os.path.join(CONFIG_DIR, "qsos.json")
 
@@ -670,6 +672,16 @@ DEFAULT_SETTINGS = {
     # YSF research that ruled that out as a clean REST-pollable option.
     "show_top_activity": False,
     "top_activity_position": 0,
+    # Awards / DXCC progress card -- off by default. Same "pure client-side
+    # aggregation over the existing qsos.json" shape as QSO Stats above,
+    # just ranked against classic ham awards (DXCC entities/next milestone,
+    # Worked All Continents, Worked All States, band x mode worked) instead
+    # of raw counts. "DXCC entities" here is a simplified unique-country-
+    # string count, NOT a real ~340-entity DXCC adjudication against LoTW/
+    # ClubLog confirmations -- see the card's own render function for the
+    # caveat this deliberately doesn't hide from the user.
+    "show_awards": False,
+    "awards_position": 0,
     # Live WSJT-X QSO logging -- off by default. Listens for WSJT-X's own
     # UDP telemetry protocol (the same feed GridTracker/JTAlert use) and
     # appends each logged QSO to the same qsos.json the ADIF importer
@@ -747,6 +759,16 @@ DEFAULT_SETTINGS = {
     # favorite callsign (favorites.json) keys up ANYWHERE on the
     # Brandmeister network, not just through this fleet's own hotspots.
     "brandmeister_alerts_enabled": False,
+    # Personal Brandmeister v2 API key (settings.json-only, no env var
+    # fallback -- same convention as every integration added after QRZ).
+    # Generated from the user's own Brandmeister dashboard (Profile
+    # Settings -> API Keys), used as an "Authorization: Bearer <key>"
+    # header against the confirmed-live v2 write endpoints
+    # (POST/DELETE .../device/{id}/talkgroup) -- see brandmeister.py.
+    # Read-only lookups (brandmeister.py's existing BrandmeisterClient.lookup())
+    # need no key at all; this only gates the hotspot card drawer's
+    # link/unlink talkgroup controls.
+    "brandmeister_api_key": "",
 }
 
 # --- Fleet activity ---

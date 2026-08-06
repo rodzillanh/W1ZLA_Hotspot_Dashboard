@@ -61,6 +61,15 @@ class AprsClient:
                 "lon":     float(entry["lng"]),
                 "comment": entry.get("comment"),
                 "time":    int(entry["time"]) if entry.get("time") else None,
+                # Combined symbol-table-char + symbol-code-char string, e.g.
+                # "/>" for a car. Confirmed live (2026-08-06) against a real
+                # what=loc response for W1ZLA's own DigiPi APRS beacon --
+                # returned exactly {"symbol":"/>","comment":"DigiPi WebChat
+                # Beacon",...}, matching the third-party docs this was
+                # originally sourced from field-for-field. Table char is
+                # entry[0] ('/' = primary, '\\' = alternate per the APRS
+                # spec), code char is entry[1].
+                "symbol":  entry.get("symbol"),
             }
         except Exception:
             return None
