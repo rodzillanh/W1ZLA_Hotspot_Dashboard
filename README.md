@@ -276,13 +276,25 @@ beyond the base card/map UI:
   a courtesy tone on new activity") — a short synthesized beep, same idea
   as a real repeater's courtesy tone, when any hotspot's active call
   starts. Off by default.
-- **Click a hotspot card for its full detail drawer** — slides out
-  everything that's tracked but doesn't fit on the compact card: full
-  recent-talker history, Brandmeister status/static talkgroups, and WPSD
-  update status (AllStarLink cards get the complete linked-node list
-  instead). The existing links inside a card — its name, 📍 map, the
-  update badge, and any callsign — still do exactly what they did
-  before; only clicking the rest of the card opens the drawer.
+- **A gear icon (⚙) on every hotspot and camera card opens its detail
+  drawer** — the card body itself isn't a click target; the existing
+  links inside a card (its name, 📍 map, the update badge, any callsign)
+  keep doing exactly what they did before. The drawer combines everything
+  that's tracked but doesn't fit on the compact card — full recent-talker
+  history, Brandmeister status/static talkgroups, and WPSD update status
+  (AllStarLink cards get the complete linked-node list instead, plus a
+  quick Connect/Disconnect action per node and a "connect to node #"
+  field) — with an editable **Settings** section for that specific card:
+  name, IP, SSH/admin credentials, lat/lon, and the type-specific fields
+  (Brandmeister ID for WPSD, ASL node + DVSwitch bridge/ports for
+  AllStarLink, admin password + additional profile passwords for
+  openSPOT4; camera cards get name/type/stream URL or Bambu
+  IP+access-code+serial). Every field saves the instant you leave it —
+  no separate Save button — and the same Test connection/Test ASL node/
+  Test openSPOT4/Test Brandmeister ID/Test stream buttons the full
+  Settings page has are right there too. Deleting a hotspot or camera is
+  intentionally NOT available from the drawer — an "Open in full
+  Settings →" link covers that and anything else not shown here.
 - **Quick Settings** — the toolbar's "⚙ Settings" link opens this first
   (one settings entry point, not a separate gear icon sitting next to
   it): theme, spotlight dimming, and courtesy tone, plus — once the Live
