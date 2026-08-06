@@ -3327,6 +3327,19 @@ config for per-integration credentials; put it in
     the drawer/sidebar is where a deeper feature set lives. Don't add
     Monitor to the card without deciding that tradeoff is worth it, not
     as an oversight to quietly fix.
+  - **ASL3 hotspots' card-name link (v3.77) points at `/allscan`, not
+    the bare IP every other hotspot type uses** -- `cardNameHref` in
+    `renderCards()` branches on the same `isAsl` flag everything else in
+    that function already checks, since an ASL3 node's web root has
+    nothing useful at it (unlike WPSD, which serves its own admin
+    dashboard there) -- AllScan, when installed, lives at `/allscan`
+    specifically. This is a URL-shape assumption from the user, not
+    independently re-verified against a live AllScan install the way
+    e.g. the ilink codes above were -- if a real device ever shows
+    AllScan living at a different path, fix this one spot plus the
+    matching link in the ASL Control sidebar's local-node strip
+    (`asl-ctrl-allscan-link`), which was deliberately built to reuse the
+    exact same `http://<ip>/allscan` shape rather than a second guess.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

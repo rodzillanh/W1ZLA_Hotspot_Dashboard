@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.76 "Bolan"</span>
+                <span class="release-version">v3.77 "Danko"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Direct AllScan links for ASL3 nodes</span> — an ASL3 hotspot's card title now opens that node's AllScan control panel (<code>http://&lt;ip&gt;/allscan</code>) instead of the node's bare IP, which has nothing useful at the web root. The ASL Control sidebar's local-node status strip gets the same link for whichever hotspot is currently selected</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.76 "Bolan"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>ASL Control sidebar: Monitor mode</span> — a receive-only link option (hear a node without your own audio going out to it), next to Connect/Disconnect on every favorite row and the Quick connect field. Uses AllStarLink ilink code 2, confirmed directly from AllScan's own <code>connect.php</code> source before being added. Also added the sidebar's own "Keep existing connections" toggle (same behavior as the compact card's, just reachable without leaving the sidebar) — unchecked, connecting to one node disconnects any other currently-connected favorite first</li>

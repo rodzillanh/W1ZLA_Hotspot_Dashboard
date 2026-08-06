@@ -811,7 +811,9 @@
         .asl-ctrl-localnode-body { min-width: 0; flex: 1; }
         .asl-ctrl-localnode-call { font-weight: 600; font-size: 13.5px; }
         .asl-ctrl-localnode-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
-        .asl-ctrl-localnode-stats { font-size: 11px; color: var(--text-dim); text-align: right; flex-shrink: 0; }
+        .asl-ctrl-localnode-stats { font-size: 11px; color: var(--text-dim); text-align: right; flex-shrink: 0; line-height: 1.6; }
+        .asl-ctrl-allscan-link { color: var(--link); text-decoration: none; }
+        .asl-ctrl-allscan-link:hover { text-decoration: underline; }
         .asl-ctrl-node-num { font-size: 10.5px; color: var(--text-dim); font-family: var(--font-mono); margin-left: 5px; }
         .asl-ctrl-qc-row { display: flex; gap: 6px; margin-top: 4px; }
         .asl-ctrl-qc-row input {
@@ -3249,10 +3251,16 @@ function renderCards(data) {
                </div>`
             : '';
 
+        // ASL3 nodes have nothing useful at their own web root -- the
+        // control panel (when installed) lives at /allscan instead, so
+        // the card name links there for this type specifically rather
+        // than the bare IP every other type uses.
+        const cardNameHref = isAsl ? `http://${hs.ip}/allscan` : `http://${hs.ip}`;
+
         return `
         <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}">
           <div class="card-header">
-            <a class="card-name" href="http://${hs.ip}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${hs.name}${chipHtml}</a>
+            <a class="card-name" href="${cardNameHref}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${hs.name}${chipHtml}</a>
             <div class="card-header-right">${updateBadge}${mapPin}${uptimeBadge}<button class="card-gear-btn" title="Card details &amp; settings" onclick="openHotspotDrawer('${hs.ip}')">⚙</button></div>
           </div>
           ${identityLine}
@@ -7240,7 +7248,10 @@ function renderAslDrawer() {
                 <div class="asl-ctrl-localnode-call">${escapeHtml(controlHotspot.name)}<span class="asl-ctrl-node-num">Node ${escapeHtml(controlHotspot.asl_node || '?')}</span></div>
                 <div class="asl-ctrl-localnode-meta">${isKeyedLocal ? '🔴 KEYED — via ' + escapeHtml(controlHotspot.active_call || '?') : 'Idle'}</div>
             </div>
-            <div class="asl-ctrl-localnode-stats">${escapeHtml(fmtUptime(controlHotspot.uptime))}<br>${escapeHtml(controlHotspot.temperature)}</div>
+            <div class="asl-ctrl-localnode-stats">
+                ${escapeHtml(fmtUptime(controlHotspot.uptime))}<br>${escapeHtml(controlHotspot.temperature)}<br>
+                <a class="asl-ctrl-allscan-link" href="http://${controlHotspot.ip}/allscan" target="_blank" rel="noopener">AllScan →</a>
+            </div>
         </div>`;
 
     // Keyed/connected favorites sort to the top, same convention as the
