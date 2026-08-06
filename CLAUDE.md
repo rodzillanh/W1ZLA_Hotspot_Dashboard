@@ -3341,6 +3341,67 @@ config for per-integration credentials; put it in
     (`asl-ctrl-allscan-link`), which was deliberately built to reuse the
     exact same `http://<ip>/allscan` shape rather than a second guess.
 
+- **Brandmeister talkgroup link/unlink (v3.79) was built and shipped;
+  TGIF link/unlink was investigated in the same session and deliberately
+  NOT built -- a real, live-verified structural gap, not a skipped
+  feature.** The inspiration for this whole feature was the third-party
+  `rupret007/WPSD-Dashboard` project's "TGIF Manager," but that project's
+  own README admits it "does not work until TGIF's API is made
+  available" -- confirmed there's no working TGIF write API to build
+  against. Brandmeister's v2 API (`POST`/`DELETE .../device/{id}/
+  talkgroup`) was real and workable instead -- see `brandmeister.py`'s
+  module docstring for that build, including a real live-tested
+  correction (the write body's field is `group`, not `talkgroup` as the
+  OpenAPI spec's own schema summary claimed -- caught via a real
+  `HTTP 455 {"error":"The group field is required."}` response, fixed,
+  then re-verified end-to-end against a real account).
+  A parallel TGIF investigation, done the same "verify against the real
+  device" way (a real hotspot's actual `/etc/dmrgateway` -- not
+  `DMRGateway.ini`, same no-extension/no-hyphen WPSD-generates-its-own-
+  file pattern as `/etc/mmdvmhost` -- plus a live `ss -tulnp` process
+  check), found:
+  - `[Dynamic TG Control] Port=3769` / `[Remote Control] Port=7643` are
+    REAL raw UDP sockets on this WPSD build, confirmed by the process
+    actually listening on both -- NOT the MQTT-topic-based protocol
+    `g4klx/DMRGateway`'s current `master` branch uses (that refactor
+    landed in commit `04146fa`, 2023-07-07; WPSD evidently still ships
+    the pre-MQTT build). Don't trust current upstream source for this
+    without checking which protocol generation is actually deployed the
+    same way -- confirmed via the parent commit
+    (`a28aa7c549acf7b017c0a4a3b704154baea75603`)'s `DMRGateway.cpp`/
+    `RemoteControl.cpp`, not `master`.
+  - The real, confirmed Dynamic TG Control protocol: a UDP packet to
+    port 3769 containing literal ASCII `"DynTG <slot>,<tg>"` (comma or
+    space both work, parsed via `strtok(..., ", \r\n")`) sets talkgroup
+    `<tg>` on timeslot `<slot>` -- confirmed byte-for-byte against the
+    real pre-MQTT `CDMRGateway::processDynamicTGControl()` source.
+  - **This mechanism only retargets pre-existing "Dynamic Rewrite
+    Rules"** (`CRewriteDynTGRF` instances, each binding one fixed RF-side
+    TG/range to one network-side TG) -- it doesn't create a talkgroup
+    membership the way Brandmeister's API does. `grep -i "Dynamic
+    Rewrite\|DynTG" /etc/dmrgateway` on the real test hotspot came back
+    completely empty -- zero rules configured, meaning the `m_dynRF`
+    list `processDynamicTGControl()` iterates is empty and a `DynTG`
+    command would be silently accepted and do *nothing* on this device
+    as configured.
+  - **The deeper reason this isn't worth building even with rules
+    configured**: TGIF has no server-side persistent "static talkgroup"
+    concept at all, unlike Brandmeister -- presence on a TG is purely a
+    function of the most recent RF transmission's DMR header, and this
+    hotspot's TGIF network is configured as `Primary=4` with
+    `PassAllTG0=1`/`PassAllTG1=2` (every talkgroup passes through
+    unrewritten on both slots), so any TGIF talkgroup is *already*
+    reachable by just keying up on it directly -- no dashboard feature
+    needed for the common case. Even with Dynamic Rewrite Rules manually
+    configured, the resulting feature would only be a handful of
+    fixed-slot "retarget this preset channel" controls, not a
+    Brandmeister-style "type any TG, click Link" experience -- a real,
+    structurally smaller feature for real setup cost, not just an
+    unverified one. If this is ever revisited, it needs a user who
+    actually wants fixed-channel remote retargeting AND is willing to
+    configure Dynamic Rewrite Rules first -- don't build speculatively
+    against a hotspot with none configured.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
