@@ -1002,40 +1002,6 @@
         .hf-source a { color: var(--text-dim); }
         .hf-unavailable { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
 
-        /* --- Awards / DXCC progress card -- see renderAwardsCard() --- */
-        .aw-section { margin-bottom: 16px; }
-        .aw-section:last-child { margin-bottom: 0; }
-        .aw-section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
-        .aw-section-title { font-size: 11.5px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
-        .aw-section-val { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
-        .aw-bar-track { height: 7px; border-radius: 4px; background: var(--panel-2); overflow: hidden; }
-        .aw-bar-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width .3s; }
-        .aw-bar-fill.good { background: var(--good); }
-        .aw-milestone-note { font-size: 11px; color: var(--text-dim); margin-top: 4px; font-family: var(--font-mono); }
-        .aw-continents { display: flex; gap: 6px; flex-wrap: wrap; }
-        .aw-cont-chip {
-            flex: 1; min-width: 68px; text-align: center; padding: 7px 4px; border-radius: 7px;
-            border: 1px solid var(--card-border); font-size: 11px; color: var(--text-dim);
-        }
-        .aw-cont-chip.worked {
-            background: var(--good-dim); border-color: color-mix(in srgb, var(--good) 45%, var(--card-border));
-            color: var(--good); font-weight: 600;
-        }
-        .aw-cont-chip .aw-cont-code { display: block; font-family: var(--font-mono); font-size: 13px; margin-bottom: 1px; }
-        .aw-matrix { border-collapse: collapse; width: 100%; font-size: 10.5px; }
-        .aw-matrix th, .aw-matrix td { text-align: center; padding: 3px 2px; }
-        .aw-matrix th { color: var(--text-dim); font-weight: 500; font-family: var(--font-mono); }
-        .aw-matrix td:first-child, .aw-matrix th:first-child { text-align: left; padding-left: 2px; }
-        .aw-matrix .band-label { font-family: var(--font-mono); color: var(--text-muted); }
-        .aw-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--card-border); }
-        .aw-dot.hit { background: var(--live); }
-        .aw-callout {
-            display: flex; align-items: flex-start; gap: 8px; margin-top: 16px;
-            background: var(--accent-dim); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--card-border));
-            border-radius: 8px; padding: 9px 11px; font-size: 12px; color: var(--text);
-        }
-        .aw-callout b { color: var(--accent); }
-
         /* --- Top 5 Activity card -- ranked bar list --- */
         .ta-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
         .ta-rank { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); width: 14px; flex-shrink: 0; text-align: right; }
@@ -2071,47 +2037,6 @@
             <div class="msg-empty" id="ta-empty" style="display:none">No fleet activity logged yet -- enable "Show fleet activity card" in Settings → Cards to start tracking callsign activity.</div>
         </div>
         {% endif %}
-        {% if settings.get('show_awards', False) %}
-        <div class="metrics-card" id="awards-card"
-             style="order:{{ settings.get('awards_position', 0) }}">
-            <div class="metrics-header">
-                <div class="card-name">🎖️ Awards</div>
-                <span class="card-sub" id="aw-sub">—</span>
-            </div>
-            <div id="aw-body">
-                <div class="aw-section">
-                    <div class="aw-section-head">
-                        <span class="aw-section-title">DXCC entities</span>
-                        <span class="aw-section-val" id="aw-dxcc-val">—</span>
-                    </div>
-                    <div class="aw-bar-track"><div class="aw-bar-fill" id="aw-dxcc-bar"></div></div>
-                    <div class="aw-milestone-note" id="aw-dxcc-note">—</div>
-                </div>
-                <div class="aw-section">
-                    <div class="aw-section-head">
-                        <span class="aw-section-title">Worked All Continents</span>
-                        <span class="aw-section-val" id="aw-wac-val">—</span>
-                    </div>
-                    <div class="aw-continents" id="aw-continents"></div>
-                </div>
-                <div class="aw-section">
-                    <div class="aw-section-head">
-                        <span class="aw-section-title">Worked All States</span>
-                        <span class="aw-section-val" id="aw-was-val">—</span>
-                    </div>
-                    <div class="aw-bar-track"><div class="aw-bar-fill good" id="aw-was-bar"></div></div>
-                </div>
-                <div class="aw-section">
-                    <div class="aw-section-head">
-                        <span class="aw-section-title">Band × mode worked</span>
-                    </div>
-                    <table class="aw-matrix" id="aw-matrix"></table>
-                </div>
-                <div class="aw-callout" id="aw-callout" style="display:none"></div>
-            </div>
-            <div class="msg-empty" id="aw-empty" style="display:none">No logged QSOs yet -- import an ADIF log or enable live WSJT-X logging in Settings.</div>
-        </div>
-        {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
         <div class="metrics-card" id="hf-conditions-card"
              style="order:{{ settings.get('hf_conditions_position', 0) }}">
@@ -2619,9 +2544,6 @@ const QSO_STATS_POSITION = {{ settings.get('qso_stats_position', 0) }};
 const QSO_STATS_POLL_MS = 20000;  // same cadence as Recent Contacts/the map -- same qsos.json source
 const SHOW_TOP_ACTIVITY = {{ 'true' if settings.get('show_top_activity', False) else 'false' }};
 const TOP_ACTIVITY_POSITION = {{ settings.get('top_activity_position', 0) }};
-const SHOW_AWARDS = {{ 'true' if settings.get('show_awards', False) else 'false' }};
-const AWARDS_POSITION = {{ settings.get('awards_position', 0) }};
-const AWARDS_POLL_MS = 20000;  // same cadence as Recent Contacts/QSO Stats -- same qsos.json source
 // let, not const -- Quick Settings (openSettingsDrawer) can flip these
 // live from the dashboard without a page reload, unlike every other
 // Jinja-rendered *_ENABLED constant in this file.
@@ -2996,7 +2918,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     wspractivity: '__wspr_activity__', digipi: '__digipi__', bigclock: '__big_clock__',
     notifications: '__notifications__', satellites: '__satellites__',
     recentcontacts: '__recent_contacts__', qsostats: '__qso_stats__',
-    topactivity: '__top_activity__', awards: '__awards__',
+    topactivity: '__top_activity__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -3138,9 +3060,6 @@ function renderCards(data) {
     if (SHOW_TOP_ACTIVITY) {
         sentinels.push({ key: 'topactivity', pos: Math.max(0, TOP_ACTIVITY_POSITION) });
     }
-    if (SHOW_AWARDS) {
-        sentinels.push({ key: 'awards', pos: Math.max(0, AWARDS_POSITION) });
-    }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, hfcond, bandplan,
     // licensequiz, wspractivity, digipi, bigclock, notifications, satellites,
@@ -3200,8 +3119,6 @@ function renderCards(data) {
     if (qsoStatsCard && 'qsostats' in sentinelOrders) qsoStatsCard.style.order = sentinelOrders.qsostats;
     const topActivityCard = document.getElementById('top-activity-card');
     if (topActivityCard && 'topactivity' in sentinelOrders) topActivityCard.style.order = sentinelOrders.topactivity;
-    const awardsCard = document.getElementById('awards-card');
-    if (awardsCard && 'awards' in sentinelOrders) awardsCard.style.order = sentinelOrders.awards;
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -5940,121 +5857,6 @@ function fetchQsoStats() {
 if (SHOW_QSO_STATS) {
     fetchQsoStats();
     setInterval(fetchQsoStats, QSO_STATS_POLL_MS);
-}
-
-// --- Awards / DXCC progress card -- same "pure client-side aggregation
-// over qsos.json" shape as QSO Stats above, ranked against classic ham
-// awards instead of raw counts. "DXCC entities" is a simplified unique-
-// country-string count (reuses COUNTRY_FLAGS/flagIso2, the same table
-// Recent Contacts' flags already use) -- NOT a real ~340-entity DXCC
-// adjudication against LoTW/ClubLog confirmations; European/Asiatic
-// Russia collapse to one entity (RU) and Turkey is counted under Asia,
-// same simplifications the flag table already accepts (see its own
-// comment). Continent/state/band/mode are all already on every
-// qsos.json record -- no new backend field, no new fetch pattern.
-const CONTINENT_BY_ISO2 = {
-    US:'NA', CA:'NA', MX:'NA', CU:'NA', JM:'NA', DO:'NA', HT:'NA', PR:'NA', BS:'NA', TT:'NA',
-    GT:'NA', HN:'NA', SV:'NA', NI:'NA', CR:'NA', PA:'NA',
-    BR:'SA', AR:'SA', CL:'SA', CO:'SA', PE:'SA', VE:'SA', EC:'SA', BO:'SA', UY:'SA', PY:'SA',
-    GB:'EU', IE:'EU', DE:'EU', FR:'EU', IT:'EU', ES:'EU', PT:'EU', NL:'EU', BE:'EU', LU:'EU',
-    CH:'EU', AT:'EU', DK:'EU', NO:'EU', SE:'EU', FI:'EU', IS:'EU', PL:'EU', CZ:'EU', SK:'EU',
-    HU:'EU', RO:'EU', BG:'EU', GR:'EU', UA:'EU', BY:'EU', EE:'EU', LV:'EU', LT:'EU', MD:'EU',
-    SI:'EU', HR:'EU', RS:'EU', BA:'EU', ME:'EU', MK:'EU', AL:'EU', MT:'EU', CY:'EU', RU:'EU',
-    TR:'AS', JP:'AS', CN:'AS', KR:'AS', KP:'AS', TW:'AS', HK:'AS', PH:'AS', TH:'AS', VN:'AS',
-    ID:'AS', MY:'AS', SG:'AS', IN:'AS', PK:'AS', BD:'AS', LK:'AS', NP:'AS', IL:'AS', SA:'AS',
-    AE:'AS', QA:'AS', KW:'AS', JO:'AS', LB:'AS', IR:'AS', IQ:'AS',
-    EG:'AF', MA:'AF', DZ:'AF', TN:'AF', NG:'AF', KE:'AF', ZA:'AF',
-    AU:'OC', NZ:'OC',
-};
-const CONTINENT_NAMES = {NA:'N. America', SA:'S. America', EU:'Europe', AS:'Asia', AF:'Africa', OC:'Oceania'};
-// Same band set as wsjtx.py's _BAND_EDGES, so the matrix has a row ready
-// for anything freq_to_band()/an ADIF BAND field can ever produce.
-const AWARDS_BANDS = ["160m","80m","40m","30m","20m","17m","15m","12m","10m","6m","2m"];
-const AWARDS_MODES = ["FT8","FT4","SSB","CW","RTTY"];
-const DXCC_MILESTONES = [10,25,50,100,150,200,250,300];
-const WAS_STATE_COUNT = 50;
-
-function renderAwardsCard(qsos) {
-    const bodyEl = document.getElementById('aw-body');
-    const emptyEl = document.getElementById('aw-empty');
-    const subEl = document.getElementById('aw-sub');
-    if (!bodyEl) return;
-
-    const list = qsos || [];
-    if (!list.length) {
-        bodyEl.style.display = 'none';
-        if (emptyEl) emptyEl.style.display = 'block';
-        if (subEl) subEl.textContent = '';
-        return;
-    }
-    bodyEl.style.display = 'block';
-    if (emptyEl) emptyEl.style.display = 'none';
-    if (subEl) subEl.textContent = `${list.length} QSOs logged`;
-
-    // DXCC entities (see the module comment above re: simplification)
-    const countries = [...new Set(list.map(q => q.country).filter(Boolean))];
-    const dxccCount = countries.length;
-    const nextTier = DXCC_MILESTONES.find(m => m > dxccCount) || DXCC_MILESTONES[DXCC_MILESTONES.length - 1];
-    document.getElementById('aw-dxcc-val').textContent = dxccCount + ' worked';
-    document.getElementById('aw-dxcc-bar').style.width = Math.min(100, (dxccCount / nextTier) * 100) + '%';
-    const toGo = nextTier - dxccCount;
-    document.getElementById('aw-dxcc-note').textContent = toGo > 0
-        ? `${toGo} more to reach ${nextTier}` : `Past the ${nextTier} milestone`;
-
-    // Worked All Continents
-    const continentsWorked = new Set(countries.map(c => CONTINENT_BY_ISO2[flagIso2(c)]).filter(Boolean));
-    document.getElementById('aw-wac-val').textContent = continentsWorked.size + ' / 6';
-    document.getElementById('aw-continents').innerHTML = Object.entries(CONTINENT_NAMES).map(([code, name]) => {
-        const worked = continentsWorked.has(code);
-        return `<div class="aw-cont-chip ${worked ? 'worked' : ''}"><span class="aw-cont-code">${code}</span>${name}</div>`;
-    }).join('');
-
-    // Worked All States -- q.state is only ever populated for a US-side
-    // QSO (see qrz.py/app.py's ADIF importer), so this is US-only by
-    // construction, no extra filtering needed.
-    const states = new Set(list.map(q => q.state).filter(Boolean));
-    document.getElementById('aw-was-val').textContent = `${states.size} / ${WAS_STATE_COUNT}`;
-    document.getElementById('aw-was-bar').style.width = (states.size / WAS_STATE_COUNT * 100) + '%';
-
-    // Band x mode matrix
-    const combos = new Set(list.map(q => q.band + '|' + q.mode));
-    let matrixHtml = '<tr><th></th>' + AWARDS_MODES.map(m => `<th>${m}</th>`).join('') + '</tr>';
-    AWARDS_BANDS.forEach(b => {
-        matrixHtml += `<tr><td class="band-label">${b}</td>` +
-            AWARDS_MODES.map(m => `<td><span class="aw-dot ${combos.has(b + '|' + m) ? 'hit' : ''}"></span></td>`).join('') +
-            '</tr>';
-    });
-    document.getElementById('aw-matrix').innerHTML = matrixHtml;
-
-    // Most recent first-time DXCC entity -- a small "new one" callout,
-    // same threshold-crossing spirit as the offline-detection/geomagnetic-
-    // alert transitions elsewhere in this app, just computed client-side
-    // from the full QSO list instead of tracked incrementally server-side.
-    const seen = new Set();
-    let newest = null;
-    list.slice().sort((a, b) => (a.logged_at || 0) - (b.logged_at || 0)).forEach(q => {
-        if (q.country && !seen.has(q.country)) {
-            seen.add(q.country);
-            newest = q;
-        }
-    });
-    const calloutEl = document.getElementById('aw-callout');
-    if (newest) {
-        calloutEl.style.display = 'flex';
-        calloutEl.innerHTML = `<span>🆕</span><span><b>New entity worked:</b> ${escapeHtml(newest.country)}` +
-            ` (${escapeHtml(newest.call || '?')}${newest.date ? ', ' + escapeHtml(newest.date) : ''})</span>`;
-    } else {
-        calloutEl.style.display = 'none';
-    }
-}
-
-function fetchAwards() {
-    if (!SHOW_AWARDS) return;
-    fetch('/api/qsos').then(r => r.json()).then(renderAwardsCard).catch(() => {});
-}
-if (SHOW_AWARDS) {
-    fetchAwards();
-    setInterval(fetchAwards, AWARDS_POLL_MS);
 }
 
 function handleAdifFile(file) {

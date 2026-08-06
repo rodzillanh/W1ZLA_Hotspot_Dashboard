@@ -3402,6 +3402,32 @@ config for per-integration credentials; put it in
     configure Dynamic Rewrite Rules first -- don't build speculatively
     against a hotspot with none configured.
 
+- **The Awards / DXCC progress card (v3.78) was built, then removed
+  outright in v3.80 -- a product/taste call, not a technical failure.**
+  It ranked logged QSOs against classic ham awards (DXCC entities/next
+  milestone, Worked All Continents, Worked All States, band x mode
+  worked), pure client-side aggregation over the same `qsos.json`
+  Recent Contacts/QSO Stats already read -- functionally correct, and
+  even got a mockup-driven resize pass to shrink it toward the other
+  cards' footprint (collapsing the DXCC/WAC/WAS bars into one compact
+  stat-tile row, matching `.hf-stats-grid` verbatim). Pulled anyway,
+  same "built it, looked at it, decided against it" outcome as the
+  RainViewer precipitation radar overlay and the MUF propagation
+  overlay elsewhere in this file -- the user just didn't want it on the
+  dashboard. Every settings key (`show_awards`/`awards_position`), the
+  `_SENTINEL_DEFS` entry, and all card CSS/HTML/JS were removed clean
+  rather than left dead/hidden -- unlike settings orphaned for
+  backward-compat with an already-deployed feature (e.g.
+  `aprs_inbox_position`/`hamalert_position` after the Notifications
+  merge), this shipped and was reverted within a day, so there was no
+  real installed base with a saved `show_awards: true` to stay
+  compatible with. If DXCC/award-tracking is ever asked for again,
+  don't just re-add this -- confirm what specifically didn't work about
+  the previous version (the concept, the visual weight, the specific
+  stats shown) rather than assuming a straight resurrection is wanted.
+  APRS symbol icons on the Live map, shipped in the same v3.78 release,
+  were NOT part of this removal and are still live.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

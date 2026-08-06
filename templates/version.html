@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.79 "Zappa"</span>
+                <span class="release-version">v3.80 "Diddley"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Removed the Awards / DXCC progress card</span> — shipped in v3.78, pulled back out after living on the dashboard for a day; it just didn't earn its keep next to the other cards. APRS symbol icons on the Live map (also from v3.78) are unaffected and stay in place</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.79 "Zappa"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Brandmeister Talkgroups — link/unlink from the hotspot card</span> — the hotspot card drawer's read-only "Brandmeister" section is now actionable: link a new static talkgroup (TG number + timeslot), unlink an existing one, and see which linked TG is live right now, all without leaving the dashboard. Uses Brandmeister's own confirmed v2 write API (a personal API key from your Brandmeister dashboard, set in Settings → Integrations) — not TGIF, which has no working API to build against. Optional quick-link favorite chips (Parrot, local nets, etc.) are managed in Settings → Favorites, same idea as ASL node favorites</li>
@@ -132,7 +142,7 @@
                 <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
-                <li><span>Awards / DXCC progress card</span> — a new optional card ranking your logged QSOs against classic ham awards: DXCC entities worked with a progress bar toward the next milestone, Worked All Continents, Worked All States, and a band × mode worked matrix. Pure client-side aggregation over the same <code>qsos.json</code> the Recent Contacts/QSO Stats cards already read — no new backend integration. The DXCC count is a simplified unique-country tally, not a real adjudicated award against LoTW/ClubLog confirmations</li>
+                <li><span>Awards / DXCC progress card</span> — a new optional card ranking your logged QSOs against classic ham awards: DXCC entities worked with a progress bar toward the next milestone, Worked All Continents, Worked All States, and a band × mode worked matrix. Pure client-side aggregation over the same <code>qsos.json</code> the Recent Contacts/QSO Stats cards already read — no new backend integration. The DXCC count is a simplified unique-country tally, not a real adjudicated award against LoTW/ClubLog confirmations. <i>Removed in v3.80 — see above.</i></li>
                 <li><span>APRS symbol icons on the Live map</span> — a caller pin whose position came from a live APRS beacon (via the aprs.fi integration) now renders that station's real APRS symbol (house, car, WX station, digipeater, HT/portable) instead of a plain dot, with the existing per-hotspot color kept as a ring around it. Verified live against a real aprs.fi response before shipping</li>
             </ul>
         </div>
