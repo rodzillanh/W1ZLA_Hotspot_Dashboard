@@ -3359,6 +3359,15 @@ config for per-integration credentials; put it in
     worth more than reasoning about the markup alone -- the corner-link
     version looked reasonable in isolation and only read as wrong once
     seen rendered in the actual app.
+  - **Moved again in v3.82** -- from right after `.asl-ctrl-localnode`
+    (near the top) to the very last element in the drawer, after the
+    Add-favorite row and status span. Purely a position change (the
+    button markup/CSS itself is untouched) -- if this drifts again,
+    it's currently the last child of `.hs-drawer-body` in
+    `renderAslDrawer()`'s template, with an inline
+    `style="margin:14px 0 0"` overriding the class's own
+    `margin-bottom` (which only made sense in the old top-of-drawer
+    position).
 
 - **Brandmeister talkgroup link/unlink (v3.79) was built and shipped;
   TGIF link/unlink was investigated in the same session and deliberately

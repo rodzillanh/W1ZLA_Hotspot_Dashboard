@@ -7471,8 +7471,7 @@ function renderAslDrawer() {
                 <div class="asl-ctrl-localnode-meta">${isKeyedLocal ? '🔴 KEYED — via ' + escapeHtml(controlHotspot.active_call || '?') : 'Idle'}</div>
             </div>
             <div class="asl-ctrl-localnode-stats">${escapeHtml(fmtUptime(controlHotspot.uptime))}<br>${escapeHtml(controlHotspot.temperature)}</div>
-        </div>
-        <a class="asl-ctrl-allscan-btn" href="http://${controlHotspot.ip}/allscan" target="_blank" rel="noopener">🔗 Open AllScan Control Panel</a>`;
+        </div>`;
 
     // Keyed/connected favorites sort to the top, same convention as the
     // compact card's own table.
@@ -7536,6 +7535,7 @@ function renderAslDrawer() {
                 <button class="asl-ctrl-add-btn" onclick="addAslFavorite('asl-drawer-add-node','asl-drawer-add-label','asl-drawer-status')">+ Add</button>
             </div>
             <span class="asl-fav-status-txt" id="asl-drawer-status" style="display:block;margin-top:6px"></span>
+            <a class="asl-ctrl-allscan-btn" href="http://${controlHotspot.ip}/allscan" target="_blank" rel="noopener" style="margin:14px 0 0">🔗 Open AllScan Control Panel</a>
         </div>`;
 }
 
