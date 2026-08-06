@@ -3203,6 +3203,44 @@ config for per-integration credentials; put it in
     `/static/<path:filename>` route) before considering the two new
     routes done -- not just a green `py_compile`.
 
+- **Quick Settings drawer "Jump to Settings" shortcuts (v3.74) needed NO
+  backend changes at all** -- `SETTINGS_TABS`/`shortcutGridHtml()`
+  (`dashboard.html`) are plain `<a href="/setup#<tab>">` chips, reusing
+  the exact same generalized `/setup#<tabname>` deep-link mechanism
+  already documented above (the one that replaced the old `#version`-only
+  special case) -- no new route, no new JS mechanism, just more chips
+  pointing at an already-general capability.
+  - **Both "attention" badges reuse existing signals rather than
+    computing anything new server-side.** The Version info chip's dot
+    reads a new module-level `dashboardUpdateAvailable` variable, set
+    inside the EXISTING `checkDashboardUpdateIndicator()` (which already
+    polled `/api/check_for_updates` every 5 min to drive the toolbar's
+    lightning-bolt icon) -- the function just also stashes the result now,
+    instead of only touching `#update-indicator`'s `style.display`. The
+    Hotspots chip's count badge is a plain
+    `(lastApiData || []).filter(hs => hs.status === 'Offline').length`,
+    computed fresh every time the drawer renders from data every other
+    part of the dashboard's 3s poll cycle already has in hand -- no
+    separate fetch, no new state to keep in sync.
+  - **All 9 tabs got a chip, deliberately not a curated subset** -- a
+    2-column grid of short labels is barely bigger than the single link
+    it replaced, and picking a "favorites" few would just relocate the
+    "how do I reach the other ones" problem rather than solve it. If this
+    ever feels cluttered, dropping the least-used ones (Backup/Version
+    are the likely candidates -- Version already has its own separate
+    entry point via the toolbar's lightning bolt) behind a smaller
+    fallback link is the documented alternative, not assumed away.
+  - **A real mistake caught while cutting this release, not hypothetical:
+    v3.73 was originally codenamed "Cobain", duplicating v3.52's Kurt
+    Cobain entry already in `VERSION_CODENAMES` -- missed at the time
+    because nothing checks the list for duplicates, only that a name is a
+    real, verifiable deceased rock musician.** Corrected to "Morrison"
+    (Jim Morrison, The Doors, 1943-1971) in the same commit that added
+    v3.74 "Vaughan" (Stevie Ray Vaughan, 1954-1990) -- fixed forward with
+    a new entry, not by rewriting already-pushed git history. If a codename
+    is ever picked again, grep the existing `VERSION_CODENAMES` list first
+    for the candidate surname, not just for whether the person is real.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

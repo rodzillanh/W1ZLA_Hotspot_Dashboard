@@ -1484,6 +1484,29 @@
         .hs-link-action-btn:hover { color: var(--text); border-color: var(--text-dim); }
         .hs-link-action-btn:disabled { opacity: .6; cursor: default; }
 
+        /* --- Quick Settings drawer "Jump to Settings" tab shortcuts --
+           replaces the old single "More settings ->" link. See
+           renderSettingsDrawer()/shortcutGridHtml(). --- */
+        .qs-shortcut-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+        .qs-shortcut-chip {
+            display: flex; align-items: center; gap: 8px; padding: 9px 10px;
+            border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2);
+            color: var(--text); text-decoration: none; font-size: 12.5px; position: relative;
+            transition: border-color .15s, background .15s;
+        }
+        .qs-shortcut-chip:hover { border-color: var(--live); background: var(--live-dim); }
+        .qs-shortcut-chip .icon { font-size: 14px; flex-shrink: 0; width: 18px; text-align: center; }
+        .qs-shortcut-chip .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .qs-shortcut-chip .badge-dot {
+            position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%;
+            background: var(--accent);
+        }
+        .qs-shortcut-chip .badge-count {
+            margin-left: auto; font-size: 10px; font-family: var(--font-mono); color: var(--danger);
+            background: var(--panel); border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
+            border-radius: 10px; padding: 0 5px;
+        }
+
         .qso-mini-map { height: 170px; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
 
         /* --- map --- */
@@ -4765,12 +4788,14 @@ if (SHOW_WSPR_ACTIVITY) {
 // --- update-available indicator next to the Settings link ---
 // Hits the same cached (~5min TTL) endpoint the Settings > Version info
 // tab uses, so this doesn't add any new load on the git host itself.
+let dashboardUpdateAvailable = false; // mirrors the toolbar lightning-bolt's own signal, read by the Quick Settings drawer's Version info shortcut chip
 function checkDashboardUpdateIndicator() {
     fetch('/api/check_for_updates')
         .then(r => r.json())
         .then(data => {
+            dashboardUpdateAvailable = !!(data.enabled && data.update_available);
             const el = document.getElementById('update-indicator');
-            if (el) el.style.display = (data.enabled && data.update_available) ? 'inline' : 'none';
+            if (el) el.style.display = dashboardUpdateAvailable ? 'inline' : 'none';
         })
         .catch(() => {});
 }
@@ -6404,6 +6429,36 @@ function qsoLogSectionHtml() {
         <button class="qso-clear-btn" id="qso-clear-btn" style="display:none" onclick="clearQsoLog()">Clear imported log</button>`;
 }
 
+// One chip per full-Settings tab, deep-linking via /setup#<tab> -- the
+// same generalized deep-link mechanism setup.html's own switchTab() logic
+// already supports for any tab, not a new mechanism. Two chips carry an
+// "attention" badge: Version info reuses the toolbar lightning-bolt's own
+// dashboardUpdateAvailable signal; Hotspots gets a live count of currently-
+// offline hotspots from lastApiData (no separate fetch -- same data every
+// other part of the dashboard's poll cycle already has in hand).
+const SETTINGS_TABS = [
+    {tab: 'general',      icon: '⚙',  label: 'General'},
+    {tab: 'cards',        icon: '🗂',  label: 'Card order'},
+    {tab: 'weather',      icon: '🌤',  label: 'Weather'},
+    {tab: 'integrations', icon: '🔌', label: 'Integrations'},
+    {tab: 'hotspots',     icon: '📡', label: 'Hotspots', countKey: 'hotspotsOffline'},
+    {tab: 'cameras',      icon: '📷', label: 'Cameras'},
+    {tab: 'favorites',    icon: '⭐', label: 'Favorites'},
+    {tab: 'backup',       icon: '💾', label: 'Backup'},
+    {tab: 'version',      icon: 'ℹ️', label: 'Version info', dotKey: 'appUpdate'},
+];
+function shortcutGridHtml() {
+    const offlineCount = (lastApiData || []).filter(hs => hs.status === 'Offline').length;
+    const badges = { appUpdate: dashboardUpdateAvailable, hotspotsOffline: offlineCount };
+    return SETTINGS_TABS.map(t => `
+        <a class="qs-shortcut-chip" href="/setup#${t.tab}">
+            <span class="icon">${t.icon}</span>
+            <span class="label">${t.label}</span>
+            ${t.dotKey && badges[t.dotKey] ? '<span class="badge-dot"></span>' : ''}
+            ${t.countKey && badges[t.countKey] > 0 ? `<span class="badge-count">${badges[t.countKey]}</span>` : ''}
+        </a>`).join('');
+}
+
 function renderSettingsDrawer() {
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
     let mapSection;
@@ -6465,7 +6520,8 @@ function renderSettingsDrawer() {
                 <input type="checkbox" ${COURTESY_TONE_ENABLED ? 'checked' : ''} onchange="toggleCourtesyToneQS()"> Courtesy tone on new activity
             </label>
             ${mapSection}
-            <a href="/setup" style="display:block;text-align:center;font-size:12px;color:var(--link);text-decoration:none;padding:16px 0 2px">More settings →</a>
+            <div class="hs-drawer-section-title">Jump to Settings</div>
+            <div class="qs-shortcut-grid">${shortcutGridHtml()}</div>
         </div>`;
 
     // QSO Log's stats box would otherwise stay blank/hidden until the
