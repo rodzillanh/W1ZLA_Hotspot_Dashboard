@@ -780,6 +780,100 @@ def setup():
                            overflow_sentinels=_overflow_sentinels(setup_settings, setup_hotspots, setup_cameras),
                            app_version=config.APP_VERSION, app_codename=config.APP_CODENAME)
 
+@app.route("/api/hotspot_config/<ip>")
+def api_hotspot_config(ip):
+    """Raw stored hotspot config (including SSH/admin credentials) for the
+    card drawer's Settings block -- /api/data deliberately excludes
+    credentials from the live-polled snapshot (a 3s poll every open
+    browser tab reads from is the wrong place for plaintext SSH
+    passwords), so the drawer fetches this separately, once, right when
+    it opens, the same way setup.html's edit form already gets these
+    values server-rendered into the page."""
+    hotspot = next((h for h in load_hotspots() if h["ip"] == ip), None)
+    if hotspot is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(hotspot)
+
+@app.route("/api/update_hotspot", methods=["POST"])
+def api_update_hotspot():
+    """JSON per-field upsert for the card drawer's instant-save Settings
+    block -- same validation rules as /setup's form POST handler above
+    (kept in sync manually -- if you touch one, check the other), but
+    returns JSON instead of a redirect, and merges onto the EXISTING
+    stored hotspot dict rather than rebuilding one from scratch. That
+    merge matters: the drawer's per-field auto-save fires far more often
+    than the full Settings form's one-shot Save, and rebuilding fresh each
+    time would silently wipe any field the drawer doesn't expose (e.g.
+    dvswitch_position, set by a completely separate /api/reorder_dvswitch
+    call) every single time a user edits so much as their SSH password."""
+    data = request.json or {}
+    name = (data.get("name") or "").strip()
+    ip   = (data.get("ip") or "").strip()
+    if not name or not ip:
+        return jsonify({"ok": False, "message": "Name and IP are required"}), 400
+
+    hotspots = load_hotspots()
+    orig_ip  = (data.get("orig_ip") or "").strip()
+    match_ip = orig_ip or ip
+    existing = next((h for h in hotspots if h["ip"] == match_ip), None)
+    hotspot  = dict(existing) if existing else {}
+
+    hotspot["name"] = name
+    hotspot["ip"]   = ip
+    hotspot["user"] = data.get("user", hotspot.get("user"))
+    hotspot["pass"] = data.get("pass", hotspot.get("pass"))
+    # Same "absent means unchecked" convention as /setup's form handler,
+    # just expressed as an explicit JSON bool instead of form-field presence.
+    hotspot["enabled"] = bool(data.get("enabled", hotspot.get("enabled", True)))
+
+    lat, lon = data.get("lat"), data.get("lon")
+    if lat not in (None, "") and lon not in (None, ""):
+        try:
+            hotspot["lat"] = float(lat)
+            hotspot["lon"] = float(lon)
+        except (TypeError, ValueError):
+            pass
+
+    bm_id = (data.get("brandmeister_id") or "").strip()
+    if bm_id:
+        hotspot["brandmeister_id"] = bm_id
+    else:
+        hotspot.pop("brandmeister_id", None)
+
+    # type isn't editable from this drawer (only full Settings can change
+    # it) -- always forwarded from the already-loaded config, never reset.
+    node_type = (data.get("type") or hotspot.get("type", "wpsd")).strip()
+    hotspot["type"] = node_type
+    if node_type == "asl3":
+        asl_node = (data.get("asl_node") or "").strip()
+        # Interpolated into a shell string over SSH (config.build_asl_status_cmd)
+        # -- validate digits-only here too, same as /setup.
+        if asl_node.isdigit():
+            hotspot["asl_node"] = asl_node
+        else:
+            hotspot.pop("asl_node", None)
+        hotspot["dvswitch_enabled"] = bool(data.get("dvswitch_enabled", hotspot.get("dvswitch_enabled", False)))
+        raw_ports = data.get("dvswitch_ports", "") or ""
+        ports = [p.strip() for p in re.split(r"[,\n]+", raw_ports) if p.strip().isdigit()]
+        if ports:
+            hotspot["dvswitch_ports"] = ",".join(ports)
+        else:
+            hotspot.pop("dvswitch_ports", None)
+    elif node_type == "openspot4":
+        extra_pass = data.get("openspot4_extra_pass", "") or ""
+        if extra_pass.strip():
+            hotspot["openspot4_extra_pass"] = extra_pass
+        else:
+            hotspot.pop("openspot4_extra_pass", None)
+
+    hotspots = [h for h in hotspots if h["ip"] != match_ip]
+    hotspots.append(hotspot)
+    save_hotspots(hotspots)
+    if mqtt_pub.enabled:
+        mqtt_pub.set_hotspots(hotspots)
+    openspot_manager.reconcile(hotspots)
+    return jsonify({"ok": True, "hotspot": hotspot})
+
 @app.route("/api/host_stats")
 def api_host_stats():
     return jsonify(host_stats.snapshot())

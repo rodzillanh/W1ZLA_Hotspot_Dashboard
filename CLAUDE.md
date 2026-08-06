@@ -3093,6 +3093,116 @@ config for per-integration credentials; put it in
     working Last Heard list. Worth revisiting later if a real want for
     accurate per-entry durations surfaces.
 
+- **Per-card gear-icon drawer (v3.73) replaced whole-card click entirely
+  on both hotspot cards and camera cards -- mocked up and iterated with
+  the user (three rounds: coexist-with-click, then full replacement/
+  merge, then per-field save + test buttons + ASL3 quick actions + a
+  Camera variant) before any of this was built for real.** `.hotspot-card`
+  lost its `onclick`/`cursor:pointer`/hover-shadow entirely; `.card-gear-
+  btn` (in `.card-header-right`) is now the only entry point into
+  `openHotspotDrawer()`. The pre-existing info drawer (Recent talkers/
+  Linked nodes, Brandmeister, Update status) is unchanged in substance,
+  just joined by a new editable Settings block above it in the same
+  drawer -- not a second drawer.
+  - **`/api/data`'s live-polled snapshot deliberately never carries SSH/
+    admin credentials** (it's read by every open browser tab every 3s) --
+    so the drawer's Settings block can't just read `lastApiData` the way
+    the rest of the drawer does. A new `GET /api/hotspot_config/<ip>`
+    (returns the raw stored dict straight from `hotspots.json`, including
+    `user`/`pass`) is fetched once, asynchronously, right when the drawer
+    opens -- same "send credentials to the browser once, on an explicit
+    action" posture `setup.html`'s edit form already has (server-rendered
+    into the page), not a new precedent.
+  - **A new `POST /api/update_hotspot` JSON endpoint exists because there
+    was no existing one to reuse.** `/setup`'s POST handler (form-encoded,
+    always `redirect("/setup")`) and `/api/toggle_hotspot/<ip>` (also a
+    redirect) are the only two hotspot-upsert paths in the app, and both
+    return HTML, not JSON -- unusable for a per-field instant-save UI with
+    no page reload. The new endpoint mirrors `/setup`'s validation rules
+    by hand (same digits-only guards on `asl_node`/`dvswitch_ports`, same
+    checkbox-absent-means-off convention, expressed as JSON) -- **kept in
+    sync manually; if you touch one, check the other**, same discipline
+    already documented elsewhere in this file for paired config
+    descriptions that don't share code.
+  - **The new endpoint merges onto the EXISTING stored hotspot dict
+    (`dict(existing)` then overlay validated fields) rather than
+    rebuilding one from scratch the way `/setup`'s handler does.** This
+    matters specifically because `/setup`'s fresh-rebuild approach means
+    editing ANY field via the full Settings form already silently drops
+    `dvswitch_position` (set by the totally separate `/api/reorder_dvswitch`
+    call, never round-tripped through the main edit form/its hidden
+    fields) back to its default -- a pre-existing latent bug, not
+    introduced here. It was never especially visible before, because the
+    full form only saves once per explicit submit; the drawer's per-field
+    auto-save fires on every single blur, so the identical bug would have
+    silently reset a DVSwitch card's position on every keystroke-worth of
+    edit if the new endpoint rebuilt fresh the same way. Verified live
+    with a real `test_client()` sequence: set `dvswitch_position` via
+    `/api/reorder_dvswitch`, then save an unrelated field
+    (`pass`) via `/api/update_hotspot`, confirm `dvswitch_position`
+    survives. `/setup`'s own handler was deliberately NOT touched to fix
+    this -- out of scope for this change, and lower risk to leave a
+    known, narrower gap in an existing stable path than to alter it while
+    adding a new one.
+  - **Field values are set via `.value` PROPERTY assignment
+    (`setVal(id, value)` -> `element.value = value`), never interpolated
+    into a `value="..."` HTML attribute string.** A password or name
+    containing a literal `"` would otherwise break out of the attribute
+    -- the same class of bug as the documented onclick-string-
+    interpolation gotcha elsewhere in this file (HTML-attribute-escaping
+    a value doesn't protect it if something later re-parses the
+    attribute), just for a `value` attribute instead of an `onclick`
+    handler. The Settings fields are rendered with empty/no `value`
+    attributes and populated via JS property assignment immediately
+    after, which is safe regardless of what characters the stored
+    credential contains.
+  - **ASL3's Linked nodes section gained real quick actions** (a "Node #
+    to connect…" field + Connect button, and a per-row Connect/Disconnect
+    button) that call the SAME `/api/asl_connect` route the ASL Favorites
+    card's `aslConnect()`/`aslSendConnect()` already use -- no new backend
+    action, no duplicated SSH/ilink logic. Deliberately skips the
+    Favorites card's "disconnect other favorites first" step, since this
+    is a direct per-node action from the hotspot's own drawer, not a
+    favorites-style exclusive select.
+  - **A new `last_poll_at` field on `HotspotStatus`** (set in
+    `monitor.py`'s `_check_one_wpsd`/`_check_one_asl3`, alongside the
+    existing `offline_since`-clearing/failure-counter-reset logic, on
+    SUCCESS only) backs the drawer's "Last SSH check Xs ago · OK" health
+    line, using the existing `fmtAgoCompact(secs)` helper -- passed an
+    already-computed ELAPSED-seconds value, not the raw epoch timestamp,
+    the exact distinction whose violation caused the real `fmtAgo`
+    double-declaration bug documented earlier in this file. Stays `None`
+    for openSPOT4 (push-based, no poll cycle to time) -- that type's
+    health line reads `status`/`offline_since` alone instead, phrased as
+    "WebSocket connected/disconnected" rather than a check interval.
+  - **The camera drawer needed NO new backend endpoint at all** -- unlike
+    hotspots, `/api/cameras` GET already returns the full stored camera
+    dicts (including RTSP credentials/Bambu access code), already polled
+    into the client-side `cameras` array every 30s, and `/api/cameras`
+    POST already merges onto an existing camera dict when `id` matches.
+    The drawer's per-field save (`saveCameraField()`) just builds the
+    full merged camera object client-side and POSTs it to that same
+    existing route, the same "send the whole object, not just the
+    changed field" shape `saveHotspotField()` uses for the (necessarily
+    new) hotspot endpoint. "Test stream" reuses `/api/test_camera`
+    verbatim; the health line reuses the existing `/api/camera_status`
+    route and `CAMERA_STATE_LABELS` map (`fetchCameraStatus()` already
+    established both) rather than inventing new status plumbing.
+    Cameras have no `enabled` field in their schema at all (confirmed by
+    reading `api_cameras_post()` before assuming one existed) -- the
+    drawer's camera variant has no Enabled toggle, unlike the hotspot
+    variant.
+  - **No Delete button in either drawer, by explicit design** -- deletion
+    stays a full-Settings-only action (`/setup#hotspots` /
+    `/setup#cameras`, reached via each drawer's "Open in full Settings →"
+    link), not something reachable from a quick per-card drawer.
+  - **Verified with a live route/decorator-count sanity check per this
+    file's own `str_replace`-decorator-loss warning above** (64
+    `@app.route`-decorated functions via a plain grep, 64 confirmed via
+    an AST walk, 65 total Flask URL rules = 64 + the implicit
+    `/static/<path:filename>` route) before considering the two new
+    routes done -- not just a green `py_compile`.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

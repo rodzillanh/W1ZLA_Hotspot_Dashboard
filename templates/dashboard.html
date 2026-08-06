@@ -397,15 +397,21 @@
             border: 1px solid var(--card-border);
             border-radius: 10px;
             padding: 20px;
-            cursor: pointer;
-            transition: background .3s, border-color .3s, box-shadow .15s;
+            transition: background .3s, border-color .3s;
         }
-        /* Whole-card click opens the detail drawer (openHotspotDrawer) --
-           existing links inside (name/map-pin/update-badge/callsigns) all
-           stopPropagation() and keep their own separate behavior, so this
-           hover cue is scoped to the card background, not a promise that
-           EVERY pixel does the same thing. */
-        .hotspot-card:hover { box-shadow: 0 0 0 1px var(--text-dim); }
+        /* The card body itself is NOT a click target -- the gear icon
+           (.card-gear-btn, in .card-header-right) is the only way into
+           openHotspotDrawer() now. Existing links inside (name/map-pin/
+           update-badge/callsigns) keep their own stopPropagation() calls;
+           harmless now that there's no parent handler to stop, but left
+           in place in case a card-level handler is ever reintroduced. */
+        .card-gear-btn {
+            width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+            border-radius: 6px; border: 1px solid var(--card-border); background: var(--panel-2);
+            color: var(--text-muted); cursor: pointer; font-size: 13px; flex-shrink: 0;
+            transition: color .15s, border-color .15s;
+        }
+        .card-gear-btn:hover { color: var(--text); border-color: var(--text-dim); }
         .hotspot-card.active {
             background: var(--card-active-bg);
             border-color: var(--card-active-border);
@@ -1429,6 +1435,55 @@
         .hs-update-note { font-size: 11.5px; color: var(--text-dim); background: var(--panel-2); border-radius: 6px; padding: 8px 10px; line-height: 1.5; margin-top: 4px; }
         .hs-update-note b { color: var(--accent); }
         .hs-empty-note { font-size: 12px; color: var(--text-dim); padding: 4px 0; }
+
+        /* --- card drawer Settings block -- per-field instant save (POSTs
+           on blur, no page-wide Save button), plus the Test buttons the
+           full Settings -> Hotspots edit form already has. See
+           openHotspotDrawer()/renderHotspotSettingsFields(). --- */
+        .hs-settings-link { font-size: 11px; color: var(--text-muted); text-decoration: none; font-weight: 400; }
+        .hs-settings-link:hover { color: var(--live); text-decoration: underline; }
+        .hs-field-block { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-top: 4px; }
+        .hs-health-line { font-size: 11px; color: var(--text-dim); margin: -2px 0 12px; display: flex; align-items: center; gap: 5px; }
+        .hs-health-line .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+        .hs-health-line.ok .dot { background: var(--good); }
+        .hs-health-line.bad .dot { background: var(--danger); }
+        .hs-field { margin-bottom: 10px; }
+        .hs-field:last-child { margin-bottom: 0; }
+        .hs-field-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+        .hs-field label { display: block; font-size: 11px; color: var(--text-muted); }
+        .hs-field-status { font-size: 10px; color: var(--good); opacity: 0; transition: opacity .25s; display: flex; align-items: center; gap: 3px; }
+        .hs-field-status.show { opacity: 1; }
+        .hs-field-status.err { color: var(--danger); }
+        .hs-field input[type="text"], .hs-field input[type="password"], .hs-field select {
+            width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px;
+            padding: 7px 9px; color: var(--text); font-family: var(--font-mono); font-size: 12.5px;
+            transition: border-color .2s;
+        }
+        .hs-field input.just-saved { border-color: color-mix(in srgb, var(--good) 55%, var(--border)); }
+        .hs-field-row { display: flex; gap: 10px; }
+        .hs-field-row .hs-field { flex: 1; }
+        .hs-pw-wrap { position: relative; }
+        .hs-pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 12px; }
+        .hs-help { font-size: 10.5px; color: var(--text-dim); margin: -6px 0 10px; line-height: 1.5; }
+        .hs-test-row { display: flex; align-items: center; gap: 8px; margin: 2px 0 12px; }
+        .hs-test-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; cursor: pointer; white-space: nowrap; }
+        .hs-test-btn:hover { color: var(--text); border-color: var(--text-dim); }
+        .hs-test-btn:disabled { opacity: .6; cursor: default; }
+        .hs-test-result { font-size: 11px; color: var(--text-dim); }
+        .hs-test-result.ok { color: var(--good); }
+        .hs-test-result.fail { color: var(--danger); }
+        .hs-toggle-row { display: flex; align-items: center; justify-content: space-between; padding-top: 10px; margin-top: 10px; border-top: 1px dashed var(--border); }
+        .hs-toggle-label { font-size: 12.5px; color: var(--text-muted); }
+        .hs-switch { width: 34px; height: 19px; border-radius: 10px; background: var(--panel); border: 1px solid var(--border); position: relative; cursor: pointer; flex-shrink: 0; }
+        .hs-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--text-dim); transition: left .15s, background .15s; }
+        .hs-switch.on { border-color: color-mix(in srgb, var(--live) 45%, var(--border)); }
+        .hs-switch.on::after { left: 17px; background: var(--live); }
+        .hs-link-quickconnect { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+        .hs-link-quickconnect input[type="text"] { flex: 1; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; color: var(--text); font-family: var(--font-mono); font-size: 12px; }
+        .hs-link-action-btn { padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text-muted); font-family: var(--font-mono); font-size: 10.5px; cursor: pointer; white-space: nowrap; flex-shrink: 0; margin-left: auto; }
+        .hs-link-action-btn:hover { color: var(--text); border-color: var(--text-dim); }
+        .hs-link-action-btn:disabled { opacity: .6; cursor: default; }
+
         .qso-mini-map { height: 170px; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
 
         /* --- map --- */
@@ -2156,6 +2211,7 @@
 <div class="hs-drawer" id="hs-drawer"></div>
 <div class="hs-drawer" id="qso-drawer"></div>
 <div class="hs-drawer" id="settings-drawer"></div>
+<div class="hs-drawer" id="camera-drawer"></div>
 
 <!-- One-time "what's available" feature tour -- see checkOnboarding()/
      dismissOnboardingTour() in the script below. Reopenable anytime from
@@ -3089,10 +3145,10 @@ function renderCards(data) {
             : '';
 
         return `
-        <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}" onclick="openHotspotDrawer('${hs.ip}')">
+        <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}">
           <div class="card-header">
             <a class="card-name" href="http://${hs.ip}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${hs.name}${chipHtml}</a>
-            <div class="card-header-right">${updateBadge}${mapPin}${uptimeBadge}</div>
+            <div class="card-header-right">${updateBadge}${mapPin}${uptimeBadge}<button class="card-gear-btn" title="Card details &amp; settings" onclick="openHotspotDrawer('${hs.ip}')">⚙</button></div>
           </div>
           ${identityLine}
           <div class="card-inner">
@@ -3406,6 +3462,7 @@ function renderCameraCards() {
                 <div class="camera-header">
                     <span class="camera-name"></span>
                     <span class="camera-type-badge"></span>
+                    <button class="card-gear-btn" title="Camera details &amp; settings" onclick="openCameraDrawer('${cam.id}')">⚙</button>
                 </div>
                 <div class="camera-video-wrap">
                     <img loading="lazy">
@@ -3439,6 +3496,179 @@ function cameraFullscreen(camId) {
     const card = document.getElementById('camera-card-' + camId);
     const wrap = card && card.querySelector('.camera-video-wrap');
     if (wrap && wrap.requestFullscreen) wrap.requestFullscreen();
+}
+
+// --- camera card drawer -- same gear-icon-only pattern as the hotspot
+// card drawer, the one other place in this app with genuine per-item
+// CRUD (name/type/URL-or-credentials/position). Per-field instant save
+// reuses the EXISTING /api/cameras POST route directly (it already
+// merges onto the stored camera dict when `id` matches -- see
+// api_cameras_post() in app.py), so no new backend endpoint was needed
+// here, unlike hotspots (which have no JSON upsert route to reuse).
+let currentCameraId = null;
+let currentCameraConfig = null;
+
+function openCameraDrawer(id) {
+    const cam = cameras.find(c => c.id === id);
+    if (!cam) return;
+    currentCameraId = id;
+    currentCameraConfig = Object.assign({}, cam);
+
+    document.getElementById('camera-drawer').innerHTML = `
+        <div class="hs-drawer-header">
+            <div class="hs-drawer-title-row">
+                <div class="hs-drawer-title"><span class="status-dot"></span>${escapeHtml(cam.name)}</div>
+                <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
+            </div>
+            <div class="hs-drawer-sub">${cam.type === 'bambu_a1' ? 'Bambu Labs A1' : cam.type === 'wyze' ? 'Wyze (RTSP firmware)' : 'RTSP'}</div>
+        </div>
+        <div class="hs-drawer-body">
+            <div class="hs-drawer-section-title" style="margin-top:2px;justify-content:space-between">
+                <span>Settings</span>
+                <a class="hs-settings-link" href="/setup#cameras">Open in full Settings →</a>
+            </div>
+            <div class="hs-field-block" id="cam-settings-fields"><div class="hs-empty-note">Loading…</div></div>
+        </div>`;
+    closeAllDrawers();
+    document.getElementById('camera-drawer').classList.add('open');
+    document.getElementById('hs-drawer-backdrop').classList.add('open');
+
+    renderCameraSettingsFields(cam);
+    fetch('/api/camera_status')
+        .then(r => r.json())
+        .then(statusMap => {
+            if (currentCameraId !== id) return; // drawer moved on / closed before this resolved
+            updateCameraHealthLine(statusMap[id] || {state: 'stopped', detail: ''});
+        })
+        .catch(() => {});
+}
+
+function renderCameraSettingsFields(cam) {
+    const el = document.getElementById('cam-settings-fields');
+    if (!el) return;
+    el.innerHTML = `
+        <div class="hs-health-line" id="cam-health-line"><span class="dot"></span> Checking status…</div>
+        <div class="hs-field">
+            <div class="hs-field-label-row"><label>Name</label><span class="hs-field-status" id="camf-status-name">✓ Saved</span></div>
+            <input type="text" id="camf-name" onblur="saveCameraField('name', this.value)">
+        </div>
+        <div class="hs-field">
+            <div class="hs-field-label-row"><label>Type</label><span class="hs-field-status" id="camf-status-type">✓ Saved</span></div>
+            <select id="camf-type" onchange="onCameraTypeChange(this)">
+                <option value="rtsp">RTSP</option>
+                <option value="bambu_a1">Bambu Labs A1</option>
+                <option value="wyze">Wyze (RTSP firmware)</option>
+            </select>
+        </div>
+        <div id="camf-rtsp-fields">
+            <div class="hs-field">
+                <div class="hs-field-label-row"><label>Stream URL</label><span class="hs-field-status" id="camf-status-rtsp_url">✓ Saved</span></div>
+                <input type="text" id="camf-rtsp-url" onblur="saveCameraField('rtsp_url', this.value)">
+            </div>
+        </div>
+        <div id="camf-bambu-fields">
+            <div class="hs-field">
+                <div class="hs-field-label-row"><label>Printer IP</label><span class="hs-field-status" id="camf-status-ip">✓ Saved</span></div>
+                <input type="text" id="camf-ip" onblur="saveCameraField('ip', this.value)">
+            </div>
+            <div class="hs-field-row">
+                <div class="hs-field">
+                    <div class="hs-field-label-row"><label>Access code</label><span class="hs-field-status" id="camf-status-access_code">✓ Saved</span></div>
+                    <div class="hs-pw-wrap">
+                        <input type="password" id="camf-access-code" onblur="saveCameraField('access_code', this.value)">
+                        <button class="hs-pw-toggle" onclick="hsTogglePw('camf-access-code')">👁</button>
+                    </div>
+                </div>
+                <div class="hs-field">
+                    <div class="hs-field-label-row"><label>Serial number</label><span class="hs-field-status" id="camf-status-serial">✓ Saved</span></div>
+                    <input type="text" id="camf-serial" onblur="saveCameraField('serial', this.value)">
+                </div>
+            </div>
+        </div>
+        <div class="hs-test-row">
+            <button class="hs-test-btn" onclick="runCameraTest(this)">Test stream</button>
+            <span class="hs-test-result" id="cam-test-result"></span>
+        </div>`;
+
+    setVal('camf-name', cam.name);
+    document.getElementById('camf-type').value = cam.type;
+    setVal('camf-rtsp-url', cam.rtsp_url);
+    setVal('camf-ip', cam.ip);
+    setVal('camf-access-code', cam.access_code);
+    setVal('camf-serial', cam.serial);
+    toggleCameraTypeFields(cam.type);
+}
+
+function toggleCameraTypeFields(type) {
+    const bambu = type === 'bambu_a1';
+    document.getElementById('camf-rtsp-fields').style.display = bambu ? 'none' : '';
+    document.getElementById('camf-bambu-fields').style.display = bambu ? '' : 'none';
+}
+
+function onCameraTypeChange(select) {
+    toggleCameraTypeFields(select.value);
+    saveCameraField('type', select.value);
+}
+
+function updateCameraHealthLine(status) {
+    const el = document.getElementById('cam-health-line');
+    if (!el) return;
+    const isUp = status.state === 'connected';
+    const label = CAMERA_STATE_LABELS[status.state] || status.state;
+    el.className = 'hs-health-line ' + (isUp ? 'ok' : (status.state === 'stopped' ? '' : 'bad'));
+    el.innerHTML = `<span class="dot"></span> ${escapeHtml(status.detail || label)}`;
+}
+
+// Same shape as saveHotspotField() -- builds the full merged camera dict
+// (never just the one changed field) since /api/cameras POST requires
+// name+type to be present/valid on every call, and sends it whole.
+function saveCameraField(field, value) {
+    if (!currentCameraConfig || !currentCameraId) return;
+    currentCameraConfig[field] = value;
+    fetch('/api/cameras', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(currentCameraConfig)
+    })
+        .then(r => r.json())
+        .then(data => {
+            flashCameraFieldStatus(field, !!data.ok, data.message);
+            if (data.ok) fetchCameras();
+        })
+        .catch(() => flashCameraFieldStatus(field, false, 'Network error'));
+}
+
+function flashCameraFieldStatus(field, ok, message) {
+    const span = document.getElementById('camf-status-' + field);
+    if (!span) return;
+    span.textContent = ok ? '✓ Saved' : '✕ ' + (message || 'Failed');
+    span.classList.toggle('err', !ok);
+    span.classList.add('show');
+    clearTimeout(span._t);
+    span._t = setTimeout(() => span.classList.remove('show'), 1600);
+}
+
+function runCameraTest(btn) {
+    const result = document.getElementById('cam-test-result');
+    result.className = 'hs-test-result';
+    result.textContent = 'Testing…';
+    btn.disabled = true;
+    fetch('/api/test_camera', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(currentCameraConfig)
+    })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            result.className = 'hs-test-result ' + (data.success ? 'ok' : 'fail');
+            result.textContent = (data.success ? '✓ ' : '✕ ') + (data.message || '');
+        })
+        .catch(() => {
+            btn.disabled = false;
+            result.className = 'hs-test-result fail';
+            result.textContent = '✕ Network error';
+        });
 }
 
 const CAMERA_STATE_LABELS = {
@@ -5518,10 +5748,16 @@ function showHotspotCard(ip) {
 // Reads lastApiData (the most recent /api/data response, already kept
 // around for ASL Favorites lookups) rather than a separate fetch -- the
 // card that was clicked already has this data in hand.
+let currentDrawerIp = null;      // hotspot this drawer is currently showing -- matches /api/update_hotspot's orig_ip
+let currentHotspotConfig = null; // raw config fetched from /api/hotspot_config/<ip>, updated in place as fields save
+
 function openHotspotDrawer(ip) {
     const hs = (lastApiData || []).find(h => h.ip === ip);
     if (!hs) return;
+    currentDrawerIp = ip;
+    currentHotspotConfig = null;
     const isAsl = hs.type === 'asl3';
+    const isOpenSpot4 = hs.type === 'openspot4';
     const isOffline = hs.status === 'Offline';
     const dotClass = isOffline ? 'offline' : (hs.is_active ? 'live' : '');
 
@@ -5535,7 +5771,7 @@ function openHotspotDrawer(ip) {
     const subLine = [ip, ...identityBits].join(' · ');
 
     let talkersHtml = '';
-    if (!isAsl) {
+    if (!isAsl && !isOpenSpot4) {
         const history = hs.history || [];
         talkersHtml = `
         <div class="hs-drawer-section" style="margin-top:10px">
@@ -5554,6 +5790,11 @@ function openHotspotDrawer(ip) {
         linkedHtml = `
         <div class="hs-drawer-section" style="margin-top:10px">
             <div class="hs-drawer-section-title">Linked nodes <span class="count">(${nodes.length})</span></div>
+            <div class="hs-link-quickconnect">
+                <input type="text" id="hs-quickconnect-node" placeholder="Node # to connect…">
+                <button class="hs-test-btn" onclick="hotspotQuickConnect()">Connect</button>
+            </div>
+            <span class="hs-test-result" id="hs-quickconnect-result" style="display:block;margin:-4px 0 8px;"></span>
             ${nodes.length ? nodes.map(n => {
                 const callHtml = n.callsign
                     ? `<a class="hs-link-call" href="https://www.qrz.com/db/${encodeURIComponent(n.callsign)}" target="_blank" rel="noopener" style="text-decoration:none;${n.keyed ? 'color:var(--live)' : ''}">${escapeHtml(n.callsign)}</a>`
@@ -5568,13 +5809,14 @@ function openHotspotDrawer(ip) {
                         ${desc ? `<div class="hs-link-desc">${escapeHtml(desc)}</div>` : ''}
                     </div>
                     <span class="hs-link-mode">${escapeHtml(n.mode || '')}</span>
+                    <button class="hs-link-action-btn" data-linked="true" data-node="${escapeHtml(n.node)}" onclick="hotspotLinkAction(this)">Disconnect</button>
                 </div>`;
             }).join('') : '<div class="hs-empty-note">No linked nodes right now.</div>'}
         </div>`;
     }
 
     let bmHtml = '';
-    if (!isAsl) {
+    if (!isAsl && !isOpenSpot4) {
         if (hs.bm_status_text || (hs.bm_static_tgs && hs.bm_static_tgs.length)) {
             bmHtml = `
             <div class="hs-drawer-section">
@@ -5595,13 +5837,21 @@ function openHotspotDrawer(ip) {
     }
 
     let updateHtml = '';
-    if (!isAsl && hs.dashboard_update_available !== null && hs.dashboard_update_available !== undefined) {
+    if (!isAsl && !isOpenSpot4 && hs.dashboard_update_available !== null && hs.dashboard_update_available !== undefined) {
         updateHtml = `
         <div class="hs-drawer-section">
             <div class="hs-drawer-section-title">Update status</div>
             ${hs.dashboard_update_available
                 ? `<div class="hs-update-note"><b>${escapeHtml((hs.dashboard_outdated_repos || []).join(', ') || 'A component')}</b> ${(hs.dashboard_outdated_repos || []).length > 1 ? 'are' : 'is'} behind.</div>`
                 : `<div class="hs-empty-note">Up to date${hs.dashboard_version ? ` (WebCode ${escapeHtml(hs.dashboard_version)}${hs.dashboard_version_date ? ', ' + escapeHtml(hs.dashboard_version_date) : ''})` : ''}.</div>`}
+        </div>`;
+    }
+
+    let openspot4Html = '';
+    if (isOpenSpot4) {
+        openspot4Html = `
+        <div class="hs-drawer-section" style="margin-top:10px">
+            <div class="hs-empty-note">openSPOT4 has no SSH log to show Recent talkers/Brandmeister/Update status from — it's push-based over its own WebSocket, and its live call state already shows directly on the card itself.</div>
         </div>`;
     }
 
@@ -5619,14 +5869,322 @@ function openHotspotDrawer(ip) {
             </div>
         </div>
         <div class="hs-drawer-body">
+            <div class="hs-drawer-section-title" style="margin-top:2px;justify-content:space-between">
+                <span>Settings</span>
+                <a class="hs-settings-link" href="/setup#hotspots">Open in full Settings →</a>
+            </div>
+            <div class="hs-field-block" id="hs-settings-fields"><div class="hs-empty-note">Loading…</div></div>
             ${talkersHtml}
             ${linkedHtml}
             ${bmHtml}
             ${updateHtml}
+            ${openspot4Html}
         </div>`;
     closeAllDrawers();
     document.getElementById('hs-drawer').classList.add('open');
     document.getElementById('hs-drawer-backdrop').classList.add('open');
+
+    fetch('/api/hotspot_config/' + encodeURIComponent(ip))
+        .then(r => r.json())
+        .then(cfg => {
+            if (currentDrawerIp !== ip || cfg.error) return; // drawer moved on / closed before this resolved
+            currentHotspotConfig = cfg;
+            renderHotspotSettingsFields(hs, cfg);
+        })
+        .catch(() => {
+            const el = document.getElementById('hs-settings-fields');
+            if (el) el.innerHTML = '<div class="hs-empty-note">Couldn\'t load settings for this hotspot.</div>';
+        });
+}
+
+// Builds the type-specific Settings fields (WPSD / ASL3 / openSPOT4) into
+// #hs-settings-fields and wires up per-field instant save + Test buttons.
+// Values are set via .value property assignment (never interpolated into
+// a value="..." attribute) so a password/name containing a quote can't
+// break out of the attribute -- same class of concern as the documented
+// onclick-string-interpolation gotcha elsewhere in this app, just for a
+// value attribute instead of an event handler.
+function renderHotspotSettingsFields(hs, cfg) {
+    const el = document.getElementById('hs-settings-fields');
+    if (!el) return;
+    const isAsl = hs.type === 'asl3';
+    const isOpenSpot4 = hs.type === 'openspot4';
+
+    let healthHtml;
+    if (isOpenSpot4) {
+        const ok = hs.status !== 'Offline';
+        healthHtml = `<div class="hs-health-line ${ok ? 'ok' : 'bad'}"><span class="dot"></span> WebSocket ${ok ? 'connected' : 'disconnected'}</div>`;
+    } else {
+        const ok = hs.status !== 'Offline';
+        const agoText = hs.last_poll_at ? fmtAgoCompact(Math.max(0, (Date.now() / 1000) - hs.last_poll_at)) + ' ago' : 'never';
+        healthHtml = `<div class="hs-health-line ${ok ? 'ok' : 'bad'}"><span class="dot"></span> Last SSH check ${agoText} · ${ok ? 'OK' : 'Offline'}</div>`;
+    }
+
+    let fieldsHtml = `
+        <div class="hs-field">
+            <div class="hs-field-label-row"><label>Name</label><span class="hs-field-status" id="hsf-status-name">✓ Saved</span></div>
+            <input type="text" id="hsf-name" onblur="saveHotspotField('name', this.value)">
+        </div>
+        <div class="hs-field">
+            <div class="hs-field-label-row"><label>IP address</label><span class="hs-field-status" id="hsf-status-ip">✓ Saved</span></div>
+            <input type="text" id="hsf-ip" onblur="saveHotspotField('ip', this.value)">
+        </div>`;
+
+    if (!isOpenSpot4) {
+        fieldsHtml += `
+        <div class="hs-field-row">
+            <div class="hs-field">
+                <div class="hs-field-label-row"><label>SSH username</label><span class="hs-field-status" id="hsf-status-user">✓ Saved</span></div>
+                <input type="text" id="hsf-user" onblur="saveHotspotField('user', this.value)">
+            </div>
+            <div class="hs-field">
+                <div class="hs-field-label-row"><label>SSH password</label><span class="hs-field-status" id="hsf-status-pass">✓ Saved</span></div>
+                <div class="hs-pw-wrap">
+                    <input type="password" id="hsf-pass" onblur="saveHotspotField('pass', this.value)">
+                    <button class="hs-pw-toggle" onclick="hsTogglePw('hsf-pass')">👁</button>
+                </div>
+            </div>
+        </div>
+        <div class="hs-test-row">
+            <button class="hs-test-btn" onclick="runHotspotTest(this, 'hs-test-ssh-result', '/api/test_ssh', () => ({ip: getVal('hsf-ip'), user: getVal('hsf-user'), pass: getVal('hsf-pass')}))">Test connection</button>
+            <span class="hs-test-result" id="hs-test-ssh-result"></span>
+        </div>`;
+    } else {
+        fieldsHtml += `
+        <div class="hs-field">
+            <div class="hs-field-label-row"><label>Admin password</label><span class="hs-field-status" id="hsf-status-pass">✓ Saved</span></div>
+            <div class="hs-pw-wrap">
+                <input type="password" id="hsf-pass" onblur="saveHotspotField('pass', this.value)">
+                <button class="hs-pw-toggle" onclick="hsTogglePw('hsf-pass')">👁</button>
+            </div>
+        </div>
+        <div class="hs-test-row">
+            <button class="hs-test-btn" onclick="runHotspotTest(this, 'hs-test-os4-result', '/api/test_openspot4', () => ({ip: getVal('hsf-ip'), pass: getVal('hsf-pass'), extra_pass: getVal('hsf-os4extra')}))">Test openSPOT4</button>
+            <span class="hs-test-result" id="hs-test-os4-result"></span>
+        </div>
+        <div class="hs-field">
+            <div class="hs-field-label-row"><label>Additional profile passwords</label><span class="hs-field-status" id="hsf-status-os4extra">✓ Saved</span></div>
+            <input type="text" id="hsf-os4extra" placeholder="one per line — for other config profiles on this device" onblur="saveHotspotField('openspot4_extra_pass', this.value)">
+            <div class="hs-help">Tried in order until one authenticates — needed if this device's active config profile has been switched to one with a different password.</div>
+        </div>`;
+    }
+
+    fieldsHtml += `
+        <div class="hs-field-row">
+            <div class="hs-field">
+                <div class="hs-field-label-row"><label>Latitude</label><span class="hs-field-status" id="hsf-status-lat">✓ Saved</span></div>
+                <input type="text" id="hsf-lat" onblur="saveHotspotField('lat', this.value)">
+            </div>
+            <div class="hs-field">
+                <div class="hs-field-label-row"><label>Longitude</label><span class="hs-field-status" id="hsf-status-lon">✓ Saved</span></div>
+                <input type="text" id="hsf-lon" onblur="saveHotspotField('lon', this.value)">
+            </div>
+        </div>`;
+
+    if (isAsl) {
+        fieldsHtml += `
+        <div class="hs-field">
+            <div class="hs-field-label-row"><label>ASL node number</label><span class="hs-field-status" id="hsf-status-aslnode">✓ Saved</span></div>
+            <input type="text" id="hsf-aslnode" onblur="saveHotspotField('asl_node', this.value)">
+        </div>
+        <div class="hs-test-row">
+            <button class="hs-test-btn" onclick="runHotspotTest(this, 'hs-test-asl-result', '/api/test_asl_node', () => ({ip: getVal('hsf-ip'), user: getVal('hsf-user'), pass: getVal('hsf-pass'), asl_node: getVal('hsf-aslnode')}))">Test ASL node</button>
+            <span class="hs-test-result" id="hs-test-asl-result"></span>
+        </div>
+        <div class="hs-toggle-row">
+            <span class="hs-toggle-label">DVSwitch bridge (Analog_Bridge)</span>
+            <div class="hs-switch" id="hsf-dvswitch-enabled" onclick="hsToggleDvswitch(this)"></div>
+        </div>
+        <div class="hs-field" id="hsf-dvports-field">
+            <div class="hs-field-label-row"><label>DVSwitch ports</label><span class="hs-field-status" id="hsf-status-dvports">✓ Saved</span></div>
+            <input type="text" id="hsf-dvports" onblur="saveHotspotField('dvswitch_ports', this.value)">
+            <div class="hs-help">One or more Analog_Bridge ports, comma or newline separated.</div>
+        </div>`;
+    } else if (!isOpenSpot4) {
+        fieldsHtml += `
+        <div class="hs-field">
+            <div class="hs-field-label-row"><label>Brandmeister ID</label><span class="hs-field-status" id="hsf-status-brandmeister_id">✓ Saved</span></div>
+            <input type="text" id="hsf-bmid" onblur="saveHotspotField('brandmeister_id', this.value)">
+        </div>
+        <div class="hs-test-row">
+            <button class="hs-test-btn" onclick="runHotspotTest(this, 'hs-test-bm-result', '/api/test_brandmeister', () => ({repeater_id: getVal('hsf-bmid')}))">Test Brandmeister ID</button>
+            <span class="hs-test-result" id="hs-test-bm-result"></span>
+        </div>`;
+    }
+
+    fieldsHtml += `
+        <div class="hs-toggle-row">
+            <span class="hs-toggle-label">Enabled</span>
+            <div class="hs-switch" id="hsf-enabled" onclick="hsToggleEnabled(this)"></div>
+        </div>`;
+
+    el.innerHTML = healthHtml + fieldsHtml;
+
+    // Populate values via the .value PROPERTY, not an HTML attribute --
+    // safe regardless of quotes/special characters in a name or password.
+    setVal('hsf-name', cfg.name);
+    setVal('hsf-ip', cfg.ip);
+    if (!isOpenSpot4) {
+        setVal('hsf-user', cfg.user);
+    }
+    setVal('hsf-pass', cfg.pass);
+    setVal('hsf-lat', cfg.lat != null ? cfg.lat : '');
+    setVal('hsf-lon', cfg.lon != null ? cfg.lon : '');
+    if (isAsl) {
+        setVal('hsf-aslnode', cfg.asl_node);
+        setVal('hsf-dvports', cfg.dvswitch_ports);
+        document.getElementById('hsf-dvswitch-enabled').classList.toggle('on', !!cfg.dvswitch_enabled);
+        document.getElementById('hsf-dvports-field').style.display = cfg.dvswitch_enabled ? '' : 'none';
+    } else if (isOpenSpot4) {
+        setVal('hsf-os4extra', cfg.openspot4_extra_pass);
+    } else {
+        setVal('hsf-bmid', cfg.brandmeister_id);
+    }
+    document.getElementById('hsf-enabled').classList.toggle('on', cfg.enabled !== false);
+}
+
+function setVal(id, value) {
+    const elx = document.getElementById(id);
+    if (elx) elx.value = value == null ? '' : value;
+}
+function getVal(id) {
+    const elx = document.getElementById(id);
+    return elx ? elx.value : '';
+}
+
+function hsTogglePw(id) {
+    const f = document.getElementById(id);
+    f.type = f.type === 'password' ? 'text' : 'password';
+}
+
+function hsToggleDvswitch(el) {
+    el.classList.toggle('on');
+    const on = el.classList.contains('on');
+    document.getElementById('hsf-dvports-field').style.display = on ? '' : 'none';
+    saveHotspotField('dvswitch_enabled', on);
+}
+
+function hsToggleEnabled(el) {
+    el.classList.toggle('on');
+    saveHotspotField('enabled', el.classList.contains('on'));
+}
+
+// Per-field instant save -- builds the full merged hotspot config (never
+// just the one changed field, since /api/update_hotspot merges onto
+// whatever's already on disk but the drawer's own in-memory copy is the
+// source of truth for every OTHER field while this drawer is open) and
+// POSTs it. Flashes a small "Saved"/error indicator next to the field
+// that changed, same instant-no-submit-step feel as the Quick Settings
+// drawer's toggles.
+function saveHotspotField(field, value) {
+    if (!currentHotspotConfig || !currentDrawerIp) return;
+    currentHotspotConfig[field] = value;
+    const payload = Object.assign({}, currentHotspotConfig, { orig_ip: currentDrawerIp });
+    fetch('/api/update_hotspot', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+        .then(r => r.json())
+        .then(data => {
+            flashFieldStatus(field, !!data.ok, data.message);
+            if (data.ok && field === 'ip' && value !== currentDrawerIp) {
+                // The hotspot's identity key just changed -- the drawer's
+                // remaining field ids/currentDrawerIp are now stale, so
+                // close it and let the next poll's fresh card carry the
+                // new IP, rather than trying to live-patch every reference.
+                currentDrawerIp = value;
+                setTimeout(() => { closeHotspotDrawer(); refresh(); }, 500);
+            }
+        })
+        .catch(() => flashFieldStatus(field, false, 'Network error'));
+}
+
+function flashFieldStatus(field, ok, message) {
+    const key = field === 'openspot4_extra_pass' ? 'os4extra'
+        : field === 'dvswitch_ports' ? 'dvports'
+        : field === 'asl_node' ? 'aslnode'
+        : field;
+    const span = document.getElementById('hsf-status-' + key);
+    if (!span) return;
+    span.textContent = ok ? '✓ Saved' : '✕ ' + (message || 'Failed');
+    span.classList.toggle('err', !ok);
+    span.classList.add('show');
+    clearTimeout(span._t);
+    span._t = setTimeout(() => span.classList.remove('show'), 1600);
+}
+
+function runHotspotTest(btn, resultId, route, bodyFn) {
+    const result = document.getElementById(resultId);
+    result.className = 'hs-test-result';
+    result.textContent = 'Testing…';
+    btn.disabled = true;
+    fetch(route, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(bodyFn())
+    })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            result.className = 'hs-test-result ' + (data.success ? 'ok' : 'fail');
+            result.textContent = (data.success ? '✓ ' : '✕ ') + (data.message || (data.success ? 'Connected' : 'Failed'));
+        })
+        .catch(() => {
+            btn.disabled = false;
+            result.className = 'hs-test-result fail';
+            result.textContent = '✕ Network error';
+        });
+}
+
+// ASL3 quick connect/disconnect -- reuses the exact same /api/asl_connect
+// route the ASL Favorites card's aslConnect()/aslSendConnect() already
+// call, just without that card's "disconnect other favorites first" step
+// (this is a direct per-node action, not a favorites-style exclusive
+// select).
+function hotspotQuickConnect() {
+    if (!currentDrawerIp) return;
+    const input = document.getElementById('hs-quickconnect-node');
+    const result = document.getElementById('hs-quickconnect-result');
+    const node = input.value.trim();
+    if (!node) return;
+    result.className = 'hs-test-result';
+    result.textContent = 'Connecting…';
+    fetch('/api/asl_connect', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ip: currentDrawerIp, node, action: 'connect'})
+    })
+        .then(r => r.json())
+        .then(data => {
+            result.className = 'hs-test-result ' + (data.success ? 'ok' : 'fail');
+            result.textContent = (data.success ? '✓ ' : '✕ ') + (data.message || '');
+            if (data.success) input.value = '';
+        });
+}
+
+function hotspotLinkAction(btn) {
+    if (!currentDrawerIp) return;
+    const node = btn.dataset.node;
+    const linked = btn.dataset.linked !== 'false';
+    const action = linked ? 'disconnect' : 'connect';
+    btn.disabled = true;
+    btn.textContent = linked ? 'Disconnecting…' : 'Connecting…';
+    fetch('/api/asl_connect', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ip: currentDrawerIp, node, action})
+    })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            if (data.success) {
+                btn.dataset.linked = linked ? 'false' : 'true';
+                btn.textContent = linked ? 'Connect' : 'Disconnect';
+            } else {
+                btn.textContent = linked ? 'Disconnect' : 'Connect';
+            }
+        });
 }
 
 // Shared by all three drawers (hotspot detail, QSO detail, quick
@@ -5638,6 +6196,7 @@ function closeAllDrawers() {
     document.getElementById('hs-drawer').classList.remove('open');
     document.getElementById('qso-drawer').classList.remove('open');
     document.getElementById('settings-drawer').classList.remove('open');
+    document.getElementById('camera-drawer').classList.remove('open');
     document.getElementById('hs-drawer-backdrop').classList.remove('open');
 }
 function closeHotspotDrawer() { closeAllDrawers(); }

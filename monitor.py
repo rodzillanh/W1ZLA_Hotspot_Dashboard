@@ -310,6 +310,7 @@ class FleetMonitor:
                 if status.offline_since is not None:
                     self._record_fleet_event(ip, status.name, "online")
                 status.offline_since = None
+                status.last_poll_at = time.time()
         except Exception:
             self._record_failure(ip)
 
@@ -330,6 +331,7 @@ class FleetMonitor:
                 if status.offline_since is not None:
                     self._record_fleet_event(ip, status.name, "online")
                 status.offline_since = None
+                status.last_poll_at = time.time()
             if dvswitch:
                 sections = self._split_dvswitch_sections(output)
                 self._check_dvswitch_tx(ip, sections)

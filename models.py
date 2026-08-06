@@ -11,6 +11,12 @@ class HotspotStatus:
     ip: str
     status: str = "Connecting..."
     offline_since: Optional[float] = None  # epoch when status first became "Offline"; None if online/unknown
+    # epoch of the last SUCCESSFUL poll (wpsd/asl3 only -- set alongside the
+    # offline_since-clearing/failure-counter-reset logic in monitor.py's
+    # _check_one_wpsd/_check_one_asl3). Stays None for openSPOT4, which is
+    # push-based over its own WebSocket rather than polled -- the card
+    # drawer's health line falls back to `status` alone for that type.
+    last_poll_at: Optional[float] = None
     uptime: str = "Unknown"
     temperature: str = "N/A"
     cpu: str = "N/A"

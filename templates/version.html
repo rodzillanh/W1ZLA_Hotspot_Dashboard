@@ -117,9 +117,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.72 "Prince"</span>
+                <span class="release-version">v3.73 "Cobain"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Hotspot and camera cards: gear icon replaces whole-card click</span> — each card's ⚙ button is now the only way to open its drawer; the drawer itself merges the old "card details" info (Recent talkers/Linked nodes, Brandmeister, Update status) with a new, editable Settings block for that card, with per-field instant save (no page-wide Save button) and the same Test connection/Test Brandmeister ID/Test ASL node/Test openSPOT4/Test stream buttons the full Settings page already has. A "Open in full Settings →" link covers everything the quick drawer doesn't (hotspot type, delete) — deletion intentionally stays a full-Settings-only action</li>
+                <li><span>ASL3 drawer: quick connect/disconnect</span> — the Linked nodes section gained a "Node # to connect…" field plus a Connect/Disconnect button per linked node, reusing the same <code>rpt cmd … ilink …</code> action the ASL Favorites card already uses</li>
+                <li><span>Hotspot cards: "Last SSH check" health line</span> — a new <code>last_poll_at</code> timestamp (set on every successful WPSD/ASL3 poll) now shows how long ago this hotspot was last successfully checked, right in the drawer</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.72 "Prince"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>DVSwitch card: real live RX/TX status</span> — a pulsing "RX DMR — W1ZLA → TG 603" indicator (or "Listening" when idle), plus DMR master / D-Star link status, sourced from a second DVSwitch log file with real start-and-end transmission markers. Scoped to DMR and D-Star only; YSF/P25/NXDN log elsewhere and aren't covered</li>
