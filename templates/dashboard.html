@@ -3409,11 +3409,16 @@ function renderCards(data) {
                </div>`
             : '';
 
-        // ASL3 nodes have nothing useful at their own web root -- the
-        // control panel (when installed) lives at /allscan instead, so
-        // the card name links there for this type specifically rather
-        // than the bare IP every other type uses.
-        const cardNameHref = isAsl ? `http://${hs.ip}/allscan` : `http://${hs.ip}`;
+        // v3.77 tried linking ASL3 card names straight to /allscan (the
+        // control panel path, when installed) instead of the bare IP,
+        // reasoning the node's own web root had nothing useful at it --
+        // reported as a real bug, not everyone's setup agrees (a node
+        // without AllScan installed, or one with something else worth
+        // reaching at its own root, just gets a broken/wrong link). Back
+        // to the bare IP for every hotspot type uniformly; the ASL
+        // Control drawer's own "Open AllScan Control Panel" button is
+        // still there for anyone who does want the /allscan shortcut.
+        const cardNameHref = `http://${hs.ip}`;
 
         return `
         <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}">

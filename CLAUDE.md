@@ -3356,6 +3356,20 @@ config for per-integration credentials; put it in
     (`asl-ctrl-allscan-btn`, see next entry), which was deliberately
     built to reuse the exact same `http://<ip>/allscan` shape rather
     than a second guess.
+  - **Reverted in v3.94, reported directly as a bug: "when you click the
+    title it is going to the allscan page instead of the nodes main
+    address."** The v3.77 assumption above (every ASL3 node's own web
+    root has nothing useful at it) doesn't hold universally -- a node
+    without AllScan installed just gets a dead/wrong link where the bare
+    IP would have worked fine, and there's no way to know from this
+    app's side whether a given node even has AllScan. `cardNameHref` is
+    back to the bare IP for every hotspot type uniformly, `isAsl` no
+    longer branches on it at all (still used elsewhere in the same
+    function for plenty of other ASL3-specific rendering, so it wasn't
+    dead-coded by this revert). The ASL Control drawer's own
+    `asl-ctrl-allscan-btn` (still `http://<ip>/allscan`) is untouched --
+    that's still there as an explicit, opt-in way to reach AllScan,
+    just no longer also hijacking the card title for everyone.
   - **The sidebar's AllScan link (v3.81) went through a real mockup-
     iteration cycle before landing on its current shape, worth noting
     since it's the kind of thing that looks obviously fine on the first

@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.93 "Moore"</span>
+                <span class="release-version">v3.94 "Gaines"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed: ASL3 hotspot card title linked to AllScan instead of the node's own address</span> — clicking an ASL3 card's title now opens its bare IP again, matching every other hotspot type, instead of jumping straight to <code>/allscan</code>. A node without AllScan installed was getting a dead link where the plain IP would've worked fine. The ASL Control drawer's own "Open AllScan Control Panel" button is unaffected — that's still there for anyone who wants the direct AllScan shortcut</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.93 "Moore"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>ASL Favorites: "recently active" indicator for favorites not linked to your hub</span> — a new amber dot flags a favorite whose AllStarLink stats show activity since the last check, even when it isn't currently connected to you — a hint for "this one's had traffic lately, might be worth connecting to." No new requests: reuses the same data already fetched for Rx%/link count, just remembers the previous poll's counters and diffs them (the same technique AllScan's own docs describe for working around the stats API's single-poll keyed field being unreliable). Bounded by how often each favorite's stats actually refresh (~5 min), so it means "some activity recently," not "keyed this second" — shown in both the compact card and the ASL Control drawer, and only for favorites NOT already linked to your hub, since a linked one already has a more precise, real-time status</li>
