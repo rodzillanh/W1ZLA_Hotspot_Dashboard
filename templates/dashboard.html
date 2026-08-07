@@ -1730,6 +1730,40 @@
             border-radius: 10px; padding: 0 5px;
         }
 
+        /* --- Quick Settings drawer "About this dashboard" -- version,
+           uptime, host CPU/temp/memory. See aboutDashboardSectionHtml(). --- */
+        .qs-about-card {
+            background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px;
+            padding: 4px 12px;
+        }
+        .qs-about-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 0; font-size: 12.5px;
+        }
+        .qs-about-row + .qs-about-row { border-top: 1px solid var(--border-soft); }
+        .qs-about-label { color: var(--text-muted); }
+        .qs-about-val { font-family: var(--font-mono); color: var(--text); font-weight: 500; }
+        .qs-update-chip {
+            display: inline-flex; align-items: center; gap: 4px; margin-left: 8px;
+            font-size: 10.5px; font-weight: 600;
+            color: var(--accent); background: var(--accent-dim);
+            border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+            border-radius: 8px; padding: 2px 8px; text-decoration: none;
+        }
+        .qs-about-stats {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+            padding: 8px 0 10px; border-top: 1px solid var(--border-soft);
+        }
+        .qs-about-tile {
+            background: var(--panel); border: 1px solid var(--border-soft); border-radius: 7px;
+            padding: 8px 6px; text-align: center;
+        }
+        .qs-about-tile .v { font-size: 14px; font-weight: 600; font-family: var(--font-mono); color: var(--text); }
+        .qs-about-tile .l {
+            font-size: 9.5px; color: var(--text-dim); text-transform: uppercase;
+            letter-spacing: .05em; margin-top: 2px;
+        }
+
         .qso-mini-map { height: 170px; border-radius: 8px; border: 1px solid var(--border); overflow: hidden; }
 
         /* --- map --- */
@@ -2706,15 +2740,38 @@ function updateSysbar(data) {
     if (data.temp) document.getElementById('sb-temp-val').textContent = data.temp;
 }
 
+// Stashed here (not just handed to updateSysbar) so a second consumer --
+// the Quick Settings drawer's "About this dashboard" section -- can read
+// the exact same already-in-flight data without a separate fetch. This
+// poll runs unconditionally regardless of SHOW_HOST_STATS (only the
+// sysbar's own render is gated), so the drawer's stats stay populated
+// even with that toolbar bar turned off.
+let lastHostStats = {};
+
 function fetchHostStats() {
     fetch('/api/host_stats')
         .then(r => r.json())
-        .then(updateSysbar)
+        .then(data => {
+            lastHostStats = data;
+            updateSysbar(data);
+        })
         .catch(() => {});
 }
 
 fetchHostStats();
 setInterval(fetchHostStats, HOST_STATS_MS);
+
+// Shared by the Fleet Activity card's own uptime line and the Quick
+// Settings drawer's "About this dashboard" section -- one formatter for
+// every "seconds since X started" display in this app, instead of two
+// separate reimplementations of the same day/hour math.
+function fmtDaysHours(seconds) {
+    if (seconds == null || isNaN(seconds)) return 'N/A';
+    const s = Math.floor(seconds);
+    const days = Math.floor(s / 86400);
+    const hrs  = Math.floor((s % 86400) / 3600);
+    return `${days}d ${hrs}h`;
+}
 
 // --- clock ---
 function updateClocks() {
@@ -5105,6 +5162,16 @@ function checkDashboardUpdateIndicator() {
 checkDashboardUpdateIndicator();
 setInterval(checkDashboardUpdateIndicator, 300000);
 
+// Version/codename never change without a restart -- fetched once (not on
+// an interval like the update check above) and cached for the Quick
+// Settings drawer's "About this dashboard" section, same /api/version the
+// Version tab itself already uses.
+let dashboardVersionInfo = null;
+fetch('/api/version')
+    .then(r => r.json())
+    .then(data => { dashboardVersionInfo = data; })
+    .catch(() => {});
+
 // Tick all timers every second — uses browser-local start times so each
 // card counts independently and smoothly across render cycles.
 setInterval(() => {
@@ -6883,6 +6950,48 @@ function qsoLogSectionHtml() {
         <button class="qso-clear-btn" id="qso-clear-btn" style="display:none" onclick="clearQsoLog()">Clear imported log</button>`;
 }
 
+// Version/uptime/host stats -- always shown regardless of SHOW_HOST_STATS
+// (that setting only gates the toolbar sysbar's own display), since the
+// whole point is this stays visible even with that bar turned off.
+// dashboardVersionInfo/lastHostStats/dashboardUpdateAvailable are all
+// fetched independently elsewhere and simply read here, not fetched fresh
+// on open -- same "read the last-known poll result" pattern the QSO Log
+// section already uses for its own stats box.
+function aboutDashboardSectionHtml() {
+    const version = dashboardVersionInfo
+        ? `v${dashboardVersionInfo.app_version} "${dashboardVersionInfo.app_codename}"`
+        : '—';
+    const updateChip = dashboardUpdateAvailable
+        ? `<a class="qs-update-chip" href="/setup#version">↑ Update available</a>`
+        : '';
+    const dashUptime = fmtDaysHours(lastHostStats.dashboard_uptime_seconds);
+    const hostUptime = fmtDaysHours(lastHostStats.host_uptime_seconds);
+    const cpu  = lastHostStats.cpu      || 'N/A';
+    const temp = lastHostStats.temp     || 'N/A';
+    const mem  = lastHostStats.mem_pct  || 'N/A';
+    return `
+        <div class="hs-drawer-section-title" style="margin-top:18px">About this dashboard</div>
+        <div class="qs-about-card">
+            <div class="qs-about-row">
+                <span class="qs-about-label">Version</span>
+                <span class="qs-about-val">${escapeHtml(version)}${updateChip}</span>
+            </div>
+            <div class="qs-about-row">
+                <span class="qs-about-label">Dashboard uptime</span>
+                <span class="qs-about-val">${dashUptime}</span>
+            </div>
+            <div class="qs-about-row">
+                <span class="qs-about-label">Host uptime</span>
+                <span class="qs-about-val">${hostUptime}</span>
+            </div>
+            <div class="qs-about-stats">
+                <div class="qs-about-tile"><div class="v">${escapeHtml(cpu)}</div><div class="l">CPU</div></div>
+                <div class="qs-about-tile"><div class="v">${escapeHtml(temp)}</div><div class="l">Temp</div></div>
+                <div class="qs-about-tile"><div class="v">${escapeHtml(mem)}</div><div class="l">Memory</div></div>
+            </div>
+        </div>`;
+}
+
 // One chip per full-Settings tab, deep-linking via /setup#<tab> -- the
 // same generalized deep-link mechanism setup.html's own switchTab() logic
 // already supports for any tab, not a new mechanism. Two chips carry an
@@ -6976,6 +7085,7 @@ function renderSettingsDrawer() {
             ${mapSection}
             <div class="hs-drawer-section-title">Jump to Settings</div>
             <div class="qs-shortcut-grid">${shortcutGridHtml()}</div>
+            ${aboutDashboardSectionHtml()}
         </div>`;
 
     // QSO Log's stats box would otherwise stay blank/hidden until the
@@ -7413,10 +7523,7 @@ function renderFleetActivity(data) {
     document.getElementById('fleet-online').textContent =
         `${data.hotspots_online} / ${data.hotspots_total}`;
 
-    const upSec = Math.floor(data.dashboard_uptime_seconds);
-    const days  = Math.floor(upSec / 86400);
-    const hrs   = Math.floor((upSec % 86400) / 3600);
-    document.getElementById('fleet-uptime').textContent = `${days}d ${hrs}h`;
+    document.getElementById('fleet-uptime').textContent = fmtDaysHours(data.dashboard_uptime_seconds);
 
     fleetLastActivity = data.last_activity;
     tickFleetLastActivity();
@@ -8031,6 +8138,14 @@ function refresh() {
         });
     if (SHOW_FLEET_ACTIVITY) fetchFleetActivity();
     if (SHOW_TOP_ACTIVITY) fetchTopActivity();
+    // Keeps "About this dashboard" (uptime/CPU/temp/memory) ticking while
+    // the drawer is left open -- guarded HERE rather than inside
+    // renderSettingsDrawer() itself, since that function is also used to
+    // pre-seed DOM elements while genuinely closed (see initMap()'s own
+    // call), which an internal "return if not open" guard would break.
+    if (document.getElementById('settings-drawer')?.classList.contains('open')) {
+        renderSettingsDrawer();
+    }
 }
 refresh();
 setInterval(refresh, POLL_MS);

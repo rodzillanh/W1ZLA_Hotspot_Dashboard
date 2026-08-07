@@ -50,6 +50,7 @@ class HostStats:
         self._mem_pct:  str = "N/A"
         self._mem_used: str = ""
         self._mem_total: str = ""
+        self._host_uptime_seconds: Optional[float] = None
 
     def start(self) -> None:
         """Start the background sampling thread (call once at app startup)."""
@@ -59,11 +60,12 @@ class HostStats:
     def snapshot(self) -> dict:
         with self._lock:
             return {
-                "cpu":       self._cpu,
-                "temp":      self._temp,
-                "mem_pct":   self._mem_pct,
-                "mem_used":  self._mem_used,
-                "mem_total": self._mem_total,
+                "cpu":                 self._cpu,
+                "temp":                self._temp,
+                "mem_pct":             self._mem_pct,
+                "mem_used":            self._mem_used,
+                "mem_total":           self._mem_total,
+                "host_uptime_seconds": self._host_uptime_seconds,
             }
 
     # --- internals ---
@@ -71,15 +73,17 @@ class HostStats:
     def _loop(self) -> None:
         while True:
             try:
-                cpu  = self._sample_cpu()
-                temp = self._sample_temp()
-                mem  = self._sample_mem()
+                cpu    = self._sample_cpu()
+                temp   = self._sample_temp()
+                mem    = self._sample_mem()
+                uptime = self._sample_uptime()
                 with self._lock:
                     self._cpu       = cpu
                     self._temp      = temp
                     self._mem_pct   = mem["pct"]
                     self._mem_used  = mem["used"]
                     self._mem_total = mem["total"]
+                    self._host_uptime_seconds = uptime
             except Exception:
                 pass
             time.sleep(self._interval)
@@ -127,6 +131,23 @@ class HostStats:
             return f"{int(raw) / 1000.0:.1f}°C"
         except (OSError, ValueError):
             return "N/A"
+
+    @staticmethod
+    def _sample_uptime() -> Optional[float]:
+        """Seconds since the HOST kernel itself booted, from /proc/uptime's
+        first field -- distinct from the dashboard app's own process uptime
+        (app.py's START_TIME), which resets on every container/service
+        restart even when the underlying machine hasn't rebooted at all.
+        Returns a raw number (None on failure), not a pre-formatted string
+        like the other samplers here -- the Quick Settings drawer formats
+        it client-side the same way it already formats dashboard_uptime_
+        seconds, so both use one shared JS formatter rather than two
+        different "Xd Yh" implementations (one server-side, one client-side)."""
+        try:
+            with open("/proc/uptime") as f:
+                return float(f.read().split()[0])
+        except (OSError, ValueError, IndexError):
+            return None
 
     @staticmethod
     def _sample_mem() -> dict:

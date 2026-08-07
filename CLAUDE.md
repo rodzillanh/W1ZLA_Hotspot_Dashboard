@@ -3255,6 +3255,61 @@ config for per-integration credentials; put it in
     a new entry, not by rewriting already-pushed git history. If a codename
     is ever picked again, grep the existing `VERSION_CODENAMES` list first
     for the candidate surname, not just for whether the person is real.
+- **Quick Settings' "About this dashboard" status panel (v3.95) --
+  version, dashboard uptime, HOST uptime, and live CPU/temp/memory --
+  reuses data that was already being fetched, with one deliberate
+  exception.** `/api/host_stats` was already polled unconditionally
+  every few seconds for the toolbar's own CPU/memory bar (only the
+  RENDER was gated by `SHOW_HOST_STATS`, not the fetch itself) --
+  `fetchHostStats()` now also stashes the raw response into a shared
+  `lastHostStats` global before calling `updateSysbar()`, so a second
+  consumer can read the exact same in-flight data with zero new
+  requests. Version/codename needed the one genuinely new fetch (a
+  one-time `/api/version` call, cached in `dashboardVersionInfo` --
+  that data never changes without a restart, so unlike the update
+  check it isn't re-polled on an interval); the update-available badge
+  reuses the already-existing `dashboardUpdateAvailable` global the
+  Version info shortcut chip already set.
+  **Two different uptimes, deliberately not collapsed into one** --
+  "Dashboard uptime" is `time.time() - START_TIME` (the Flask process's
+  own age, already computed for `/api/activity`'s Fleet-Activity-only
+  consumer, now ALSO added to `/api/host_stats` so it's available
+  regardless of whether that card is enabled) vs. "Host uptime", a
+  genuinely new reading of `/proc/uptime`'s first field
+  (`HostStats._sample_uptime()`) -- the actual MACHINE's age, which can
+  differ substantially from the app's own uptime after a container/
+  service restart with no real reboot. Both are sent as raw seconds
+  (not pre-formatted strings, unlike `temp`/`mem_pct`/etc. elsewhere in
+  this same response) specifically so one shared client-side formatter
+  (`fmtDaysHours()`) can handle both -- extracted from what used to be
+  `renderFleetActivity()`'s own inline day/hour math, now used by both
+  call sites instead of two copies of the same arithmetic.
+  **`renderSettingsDrawer()` couldn't get the same "return early if not
+  open" guard every other drawer's render function has** -- it's ALSO
+  called once, deliberately, while the drawer is still closed (from
+  `initMap()`, to pre-seed the QSO Log section's `#qso-show-toggle`
+  checkbox into the DOM before it's ever referenced) -- an internal
+  guard would silently break that call and null-ref the line right
+  after it. Fixed by guarding at the POLL-LOOP call site instead
+  (`refresh()` checks `#settings-drawer`'s own `.open` class before
+  calling), leaving the function's existing "always rebuild
+  unconditionally" contract intact for its other callers.
+  **Verification needed monkeypatching the sampler METHODS, not just
+  the instance attributes** -- a first attempt at a live-rendered check
+  set `host_stats._cpu`/`_temp`/etc. directly after import, but
+  `HostStats`'s own background thread (already running since
+  `app.py`'s module-level `host_stats.start()`) sampled again on its
+  normal 5s interval before the screenshot fired, silently overwriting
+  the injected values with real (N/A, this is a Windows dev box) ones.
+  Fixed by patching `HostStats._sample_cpu`/`_sample_temp`/`_sample_
+  mem`/`_sample_uptime` on the class itself (so every future loop
+  iteration keeps returning the fake values, not just the one
+  instant right after import) and waiting a full interval before
+  taking the screenshot -- confirmed correct output (real-looking
+  numbers, both uptimes showing genuinely different values) before
+  trusting the feature, then deleted the throwaway script, same "never
+  committed, exists only to prove the styling renders correctly"
+  discipline as the ASL Control "recently active" verification above.
 
 - **ASL Favorites' "ASL Control" sidebar (v3.75) is styled and laid out
   closer to [AllScan](https://github.com/davidgsd/AllScan)'s node-control

@@ -286,6 +286,14 @@ with sync_playwright() as p:
         else:
             print(f"skip (not found/visible): #{element_id}")
 
+    page.click('a.settings-link')  # opens the Quick Settings drawer (not /setup -- that's a separate capture below)
+    page.wait_for_timeout(500)
+    qs_drawer = page.query_selector('[id="settings-drawer"]')
+    if qs_drawer and qs_drawer.is_visible():
+        qs_drawer.screenshot(path=os.path.join(OUTPUT_DIR, "quick-settings.png"))
+        print("wrote quick-settings.png")
+    page.click('[id="settings-drawer"] .hs-drawer-close')  # scoped -- every drawer has one of these
+
     page.click('.tab-btn[data-tab="map"]')
     page.wait_for_timeout(3000)  # tile load
     page.screenshot(path=os.path.join(OUTPUT_DIR, "live-map.png"))

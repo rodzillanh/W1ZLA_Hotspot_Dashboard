@@ -921,7 +921,14 @@ def api_update_hotspot():
 
 @app.route("/api/host_stats")
 def api_host_stats():
-    return jsonify(host_stats.snapshot())
+    # dashboard_uptime_seconds also lives on /api/activity's response (used
+    # by the Fleet Activity card, which is only fetched when that card is
+    # enabled) -- also included here since THIS endpoint is polled
+    # unconditionally regardless of settings, which the Quick Settings
+    # drawer's own uptime row relies on to always have a value.
+    data = host_stats.snapshot()
+    data["dashboard_uptime_seconds"] = time.time() - START_TIME
+    return jsonify(data)
 
 def _run_power_command(cmd: list[str]) -> tuple[bool, str]:
     """Run a reboot/poweroff command, waiting briefly to catch an immediate
