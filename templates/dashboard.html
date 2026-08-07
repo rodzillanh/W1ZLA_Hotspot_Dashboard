@@ -1491,52 +1491,108 @@
         .hs-talker-call { color: var(--link); font-weight: 600; font-size: 13px; text-decoration: none; width: 76px; flex-shrink: 0; }
         .hs-talker-meta { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        /* --- DVSwitch card -- reuses .metrics-card/.linked-item/
-           .hs-talker-row wholesale (same footprint/tokens as every other
-           card here), just adds the header badge/footer bits those don't
-           already have. */
+        /* --- DVSwitch card (v3.91 redesign, approved via a mockup -- see
+           CLAUDE.md) -- reuses .metrics-card/.linked-item/.hs-talker-row/
+           .split-linked wholesale (same footprint/tokens as every other
+           card here). Two real behavior changes from the original: (1)
+           the badge's color now tracks dvswitch_live (an actual open
+           transmission), not tunedCount>0 (a bridge merely CONFIGURED with
+           a target TG) -- the old version lit the badge live-cyan just
+           because a bridge had a static TG set, even with nobody talking,
+           which is a configuration fact, not an activity signal; (2) when
+           there's truly nothing to report (nothing live, no bridge tuned,
+           no heard history yet), the card collapses to one quiet summary
+           line instead of always rendering the full live-row/bridges/
+           last-heard/footer stack -- see dvswitchCardHtml()'s own comment
+           for the exact collapse condition. */
+        .dvs-card { position: relative; }
+        .dvs-card::before {
+            content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            border-radius: 10px 10px 0 0; background: var(--border);
+        }
+        .dvs-card.dvs-live-accent::before { background: linear-gradient(90deg, var(--live), transparent 75%); }
+        .dvs-name-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .dvs-icon { font-size: 15px; line-height: 1; flex-shrink: 0; }
         .dvs-badge {
-            font-size: 10.5px; font-family: var(--font-mono); font-weight: 600;
-            color: var(--live); background: var(--live-dim);
-            border: 1px solid color-mix(in srgb, var(--live) 40%, var(--border));
+            font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+            color: var(--text-dim); border: 1px solid var(--border);
             border-radius: 20px; padding: 3px 10px; white-space: nowrap;
         }
-        .dvs-badge.idle {
-            color: var(--text-dim); background: transparent; border-color: var(--border);
+        .dvs-badge.live {
+            color: var(--live); background: var(--live-dim);
+            border-color: color-mix(in srgb, var(--live) 40%, var(--border));
         }
-        /* Live RX/TX row -- same "on air now" pulsing-dot language as
-           .linked-item.keyed/.hs-link-row.keyed elsewhere, sourced from a
+        /* Collapsed "nothing to report" state -- one line + the footer's
+           vocoder pill, replacing the old always-rendered live-row/
+           bridges/last-heard/footer stack when it would otherwise all be
+           empty/idle placeholders. */
+        .dvs-idle-line {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            font-size: 12.5px; color: var(--text-dim); padding: 10px 2px; margin-bottom: 4px;
+        }
+        .dvs-idle-line .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+        .dvs-idle-ports { font-family: var(--font-mono); color: var(--text-dim); margin-left: auto; font-size: 11.5px; }
+        /* Active RX/TX row -- same tinted-panel "on air now" language the
+           hotspot cards already use for an active call, sourced from a
            genuinely different signal (MMDVM_Bridge.log's real start/end
            lines) than the rest of this card. */
         .dvs-live-row {
-            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-            font-size: 12px; color: var(--text-dim);
-            padding: 8px 10px; margin-bottom: 14px;
-            background: var(--panel-2); border-radius: 6px;
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            font-size: 13px; padding: 10px 12px; margin-bottom: 14px; border-radius: 8px;
+            background: var(--live-dim); border: 1px solid color-mix(in srgb, var(--live) 35%, var(--border));
         }
-        .dvs-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
-        .dvs-live-row.active { color: var(--text); }
-        .dvs-live-row.active .dvs-live-dot { background: var(--live); animation: pulse 1.4s infinite; }
-        .dvs-live-text { font-weight: 600; }
-        .dvs-link-text { margin-left: auto; font-size: 11px; color: var(--text-dim); }
+        .dvs-live-dot {
+            width: 8px; height: 8px; border-radius: 50%; background: var(--live); flex-shrink: 0;
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--live) 22%, transparent);
+            animation: pulse 1.4s infinite;
+        }
+        .dvs-live-row .call { font-weight: 700; font-family: var(--font-mono); }
+        .dvs-live-row .arrow { color: var(--text-dim); }
+        .dvs-live-row .link-state { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+        /* Link status shown with no open transmission -- quieter than the
+           live row, same background language as the idle line. */
+        .dvs-link-only {
+            font-size: 12px; color: var(--text-dim); padding: 8px 10px;
+            margin-bottom: 14px; background: var(--panel-2); border-radius: 6px;
+        }
         .dvs-section-title {
             font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
             color: var(--text-dim); margin: 14px 0 8px;
         }
         .dvs-section-title:first-of-type { margin-top: 0; }
-        .dvs-heard-ago { font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+        /* An idle bridge collapses to one muted line here instead of a
+           full-size .linked-item chip the same visual weight as a tuned
+           one -- the tuned bridge (rendered as a real .linked-item.keyed
+           chip above this) is the one actually worth looking at. */
+        .dvs-bridges-quiet {
+            font-family: var(--font-mono); font-size: 12px; color: var(--text-dim);
+            padding: 8px 10px; background: var(--panel-2); border-radius: 6px;
+        }
+        .dvs-bridges-quiet b { color: var(--text-muted); font-weight: 600; }
+        .dvs-heard-ago { font-size: 11px; color: var(--text-dim); flex-shrink: 0; margin-left: auto; }
         .dvs-footer {
             display: flex; align-items: center; justify-content: space-between; gap: 12px;
-            margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--card-border);
+            margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft);
         }
-        .dvs-vocoder { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
-        .dvs-vocoder .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
-        .dvs-vocoder.hw .dot { background: var(--live); }
-        .dvs-vocoder.sw .dot { background: var(--caution); }
-        .dvs-vocoder-tag {
-            font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim);
-            border: 1px solid var(--card-border); border-radius: 3px; padding: 0 4px; margin-left: 2px;
+        /* Vocoder state as a real semantic pill (matches how the rest of
+           the dashboard encodes state -- a colored chip, not a caption
+           line) -- see monitor.py's _parse_dvswitch_vocoder() for why this
+           is now backed by ABInfo.json's live use_fallback field rather
+           than a one-time log line that ages out after log rotation. */
+        .dvs-vocoder-pill {
+            display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+            padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border); color: var(--text-dim);
         }
+        .dvs-vocoder-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+        .dvs-vocoder-pill.hw {
+            color: var(--live); background: var(--live-dim);
+            border-color: color-mix(in srgb, var(--live) 40%, var(--border));
+        }
+        .dvs-vocoder-pill.sw {
+            color: var(--caution); background: var(--caution-dim);
+            border-color: color-mix(in srgb, var(--caution) 40%, var(--border));
+        }
+        .dvs-spark-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .hs-link-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--border); }
         .hs-link-row:last-child { border-bottom: none; }
         .hs-link-row.keyed { background: var(--live-dim); border-radius: 6px; padding: 7px 8px; border-bottom: none; margin: 2px 0; }
@@ -3486,114 +3542,146 @@ function renderDvswitchCards(data) {
 
 function dvswitchCardHtml(hs) {
     const bridges = hs.dvswitch_bridges || [];
-    const tunedCount = bridges.filter(b => b.tuned).length;
-    const idleCount  = bridges.length - tunedCount;
-    // "Tuned" reflects ABInfo.json's own last_tune field being present --
-    // NOT a confirmed true link/connect state (see CLAUDE.md), so the
-    // badge/dot language says "tuned"/"idle", never "linked"/"connected".
-    const badgeText = bridges.length
-        ? `${tunedCount} TUNED · ${idleCount} IDLE`
-        : 'NO BRIDGES CONFIGURED';
-    const badgeClass = tunedCount > 0 ? '' : 'idle';
-
-    const bridgeChips = bridges.length
-        ? bridges.map(b => {
-            const stateClass = b.tuned ? 'keyed' : 'idle-link';
-            const desc = b.tuned
-                ? escapeHtml(b.mode ? `${b.mode} — ${b.tuned}` : b.tuned)
-                : 'Not tuned';
-            return `
-                <div class="linked-item ${stateClass}">
-                    <span class="dot"></span>
-                    <div class="info">
-                        <span class="node-num">:${escapeHtml(b.port)}</span>
-                        <span class="desc">${desc}</span>
-                    </div>
-                </div>`;
-        }).join('')
-        : '<div class="hs-empty-note">No bridge ports configured — add one in Settings → Hotspots.</div>';
-
-    const heard = (hs.dvswitch_heard || []).slice(0, 2);
-    const heardHtml = heard.length
-        ? heard.map(h => {
-            const call = h.call || h.dmr_id || '?';
-            const lookupHref = QRZ_ENABLED
-                ? `https://www.qrz.com/db/${encodeURIComponent(call)}`
-                : `https://radioid.net/database/search?callsign=${encodeURIComponent(call)}`;
-            const metaBits = [];
-            if (h.dst) metaBits.push('TG ' + escapeHtml(h.dst));
-            if (h.call && h.dmr_id) metaBits.push(escapeHtml(h.dmr_id));
-            else if (!h.call) metaBits.push('unresolved ID');
-            const agoSec = Math.max(0, Math.floor(Date.now() / 1000 - h.seen_at));
-            return `
-                <div class="hs-talker-row">
-                    <a class="hs-talker-call" href="${lookupHref}" target="_blank" rel="noopener">${escapeHtml(call)}</a>
-                    <span class="hs-talker-meta">${metaBits.join(' · ') || '—'}</span>
-                    <span class="dvs-heard-ago">${fmtAgoCompact(agoSec)} ago</span>
-                </div>`;
-        }).join('')
-        : '<div class="hs-empty-note">No DVSwitch activity logged yet this session.</div>';
-
-    // Both states are real, confirmed-live detected log events (not
-    // config-only): "software" from "Using software MBE decoder...",
-    // "hardware" from "Using hardware AMBE vocoder" -- a genuine positive
-    // match, not just "no fallback message seen" the way this used to be
-    // inferred. null means no DVSwitch log output was read at all yet.
-    // See models.py's HotspotStatus.dvswitch_vocoder.
-    let vocoderClass = '', vocoderText = 'Vocoder: unknown', vocoderTag = 'no data yet';
-    if (hs.dvswitch_vocoder === 'software') {
-        vocoderClass = 'sw'; vocoderText = 'Software vocoder'; vocoderTag = 'fallback detected';
-    } else if (hs.dvswitch_vocoder === 'hardware') {
-        vocoderClass = 'hw'; vocoderText = 'Hardware AMBE'; vocoderTag = 'confirmed';
-    }
-
-    const sparkline = hs.dvswitch_sparkline || [];
-    const sparkSvg = sparkline.length ? sparklineSvg(sparkline) : '';
+    // "Tuned" reflects ABInfo.json's own digital.tg/last_tune fields being
+    // present -- NOT a confirmed true link/connect state (see CLAUDE.md),
+    // so the language here says "tuned"/"not tuned", never "linked"/
+    // "connected".
+    const tunedBridges = bridges.filter(b => b.tuned);
+    const idleBridges  = bridges.filter(b => !b.tuned);
 
     // Live RX/TX state -- sourced from MMDVM_Bridge.log, a DIFFERENT log
-    // than everything above (bridges/heard/vocoder all come from
-    // Analog_Bridge.log), scoped to DMR + D-Star only (YSF/P25/NXDN write
-    // to their own separate gateway logs, not tailed). Re-scanned fresh
-    // from the log tail every poll -- no "still probably active" guess
-    // carried between polls, so this can under-report idle for a still-
-    // ongoing call whose own start line has scrolled out of the tail (see
-    // monitor.py's _parse_dvswitch_mmdvm_live() for the full reasoning).
+    // than everything else on this card (bridges/heard/vocoder all come
+    // from Analog_Bridge.log), scoped to DMR + D-Star only (YSF/P25/NXDN
+    // write to their own separate gateway logs, not tailed). Re-scanned
+    // fresh from the log tail every poll -- no "still probably active"
+    // guess carried between polls, so this can under-report idle for a
+    // still-ongoing call whose own start line has scrolled out of the
+    // tail (see monitor.py's _parse_dvswitch_mmdvm_live() for the full
+    // reasoning).
     const live = hs.dvswitch_live;
-    const liveText = live
-        ? `RX ${escapeHtml(live.mode)} — ${escapeHtml(live.call)} → ${escapeHtml(live.target)}`
-        : 'Listening';
-    const liveClass = live ? 'active' : '';
 
-    const linkBits = [];
-    if (hs.dvswitch_dmr_linked === true) linkBits.push('DMR: Linked');
-    else if (hs.dvswitch_dmr_linked === false) linkBits.push('DMR: Not linked');
-    if (hs.dvswitch_dstar_status) linkBits.push('D-Star: ' + escapeHtml(hs.dvswitch_dstar_status.trim()));
-    const linkHtml = linkBits.length ? `<span class="dvs-link-text">${linkBits.join(' · ')}</span>` : '';
+    // The badge tracks LIVE activity (an actual open transmission), not
+    // tunedBridges.length -- a bridge can be configured with a static
+    // target TG (and show up as "tuned") with nobody talking through it
+    // right now, which is a config fact, not an activity signal worth
+    // lighting the badge cyan for.
+    const badgeText = bridges.length
+        ? `${tunedBridges.length} tuned · ${idleBridges.length} idle`
+        : 'No bridges configured';
+    const badgeClass = live ? 'live' : '';
+
+    // Both "software"/"hardware" are real, directly-detected states (see
+    // monitor.py's _parse_dvswitch_vocoder()) -- primarily from each
+    // configured bridge's own live ABInfo.json use_fallback field
+    // (re-read every poll, so it can't go stale), falling back to a
+    // one-time Analog_Bridge.log startup line only when no bridge has
+    // usable ABInfo data. null means no signal at all yet from either
+    // source. See models.py's HotspotStatus.dvswitch_vocoder.
+    let vocoderClass = '', vocoderText = 'Vocoder unknown';
+    if (hs.dvswitch_vocoder === 'software') {
+        vocoderClass = 'sw'; vocoderText = 'Software vocoder';
+    } else if (hs.dvswitch_vocoder === 'hardware') {
+        vocoderClass = 'hw'; vocoderText = 'Hardware AMBE';
+    }
+    const vocoderPillHtml = `<div class="dvs-vocoder-pill ${vocoderClass}"><span class="dot"></span>${vocoderText}</div>`;
+
+    const heard = (hs.dvswitch_heard || []).slice(0, 2);
 
     const sentinelKey = 'dvs-' + hs.ip;
     const orderStyle = sentinelKey in lastSentinelOrders ? ` style="order:${lastSentinelOrders[sentinelKey]}"` : '';
+    const nameHtml = `<div class="dvs-name-row"><span class="dvs-icon">📻</span><div class="card-name">DVSwitch — ${escapeHtml(hs.name)}</div></div>`;
+
+    // Nothing worth reporting: no open transmission, nothing tuned, and
+    // nothing heard yet this session -- collapse the whole card to one
+    // quiet line + the vocoder pill instead of the full live-row/bridges/
+    // last-heard stack rendered below, all of which would otherwise just
+    // be idle placeholders. This is the common resting state for most
+    // DVSwitch setups most of the time.
+    if (!live && tunedBridges.length === 0 && heard.length === 0) {
+        const idleText = bridges.length
+            ? 'Listening — no activity this session'
+            : 'No bridge ports configured — add one in Settings → Hotspots';
+        const portList = bridges.map(b => ':' + escapeHtml(b.port)).join(' · ');
+        return `
+            <div class="metrics-card dvs-card"${orderStyle}>
+                <div class="metrics-header">
+                    ${nameHtml}
+                    <div class="dvs-badge ${badgeClass}">${badgeText}</div>
+                </div>
+                <div class="dvs-idle-line">
+                    <span class="dot"></span>
+                    <span>${idleText}</span>
+                    ${portList ? `<span class="dvs-idle-ports">${portList}</span>` : ''}
+                </div>
+                <div class="dvs-footer">${vocoderPillHtml}</div>
+            </div>`;
+    }
+
+    const linkBits = [];
+    if (hs.dvswitch_dmr_linked === true) linkBits.push('DMR linked');
+    else if (hs.dvswitch_dmr_linked === false) linkBits.push('DMR not linked');
+    if (hs.dvswitch_dstar_status) linkBits.push('D-Star: ' + escapeHtml(hs.dvswitch_dstar_status.trim()));
+    const linkText = linkBits.join(' · ');
+
+    const liveRowHtml = live
+        ? `<div class="dvs-live-row">
+               <span class="dvs-live-dot"></span>
+               <span class="call">${escapeHtml(live.call)}</span>
+               <span class="arrow">→</span>
+               <span class="call">${escapeHtml(live.target)}</span>
+               ${linkText ? `<span class="link-state">${linkText}</span>` : ''}
+           </div>`
+        : (linkText ? `<div class="dvs-link-only">${linkText}</div>` : '');
+
+    const bridgesHtml = bridges.length
+        ? `<div class="dvs-section-title">Bridges</div>
+           ${tunedBridges.length ? `<div class="split-linked">${tunedBridges.map(b => `
+               <div class="linked-item keyed">
+                   <span class="dot"></span>
+                   <div class="info">
+                       <span class="node-num">:${escapeHtml(b.port)}</span>
+                       <span class="desc">${escapeHtml(b.mode ? `${b.mode} — ${b.tuned}` : b.tuned)}</span>
+                   </div>
+               </div>`).join('')}</div>` : ''}
+           ${idleBridges.length ? `<div class="dvs-bridges-quiet">${idleBridges.map(b => `<b>:${escapeHtml(b.port)}</b> not tuned`).join(' · ')}</div>` : ''}`
+        : '';
+
+    const heardHtml = heard.length
+        ? `<div class="dvs-section-title">Last heard</div>
+           <div>${heard.map(h => {
+               const call = h.call || h.dmr_id || '?';
+               const lookupHref = QRZ_ENABLED
+                   ? `https://www.qrz.com/db/${encodeURIComponent(call)}`
+                   : `https://radioid.net/database/search?callsign=${encodeURIComponent(call)}`;
+               const metaBits = [];
+               if (h.dst) metaBits.push('TG ' + escapeHtml(h.dst));
+               if (h.call && h.dmr_id) metaBits.push(escapeHtml(h.dmr_id));
+               else if (!h.call) metaBits.push('unresolved ID');
+               const agoSec = Math.max(0, Math.floor(Date.now() / 1000 - h.seen_at));
+               return `
+                   <div class="hs-talker-row">
+                       <a class="hs-talker-call" href="${lookupHref}" target="_blank" rel="noopener">${escapeHtml(call)}</a>
+                       <span class="hs-talker-meta">${metaBits.join(' · ') || '—'}</span>
+                       <span class="dvs-heard-ago">${fmtAgoCompact(agoSec)} ago</span>
+                   </div>`;
+           }).join('')}</div>`
+        : '';
+
+    const sparkline = hs.dvswitch_sparkline || [];
+    const sparkSvg = sparkline.length ? sparklineSvg(sparkline, hs.ip) : '';
 
     return `
-        <div class="metrics-card"${orderStyle}>
+        <div class="metrics-card dvs-card${live ? ' dvs-live-accent' : ''}"${orderStyle}>
             <div class="metrics-header">
-                <div class="card-name">📻 DVSwitch — ${escapeHtml(hs.name)}</div>
+                ${nameHtml}
                 <div class="dvs-badge ${badgeClass}">${badgeText}</div>
             </div>
-            <div class="dvs-live-row ${liveClass}">
-                <span class="dvs-live-dot"></span>
-                <span class="dvs-live-text">${liveText}</span>
-                ${linkHtml}
-            </div>
-            <div class="dvs-section-title">Bridges (by port)</div>
-            <div class="split-linked">${bridgeChips}</div>
-            <div class="dvs-section-title">Last heard</div>
-            <div>${heardHtml}</div>
+            ${liveRowHtml}
+            ${bridgesHtml}
+            ${heardHtml}
             <div class="dvs-footer">
-                <div class="dvs-vocoder ${vocoderClass}">
-                    <span class="dot"></span>
-                    ${vocoderText} <span class="dvs-vocoder-tag">${vocoderTag}</span>
-                </div>
-                ${sparkSvg}
+                ${vocoderPillHtml}
+                <div class="dvs-spark-wrap">${sparkSvg}</div>
             </div>
         </div>`;
 }
@@ -3603,18 +3691,36 @@ function dvswitchCardHtml(hs) {
 // Activity's own DVSwitch mode already writes), not decorative. Color
 // matches --danger, the same token FLEET_MODE_COLOR_VARS assigns to
 // DVSwitch in the Fleet Activity bar, so the two visually tie together.
-function sparklineSvg(counts) {
-    const w = 72, h = 20;
+// An area fill + baseline gridline + emphasized endpoint read as a trend
+// at a glance better than a bare stroke did. `uid` (the hotspot's own ip,
+// already used elsewhere for element ids) keys the gradient's id so two
+// DVSwitch cards rendered on the same page never collide over one shared
+// <linearGradient id="..."> definition.
+function sparklineSvg(counts, uid) {
+    const w = 72, h = 22;
     const max = Math.max(1, ...counts);
     const step = w / Math.max(1, counts.length - 1);
+    const gradId = 'dvs-spark-grad-' + String(uid).replace(/[^a-zA-Z0-9]/g, '_');
     const points = counts.map((c, i) => {
         const x = (i * step).toFixed(1);
         const y = (h - 2 - (c / max) * (h - 4)).toFixed(1);
-        return `${x},${y}`;
-    }).join(' ');
-    return `<svg class="dvs-sparkline" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-        <polyline points="${points}" fill="none" stroke="var(--danger)" stroke-width="1.5"
+        return [x, y];
+    });
+    const lineStr = points.map(p => p.join(',')).join(' ');
+    const [lastX, lastY] = points[points.length - 1];
+    const fillStr = `0,${h} ${lineStr} ${w},${h}`;
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <defs>
+            <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--danger)" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="var(--danger)" stop-opacity="0"/>
+            </linearGradient>
+        </defs>
+        <line x1="0" y1="${h / 2}" x2="${w}" y2="${h / 2}" stroke="var(--border-soft)" stroke-width="1"/>
+        <polygon points="${fillStr}" fill="url(#${gradId})"/>
+        <polyline points="${lineStr}" fill="none" stroke="var(--danger)" stroke-width="1.5"
                   stroke-linejoin="round" stroke-linecap="round"/>
+        <circle cx="${lastX}" cy="${lastY}" r="2.2" fill="var(--danger)"/>
     </svg>`;
 }
 

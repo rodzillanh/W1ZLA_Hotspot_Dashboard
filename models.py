@@ -98,20 +98,29 @@ class HotspotStatus:
     asl_linked_nodes: List[dict] = field(default_factory=list)
     # DVSwitch (Analog_Bridge) card -- only populated for ASL3 hotspots with
     # dvswitch_enabled set (see monitor.py's _check_one_asl3/_check_dvswitch_tx).
-    # dvswitch_bridges: one entry per configured port, {port, tuned, mode} --
-    # tuned/mode come from that instance's own /tmp/ABInfo_<port>.json.
+    # dvswitch_bridges: one entry per configured port, {port, tuned, mode,
+    # use_fallback} -- tuned/mode/use_fallback all come from that
+    # instance's own /tmp/ABInfo_<port>.json, re-read fresh every poll.
     # "tuned" is "TG <n>" from that JSON's digital.tg field when present
     # (confirmed live -- matches the exact dst= value seen in a real Begin
     # TX line for the same bridge), falling back to the top-level
     # last_tune field otherwise (confirmed live to be "" -- not useful --
     # for a static-TG bridge; only relevant for a dynamic-retuning setup
     # this app hasn't seen a real example of). None if neither is present.
-    # dvswitch_vocoder is "software"/"hardware"/
-    # None (unknown -- no DVSwitch log output seen at all yet), based on
-    # real confirmed log lines for BOTH states ("Using software MBE
-    # decoder..." / "Using hardware AMBE vocoder") rather than config
-    # alone -- "hardware" is a genuine positive detection, not just
-    # "no fallback message seen". dvswitch_heard mirrors `history`'s shape
+    # use_fallback is True/False/None from that same JSON's own
+    # use_fallback field (confirmed live, cross-checked against the log
+    # lines below at the time it was found) -- the PRIMARY source for
+    # dvswitch_vocoder now, since it's re-read every poll and can't go
+    # stale the way the log-based signal below does.
+    # dvswitch_vocoder is "software"/"hardware"/None (unknown -- no signal
+    # from either source yet), preferring the live use_fallback above
+    # (aggregated across configured bridges: any bridge on fallback marks
+    # the whole card "software") and falling back to a one-time
+    # Analog_Bridge.log startup line ("Using software MBE decoder..." /
+    # "Using hardware AMBE vocoder") only when no bridge has a usable
+    # use_fallback value -- that log line is written once per process
+    # start and silently ages out once the log rotates, which is why it's
+    # no longer the primary source. dvswitch_heard mirrors `history`'s shape
     # but WITH a real
     # timestamp per entry (unlike `history`, which has none) -- {call,
     # dmr_id, dst, seen_at}, call falls back to the bare DMR ID when the

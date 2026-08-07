@@ -338,10 +338,11 @@ class FleetMonitor:
                 sections = self._split_dvswitch_sections(output)
                 self._check_dvswitch_tx(ip, sections)
                 live, dmr_linked, dstar_status = self._parse_dvswitch_mmdvm_live(sections)
+                bridges = self._parse_dvswitch_bridges(sections, dvswitch_ports)
                 with self._lock:
                     status = self._data[ip]
-                    status.dvswitch_bridges = self._parse_dvswitch_bridges(sections, dvswitch_ports)
-                    status.dvswitch_vocoder = self._parse_dvswitch_vocoder(sections)
+                    status.dvswitch_bridges = bridges
+                    status.dvswitch_vocoder = self._parse_dvswitch_vocoder(sections, bridges)
                     status.dvswitch_live = live
                     status.dvswitch_dmr_linked = dmr_linked
                     status.dvswitch_dstar_status = dstar_status
@@ -459,39 +460,79 @@ class FleetMonitor:
         absent, for whatever dynamic-tuning shape that turns out to be.
         Missing/unreadable ABInfo.json (DVSwitch not running, wrong port,
         no permission) degrades to tuned=None/mode=None rather than
-        raising, same contract as every other integration in this app."""
+        raising, same contract as every other integration in this app.
+
+        Also extracts `use_fallback` (real field, confirmed live in a
+        capture from the same session that found `digital.tg` above --
+        `"use_fallback": "true"` on a bridge simultaneously confirmed via
+        its own log lines to be running the software MBE decoder, i.e. a
+        real, cross-checked agreement, not just a plausible field name).
+        Unlike the log's one-time startup message (see
+        _parse_dvswitch_vocoder), this is read fresh from ABInfo.json
+        every poll, so it can't go stale the way the log-based signal
+        does once Analog_Bridge.log rotates past its own startup line.
+        Arrives as the string "true"/"false" in the one real capture seen
+        so far; parsed leniently (also accepting a real JSON bool, in
+        case a different Analog_Bridge build emits one) rather than
+        assuming the exact string shape holds everywhere."""
         bridges = []
         for port in ports:
             raw = "\n".join(sections.get("abinfo:" + port, [])).strip()
             tuned = None
             mode  = None
+            use_fallback = None
             if raw:
                 try:
                     data = json.loads(raw)
                     tg = (data.get("digital") or {}).get("tg")
                     tuned = f"TG {tg}" if tg else (data.get("last_tune") or None)
                     mode  = (data.get("tlv") or {}).get("ambe_mode") or None
+                    fb = data.get("use_fallback")
+                    if isinstance(fb, bool):
+                        use_fallback = fb
+                    elif isinstance(fb, str):
+                        if fb.strip().lower() in ("true", "1"):
+                            use_fallback = True
+                        elif fb.strip().lower() in ("false", "0"):
+                            use_fallback = False
                 except (ValueError, TypeError, AttributeError):
                     pass
-            bridges.append({"port": port, "tuned": tuned, "mode": mode})
+            bridges.append({"port": port, "tuned": tuned, "mode": mode, "use_fallback": use_fallback})
         return bridges
 
     @staticmethod
-    def _parse_dvswitch_vocoder(sections: dict[str, list[str]]) -> str | None:
-        """Both "software" and "hardware" are now confirmed-real, directly
-        detected log messages (see config.DVSWITCH_HARDWARE_VOCODER_PATTERN/
-        DVSWITCH_SOFTWARE_FALLBACK_PATTERN's own comments) -- "hardware" is
-        no longer just "absence of a fallback message," it's a genuine
-        positive match on "Using hardware AMBE vocoder". The SSH command's
-        own grep already resolves the "log has both an older fallback line
-        and a newer success line from a later restart" case (`tail -1`
-        picks the most recent), so this only ever needs to look at the
-        single line that made it through. None means no DVSwitch log
-        output was read at all (both sections empty, e.g. Analog_Bridge
-        isn't running / wrong log path) OR a non-empty vocoder section that
-        somehow matched neither pattern (shouldn't happen given the grep
-        itself only matches one of the two, but a real reason to default to
-        "unknown" here too rather than assume a specific state)."""
+    def _parse_dvswitch_vocoder(sections: dict[str, list[str]], bridges: list[dict] | None = None) -> str | None:
+        """Prefers each configured bridge's own LIVE `use_fallback` (from
+        /tmp/ABInfo_<port>.json, re-read every poll -- see
+        _parse_dvswitch_bridges) over the log-based startup message below,
+        since the log line is only ever written ONCE per Analog_Bridge
+        process start and silently disappears once Analog_Bridge.log
+        rotates past it -- a real, reported symptom ("card sometimes shows
+        it can't detect hardware AMBE" for a device that's actually fine)
+        traced to this: the card would fall back to "unknown" forever
+        after a rotation, with no way to reconfirm short of an
+        Analog_Bridge restart. ABInfo.json has no such blind spot, so it's
+        now the primary source whenever at least one configured bridge
+        reports a definite use_fallback value. Any bridge on software
+        fallback is treated as "software" for the whole card (a single
+        card-level badge, not per-port -- the degraded-audio case is worth
+        flagging even if only one of several bridges hit it); "hardware"
+        only when every bridge that reported a value agrees.
+
+        Falls back to the old log-based one-shot detection (both
+        "software"/"hardware" are real, directly-matched log messages --
+        see config.DVSWITCH_HARDWARE_VOCODER_PATTERN/
+        DVSWITCH_SOFTWARE_FALLBACK_PATTERN) only when no configured bridge
+        has a usable use_fallback value -- e.g. zero bridges configured,
+        or an ABInfo.json shape that doesn't carry the field at all. The
+        SSH command's own grep already resolves "log has both an older
+        fallback line and a newer success line" (`tail -1` picks the most
+        recent), so this only ever needs to look at the single line that
+        made it through. None means genuinely no signal either way (no
+        ABInfo data AND no DVSwitch log output read at all)."""
+        known = [b["use_fallback"] for b in (bridges or []) if b.get("use_fallback") is not None]
+        if known:
+            return "software" if any(known) else "hardware"
         if not sections.get("tail") and not sections.get("vocoder"):
             return None
         for line in sections.get("vocoder", []):
