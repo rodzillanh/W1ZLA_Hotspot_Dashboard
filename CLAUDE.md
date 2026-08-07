@@ -3787,6 +3787,42 @@ Always clean up `__pycache__` before zipping/packaging a build.
   fields — keep it in sync if you add a new env-var-based setting (rare;
   most new settings go in `config.DEFAULT_SETTINGS`/Settings UI instead,
   not the Unraid template).
+- **`sync-wiki.sh` splits README.md into grouped Forgejo wiki pages, not a
+  single Home.md dump (rewritten from the original single-page version
+  once README.md grew past ~1500 lines / 41 `## ` sections).** Every
+  `## ` heading in README.md must be preceded by a
+  `<!-- wiki-group: <Group Name> -->` HTML comment -- invisible in both
+  GitHub's rendering and this app's own `/readme` page, since
+  `templates/readme.html` runs the raw markdown through `marked.parse()`
+  client-side and HTML comments pass straight through into the DOM
+  without the browser displaying them. Each distinct group name becomes
+  its own wiki page (`Getting Started`, `Dashboard and Live Map`,
+  `Hotspot Types`, `Integrations`, `Optional Cards`, `Admin and
+  Maintenance` as of this writing); the script also generates `Home.md`
+  (intro + a linked table of contents) and `_Sidebar.md` (Forgejo's own
+  hidden file that replaces the default flat alphabetical wiki page list
+  with custom grouped navigation — confirmed against Forgejo's own docs
+  before building this, not assumed). **A `## ` heading with no marker
+  above it is a hard Python `sys.exit()` error, not a silent drop** —
+  when adding a new README section, add a `<!-- wiki-group: ... -->`
+  line right above it (reusing an existing group name, or introducing a
+  new one) or `sync-wiki.sh` refuses to run rather than quietly leaving
+  that section out of the wiki. Stale pages are pruned safely: the
+  script writes a `.wiki-sync-manifest` listing every file it generated,
+  and on the next run diffs the OLD manifest (captured before Python
+  overwrites it) against the new one to delete only pages this script
+  itself created previously — a hand-added wiki page would never be
+  touched, since it was never in any manifest to begin with. Internal
+  links use Forgejo's `[[Page Name]]` wiki-link syntax (not a
+  hand-computed slug in an explicit Markdown link) specifically so this
+  script doesn't have to independently reproduce Forgejo's own
+  name-to-filename slugification rules to get cross-links right — the
+  wiki engine resolves those itself. Verified end-to-end against the
+  real wiki repo (not just a scratch dir) before considering this done:
+  ran it once (6 group pages + Home + Sidebar pushed, replacing the old
+  single-page dump), then ran it again immediately after with no README
+  changes and confirmed it correctly reported "already up to date,
+  nothing to push" rather than force-committing an identical tree.
 
 ## Conventions
 

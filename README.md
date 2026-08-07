@@ -4,6 +4,7 @@ Live status dashboard for a fleet of Pi-Star / WPSD hotspots, AllStarLink
 (ASL3) nodes (polled over SSH), and openSPOT 4 (SharkRF) nodes (monitored
 over HTTP/WebSocket).
 
+<!-- wiki-group: Getting Started -->
 ## Project layout
 
 ```
@@ -25,6 +26,7 @@ unraid-template.xml     for Unraid's Docker GUI (see "Running on Unraid" below)
 ```
 
 
+<!-- wiki-group: Getting Started -->
 ## Running on Raspberry Pi / Linux (standalone)
 
 For a standalone install on a Raspberry Pi or any Debian/Ubuntu-based Linux system
@@ -132,6 +134,7 @@ is preserved — delete it manually if you no longer need it.
 
 ---
 
+<!-- wiki-group: Getting Started -->
 ## Running on Unraid
 
 Unraid's Docker GUI doesn't build images from a Dockerfile directly — you
@@ -212,6 +215,7 @@ Once it's running, open the dashboard and hit **Settings** to add a hotspot
 Hotspot config lives in `hotspots.json` under the appdata folder above, so
 it survives container rebuilds and Unraid reboots.
 
+<!-- wiki-group: Getting Started -->
 ## Config via environment variables
 
 All in `config.py`, overridable without touching code:
@@ -235,6 +239,7 @@ All in `config.py`, overridable without touching code:
 
 Example: `docker compose run -e POLL_INTERVAL=10 ...`
 
+<!-- wiki-group: Getting Started -->
 ## First run
 
 A fresh install (no hotspots configured yet) shows a plain "Let's get
@@ -254,6 +259,7 @@ all (not just missing a couple of newer keys) — an existing install's
 treated as "already seen," full stop, regardless of how long ago you set
 it up.
 
+<!-- wiki-group: Dashboard and Live Map -->
 ## Dashboard look
 
 The dashboard uses an "instrument panel" visual identity — graphite panel
@@ -309,6 +315,7 @@ beyond the base card/map UI:
   there. A "More settings →" link at the bottom goes to the full
   `/setup` page for everything not covered here.
 
+<!-- wiki-group: Dashboard and Live Map -->
 ## Dashboard customization
 
 Everything below is configured from the **Settings** page (`/setup`) —
@@ -364,6 +371,7 @@ and **Version info**.
 - **ASL favorites & control card** — off by default (General tab toggle);
   see "ASL Favorites & Control" below.
 
+<!-- wiki-group: Integrations -->
 ## QRZ caller lookup
 
 When `QRZ_USERNAME` / `QRZ_PASSWORD` are set, the dashboard looks up the
@@ -398,6 +406,7 @@ worth knowing:
   used on the map instead of QRZ's static home-station coordinates (see
   "APRS.fi live position" below).
 
+<!-- wiki-group: Integrations -->
 ## RadioID.net lookup
 
 A free, no-account fallback for caller name and city/state, used only when
@@ -407,6 +416,7 @@ on its own — it only fills in the name/location text on the card. On by
 default; toggle it off in Settings → Integrations if you'd rather see a
 bare callsign than an unverified fallback name.
 
+<!-- wiki-group: Integrations -->
 ## APRS.fi live position
 
 Optional — requires a free API key from
@@ -418,6 +428,7 @@ operators. Positions are cached only 2 minutes (`APRS_CACHE_TTL`) since
 they can move. Leave the API key blank to disable; the map falls back to
 QRZ/RadioID's static location or no pin at all if neither has data.
 
+<!-- wiki-group: Integrations -->
 ## Brandmeister repeater profile
 
 Optional — set your hotspot's Brandmeister/CCS7 ID (Settings → Hotspots,
@@ -442,6 +453,7 @@ background connection, extra dependency, reconnect handling) from the rest
 of this app's SSH-poll model. That's not implemented here; this feature
 covers the device/talkgroup REST endpoints only.
 
+<!-- wiki-group: Hotspot Types -->
 ## WPSD/Pi-Star update check
 
 If a hotspot's dashboard is a git-based checkout (true for WPSD and most
@@ -468,6 +480,7 @@ run against a repo it doesn't recognize as owned by the current user, and
 fails silently under this check's error suppression. This flag doesn't
 modify the hotspot's own git config; it only applies to this one command.
 
+<!-- wiki-group: Hotspot Types -->
 ## WPSD radio frequency / duplex / identity display
 
 A WPSD hotspot's card shows a few extra pieces of static info, all read
@@ -492,6 +505,7 @@ all), so these lines simply don't appear on those card types; a field
 missing from your `/etc/mmdvmhost` (e.g. no `Location` set) just omits
 that piece rather than showing a placeholder.
 
+<!-- wiki-group: Hotspot Types -->
 ## AllStarLink (ASL3) nodes
 
 A second node type alongside WPSD/Pi-Star, added in v3.0 — Settings →
@@ -568,6 +582,7 @@ tell them apart — it only sees "this node is keyed," same as any other
 ASL3 monitoring tool (AllScan included). Not something pollable/fixable
 via SSH; a protocol ceiling, not a bug.
 
+<!-- wiki-group: Hotspot Types -->
 ## DVSwitch card
 
 A separate, optional card for an ASL3 node that also runs a DVSwitch
@@ -624,6 +639,7 @@ Like camera cards, its position is part of the same drag-and-drop
 **Card order** list as everything else (Settings → Hotspots) — drag it
 anywhere in that list to move it.
 
+<!-- wiki-group: Hotspot Types -->
 ## openSPOT 4 (SharkRF) nodes
 
 A third node type alongside WPSD/Pi-Star and ASL3, added in v3.38 —
@@ -669,6 +685,7 @@ device at a time. If the card still shows Offline and the Settings
 "Test" button reports a 401 after all of that, none of the stored
 passwords matched the currently active profile.
 
+<!-- wiki-group: Admin and Maintenance -->
 ## Host power control
 
 Optional "🔄 Reboot Pi" / "⏻ Power off Pi" buttons in Settings → General —
@@ -707,6 +724,7 @@ bigger consequence than editing a hotspot's config, so if this dashboard
 is reachable beyond a trusted LAN, put it behind a reverse proxy with
 auth, or don't enable this feature's host access, before relying on it.
 
+<!-- wiki-group: Admin and Maintenance -->
 ## Self-update
 
 Settings → Version info checks this project's git repository for new
@@ -755,6 +773,7 @@ Put this behind a reverse proxy with auth, or turn off "Check for
 updates" in Settings, if the dashboard is reachable beyond a trusted
 LAN.
 
+<!-- wiki-group: Hotspot Types -->
 ## ASL Favorites & Control
 
 Optional dashboard card (Settings → Cards → "Show ASL favorites &
@@ -804,6 +823,7 @@ By default the card appears first, before any hotspot cards. Its position
 is part of the same drag-and-drop **Card order** list as the hotspot cards
 (Settings → Hotspots) — drag it anywhere in that list to move it.
 
+<!-- wiki-group: Integrations -->
 ## Camera cards
 
 Optional (Settings → Cameras → "Enable camera cards", off by default).
@@ -850,6 +870,7 @@ unwatched camera doesn't run in the background indefinitely. Click
 "Test connection" in Settings before saving a camera to confirm it's
 reachable without needing to fully add it first.
 
+<!-- wiki-group: Integrations -->
 ## Home Assistant (MQTT)
 
 Optional — set a broker host in Settings → Integrations to publish every
@@ -884,6 +905,7 @@ automatically); on Docker/Unraid, rebuild the image
 (`docker compose up -d --build` or the Unraid "force update" equivalent)
 rather than just restarting the existing container.
 
+<!-- wiki-group: Integrations -->
 ## APRS favorite alerts
 
 Optional — set your callsign in Settings → Integrations to get an APRS
@@ -922,6 +944,7 @@ matching how simple APRS bots generally behave. It uses the caller's
 actual callsign rather than their optional friendly name/label, to read as
 a proper APRS message.
 
+<!-- wiki-group: Integrations -->
 ## Notifications card
 
 Optional dashboard card (Settings → Cards) that merges up to five
@@ -1013,6 +1036,7 @@ rather than growing the card forever. Position it anywhere in the same
 drag-and-drop **Card order** list (Settings → Hotspots), same as Fleet
 Activity/APRS Messages/etc.
 
+<!-- wiki-group: Optional Cards -->
 ## HF Conditions card
 
 Optional dashboard card (Settings → Cards → "Show HF Conditions
@@ -1037,6 +1061,7 @@ list.
   faster is just extra load on someone else's free service for no
   fresher data.
 
+<!-- wiki-group: Optional Cards -->
 ## Band Plan card
 
 Optional dashboard card (Settings → Cards → "Show Band Plan card", off
@@ -1055,6 +1080,7 @@ module of its own, just data baked into the template.
   chart before operating, don't rely on this card alone.
 - Same drag-and-drop **Card order** placement as every other extra card.
 
+<!-- wiki-group: Optional Cards -->
 ## License Quiz card
 
 Optional dashboard card (Settings → Cards → "Show License Quiz card",
@@ -1093,6 +1119,7 @@ each poll fetches exactly one question.
   stats.
 - Same drag-and-drop **Card order** placement as every other extra card.
 
+<!-- wiki-group: Optional Cards -->
 ## Satellites card
 
 Optional dashboard card (Settings → Cards → "Show Satellites card", off
@@ -1127,6 +1154,7 @@ satellites, plus a live ground-track overlay on the **Live map**.
   go silent, decay, or get replaced), so the default list is
   intentionally small and editable rather than exhaustive.
 
+<!-- wiki-group: Optional Cards -->
 ## Recent Contacts card
 
 Optional dashboard card (Settings → Cards → "Show Recent Contacts card",
@@ -1156,6 +1184,7 @@ to slide out the full detail: a small live map centered on the contact
 frequency/RST/grid/distance/location, and a "View on full map" button
 for exploring further on the actual Live map.
 
+<!-- wiki-group: Optional Cards -->
 ## QSO Stats card
 
 Optional dashboard card (Settings → Cards → "Show QSO Stats card", off
@@ -1167,6 +1196,7 @@ precision some logs store), unique bands worked, and a small breakdown
 of your most-used bands. Pure client-side aggregation, no new data
 source or backend query.
 
+<!-- wiki-group: Optional Cards -->
 ## Top 5 Activity card
 
 Optional dashboard card (Settings → Cards → "Show Top 5 Activity card",
@@ -1189,6 +1219,7 @@ rather than a periodic poll — see the Notifications card's Brandmeister
 favorite alerts above for the one place this dashboard *does* use a
 Brandmeister live connection, for a different, narrower purpose).
 
+<!-- wiki-group: Optional Cards -->
 ## Big Ass Clock card
 
 Optional dashboard card (Settings → Cards → "Show Big Ass Clock card",
@@ -1217,6 +1248,7 @@ styles via a dropdown in the card header:
   sync across every device viewing the same dashboard.
 - Same drag-and-drop **Card order** placement as every other extra card.
 
+<!-- wiki-group: Optional Cards -->
 ## Band Activity card
 
 Optional dashboard card (Settings → Cards → "Show Band Activity card",
@@ -1250,6 +1282,7 @@ data than HF Conditions: real observed spot counts from
   free API is rate-limited (20 requests/minute, non-commercial use).
 - Same drag-and-drop **Card order** placement as every other extra card.
 
+<!-- wiki-group: Dashboard and Live Map -->
 ## Transmission timer
 
 While a node is active, the card shows a live "⏱ m:ss" counter next to
@@ -1258,6 +1291,7 @@ started. It resets to 0:00 the instant a *new* callsign keys up (it does
 not accumulate across multiple callers or multiple transmissions from the
 same person).
 
+<!-- wiki-group: Dashboard and Live Map -->
 ## Live map
 
 The **Live map** tab shows an interactive map (Leaflet.js + OpenStreetMap,
@@ -1371,6 +1405,7 @@ appear as pins — the QRZ subscription caveat above applies here too.
   default; PSK Reporter's own server actively rate-limits frequent
   polling, so this is cached 10 minutes server-side regardless of how
   long the checkbox has been on.
+<!-- wiki-group: Dashboard and Live Map -->
 ## Fleet activity
 
 Optional — off by default (Settings → Cards → "Show fleet activity
@@ -1419,6 +1454,7 @@ confirmed end-of-transmission line to detect completion from, so this is
 a deliberate, disclosed difference in what's being counted for this mode
 specifically, not a bug.
 
+<!-- wiki-group: Dashboard and Live Map -->
 ## Talkgroup / reflector display
 
 Each card shows a "Linked:" line with the last talkgroup or reflector seen
@@ -1437,6 +1473,7 @@ same way mode/RSSI/BER are. A couple of behavior notes:
   diagnosing a missing active-call indicator) and the parser in
   `monitor.py`'s `_extract_destination` can be tuned to match.
 
+<!-- wiki-group: Admin and Maintenance -->
 ## Backup & Restore
 
 Settings → **Backup** tab lets you export/import a single combined JSON file
@@ -1464,6 +1501,7 @@ Cameras, and Settings.
 This is the same tool for moving your setup to a new install as it is for
 just keeping a backup around.
 
+<!-- wiki-group: Dashboard and Live Map -->
 ## Offline detection
 
 A hotspot card turns red with an "⚠ OFFLINE" badge once its SSH poll fails
@@ -1479,6 +1517,7 @@ working" signal than ICMP (it proves the SSH service itself responds, not
 just that the network stack does), and it comes for free every poll cycle
 with no extra network traffic or permissions.
 
+<!-- wiki-group: Dashboard and Live Map -->
 ## Card uptime
 
 Each card shows a small "⏱ 3d 2h" badge in the top-right corner, next to the
@@ -1491,6 +1530,7 @@ the "⬆ update" badge and "📍 map" link when those are present — all three
 are grouped into one cluster that stays pinned to the right regardless of
 how many are shown at once, rather than spreading across the card.
 
+<!-- wiki-group: Integrations -->
 ## DigiPi card
 
 Shows recent APRS/Direwolf activity and a live screen mirror from a
@@ -1523,6 +1563,7 @@ DigiPi's IP/SSH credentials in Settings → Integrations.
   device actually running them to build against, the same discipline
   used for everything else in this app.
 
+<!-- wiki-group: Admin and Maintenance -->
 ## Known tradeoffs (intentionally left as-is for now)
 
 - No authentication on `/setup` — anyone who can reach the dashboard can
