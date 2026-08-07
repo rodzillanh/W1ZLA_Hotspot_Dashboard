@@ -3632,6 +3632,38 @@ config for per-integration credentials; put it in
   BOTH accepts free typing AND has some other code path that also writes
   a value into it, it needs this same focus-gated (not unconditional)
   restore rule, not the simpler one.
+- **The compact ASL Favorites card gained the same live Rx%/LCnt/status
+  dot the ASL Control drawer already had (v3.90) -- mocked up, approved,
+  then caught and fixed a real layout bug the mockup itself couldn't
+  have shown, since it wasn't constrained by the actual card's real
+  pixel width.** First attempt added a 4th `<td>` (a whole new stats
+  column) to `asl-fav-table`'s 3-column row -- confirmed via
+  `generate_screenshots.py` (not just reading the code) that this stole
+  width from the name column, wrapping a longer favorite name
+  ("Northeast Repeater Group") onto two lines and clipping it against
+  `.asl-fav-scroll`'s fixed 118px max-height. The mockup itself never
+  hit this since it was a static page with no scroll-height constraint
+  and short enough names to fit either way -- a reminder that a mockup
+  validates the DESIGN, not necessarily the real layout math once it's
+  dropped into the actual, narrower card. Fixed by folding Rx%/LCnt into
+  the EXISTING secondary text line (`.asl-fav-desc`, already used for
+  "Node NNNN") as plain joined text ("Node 27339 · 62% rx · 8 links")
+  instead of a separate column -- same information, but costing far less
+  horizontal room than the drawer's own pill-styled `.asl-ctrl-rx`/
+  `.asl-ctrl-lcnt` spans (which have more breathing room in the sidebar
+  than this compact card does). Re-verified with a second screenshot
+  pass after the fix: all three rows fit cleanly, real live stats
+  ("20.7% rx · 17 links" for a genuinely resolved node) rendered
+  correctly. `fetchAslFavoriteStats()` now refreshes both
+  `renderAslFavorites()` (the compact card, always visible when the
+  feature's enabled) and `renderAslDrawer()` (no-op while closed) from
+  the same fetch/throttle -- one shared 60s-throttled request, two
+  renderers kept in sync, no new endpoint. Monitor mode deliberately
+  stayed drawer-only, per the original tradeoff discussion -- a third
+  button per row would reintroduce exactly the density problem the
+  drawer's own click-to-select redesign (the entry above) moved away
+  from, and this compact card has even less width to spare than the
+  drawer did.
 
 - **Brandmeister talkgroup link/unlink (v3.79) was built and shipped;
   TGIF link/unlink was investigated in the same session and deliberately

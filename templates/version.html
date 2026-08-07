@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.89 "Rossington"</span>
+                <span class="release-version">v3.90 "Wilson"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL Favorites card: live Rx%/link-count stats</span> — each favorite now shows a status dot (keyed/Web-Transceiver/Active, same convention as the ASL Control drawer) plus busy-ness % and link count from AllStarLink's own stats API, right on the compact dashboard card — no need to open the drawer just to see it. Reuses the exact same data the drawer already fetches, so this adds no new requests</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.89 "Rossington"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Updated the default self-update repository URL</span> — this project's git host repo was renamed; the "Check for updates" default and the standalone installer's persistent-checkout fallback source now point at the new URL instead of relying on the host's rename redirect indefinitely</li>

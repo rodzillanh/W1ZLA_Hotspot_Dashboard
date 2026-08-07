@@ -7344,17 +7344,49 @@ function renderAslFavorites() {
             : (isConn
                 ? `<span class="asl-status-chip connected">🟢 Connected</span>`
                 : `<span class="asl-status-chip idle">Not connected</span>`);
-        const label     = fav.label || (link && link.callsign) || '';
-        const nameLine  = label
-            ? `<span class="asl-fav-callsign">${label}</span><span class="asl-fav-desc">Node ${fav.node}</span>`
-            : `<span class="asl-fav-callsign">Node ${fav.node}</span>`;
+        // Rx%/LCnt/status dot -- same aslFavoriteStats source and same
+        // keyed/webtx/active convention the ASL Control drawer already
+        // uses (see renderAslDrawer()), just also surfaced on the compact
+        // card now. No new fetch: fetchAslFavoriteStats() below is called
+        // from here too, sharing the same 60s-throttled cache as the drawer.
+        //
+        // Folded into the existing secondary text line rather than a new
+        // table column -- a real layout bug caught by actually rendering
+        // this (via generate_screenshots.py), not just reading the code: a
+        // 4th column stole width from the name column, wrapping a longer
+        // favorite name onto 2 lines and clipping it against the row
+        // list's fixed scroll height. Plain text costs far less horizontal
+        // room than the drawer's own pill-styled Rx%/LCnt spans, which
+        // have more breathing room in the sidebar than this compact card
+        // does.
+        const stats = aslFavoriteStats[fav.node];
+        let dotClass = '';
+        const descBits = [];
+        if (isKeyed) {
+            dotClass = 'keyed';
+        } else if (stats && stats.found === true) {
+            dotClass = stats.webtransceiver ? 'webtx' : (stats.status === 'Active' ? 'active' : '');
+            descBits.push(stats.rx_pct != null ? stats.rx_pct + '% rx' : '— rx');
+            descBits.push(stats.lcnt != null ? stats.lcnt + ' links' : '— links');
+        } else if (stats && stats.found === false) {
+            descBits.push('Not in ASL DB');
+        } else if (stats && stats.error) {
+            descBits.push('Stats unavailable');
+        }
+
+        const label      = fav.label || (link && link.callsign) || '';
+        const primaryText = label || `Node ${fav.node}`;
+        if (label) descBits.unshift(`Node ${fav.node}`);
+        const nameLine = descBits.length
+            ? `<span class="asl-fav-callsign">${primaryText}</span><span class="asl-fav-desc">${descBits.join(' · ')}</span>`
+            : `<span class="asl-fav-callsign">${primaryText}</span>`;
         const actionBtn = isConn
             ? `<button class="asl-btn-disconnect" onclick="aslConnect('${controlHotspot.ip}','${fav.node}','disconnect')">Disconnect</button>`
             : `<button class="asl-btn-connect" onclick="aslConnect('${controlHotspot.ip}','${fav.node}','connect')">Connect</button>`;
 
         return `
         <tr class="asl-fav-row ${rowClass}">
-            <td>${nameLine}</td>
+            <td><span class="asl-ctrl-node-dot ${dotClass}" style="margin-right:7px"></span>${nameLine}</td>
             <td>${chip}</td>
             <td class="asl-fav-actions">
                 ${actionBtn}
@@ -7362,6 +7394,8 @@ function renderAslFavorites() {
             </td>
         </tr>`;
     }).join('');
+
+    fetchAslFavoriteStats();
 
     document.getElementById('asl-fav-count').textContent     = aslFavorites.length;
     document.getElementById('asl-fav-keyed').textContent     = keyedCount;
@@ -7682,8 +7716,10 @@ function renderAslDrawer() {
 // Server-cached (120s, see aslstats.py's favorite_stats()) per-favorite
 // Rx%/LCnt/Active/Web-Transceiver from stats.allstarlink.org. Throttled
 // client-side too (own timestamp, not just the server cache) so the 3s
-// poll-driven renderAslDrawer() calls don't refetch on every single
-// render -- AllScan's own docs cite a real 30-req/min cap on this API.
+// poll-driven renderAslFavorites()/renderAslDrawer() calls don't refetch
+// on every single render -- AllScan's own docs cite a real 30-req/min cap
+// on this API. Shared by both the compact card and the drawer -- one
+// fetch, one throttle timestamp, two renderers refreshed from the result.
 let aslFavoriteStats = {};
 let aslFavoriteStatsFetchedAt = 0;
 const ASL_FAVORITE_STATS_INTERVAL_MS = 60000;
@@ -7697,6 +7733,7 @@ function fetchAslFavoriteStats() {
         .then(r => r.json())
         .then(data => {
             aslFavoriteStats = data;
+            renderAslFavorites(); // always visible whenever ASL Favorites is enabled, unlike the drawer
             renderAslDrawer(); // no-op if closed by the time this resolves
         })
         .catch(() => {});
