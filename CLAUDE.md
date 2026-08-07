@@ -1202,6 +1202,21 @@ config for per-integration credentials; put it in
   already used for `href="http://${hs.ip}"` on WPSD cards — no proxying,
   no new route, same trusted-LAN assumption already documented elsewhere
   in this file.
+- **DigiPi card packet callsigns link to aprs.fi, not QRZ (v3.87)** --
+  shipped originally copying the QRZ-link pattern every other callsign
+  in this app uses (Recent Contacts, hotspot card history, ASL
+  favorites), but a heard *APRS packet* is a materially different
+  context than a DMR/D-Star contact or a linked ASL node: what's
+  actually useful here is that station's live position/track on
+  aprs.fi, not a QRZ bio lookup. `renderDigipi()`'s packet row template
+  just points at `https://aprs.fi/${escapeHtml(p.call)}` -- aprs.fi
+  accepts a bare callsign (SSID included, e.g. `KC1ABC-9`) directly in
+  the URL path, no API key or extra lookup needed for this link-only
+  use (unlike `aprs.py`'s own aprs.fi API client, which resolves a
+  position server-side and does need a key). Don't copy this pattern
+  back onto QRZ-linked callsigns elsewhere in the app without the same
+  "is this actually an APRS-heard station" reasoning -- QRZ is still the
+  right destination for DMR/D-Star/ASL callsigns.
 
 - **A WPSD/MMDVM "screen mirror" (DigiPi-style) for the small OLED HATs
   was explored and rejected as infeasible — not just unbuilt.** Checked

@@ -4339,7 +4339,7 @@ function renderDigipi(data) {
     document.getElementById('dp-packets').innerHTML = packets.map(p => `
         <div class="dp-packet">
             <span class="dp-dir" title="${escapeHtml(p.direction)}">${DIGIPI_DIR_ICONS[p.direction] || '•'}</span>
-            <a class="dp-call" href="https://www.qrz.com/db/${escapeHtml(p.call)}" target="_blank" rel="noopener">${escapeHtml(p.call)}</a>
+            <a class="dp-call" href="https://aprs.fi/${escapeHtml(p.call)}" target="_blank" rel="noopener">${escapeHtml(p.call)}</a>
             <span class="dp-type">${escapeHtml(p.type)}</span>
             <span class="dp-payload">${escapeHtml(p.payload)}</span>
         </div>`).join('');

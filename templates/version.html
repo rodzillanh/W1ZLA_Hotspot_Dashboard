@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.86 "Curtis"</span>
+                <span class="release-version">v3.87 "Bolin"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed: DigiPi card callsigns linked to QRZ instead of APRS.fi</span> — a heard station's callsign in the DigiPi card now opens its aprs.fi station page (live position/track history) instead of a QRZ lookup, matching what you'd actually want to check for an APRS packet</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.86 "Curtis"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed: ASL Control favorite stats hitting AllStarLink's rate limit</span> — with several favorites saved, their stats all get cached at the same moment and then all expire together too, so refreshing them fired one request per favorite back-to-back with zero spacing. Confirmed live this can trip stats.allstarlink.org's real 30 req/min cap and return a 429 for every favorite in the same burst at once — showing "Stats unavailable" across the whole list simultaneously, even for nodes confirmed live to be real and registered. Fixed by self-throttling this app's own outbound requests to that API (at most one every 0.6s) and giving favorite stats their own longer cache (5 min instead of 2, since Rx%/busy-ness doesn't need link-topology freshness) so a full refresh burst happens far less often. Fetch failures are now also printed to the app's own logs with the real reason (HTTP status, rate-limited, timeout, etc.) instead of vanishing silently</li>
