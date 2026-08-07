@@ -3879,6 +3879,41 @@ Always clean up `__pycache__` before zipping/packaging a build.
   Deliberately does NOT auto-insert any `![...]()` image reference into a
   generated wiki page -- which screenshot illustrates which page is an
   editorial call, left to be added by hand.
+- **A real, live-confirmed incident: renaming this repo on Forgejo
+  (`W1ZLAHotspot_Dashboard` -> `W1ZLA_Hotspot_Dashboard`) silently
+  redirected `sync-wiki.sh`'s hardcoded `<old-name>.wiki.git` URL to the
+  renamed MAIN repo instead of the renamed WIKI repo -- two consecutive
+  "successful" `sync-wiki.sh` runs (the ones that added image support)
+  actually pushed 26 wiki files, including all 17 screenshots, onto this
+  repo's own `main` branch, while the real wiki sat stale and untouched.**
+  Confirmed directly, not guessed: `git ls-remote` against the OLD
+  `<old-name>.wiki.git` URL printed a `redirecting to
+  .../W1ZLA_Hotspot_Dashboard/` warning and returned the MAIN repo's
+  current commit hash -- proving Forgejo's rename-redirect strips/ignores
+  the `.wiki` suffix and resolves straight to the renamed repo itself,
+  not `<new-name>.wiki`. `git push`/`clone`/`ls-remote` all silently
+  follow this redirect with no error, which is exactly why two full
+  `sync-wiki.sh` runs reported "Wiki updated"/"already up to date" with
+  no indication anything was wrong -- the destination was simply wrong,
+  not unreachable. Fixed in two parts: (1) reverted the errant commit
+  from `main` with a plain `git revert` (an additive fix, not a
+  history-rewriting force-push, since this was already-pushed shared
+  history) before re-pushing the real, intended commit on top; (2)
+  updated every hardcoded reference to the old repo name across the
+  whole project -- confirmed via a full-repo grep sweep before
+  considering this done, not just the two wiki scripts -- covering
+  `sync-wiki.sh`/`release.sh` (both dev-tooling, would have kept silently
+  misfiring), AND three real production-facing defaults that would have
+  otherwise shipped the old name to every future install:
+  `config.DEFAULT_SETTINGS["update_check_repo"]`, and
+  `install.sh`/`update.sh`'s `DEFAULT_REPO_URL` (the persistent
+  `/opt/hotspot-dashboard-src` git-checkout fallback source). **If this
+  repo is ever renamed again, re-verify with the exact same live
+  `git ls-remote` check against the OLD `<name>.wiki.git` URL before
+  trusting that `sync-wiki.sh`/`release.sh` still point at the right
+  place** -- don't assume a redirect "probably" preserves the wiki
+  suffix just because it correctly preserves the main repo path; this
+  is a confirmed, live-reproduced case where it doesn't.
 
 ## Conventions
 

@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.88"
+APP_VERSION = "3.89"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -56,6 +56,7 @@ VERSION_CODENAMES = [
     "Bolin",            # v3.87 -- Tommy Bolin, guitarist, Deep Purple/
                         # James Gang (1951-1976)
     "Entwistle",        # v3.88 -- John Entwistle, The Who (1944-2002)
+    "Rossington",       # v3.89 -- Gary Rossington, Lynyrd Skynyrd (1951-2023)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -601,7 +602,7 @@ DEFAULT_SETTINGS = {
     # git host's REST API (Forgejo/Gitea-compatible). Defaults point at
     # this project's own repo; override if you run a fork.
     "update_check_enabled": True,
-    "update_check_repo": "https://git.trytheitguy.com/rodney_berry/W1ZLAHotspot_Dashboard",
+    "update_check_repo": "https://git.trytheitguy.com/rodney_berry/W1ZLA_Hotspot_Dashboard",
     "update_check_branch": "main",
     # Camera cards -- off by default, since it's a new external process
     # (ffmpeg) per RTSP camera and pulls in a new pip dependency

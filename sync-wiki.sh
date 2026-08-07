@@ -45,7 +45,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_URL="https://git.trytheitguy.com/rodney_berry/W1ZLAHotspot_Dashboard"
+REPO_URL="https://git.trytheitguy.com/rodney_berry/W1ZLA_Hotspot_Dashboard"
 WIKI_URL="${REPO_URL}.wiki.git"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT

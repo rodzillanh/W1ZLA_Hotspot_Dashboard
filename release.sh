@@ -27,7 +27,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 API_BASE="https://git.trytheitguy.com/api/v1"
 OWNER="rodney_berry"
-REPO="W1ZLAHotspot_Dashboard"
+REPO="W1ZLA_Hotspot_Dashboard"
 
 if [ -z "$FORGEJO_TOKEN" ] && [ -f "${SCRIPT_DIR}/.forgejo-token" ]; then
     FORGEJO_TOKEN="$(tr -d '[:space:]' < "${SCRIPT_DIR}/.forgejo-token")"

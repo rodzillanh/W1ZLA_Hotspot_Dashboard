@@ -108,7 +108,7 @@ fi
 # leaving update checks permanently broken.
 header "Setting up application source"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_REPO_URL="https://git.trytheitguy.com/rodney_berry/W1ZLAHotspot_Dashboard"
+DEFAULT_REPO_URL="https://git.trytheitguy.com/rodney_berry/W1ZLA_Hotspot_Dashboard"
 SOURCE_DIR="/opt/${APP_NAME}-src"
 
 if [[ -d "${SCRIPT_DIR}/.git" ]]; then

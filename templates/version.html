@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.88 "Entwistle"</span>
+                <span class="release-version">v3.89 "Rossington"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Updated the default self-update repository URL</span> — this project's git host repo was renamed; the "Check for updates" default and the standalone installer's persistent-checkout fallback source now point at the new URL instead of relying on the host's rename redirect indefinitely</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.88 "Entwistle"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed: ASL Control drawer's typed input disappearing while typing</span> — the drawer rebuilds itself every few seconds to stay in sync with live data, which was wiping out anything you were mid-typing into "Add favorite" or "Quick connect" (and the "Keep existing connections" checkbox) each time. Those fields now keep whatever you've typed — and keep your cursor position and focus — across every rebuild</li>

@@ -146,7 +146,7 @@ success "Files updated"
 # needs its own persistent git checkout to work, regardless of how THIS
 # particular update.sh run got its files -- so this doesn't touch the
 # files just installed, only where future automatic updates pull from. ---
-DEFAULT_REPO_URL="https://git.trytheitguy.com/rodney_berry/W1ZLAHotspot_Dashboard"
+DEFAULT_REPO_URL="https://git.trytheitguy.com/rodney_berry/W1ZLA_Hotspot_Dashboard"
 PERSISTENT_SOURCE_DIR="/opt/${APP_NAME}-src"
 if [[ -d "${SCRIPT_DIR}/.git" ]]; then
     UPDATER_SOURCE_DIR="$SCRIPT_DIR"
