@@ -3483,6 +3483,37 @@ config for per-integration credentials; put it in
     changelog. Re-verify any future change here with a SINGLE request
     and a mocked-data test for the logic itself, not a fresh live burst,
     to avoid tripping the same limit while debugging.
+- **ASL Control's favorites list went from two-line rows with a
+  permanent Connect/Monitor/Disconnect trio to single-line clickable
+  rows (v3.85) -- a direct, reported "taking up a lot of room" complaint
+  once Rx%/LCnt joined each row, mocked up and approved before
+  building, same workflow as every other feature this session.** Each
+  row is now dot + name/node + Rx%/LCnt-or-status + a small ✕ remove --
+  clicking anywhere else on the row calls `selectAslFavorite(node)`,
+  which sets a new module-level `aslSelectedFavoriteNode` and
+  re-renders; clicking the already-selected row again deselects (sets
+  it back to `null`). Quick Connect (`renderAslDrawer()`'s
+  `qcSelectedHtml`/`qcButtonsHtml`) reads this selection each render:
+  no selection -> the original freeform "any node #" field with
+  Connect+Monitor; a selection -> the field is pre-filled with that
+  favorite's node, a "Selected: **name** · node" line appears above it,
+  and the buttons collapse to a single Disconnect if `linkedByNode`
+  (this app's own SSH-sourced `asl_linked_nodes`, not the stats API)
+  shows that node currently connected, else stay Connect+Monitor. The
+  remove button keeps its own `event.stopPropagation()` so clicking ✕
+  deletes the favorite instead of also selecting the row underneath it
+  first -- same pattern already used elsewhere in this drawer (map-pin/
+  update-badge clicks inside a clickable hotspot card). `removeAslFavorite()`
+  now also clears `aslSelectedFavoriteNode` if the removed node was the
+  selected one, and `renderAslDrawer()` itself defensively clears the
+  selection if the selected node ever isn't found in `aslFavorites`
+  (e.g. removed via the compact card or an import while the sidebar
+  happened to be open) rather than rendering a Quick Connect block for a
+  favorite that no longer exists. This was a pure frontend change --
+  `aslConnect()`/`aslDrawerQuickConnect()`/`/api/asl_connect` needed no
+  changes at all, since the new Disconnect button just calls
+  `aslDrawerQuickConnect(ip, 'disconnect')`, an action that function
+  already passed through generically.
 
 - **Brandmeister talkgroup link/unlink (v3.79) was built and shipped;
   TGIF link/unlink was investigated in the same session and deliberately

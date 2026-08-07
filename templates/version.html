@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.84 "Marley"</span>
+                <span class="release-version">v3.85 "Ronson"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL Control: click-to-select favorites</span> — each favorite is now a single clickable row (dot, name/node, Rx%/link count, a small ✕ to remove) instead of two lines with a permanent Connect/Monitor/Disconnect button trio, which took up a lot of room once a handful of favorites were saved. Click a row to load its node into Quick Connect above — the buttons there switch to a single Disconnect if that node is currently linked, or Connect+Monitor otherwise. Click the same row again to deselect back to freeform "any node #" entry</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.84 "Marley"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed: ASL Control favorites wrongly showing "Not in ASL DB"</span> — v3.83's Rx% calculation divided two fields that arrive as text strings from AllStarLink's API (e.g. <code>"73285"</code>), not numbers; that crashed silently for every node that actually WAS found, and got mislabeled as missing. Only genuine 404s (which don't hit that code at all) displayed correctly — the opposite of what the bug looked like. Also splits a real fetch/rate-limit error from a genuine "not in ASL DB" 404 going forward, so a future hiccup shows "Stats unavailable" instead of confidently claiming a node doesn't exist</li>
