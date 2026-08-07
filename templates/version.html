@@ -117,9 +117,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.82 "Hutchence"</span>
+                <span class="release-version">v3.83 "Buckley"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL Control: live stats on every favorite</span> — each favorite now shows Rx% (busy-ness) and link count from AllStarLink's own stats API, plus a colored dot for Web-Transceiver-enabled/Active/Not-in-ASL-DB — Connect/Monitor/Disconnect stay exactly as before, just on their own row beneath. "Keyed now" (red) is still sourced only from this app's own reliable SSH-based link data, not the stats API's own keyed field, which AllScan's own changelog documents as unreliable for many nodes</li>
+                <li><span>Import favorites.ini</span> — pulls in an AllScan/Supermon favorites file directly into your favorites list. EchoLink entries are skipped (shown, not hidden) since this app has no way to resolve them the way AllScan does</li>
+                <li><span>AllScan button dimmed</span> — muted grey border/text until hover, instead of a solid bright-cyan fill</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.82 "Hutchence"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>ASL Control sidebar: AllScan button moved to the bottom</span> — now sits below Favorites/Add favorite as the last element in the drawer, instead of right under the local-node status strip near the top</li>

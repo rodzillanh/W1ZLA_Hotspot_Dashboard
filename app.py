@@ -48,6 +48,7 @@ from wsjtx import WsjtxListener
 from hamalert import HamAlertListener
 from brandmeister_lastheard import BrandmeisterLastHeardListener
 from satellites import SatelliteTracker
+from aslstats import AslStatsClient
 
 import host_stats as host_stats_mod
 
@@ -68,6 +69,11 @@ license_quiz    = LicenseQuizPool()
 satellite_tracker = SatelliteTracker()
 wspr_activity   = WsprActivityClient()
 aurora_client   = AuroraClient()
+# Separate from monitor.py's own private AslStatsClient (used internally
+# for linked-node callsign resolution) -- this one backs the ASL Control
+# sidebar's per-favorite Rx%/LCnt/status lookups, a different query shape
+# (favorite_stats(), not linked_node_info()) with its own cache keys.
+asl_stats_client = AslStatsClient()
 pota_client     = PotaClient()
 sota_client     = SotaClient()
 psk_reporter    = PskReporterClient()
@@ -596,6 +602,16 @@ def api_asl_favorites_post():
     ]
     save_asl_favorites(cleaned)
     return jsonify({"ok": True})
+
+@app.route("/api/asl_favorite_stats")
+def api_asl_favorite_stats():
+    """Per-favorite live stats (Active status, Web-Transceiver flag, Rx%,
+    LCnt) from stats.allstarlink.org for the ASL Control sidebar --
+    accepts ?nodes=27339,29332,... and returns one AslStatsClient.
+    favorite_stats() result per node, cached server-side (see that
+    method's docstring for why it deliberately omits keyed status)."""
+    nodes = [n.strip() for n in request.args.get("nodes", "").split(",") if n.strip().isdigit()]
+    return jsonify({n: asl_stats_client.favorite_stats(n) for n in nodes})
 
 @app.route("/api/bm_tg_favorites", methods=["GET"])
 def api_bm_tg_favorites_get():

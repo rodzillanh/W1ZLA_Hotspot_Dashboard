@@ -3368,6 +3368,88 @@ config for per-integration credentials; put it in
     `style="margin:14px 0 0"` overriding the class's own
     `margin-bottom` (which only made sense in the old top-of-drawer
     position).
+  - **Dimmed again in v3.83** -- solid `--live`-filled background/border/
+    text replaced with a muted grey border/text (`color-mix(in srgb,
+    var(--live) 35%, var(--border))` border, `--text-muted` text) that
+    only lights up to full `--live` on hover. Purely visual, no markup
+    change.
+
+- **ASL Control: per-favorite live stats + favorites.ini import (v3.83)
+  -- built from real, fetched sources at every step, not assumed.**
+  - **`stats.allstarlink.org/api/stats/<node>`'s FULL response shape was
+    fetched live** (a real hub node, 27339) before writing
+    `aslstats.py`'s new `favorite_stats()` -- confirmed real fields:
+    top-level `node.Status`/`node.access_webtransceiver` (the
+    Web-Transceiver flag AllScan's own Favorites Table colors on), and
+    `stats.data.apprptuptime`/`totaltxtime`/`links` (an array of that
+    node's own current link numbers). Rx% (`totaltxtime / apprptuptime
+    × 100`) and LCnt (`len(links)`) match AllScan's own documented
+    definitions exactly. A bogus node number returns a real, clean 404 --
+    confirmed live, not assumed -- which is what `favorite_stats()`
+    reports back as `{"found": False}` for the "Not in ASL DB" state.
+  - **Deliberately does NOT use the stats API's own `keyed` field for
+    "keyed now" coloring.** AllScan's real changelog (fetched from the
+    actual repo, not summarized secondhand) documents this field as
+    unreliable: *"ASL stats API data for many nodes shows a 0
+    stats.keyed value even when the node is in fact keyed... keyed
+    status can be detected from changes in \[totalkeyups/totaltxtime\]
+    between stats requests"* -- AllScan's own fix is a two-poll diff.
+    This app already has a genuinely reliable keyed signal for anything
+    actually linked to a controlling hotspot (`asl_linked_nodes`,
+    SSH-sourced, no known reliability gap), so `favorite_stats()`
+    doesn't return `keyed` at all, and `renderAslDrawer()`'s row
+    coloring only ever lights up "keyed" (red) from that existing link
+    data -- a favorite the stats API calls unkeyed-but-you're-not-sure
+    never gets guessed at.
+  - **Caching/rate limit**: AllScan's changelog also documents a real
+    30-requests/minute cap on this API. `favorite_stats()` reuses
+    `AslStatsClient`'s existing per-node cache (`ASLSTATS_CACHE_TTL`,
+    120s) under a separate `fav:<node>` cache-key prefix (distinct from
+    `linked_node_info()`'s own keys, since this reads the queried node's
+    OWN top-level stats, not a `linkedNodes` sub-array entry). The new
+    `/api/asl_favorite_stats?nodes=a,b,c` route is ONE shared server-side
+    poll across every open browser tab (same pattern as every other
+    integration in this app) -- AllScan's own architecture has each
+    browser tab poll independently, which its own changelog flags as a
+    real risk of hitting the rate limit with multiple open tabs; this
+    app's shared-cache design avoids that class of problem by
+    construction. `dashboard.html`'s own `fetchAslFavoriteStats()` adds a
+    second, client-side throttle (`ASL_FAVORITE_STATS_INTERVAL_MS`,
+    60s) on top of the server cache, so the 3s-poll-driven
+    `renderAslDrawer()` calls don't even issue a request every time they
+    run.
+  - **`asl_stats_client` is a SEPARATE `AslStatsClient` instance from
+    `monitor.py`'s own private one** -- same reasoning as `bm_write_client`
+    being separate from `monitor.py`'s read-only Brandmeister client
+    elsewhere in this file: different call shape (`favorite_stats()`,
+    not `linked_node_info()`), own cache keys, no need to reach into
+    `FleetMonitor`'s internals from `app.py`.
+  - **favorites.ini's real format was fetched from AllScan's actual
+    `favorites-Sample.ini` (GitHub, `main` branch -- note: `main` is the
+    real default branch per the repo's own API metadata, even though
+    `master` also resolves for raw file fetches; found by discovery, not
+    assumed) before writing the parser.** `label[]`/`cmd[]` are PARALLEL
+    PHP-ini arrays -- the Nth label pairs with the Nth cmd by POSITION,
+    there is no single key=value per favorite, and the remote node
+    number lives inside the `cmd` string itself (`rpt cmd %node% ilink 3
+    27339`), extracted via `/ilink\s+\d+\s+(\d+)/`, not a separate field.
+    Verified this regex-pairing approach against a synthetic sample
+    matching the real file's exact shape (including the real sample
+    file's own blank-cmd placeholder row) before trusting it.
+  - **EchoLink favorites (node number >= 3000000, confirmed from
+    AllScan's own `astapi/nodeInfo.php` range check) are detected and
+    skipped VISIBLY during import, not silently dropped** -- this app has
+    no Asterisk Manager Interface connection to do the `echolink dbget
+    nodename` lookup AllScan uses to resolve those, so importing one as
+    if it were a normal ASL node would be actively wrong, not just
+    incomplete.
+  - **Import writes through the exact same `/api/asl_favorites` POST
+    route the compact card's manual add already uses** -- no new
+    backend endpoint for the import itself, only for the stats lookup.
+    `importFavoritesIni()` merges parsed entries onto the existing
+    `aslFavorites` list by node (import wins on a collision, same
+    dedup-by-node convention `addAslFavorite()` already has for a single
+    manual add) and POSTs the whole merged list.
 
 - **Brandmeister talkgroup link/unlink (v3.79) was built and shipped;
   TGIF link/unlink was investigated in the same session and deliberately
