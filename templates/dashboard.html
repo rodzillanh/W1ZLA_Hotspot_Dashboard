@@ -7487,6 +7487,30 @@ function renderAslDrawer() {
     const drawer = document.getElementById('asl-drawer');
     if (!drawer || !drawer.classList.contains('open')) return; // cheap no-op while closed, same as other drawers' own precedent
 
+    // The drawer body gets fully rebuilt via innerHTML on every poll tick
+    // (refresh() calls this every POLL_MS) plus after every favorite
+    // save/select -- without this, anything mid-typed into "Add favorite"
+    // or "Quick connect" got silently wiped every few seconds (a real,
+    // reported bug: the field would clear itself while typing). Node #/
+    // Label/Keep-connections have no competing logic, so they always
+    // restore verbatim regardless of focus. asl-drawer-qc-node ALSO gets
+    // auto-populated from the current favorite selection further down
+    // (selectedFav), so its typed value is only snapshotted while it's
+    // the actually-focused element -- otherwise a stale typed value would
+    // fight the selection-driven value on every later re-render even
+    // after the user moved on to something else.
+    const PRESERVE_IDS = ['asl-drawer-add-node', 'asl-drawer-add-label', 'asl-drawer-keep-connections', 'asl-drawer-qc-node'];
+    const activeEl   = document.activeElement;
+    const focusedId  = (activeEl && drawer.contains(activeEl)) ? activeEl.id : null;
+    const selStart   = (focusedId && typeof activeEl.selectionStart === 'number') ? activeEl.selectionStart : null;
+    const selEnd     = (focusedId && typeof activeEl.selectionEnd   === 'number') ? activeEl.selectionEnd   : null;
+    const preserved  = {};
+    PRESERVE_IDS.forEach(id => {
+        if (id === 'asl-drawer-qc-node' && id !== focusedId) return;
+        const el = document.getElementById(id);
+        if (el) preserved[id] = el.type === 'checkbox' ? el.checked : el.value;
+    });
+
     const aslHotspots = (lastApiData || []).filter(hs => hs.type === 'asl3');
     if (aslHotspots.length === 0) {
         drawer.innerHTML = `
@@ -7636,6 +7660,21 @@ function renderAslDrawer() {
             <div id="asl-drawer-import-preview"></div>
             <a class="asl-ctrl-allscan-btn" href="http://${controlHotspot.ip}/allscan" target="_blank" rel="noopener" style="margin:14px 0 0">🔗 Open AllScan Control Panel</a>
         </div>`;
+
+    // Restore whatever was captured before the rebuild above.
+    Object.keys(preserved).forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.type === 'checkbox') el.checked = preserved[id];
+        else el.value = preserved[id];
+    });
+    if (focusedId) {
+        const el = document.getElementById(focusedId);
+        if (el && typeof el.focus === 'function') {
+            el.focus();
+            if (selStart !== null && typeof el.setSelectionRange === 'function') el.setSelectionRange(selStart, selEnd);
+        }
+    }
 
     fetchAslFavoriteStats();
 }

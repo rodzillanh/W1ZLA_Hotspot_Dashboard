@@ -3595,6 +3595,44 @@ config for per-integration credentials; put it in
   independent `_last_live_fetch_at` clocks) is the dominant remaining
   contributor before assuming the fix here was insufficient.
 
+- **A real, reported bug: text typed into the ASL Control drawer's "Add
+  favorite"/"Quick connect" fields (and the "Keep existing connections"
+  checkbox) would vanish mid-typing (v3.88).** Root cause was structural,
+  not a typo -- `renderAslDrawer()` fully replaces the drawer's
+  `innerHTML` on every call, and it's called far more often than "the
+  user did something": every `refresh()` poll tick (every `POLL_MS`,
+  currently a few seconds), after every favorite save/select, and after
+  `fetchAslFavoriteStats()`'s own throttled resolve. Rebuilding
+  `innerHTML` destroys and recreates every `<input>` element from
+  scratch, which silently wipes whatever's typed into one -- there was
+  no code doing this on purpose, it's just what `innerHTML =` does to
+  live DOM nodes. This was a pre-existing latent issue in this same
+  drawer well before it was ever reported -- every earlier version of
+  `renderAslDrawer()` in this file (going back to the sidebar's original
+  build) had the identical unconditional `innerHTML` rebuild, just never
+  got flagged until a user actually hit it directly.
+  Fixed by snapshotting the affected fields' values (and, if one of them
+  currently has focus, the focused element's id + cursor position) right
+  before the `innerHTML` rebuild, then restoring them immediately after.
+  Two different restore rules, not one, because `asl-drawer-qc-node` has
+  competing logic no other field has: it's ALSO auto-populated from
+  `aslSelectedFavoriteNode` (see the click-to-select entry above) via a
+  `value="..."` attribute baked directly into the template string. If
+  its typed value were unconditionally restored the same way as the
+  other fields, that restore would immediately stomp the fresh
+  selection-driven value on every single re-render after a row click --
+  the field would never actually update to show the newly selected
+  node. So `asl-drawer-add-node`/`asl-drawer-add-label`/
+  `asl-drawer-keep-connections` restore unconditionally (nothing else
+  ever writes to them), while `asl-drawer-qc-node`'s typed value is only
+  snapshotted+restored when it's the actually-focused element at the
+  moment of the rebuild -- i.e. only while the user is the one actively
+  typing into it, never on an unrelated poll tick or a deliberate
+  selection click. If another field is ever added to this drawer that
+  BOTH accepts free typing AND has some other code path that also writes
+  a value into it, it needs this same focus-gated (not unconditional)
+  restore rule, not the simpler one.
+
 - **Brandmeister talkgroup link/unlink (v3.79) was built and shipped;
   TGIF link/unlink was investigated in the same session and deliberately
   NOT built -- a real, live-verified structural gap, not a skipped
