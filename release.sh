@@ -79,12 +79,17 @@ PY
 )"
 
 if [ -z "$(git tag -l "$TAG")" ]; then
-    echo "==> Creating and pushing tag ${TAG}..."
+    echo "==> Creating tag ${TAG}..."
     git tag "$TAG"
-    git push origin "$TAG"
-else
-    echo "==> Tag ${TAG} already exists locally -- assuming it's already pushed, skipping tag creation."
 fi
+# Push unconditionally, even if the tag already existed locally -- a
+# previous run can create the local tag and then have the push itself
+# fail (confirmed live: the same expired-credentials issue plain
+# `git push` hits on this host). `git push` on an already-pushed tag is a
+# harmless no-op, so this is always safe to (re-)run rather than
+# assuming "exists locally" also means "reached the remote."
+echo "==> Pushing tag ${TAG}..."
+git push origin "$TAG"
 
 echo "==> Creating Forgejo release..."
 # NOTES goes over stdin, not argv -- an argument containing non-ASCII text
