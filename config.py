@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.85"
+APP_VERSION = "3.86"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -52,6 +52,7 @@ VERSION_CODENAMES = [
     "Marley",           # v3.84 -- Bob Marley (1945-1981)
     "Ronson",           # v3.85 -- Mick Ronson, guitarist, David Bowie's
                         # Spiders from Mars (1946-1993)
+    "Curtis",           # v3.86 -- Ian Curtis, Joy Division (1956-1980)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -419,6 +420,24 @@ APRS_CACHE_TTL = int(os.environ.get("APRS_CACHE_TTL", 120))  # positions can mov
 ASLSTATS_AGENT     = os.environ.get("ASLSTATS_AGENT", "hotspot-dashboard/1.0")
 ASLSTATS_TIMEOUT   = int(os.environ.get("ASLSTATS_TIMEOUT", 5))
 ASLSTATS_CACHE_TTL = int(os.environ.get("ASLSTATS_CACHE_TTL", 120))  # link topology changes -- short TTL
+# ASL Control's per-favorite Rx%/LCnt/status is far slower-moving than link
+# topology (a busy-ness % over the node's whole uptime, not "who's linked
+# right now") -- a longer, separate TTL than ASLSTATS_CACHE_TTL cuts how
+# often a full-favorites-list refetch burst has to happen at all.
+ASLSTATS_FAVORITE_CACHE_TTL = int(os.environ.get("ASLSTATS_FAVORITE_CACHE_TTL", 300))
+# stats.allstarlink.org's own documented cap is 30 req/min for the whole
+# source IP (confirmed live 2026-08: X-RateLimit-Limit: 30) -- shared across
+# every favorite fetched AND monitor.py's own separate link-topology polling.
+# A cold cache (e.g. right after a restart, or every ASLSTATS_FAVORITE_CACHE_TTL
+# once several favorites' entries expire in lockstep, since they were all
+# populated in the same original burst) used to fire one request per favorite
+# back-to-back with zero spacing -- confirmed live to trip a 429 for every
+# node in that burst at once ("Stats unavailable" on every single favorite
+# simultaneously, even ones known to be real/registered). This throttles
+# AslStatsClient's own outbound requests to at most one every this many
+# seconds, so a 15-favorite cold-cache burst spreads over ~9s instead of
+# landing in under 1s.
+ASLSTATS_MIN_LIVE_INTERVAL_SEC = float(os.environ.get("ASLSTATS_MIN_LIVE_INTERVAL_SEC", 0.6))
 
 # --- Brandmeister repeater profile lookup ---
 BRANDMEISTER_AGENT     = os.environ.get("BRANDMEISTER_AGENT", "hotspot-dashboard/1.0 (+https://github.com/)")

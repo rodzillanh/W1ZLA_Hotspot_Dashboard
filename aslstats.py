@@ -33,6 +33,25 @@ class AslStatsClient:
     def __init__(self):
         self._lock  = threading.Lock()
         self._cache: dict = {}  # node -> (expiry_epoch, {linked_node: {callsign, description, location}})
+        self._rate_lock = threading.Lock()  # separate from _lock -- guards _last_live_fetch_at only, never held while sleeping
+        self._last_live_fetch_at = 0.0
+
+    def _throttle_live_request(self):
+        """Self-rate-limits this client's own outbound requests to
+        stats.allstarlink.org (confirmed live: 30 req/min per source IP,
+        shared across every caller on this box). Without this, a burst of
+        several favorites' caches expiring at once (they were all
+        populated in the same original burst, so they expire together
+        too) fired one request per node with zero spacing -- confirmed
+        live to trip a 429 on every request in that burst simultaneously.
+        The wait-time is computed under the lock but slept OUTSIDE it, so
+        this never blocks other threads' cache-hit lookups."""
+        with self._rate_lock:
+            now = time.time()
+            wait = self._last_live_fetch_at + config.ASLSTATS_MIN_LIVE_INTERVAL_SEC - now
+            self._last_live_fetch_at = (now + wait) if wait > 0 else now
+        if wait > 0:
+            time.sleep(wait)
 
     def linked_node_info(self, node: str) -> dict:
         """Return {linked_node_number: {"callsign": str|None, "description":
@@ -74,10 +93,11 @@ class AslStatsClient:
                 return cached[1]
         result = self._fetch_favorite_stats(node)
         with self._lock:
-            self._cache[cache_key] = (time.time() + config.ASLSTATS_CACHE_TTL, result)
+            self._cache[cache_key] = (time.time() + config.ASLSTATS_FAVORITE_CACHE_TTL, result)
         return result
 
     def _fetch_favorite_stats(self, node: str) -> dict:
+        self._throttle_live_request()
         try:
             req = urllib.request.Request(
                 f"{ASLSTATS_BASE_URL}{node}",
@@ -115,11 +135,20 @@ class AslStatsClient:
             # same claim as "this node doesn't exist" -- found=None (vs.
             # False) lets callers show "unknown/unavailable" instead of a
             # confident, potentially wrong "Not in ASL DB".
+            print(f"aslstats: favorite_stats({node}) HTTP {e.code} from stats.allstarlink.org"
+                  + (" -- likely rate-limited (30 req/min)" if e.code == 429 else ""))
             return {"found": None, "error": True}
-        except Exception:
+        except Exception as e:
+            # Printed (not raised) to keep this integration's silent-degrade
+            # contract intact -- but printed, not swallowed outright, since
+            # "every favorite shows Stats unavailable" is otherwise
+            # undiagnosable from the outside (confirmed live: this exact
+            # symptom shipped once with zero trace anywhere to explain it).
+            print(f"aslstats: favorite_stats({node}) failed: {type(e).__name__}: {e}")
             return {"found": None, "error": True}
 
     def _lookup_remote(self, node: str) -> dict:
+        self._throttle_live_request()
         try:
             req = urllib.request.Request(
                 f"{ASLSTATS_BASE_URL}{node}",
@@ -143,5 +172,6 @@ class AslStatsClient:
                         "location":    location,
                     }
             return linked
-        except Exception:
+        except Exception as e:
+            print(f"aslstats: linked_node_info({node}) failed: {type(e).__name__}: {e}")
             return {}

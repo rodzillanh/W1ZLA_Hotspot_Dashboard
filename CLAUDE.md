@@ -3515,6 +3515,71 @@ config for per-integration credentials; put it in
   `aslDrawerQuickConnect(ip, 'disconnect')`, an action that function
   already passed through generically.
 
+- **A real, user-reported recurrence of "every ASL Control favorite shows
+  Stats unavailable" (v3.86) -- root-caused live, not guessed, and this
+  time the network path itself was confirmed innocent before touching
+  any code.** A `curl` from the Unraid host itself succeeded (200, valid
+  JSON, `X-RateLimit-Remaining: 15`); the exact same request run via
+  `docker exec` inside the actual `hotspot-dashboard` container also
+  succeeded (200, valid JSON) -- but `X-RateLimit-Remaining` had dropped
+  to **2** in the few moments between the two checks, confirming
+  `stats.allstarlink.org`'s real, documented 30-req/min cap (see the
+  v3.83 entry above) is shared across the box's whole public IP and was
+  genuinely close to exhausted, not a DNS/firewall/cert problem local to
+  the container. Root cause: with N favorites saved, `favorite_stats()`
+  cached every one of them at nearly the same instant (one batch fetch
+  from `/api/asl_favorite_stats`), so they ALL expire in lockstep too --
+  every ~120s (the old shared `ASLSTATS_CACHE_TTL`), the app fired N
+  outbound requests to stats.allstarlink.org back-to-back with zero
+  spacing between them. Combined with `monitor.py`'s own SEPARATE
+  `AslStatsClient` instance polling the same API independently for link
+  topology, an unlucky burst landing when the shared budget was already
+  partly spent tripped a 429 for every request in that burst
+  simultaneously -- exactly the "every favorite fails at once, including
+  ones confirmed live to be real and registered" symptom, both times
+  it's been reported.
+  Fixed two ways, both in `aslstats.py`, without touching the actual
+  request/parsing logic that was already correct as of the v3.83/v3.84
+  fix:
+  1. **Self-throttling** -- `AslStatsClient._throttle_live_request()`
+     (a separate `_rate_lock`/`_last_live_fetch_at` pair from the
+     existing cache `_lock`, deliberately not reusing it so a throttled
+     wait never blocks another thread's pure cache-hit lookup) enforces
+     a minimum spacing (`config.ASLSTATS_MIN_LIVE_INTERVAL_SEC`, default
+     0.6s) between this client instance's own outbound live requests,
+     called at the top of both `_fetch_favorite_stats()` AND
+     `_lookup_remote()` -- a cold-cache burst of 15 favorites now spreads
+     over ~9 seconds instead of landing in under 1. Verified with a
+     mocked-`urlopen` test (not a fresh live burst, learning directly
+     from the "re-verify with a mocked test, not another live burst"
+     lesson the v3.83/v3.84 entry above already recorded) asserting the
+     real minimum gap between recorded call timestamps, plus a second
+     assertion that a same-node call still within the cache TTL makes
+     ZERO live calls at all (pure cache hit, unaffected by the throttle).
+  2. **A separate, longer cache TTL for favorites specifically**
+     (`ASLSTATS_FAVORITE_CACHE_TTL`, default 300s vs. `ASLSTATS_CACHE_TTL`'s
+     120s) -- Rx%/LCnt/status is a busy-ness percentage over a node's
+     entire uptime, not live link topology, so it doesn't need the same
+     freshness `linked_node_info()` does. A longer TTL directly cuts how
+     often the lockstep-expiry burst happens at all, on top of the
+     throttle making each burst, when it does happen, far gentler.
+  Also fixed the actual undiagnosability that made this take a live
+  debugging session to pin down at all: both `_fetch_favorite_stats()`'s
+  and `_lookup_remote()`'s exception handlers now `print()` the real
+  failure (HTTP status code, explicitly flagging a 429 as "likely
+  rate-limited", or the exception type/message for anything else)
+  instead of silently swallowing it -- keeps the "never raises out of a
+  client's public methods" degrade-gracefully contract intact (still
+  returns the same `found`/`error` shape either way), but means a future
+  recurrence shows up in `docker logs`/journalctl immediately instead of
+  needing a `curl`-from-host vs. `docker exec`-from-container comparison
+  to even confirm the network path is innocent. If this recurs a THIRD
+  time, check whether `monitor.py`'s own separate `AslStatsClient`
+  instance's traffic (never throttled against app.py's instance's own
+  budget usage, since they're two independent objects with two
+  independent `_last_live_fetch_at` clocks) is the dominant remaining
+  contributor before assuming the fix here was insufficient.
+
 - **Brandmeister talkgroup link/unlink (v3.79) was built and shipped;
   TGIF link/unlink was investigated in the same session and deliberately
   NOT built -- a real, live-verified structural gap, not a skipped
