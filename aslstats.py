@@ -22,6 +22,13 @@ import config
 ASLSTATS_BASE_URL = "https://stats.allstarlink.org/api/stats/"
 
 
+def _to_int(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class AslStatsClient:
     def __init__(self):
         self._lock  = threading.Lock()
@@ -80,8 +87,18 @@ class AslStatsClient:
                 data = json.loads(resp.read())
             node_info  = data.get("node") or {}
             stats_data = (data.get("stats") or {}).get("data") or {}
-            uptime = stats_data.get("apprptuptime")
-            txtime = stats_data.get("totaltxtime")
+            # apprptuptime/totaltxtime arrive as STRINGS in the real API
+            # response (confirmed live: "apprptuptime":"73285", quoted) --
+            # NOT numbers, despite looking indistinguishable from one
+            # through a bare print() during earlier research, which is
+            # exactly how this shipped broken the first time: dividing
+            # them directly raised a silent TypeError on every node that
+            # actually WAS found, caught by the generic except below and
+            # misreported as "not found" -- only genuine 404s (which never
+            # reach this line) displayed correctly, making the bug look
+            # like the opposite of what it was.
+            uptime = _to_int(stats_data.get("apprptuptime"))
+            txtime = _to_int(stats_data.get("totaltxtime"))
             rx_pct = round(txtime / uptime * 100, 1) if uptime else None
             links  = stats_data.get("links")
             return {
@@ -94,9 +111,13 @@ class AslStatsClient:
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return {"found": False}  # confirmed live: a real 404 for an unregistered/bogus node number
-            return {"found": False, "error": True}
+            # A non-404 HTTP error (rate limit, server hiccup) is NOT the
+            # same claim as "this node doesn't exist" -- found=None (vs.
+            # False) lets callers show "unknown/unavailable" instead of a
+            # confident, potentially wrong "Not in ASL DB".
+            return {"found": None, "error": True}
         except Exception:
-            return {"found": False, "error": True}
+            return {"found": None, "error": True}
 
     def _lookup_remote(self, node: str) -> dict:
         try:

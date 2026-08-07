@@ -7532,17 +7532,24 @@ function renderAslDrawer() {
         // (this app's own reliable SSH-sourced asl_linked_nodes), never from
         // the stats API's own "keyed" field, which AllScan's own changelog
         // documents as unreliable for many nodes.
+        // stats.found: true = real data below; false = a confirmed 404
+        // (genuinely not in the ASL DB); null = a fetch/parse error --
+        // NOT the same claim as "not in DB", so it gets its own label
+        // rather than collapsing into "Not in ASL DB" (a real bug this
+        // app shipped once already -- see aslstats.py's favorite_stats()).
         const stats = aslFavoriteStats[fav.node];
         let dotClass = '';
         let statsHtml = '';
         if (isKeyed) {
             dotClass = 'keyed';
-        } else if (stats && stats.found) {
+        } else if (stats && stats.found === true) {
             dotClass = stats.webtransceiver ? 'webtx' : (stats.status === 'Active' ? 'active' : '');
             statsHtml = `<span class="asl-ctrl-rx">${stats.rx_pct != null ? stats.rx_pct + '% rx' : '— rx'}</span>
                          <span class="asl-ctrl-lcnt">${stats.lcnt != null ? stats.lcnt + ' links' : '— links'}</span>`;
-        } else if (stats && !stats.found) {
+        } else if (stats && stats.found === false) {
             statsHtml = '<span class="asl-ctrl-notdb">Not in ASL DB</span>';
+        } else if (stats && stats.error) {
+            statsHtml = '<span class="asl-ctrl-notdb">Stats unavailable</span>';
         }
 
         return `

@@ -3450,6 +3450,39 @@ config for per-integration credentials; put it in
     `aslFavorites` list by node (import wins on a collision, same
     dedup-by-node convention `addAslFavorite()` already has for a single
     manual add) and POSTs the whole merged list.
+  - **A real, shipped bug, fixed in v3.84: almost every favorite showed
+    "Not in ASL DB" even for well-known, definitely-registered nodes.**
+    Root cause: `stats.data.apprptuptime`/`totaltxtime` arrive as JSON
+    STRINGS from the real API (`"apprptuptime":"73285"`, confirmed via
+    the actual raw response), not numbers -- despite printing as
+    indistinguishable digits through a bare Python `print()` during the
+    original research, which is exactly how this got missed the first
+    time. `rx_pct = round(txtime / uptime * 100, 1)` raised a silent
+    `TypeError` for every node that WAS found; the broad `except
+    Exception` caught it and returned the same `found: False` shape a
+    genuine 404 returns, which `renderAslDrawer()` renders as "Not in
+    ASL DB" either way. The one case that looked "correct" (a real 404,
+    e.g. node 1999) worked precisely BECAUSE it fails before reaching
+    the division at all -- making the bug look like the opposite of what
+    it was. Fixed two ways: (1) `_to_int()` casts both fields before
+    dividing -- confirmed against the exact real string-typed response
+    shape via a mocked test (`rx_pct` came back `33.0`, matching the
+    live AllScan screenshot that prompted building this feature in the
+    first place); (2) `found` is now three-valued, not boolean --
+    `True` (real data), `False` (confirmed 404, genuinely not in the
+    ASL DB), `None` (a fetch/parse/rate-limit error -- NOT the same
+    claim). `renderAslDrawer()` now shows "Stats unavailable" for the
+    `None` case instead of confidently asserting a node doesn't exist.
+    **Also discovered while fixing this**: `stats.allstarlink.org`
+    started timing out entirely (both `curl` and `urllib`) partway
+    through this debugging session, most likely from the sheer volume of
+    requests made testing this one feature (initial research, repo/file
+    fetches, a deliberate 20-node burst test, several retries) -- a
+    real, observed reminder that this API's documented 30-req/min limit
+    is a genuine constraint, not just a note in someone else's
+    changelog. Re-verify any future change here with a SINGLE request
+    and a mocked-data test for the logic itself, not a fresh live burst,
+    to avoid tripping the same limit while debugging.
 
 - **Brandmeister talkgroup link/unlink (v3.79) was built and shipped;
   TGIF link/unlink was investigated in the same session and deliberately
