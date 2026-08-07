@@ -35,6 +35,11 @@ class AslStatsClient:
         self._cache: dict = {}  # node -> (expiry_epoch, {linked_node: {callsign, description, location}})
         self._rate_lock = threading.Lock()  # separate from _lock -- guards _last_live_fetch_at only, never held while sleeping
         self._last_live_fetch_at = 0.0
+        # node -> (totalkeyups, totaltxtime) from the PREVIOUS live fetch --
+        # never expires on its own (unlike _cache), since it exists purely
+        # to be diffed against the next live fetch, however far apart that
+        # ends up being. See _check_recent_activity().
+        self._prev_counters: dict = {}
 
     def _throttle_live_request(self):
         """Self-rate-limits this client's own outbound requests to
@@ -72,20 +77,21 @@ class AslStatsClient:
         """Per-node live stats for the ASL Control sidebar's Favorites
         list -- Active/registered status, Web-Transceiver flag, Rx%
         (totaltxtime/apprptuptime, matching AllScan's own documented
-        formula), and LCnt (that node's own current link count). Cached
-        separately from linked_node_info() (own cache key prefix) since
-        this reads the TOP-LEVEL node/stats.data of the queried node
-        itself, not the linkedNodes sub-array the other method extracts.
+        formula), LCnt (that node's own current link count), and
+        recently_active (see _check_recent_activity()). Cached separately
+        from linked_node_info() (own cache key prefix) since this reads
+        the TOP-LEVEL node/stats.data of the queried node itself, not the
+        linkedNodes sub-array the other method extracts.
 
-        Deliberately does NOT return a "keyed" field -- confirmed live
-        via AllScan's own changelog that the stats API's keyed value is
-        unreliable for many nodes ("shows a 0 value even when the node
-        is in fact keyed"), and AllScan's own fix requires polling twice
-        and diffing totalkeyups/totaltxtime. This app has a genuinely
-        reliable keyed signal already for anything actually linked to a
-        controlling hotspot (asl_linked_nodes, SSH-sourced) -- callers
-        should use that instead of trusting a "maybe keyed" guess from
-        here for favorites that aren't currently connected."""
+        Deliberately does NOT trust the stats API's own "keyed" field
+        directly -- confirmed live via AllScan's own changelog that it's
+        unreliable for many nodes ("shows a 0 value even when the node is
+        in fact keyed"). This app has a genuinely reliable keyed signal
+        already for anything actually linked to a controlling hotspot
+        (asl_linked_nodes, SSH-sourced) -- callers should prefer that over
+        recently_active whenever a favorite IS currently linked, since
+        recently_active is a coarser, several-minutes-wide "there was
+        SOME activity" signal, not "keyed right now"."""
         cache_key = f"fav:{node}"
         with self._lock:
             cached = self._cache.get(cache_key)
@@ -119,14 +125,16 @@ class AslStatsClient:
             # like the opposite of what it was.
             uptime = _to_int(stats_data.get("apprptuptime"))
             txtime = _to_int(stats_data.get("totaltxtime"))
+            keyups = _to_int(stats_data.get("totalkeyups"))
             rx_pct = round(txtime / uptime * 100, 1) if uptime else None
             links  = stats_data.get("links")
             return {
-                "found":          True,
-                "status":         node_info.get("Status"),
-                "webtransceiver": node_info.get("access_webtransceiver") == "1",
-                "rx_pct":         rx_pct,
-                "lcnt":           len(links) if isinstance(links, list) else None,
+                "found":           True,
+                "status":          node_info.get("Status"),
+                "webtransceiver":  node_info.get("access_webtransceiver") == "1",
+                "rx_pct":          rx_pct,
+                "lcnt":            len(links) if isinstance(links, list) else None,
+                "recently_active": self._check_recent_activity(node, keyups, txtime),
             }
         except urllib.error.HTTPError as e:
             if e.code == 404:
@@ -146,6 +154,34 @@ class AslStatsClient:
             # symptom shipped once with zero trace anywhere to explain it).
             print(f"aslstats: favorite_stats({node}) failed: {type(e).__name__}: {e}")
             return {"found": None, "error": True}
+
+    def _check_recent_activity(self, node: str, keyups: int | None, txtime: int | None) -> bool | None:
+        """AllScan's own documented workaround for the stats API's
+        single-poll "keyed" field being unreliable for many nodes: diff
+        totalkeyups/totaltxtime against the PREVIOUS live fetch's values
+        rather than trusting keyed directly. True = a counter moved since
+        the last check (some transmission happened on this node in that
+        window); None = no prior sample yet to compare against (e.g. the
+        first check for this node since a restart); False = unchanged.
+
+        The detectable window is bounded by how often a fresh live fetch
+        actually happens for THIS node (config.ASLSTATS_FAVORITE_CACHE_TTL,
+        5 min by default) -- intentionally coarser than the SSH-sourced
+        asl_linked_nodes signal, which stays the only source of true
+        "keyed right now" state. Callers should only surface this for a
+        favorite that ISN'T currently linked to the controlling hotspot --
+        see the compact card's/drawer's own dot-priority logic."""
+        with self._lock:
+            prev = self._prev_counters.get(node)
+            self._prev_counters[node] = (keyups, txtime)
+        if prev is None:
+            return None
+        prev_keyups, prev_txtime = prev
+        if keyups is not None and prev_keyups is not None and keyups > prev_keyups:
+            return True
+        if txtime is not None and prev_txtime is not None and txtime > prev_txtime:
+            return True
+        return False
 
     def _lookup_remote(self, node: str) -> dict:
         self._throttle_live_request()

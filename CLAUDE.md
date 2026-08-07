@@ -3664,6 +3664,63 @@ config for per-integration credentials; put it in
   drawer's own click-to-select redesign (the entry above) moved away
   from, and this compact card has even less width to spare than the
   drawer did.
+- **"Recently active" amber indicator (v3.93) for ASL favorites NOT
+  currently linked to your hub -- built after the user clarified their
+  actual intent ("I think there is value in seeing what node in my
+  favorites list to I want to listen to") once it became clear the
+  existing red/keyed dot only ever reflects nodes linked to YOUR OWN
+  hub, never activity elsewhere on the wider network.** Implements the
+  exact diff-based workaround AllScan's own changelog describes for the
+  stats API's single-poll `keyed` field being unreliable ("shows a 0
+  value even when the node is in fact keyed") -- `AslStatsClient` now
+  keeps `self._prev_counters: dict[node, (totalkeyups, totaltxtime)]`,
+  a SEPARATE, never-expiring dict from `self._cache` (which exists
+  purely to be diffed against the NEXT live fetch, however far apart
+  that ends up being -- unlike the TTL cache, this must never get
+  cleared just because the cached RESULT expired). `_check_recent_
+  activity()` returns `True` if either counter increased since the
+  previous live fetch, `False` if unchanged, `None` if there's no prior
+  sample yet (first check for that node, e.g. right after a restart) --
+  three-valued for the same reason `found` already is (`None` isn't
+  "not active", it's "don't know yet"). Verified with a live
+  three-sample mocked sequence (sample 1: baseline, `recently_active`
+  is `None`; sample 2: counters moved, `True`; sample 3: unchanged from
+  sample 2, `False`) before trusting the diff logic, not just read
+  through once.
+  **No new network requests** -- `totalkeyups` was already sitting
+  unused in the same JSON response `_fetch_favorite_stats()` was
+  already parsing for Rx%/LCnt/Web-Transceiver.
+  **Precedence, in both the compact card and the drawer**: `isKeyed`
+  (SSH-linked, keyed right now) always wins first; only when NOT
+  currently linked does `stats.recently_active === true` get to color
+  the dot amber -- a linked favorite already has a strictly more
+  precise, real-time signal, so the coarser several-minutes-wide stats
+  diff never overrides it. Compact card folds "recently active" into
+  the existing plain-text desc line (amber-colored inline span) rather
+  than a new element, same "don't reintroduce the column-width-squeeze
+  bug from earlier this session" discipline as the Rx%/LCnt entry
+  above; the drawer gets its own `.asl-ctrl-recent` pill-styled span,
+  matching its existing `.asl-ctrl-notdb` shape.
+  **Verification needed a real trick, not just a normal screenshot
+  run**: `recently_active` can only ever be `True` on a node's SECOND
+  live fetch, and `generate_screenshots.py`'s seeded demo hotspots start
+  a fresh process every run (empty `_prev_counters`), so it can never
+  naturally show the amber state in one screenshot pass. Confirmed the
+  actual CSS/JS rendering (not just the backend logic) by writing a
+  throwaway script that monkeypatched
+  `AslStatsClient._check_recent_activity` to unconditionally return
+  `True`, screenshotted both the compact card and drawer, deleted the
+  script and its output images once confirmed -- never committed, since
+  it exists only to prove the styling renders correctly, not as
+  reusable tooling. That check also caught a real, narrow-viewport-only
+  false alarm: an initial pass at 900px width showed the SAME
+  wrapping/clipping bug the Rx%/LCnt entry above already fixed once,
+  which turned out to be purely an artifact of testing at an
+  unrealistically narrow width -- re-running at the dashboard's real
+  1600px grid width showed clean, unwrapped rows. Don't assume a
+  narrow-viewport screenshot regression is real without also checking
+  at a realistic width; it can just as easily be the test harness's own
+  choice of viewport, not the app.
 
 - **Brandmeister talkgroup link/unlink (v3.79) was built and shipped;
   TGIF link/unlink was investigated in the same session and deliberately

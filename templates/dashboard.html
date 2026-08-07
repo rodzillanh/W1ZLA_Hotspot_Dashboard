@@ -758,6 +758,7 @@
         .asl-fav-row td:last-child  { border-radius: 0 8px 8px 0; }
         .asl-fav-row.keyed     { background: var(--danger-dim); }
         .asl-fav-row.connected { background: var(--good-dim); }
+        .asl-fav-row.recent    { background: var(--accent-dim); }
         .asl-fav-callsign { font-weight: 500; }
         .asl-fav-desc { display: block; font-size: 11px; color: var(--text-muted); }
         .asl-status-chip {
@@ -858,16 +859,19 @@
         .asl-ctrl-node-row:hover { border-color: var(--text-dim); }
         .asl-ctrl-node-row.keyed { background: var(--danger-dim); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
         .asl-ctrl-node-row.connected { background: var(--good-dim); border-color: color-mix(in srgb, var(--good) 40%, var(--border)); }
+        .asl-ctrl-node-row.recent { background: var(--accent-dim); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
         .asl-ctrl-node-row.selected { border-color: var(--live); box-shadow: 0 0 0 1px var(--live) inset; }
         .asl-ctrl-node-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
         .asl-ctrl-node-dot.keyed { background: var(--danger); animation: pulse 1.2s infinite; }
         .asl-ctrl-node-dot.webtx { background: var(--good); box-shadow: 0 0 4px var(--good); }
         .asl-ctrl-node-dot.active { background: color-mix(in srgb, var(--good) 55%, var(--text-dim)); }
+        .asl-ctrl-node-dot.recent { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
         .asl-ctrl-node-body { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .asl-ctrl-node-call { font-weight: 600; font-size: 12.5px; }
         .asl-ctrl-rx { font-size: 10px; font-family: var(--font-mono); color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
         .asl-ctrl-lcnt { font-size: 10px; font-family: var(--font-mono); color: var(--text-dim); background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 0 6px; white-space: nowrap; flex-shrink: 0; }
         .asl-ctrl-notdb { font-size: 10px; color: var(--text-dim); font-style: italic; flex-shrink: 0; }
+        .asl-ctrl-recent { font-size: 10px; color: var(--accent); font-style: italic; flex-shrink: 0; }
         .asl-ctrl-btn-remove {
             font-size: 10px; padding: 3px 6px; border-radius: 5px; cursor: pointer; border: 1px solid var(--border);
             background: none; color: var(--text-dim); flex-shrink: 0; font-family: var(--font-mono);
@@ -7493,17 +7497,21 @@ function renderAslFavorites() {
         if (isKeyed) keyedCount++;
         if (isConn)  connectedCount++;
 
-        const rowClass  = isKeyed ? 'keyed' : (isConn ? 'connected' : '');
         const chip      = isKeyed
             ? `<span class="asl-status-chip keyed">🔴 KEYED</span>`
             : (isConn
                 ? `<span class="asl-status-chip connected">🟢 Connected</span>`
                 : `<span class="asl-status-chip idle">Not connected</span>`);
         // Rx%/LCnt/status dot -- same aslFavoriteStats source and same
-        // keyed/webtx/active convention the ASL Control drawer already
-        // uses (see renderAslDrawer()), just also surfaced on the compact
-        // card now. No new fetch: fetchAslFavoriteStats() below is called
-        // from here too, sharing the same 60s-throttled cache as the drawer.
+        // keyed/webtx/active/recent convention the ASL Control drawer
+        // already uses (see renderAslDrawer()), just also surfaced on the
+        // compact card now. No new fetch: fetchAslFavoriteStats() below is
+        // called from here too, sharing the same 60s-throttled cache as
+        // the drawer. "recent" (amber -- some activity on this node since
+        // the last check, per aslstats.py's totalkeyups/totaltxtime diff)
+        // only applies when NOT already linked to this hub -- a linked
+        // favorite already has a more precise, real-time keyed/connected
+        // signal, which wins.
         //
         // Folded into the existing secondary text line rather than a new
         // table column -- a real layout bug caught by actually rendering
@@ -7520,14 +7528,18 @@ function renderAslFavorites() {
         if (isKeyed) {
             dotClass = 'keyed';
         } else if (stats && stats.found === true) {
-            dotClass = stats.webtransceiver ? 'webtx' : (stats.status === 'Active' ? 'active' : '');
+            dotClass = stats.recently_active === true ? 'recent'
+                : stats.webtransceiver ? 'webtx'
+                : (stats.status === 'Active' ? 'active' : '');
             descBits.push(stats.rx_pct != null ? stats.rx_pct + '% rx' : '— rx');
             descBits.push(stats.lcnt != null ? stats.lcnt + ' links' : '— links');
+            if (stats.recently_active === true) descBits.push('<span style="color:var(--accent)">recently active</span>');
         } else if (stats && stats.found === false) {
             descBits.push('Not in ASL DB');
         } else if (stats && stats.error) {
             descBits.push('Stats unavailable');
         }
+        const rowClass  = isKeyed ? 'keyed' : (isConn ? 'connected' : (dotClass === 'recent' ? 'recent' : ''));
 
         const label      = fav.label || (link && link.callsign) || '';
         const primaryText = label || `Node ${fav.node}`;
@@ -7744,18 +7756,21 @@ function renderAslDrawer() {
         const isKeyed  = !!(link && link.keyed);
         const isConn   = !!link;
         const isSelected = fav.node === aslSelectedFavoriteNode;
-        const rowClass = (isKeyed ? 'keyed' : (isConn ? 'connected' : '')) + (isSelected ? ' selected' : '');
         const label    = fav.label || (link && link.callsign) || '';
         const callHtml = label
             ? `<span class="asl-ctrl-node-call">${escapeHtml(label)}</span><span class="asl-ctrl-node-num">${escapeHtml(fav.node)}</span>`
             : `<span class="asl-ctrl-node-call" style="color:var(--text-dim)">Node ${escapeHtml(fav.node)}</span>`;
 
-        // Rx%/LCnt/Active/Web-Transceiver come from stats.allstarlink.org
-        // (aslFavoriteStats, fetched separately -- see fetchAslFavoriteStats()).
-        // "keyed" (bright red) deliberately only ever comes from `link` above
-        // (this app's own reliable SSH-sourced asl_linked_nodes), never from
-        // the stats API's own "keyed" field, which AllScan's own changelog
-        // documents as unreliable for many nodes.
+        // Rx%/LCnt/Active/Web-Transceiver/recently-active come from
+        // stats.allstarlink.org (aslFavoriteStats, fetched separately --
+        // see fetchAslFavoriteStats()). "keyed" (bright red) deliberately
+        // only ever comes from `link` above (this app's own reliable
+        // SSH-sourced asl_linked_nodes), never from the stats API's own
+        // "keyed" field, which AllScan's own changelog documents as
+        // unreliable for many nodes. "recent" (amber -- some activity on
+        // this node since the last check, per aslstats.py's
+        // totalkeyups/totaltxtime diff) only kicks in once NOT already
+        // linked, same precedence the compact card uses.
         // stats.found: true = real data below; false = a confirmed 404
         // (genuinely not in the ASL DB); null = a fetch/parse error --
         // NOT the same claim as "not in DB", so it gets its own label
@@ -7767,14 +7782,19 @@ function renderAslDrawer() {
         if (isKeyed) {
             dotClass = 'keyed';
         } else if (stats && stats.found === true) {
-            dotClass = stats.webtransceiver ? 'webtx' : (stats.status === 'Active' ? 'active' : '');
+            dotClass = stats.recently_active === true ? 'recent'
+                : stats.webtransceiver ? 'webtx'
+                : (stats.status === 'Active' ? 'active' : '');
+            const recentBit = stats.recently_active === true ? '<span class="asl-ctrl-recent">recently active</span>' : '';
             statsHtml = `<span class="asl-ctrl-rx">${stats.rx_pct != null ? stats.rx_pct + '% rx' : '— rx'}</span>
-                         <span class="asl-ctrl-lcnt">${stats.lcnt != null ? stats.lcnt + ' links' : '— links'}</span>`;
+                         <span class="asl-ctrl-lcnt">${stats.lcnt != null ? stats.lcnt + ' links' : '— links'}</span>
+                         ${recentBit}`;
         } else if (stats && stats.found === false) {
             statsHtml = '<span class="asl-ctrl-notdb">Not in ASL DB</span>';
         } else if (stats && stats.error) {
             statsHtml = '<span class="asl-ctrl-notdb">Stats unavailable</span>';
         }
+        const rowClass = (isKeyed ? 'keyed' : (isConn ? 'connected' : (dotClass === 'recent' ? 'recent' : ''))) + (isSelected ? ' selected' : '');
 
         return `
         <div class="asl-ctrl-node-row ${rowClass}" onclick="selectAslFavorite('${fav.node}')">
@@ -7788,6 +7808,7 @@ function renderAslDrawer() {
     const statsLegend = sortedFavorites.length ? `
         <div class="asl-ctrl-stats-legend">
             <span><span class="asl-ctrl-node-dot keyed" style="animation:none"></span>Keyed now</span>
+            <span><span class="asl-ctrl-node-dot recent"></span>Recently active</span>
             <span><span class="asl-ctrl-node-dot webtx"></span>Web-Transceiver</span>
             <span><span class="asl-ctrl-node-dot active"></span>Active</span>
         </div>` : '';

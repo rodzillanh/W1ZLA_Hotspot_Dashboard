@@ -606,10 +606,11 @@ def api_asl_favorites_post():
 @app.route("/api/asl_favorite_stats")
 def api_asl_favorite_stats():
     """Per-favorite live stats (Active status, Web-Transceiver flag, Rx%,
-    LCnt) from stats.allstarlink.org for the ASL Control sidebar --
-    accepts ?nodes=27339,29332,... and returns one AslStatsClient.
-    favorite_stats() result per node, cached server-side (see that
-    method's docstring for why it deliberately omits keyed status)."""
+    LCnt, recently_active) from stats.allstarlink.org for the ASL Control
+    sidebar -- accepts ?nodes=27339,29332,... and returns one
+    AslStatsClient.favorite_stats() result per node, cached server-side
+    (see that method's docstring for why it prefers this app's own
+    SSH-sourced keyed status over the stats API's own unreliable one)."""
     nodes = [n.strip() for n in request.args.get("nodes", "").split(",") if n.strip().isdigit()]
     return jsonify({n: asl_stats_client.favorite_stats(n) for n in nodes})
 
