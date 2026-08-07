@@ -3874,5 +3874,38 @@ Always clean up `__pycache__` before zipping/packaging a build.
   use real, verifiable deceased rock musicians (don't invent one or
   guess whether someone's still alive) — pre-v3.49 releases were never
   retroactively named, so the list only needs to grow forward from here.
+- **`release.sh` tags and creates a Forgejo Release for the current
+  version — the last step of the version-bump workflow, once
+  `APP_VERSION`/`VERSION_CODENAMES`/`version.html`'s changelog entry are
+  committed AND PUSHED to `main`.** Run it as `bash release.sh` after
+  that push (not before — it tags whatever commit is currently HEAD).
+  It reads `config.APP_VERSION`/`APP_CODENAME` for the tag/title, pulls
+  the release notes straight from `version.html`'s current (first)
+  `<div class="release">` block so the two never drift apart, tags+pushes
+  `vX.Y` if it doesn't already exist, then `POST`s to Forgejo's
+  `/repos/{owner}/{repo}/releases` (confirmed live against this host's
+  own `swagger.v1.json` before writing this — `tag_name` is the only
+  required field; `name`/`body` optional — rather than assumed from
+  GitHub's differently-shaped API). Needs a Forgejo API token
+  (`$FORGEJO_TOKEN` env var, or a `.forgejo-token` file next to the
+  script — gitignored, never commit it) since tag pushes reuse existing
+  git credentials but the Release itself is a REST API call, which git
+  credentials don't cover. A 409 (release for that tag already exists)
+  is treated as success/no-op, same idempotent spirit as `sync-wiki.sh`'s
+  "already up to date" case, not an error.
+  **A real encoding bug was caught and fixed before this shipped**: this
+  dev shell's default Python stdout encoding is `cp1252`, which silently
+  mangled the em-dashes ("—") every changelog entry in this project uses
+  — confirmed live (`python3 -c "print(sys.stdout.encoding)"` -> `cp1252`)
+  before assuming the extraction was correct, not caught by inspection.
+  Every `python3` invocation in this script that touches changelog text
+  is prefixed with `PYTHONIOENCODING=utf-8`, and the notes text is passed
+  between the two `python3` steps over stdin rather than as a command-line
+  argument — argv decoding is a second, independent encoding risk on
+  Windows (locale-dependent), so this sidesteps it entirely rather than
+  assuming it round-trips. If this script is ever touched again and starts
+  producing garbled `—`/curly-quote characters in a release's notes, this
+  is the first thing to re-check, not the JSON encoding logic itself
+  (verified separately and confirmed correct).
 - No JS build step, no npm — all frontend libraries (Leaflet, marked.js,
   leaflet.markercluster) are loaded from CDN via plain `<script>` tags.

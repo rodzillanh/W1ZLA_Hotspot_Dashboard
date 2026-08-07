@@ -223,3 +223,8 @@ __marimo__/
 # update.sh/docker-update.sh, read by the Version tab's update check --
 # not source, shouldn't be committed.
 BUILD_COMMIT
+
+# Hotspot Dashboard: optional local Forgejo API token for release.sh
+# (falls back to $FORGEJO_TOKEN if this file doesn't exist) -- a secret,
+# never commit this.
+.forgejo-token
