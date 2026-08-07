@@ -205,21 +205,31 @@ with app.monitor._lock:
 
 # --- 4. Seed Fleet Activity / Top 5 Activity (storage_activity.py) --
 # log_activity() always timestamps "now", which is fine for a demo chart.
-for call, mode, tg in [
-    ("KC1ABC", "DMR", "31665"), ("W2ECR", "DMR", "31665"),
-    ("N1LCP", "DMR", "3172"), ("KC1ABC", "DMR", "31665"),
-    ("W4KEV", "D-Star", None),
+# Durations are deliberately NOT proportional to call count -- W2ECR's one
+# long QSO outranks KC1ABC's three short check-ins under the Top 5 card's
+# new default "talk time" ranking, same non-monotonic-by-design dataset
+# used to validate that ranking (see chat/commit history), so the
+# screenshot actually demonstrates why duration-ranking exists rather than
+# just looking like a re-skinned count.
+for call, mode, tg, duration in [
+    ("KC1ABC", "DMR", "31665", 34), ("W2ECR", "DMR", "31665", 245),
+    ("N1LCP", "DMR", "3172", 58), ("KC1ABC", "DMR", "31665", 27),
+    ("W4KEV", "D-Star", None, 112),
 ]:
     storage_activity.log_activity(
         HOTSPOT_WPSD_ACTIVE["ip"], HOTSPOT_WPSD_ACTIVE["name"], mode,
-        target=call, target_type="callsign", via=tg,
+        target=call, target_type="callsign", via=tg, duration=duration,
     )
 # DVSwitch card's own footer sparkline reads the same activity_log table,
 # filtered to mode="DVSwitch" -- see storage_activity.dvswitch_sparkline().
-for call in ("W1ZLA", "KC1ABC", "W1ZLA", "N1LCP"):
+# Real DVSwitch begin-tx events never carry a duration (no confirmed
+# end-of-transmission line -- see CLAUDE.md), but this demo passes short
+# ones anyway so these rows don't render as a literal "0s" in the Top 5
+# card's now-default talk-time view.
+for call, duration in (("W1ZLA", 14), ("KC1ABC", 9), ("W1ZLA", 11), ("N1LCP", 6)):
     storage_activity.log_activity(
         HOTSPOT_ASL3["ip"], HOTSPOT_ASL3["name"], "DVSwitch",
-        target=call, target_type="callsign",
+        target=call, target_type="callsign", duration=duration,
     )
 
 # --- 5. Start the real app the same way main() does (waitress, not the

@@ -54,12 +54,14 @@ def _get_conn() -> sqlite3.Connection:
         conn.execute("ALTER TABLE activity_log ADD COLUMN target_type TEXT")
     if "via" not in cols:
         conn.execute("ALTER TABLE activity_log ADD COLUMN via TEXT")
+    if "duration" not in cols:
+        conn.execute("ALTER TABLE activity_log ADD COLUMN duration REAL")
     return conn
 
 
 def log_activity(hotspot_ip: str, hotspot_name: str, mode: str | None,
                   target: str | None = None, target_type: str | None = None,
-                  via: str | None = None) -> None:
+                  via: str | None = None, duration: float | None = None) -> None:
     """Insert one row for a just-completed transmission and prune anything
     older than RETENTION_SECONDS. Prune happens inline here rather than a
     separate thread -- inserts are infrequent (once per completed
@@ -71,15 +73,19 @@ def log_activity(hotspot_ip: str, hotspot_name: str, mode: str | None,
     specific transmission was heard on -- ASL3 has no separate concept,
     since the linked node IS effectively the "channel") is likewise
     optional, shown alongside the callsign for context, not used for
-    ranking."""
+    ranking. duration (seconds, monitor.py's _log_activity computes it
+    from status.tx_start before that field gets cleared) is optional too
+    -- rows logged before this column existed, or from a caller that
+    never had a tx_start to read, are simply excluded from a
+    duration-ranked top_targets() query rather than sorting as zero."""
     now = time.time()
     with _lock:
         conn = _get_conn()
         try:
             conn.execute(
-                "INSERT INTO activity_log (ts, hotspot_ip, hotspot_name, mode, target, target_type, via) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (now, hotspot_ip, hotspot_name, mode, target, target_type, via),
+                "INSERT INTO activity_log (ts, hotspot_ip, hotspot_name, mode, target, target_type, via, duration) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (now, hotspot_ip, hotspot_name, mode, target, target_type, via, duration),
             )
             conn.execute("DELETE FROM activity_log WHERE ts < ?", (now - RETENTION_SECONDS,))
             conn.commit()
@@ -87,26 +93,38 @@ def log_activity(hotspot_ip: str, hotspot_name: str, mode: str | None,
             conn.close()
 
 
-def top_targets(hours: int = 24, limit: int = 5) -> list:
+def top_targets(hours: int = 24, limit: int = 5, rank_by: str = "count") -> list:
     """Most active callsigns (who transmitted, not which talkgroup/node
-    they went through) across the fleet in the trailing `hours` window,
-    ranked by transmission count -- own-fleet activity only, not a
-    network-wide feed (see CLAUDE.md for why a network-wide version
-    isn't built: no clean REST-pollable option was found for any of
-    Brandmeister/TGIF/AllStarLink/YSF).
+    they went through) across the fleet in the trailing `hours` window --
+    own-fleet activity only, not a network-wide feed (see CLAUDE.md for
+    why a network-wide version isn't built: no clean REST-pollable option
+    was found for any of Brandmeister/TGIF/AllStarLink/YSF).
+
+    rank_by picks which metric determines the top 5, not just the
+    ordering of a fixed set -- "count" (raw transmission count) and
+    "duration" (summed talk-time) can genuinely disagree on WHICH five
+    targets make the cut, not just their order, so this has to be a
+    real query-time choice rather than a client-side re-sort of one
+    fetched list. Any value other than "duration" falls back to "count"
+    -- this is only ever driven by a fixed two-button toggle, not
+    free-text input, but validating defensively costs nothing here since
+    the column name is chosen in Python, never interpolated from the
+    argument itself.
 
     Each row also carries `via` -- the talkgroup/node this callsign was
     MOST RECENTLY heard on within the window (a correlated subquery
     picking the `via` from that callsign's own latest row), not an
     aggregate across every transmission -- simpler and more useful at a
     glance than "most common," and cheap at this table's bounded size."""
+    order_col = "total_duration" if rank_by == "duration" else "cnt"
     cutoff = time.time() - hours * 3600
     with _lock:
         conn = _get_conn()
         try:
             rows = conn.execute(
-                """
+                f"""
                 SELECT a1.target, a1.target_type, COUNT(*) AS cnt,
+                       SUM(COALESCE(a1.duration, 0)) AS total_duration,
                        (SELECT a2.via FROM activity_log a2
                         WHERE a2.target = a1.target AND a2.target_type = a1.target_type
                           AND a2.ts >= ? AND a2.via IS NOT NULL
@@ -114,14 +132,20 @@ def top_targets(hours: int = 24, limit: int = 5) -> list:
                 FROM activity_log a1
                 WHERE a1.target IS NOT NULL AND a1.ts >= ?
                 GROUP BY a1.target, a1.target_type
-                ORDER BY cnt DESC
+                ORDER BY {order_col} DESC
                 LIMIT ?
                 """,
                 (cutoff, cutoff, limit),
             ).fetchall()
         finally:
             conn.close()
-    return [{"target": t, "target_type": tt, "count": cnt, "via": via} for t, tt, cnt, via in rows]
+    return [
+        {
+            "target": t, "target_type": tt, "count": cnt,
+            "duration_seconds": round(dur) if dur else 0, "via": via,
+        }
+        for t, tt, cnt, dur, via in rows
+    ]
 
 
 def dvswitch_sparkline(hotspot_ip: str, minutes: int = 180, buckets: int = 14) -> list:

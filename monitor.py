@@ -746,7 +746,16 @@ class FleetMonitor:
         on, shown alongside the callsign for context (not used for
         ranking) -- ASL3 has no separate concept here (status.talkgroup
         is never set for it; the linked node captured in active_call
-        already IS the "channel", so there's nothing distinct to add)."""
+        already IS the "channel", so there's nothing distinct to add).
+
+        `duration` is read from status.tx_start here, BEFORE the caller's
+        own `updates` dict (which sets tx_start back to None) gets applied
+        -- every one of this method's call sites in _parse_wpsd_output/
+        _parse_asl_output runs while tx_start still holds the real
+        transmission start time, so this is a correct duration, not a
+        guess. None if tx_start was somehow never set (shouldn't happen
+        given the callers, but degrades to count-only ranking rather than
+        a crash if it ever does)."""
         if not load_settings().get("show_fleet_activity", False):
             return
         with self._lock:
@@ -757,7 +766,9 @@ class FleetMonitor:
             target = status.active_call or None
             target_type = "callsign" if target else None
             via = status.talkgroup or None
-        storage_activity.log_activity(ip, name, mode, target, target_type, via)
+            tx_start = status.tx_start
+        duration = (time.time() - tx_start) if tx_start else None
+        storage_activity.log_activity(ip, name, mode, target, target_type, via, duration)
 
     def _lookup_caller(self, call: str) -> dict:
         """Compose caller info from QRZ, RadioID.net (name/location fallback),

@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.91 "Burton"</span>
+                <span class="release-version">v3.92 "Watts"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Top 5 Activity card: rank by talk-time, not just transmission count</span> — a new "Talk time / Calls" toggle switches the ranking metric; talk-time (summed transmission duration, now computed for free from the same tx_start already tracked for the timer) is the new default, since a net-control station doing many short check-ins isn't necessarily the busiest user of the repeater. Switching modes can change WHICH five callsigns appear, not just their order — each row shows the other metric as a small secondary line either way. Also replaced the bar's solid accent-color fill with a low-key outline treatment (a faint tint + a tinted edge tick) — the filled bar read as a warning/alert at full saturation, which was never the intent</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.91 "Burton"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>DVSwitch card redesign</span> — the idle state now collapses to a single quiet line instead of always showing the full live-row/bridges/last-heard/footer stack; the active state gets a real accent bar and tinted live row, matching how the hotspot cards signal an on-air call; the badge now tracks an actual open transmission instead of lighting up just because a bridge has a static talkgroup configured; and untuned bridges collapse to one muted line instead of a full-size chip</li>

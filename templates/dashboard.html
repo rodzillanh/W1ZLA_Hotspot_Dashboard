@@ -1041,16 +1041,28 @@
         .hf-source a { color: var(--text-dim); }
         .hf-unavailable { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
 
-        /* --- Top 5 Activity card -- ranked bar list --- */
+        /* --- Top 5 Activity card -- ranked bar list ---
+           Bar is deliberately NOT a filled --accent/--live bar -- both read
+           as an alert/warning at full saturation when reviewed as a mockup.
+           "Outline" style instead: a faint tinted fill plus a solid tick at
+           the bar's leading edge, closer to an instrument-panel readout than
+           a progress bar. */
         .ta-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
         .ta-rank { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); width: 14px; flex-shrink: 0; text-align: right; }
         .ta-bar-wrap { flex: 1; min-width: 0; }
         .ta-top { display: flex; align-items: baseline; gap: 6px; margin-bottom: 3px; min-width: 0; }
         .ta-label { font-size: 12.5px; font-weight: 600; color: var(--link); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ta-via { font-size: 10px; color: var(--text-dim); flex-shrink: 0; }
-        .ta-bar-track { height: 6px; border-radius: 3px; background: var(--panel-2); overflow: hidden; }
-        .ta-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); }
-        .ta-count { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); flex-shrink: 0; min-width: 20px; text-align: right; }
+        .ta-bar-track { height: 6px; border-radius: 3px; background: transparent; border: 1px solid var(--card-border); overflow: hidden; }
+        .ta-bar-fill {
+            height: 100%; border-radius: 2px; transition: width .35s ease;
+            background: color-mix(in srgb, var(--live) 16%, transparent);
+            box-shadow: inset -2px 0 0 color-mix(in srgb, var(--live) 65%, transparent);
+        }
+        .ta-count { font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); flex-shrink: 0; min-width: 34px; text-align: right; }
+        .ta-count.primary { color: var(--text); font-weight: 600; font-size: 13px; }
+        .ta-sub-metric { font-size: 10px; color: var(--text-dim); font-variant-numeric: tabular-nums; margin-top: 2px; }
+        @media (prefers-reduced-motion: reduce) { .ta-bar-fill { transition: none; } }
 
         /* --- Band Plan card --- */
         .bp-legend { display: flex; gap: 5px; }
@@ -2126,9 +2138,15 @@
              style="order:{{ settings.get('top_activity_position', 0) }}">
             <div class="metrics-header">
                 <div class="card-name">🏆 Top 5 Activity</div>
-                <span class="card-sub" id="ta-card-sub">—</span>
+                <div class="fleet-mode-toggle">
+                    <button class="fleet-mode-btn active" data-rank="duration"
+                            onclick="setTopActivityRankBy('duration')">Talk time</button>
+                    <button class="fleet-mode-btn" data-rank="count"
+                            onclick="setTopActivityRankBy('count')">Calls</button>
+                </div>
             </div>
-            <div id="ta-list"></div>
+            <span class="card-sub" id="ta-card-sub">—</span>
+            <div id="ta-list" style="margin-top:8px"></div>
             <div class="msg-empty" id="ta-empty" style="display:none">No fleet activity logged yet -- enable "Show fleet activity card" in Settings → Cards to start tracking callsign activity.</div>
         </div>
         {% endif %}
@@ -7133,6 +7151,22 @@ function cssVar(name) {
 
 const TOP_ACTIVITY_HOURS = 24;
 
+// "duration" (summed talk-time) vs "count" (raw transmission count) -- a
+// real query-time choice, not a client-side re-sort, since the two can
+// disagree on WHICH five targets make the top 5, not just their order
+// (a chatty short-transmission caller can rank top-5 by count while
+// falling out of the top 5 by talk-time, and vice versa). Plain in-memory
+// var, not persisted -- same "resets on reload" convention as the Fleet
+// Activity card's own aggregate/per-hotspot toggle (fleetChartMode) right
+// above this, the closest existing analogue.
+let topActivityRankBy = 'duration';
+
+function fmtTalkTime(totalSeconds) {
+    const s = Math.max(0, Math.round(totalSeconds));
+    const m = Math.floor(s / 60), r = s % 60;
+    return m > 0 ? `${m}:${String(r).padStart(2, '0')}` : `${r}s`;
+}
+
 function renderTopActivity(topTargets) {
     const listEl = document.getElementById('ta-list');
     const emptyEl = document.getElementById('ta-empty');
@@ -7147,15 +7181,21 @@ function renderTopActivity(topTargets) {
         return;
     }
     if (emptyEl) emptyEl.style.display = 'none';
-    if (subEl) subEl.textContent = `last ${TOP_ACTIVITY_HOURS}h`;
+    const rankedByTime = topActivityRankBy === 'duration';
+    if (subEl) subEl.textContent = `last ${TOP_ACTIVITY_HOURS}h · ranked by ${rankedByTime ? 'talk time' : 'calls'}`;
 
-    const maxCount = Math.max(...top.map(t => t.count));
+    const metricOf = t => rankedByTime ? t.duration_seconds : t.count;
+    const maxMetric = Math.max(...top.map(metricOf));
     listEl.innerHTML = top.map((t, i) => {
-        const pct = maxCount ? Math.round(t.count / maxCount * 100) : 0;
+        const pct = maxMetric ? Math.round(metricOf(t) / maxMetric * 100) : 0;
         const call = t.target || '?';
         const lookupHref = QRZ_ENABLED
             ? `https://www.qrz.com/db/${encodeURIComponent(call)}`
             : `https://radioid.net/database/search?callsign=${encodeURIComponent(call)}`;
+        const primary = rankedByTime ? fmtTalkTime(t.duration_seconds) : String(t.count);
+        const secondary = rankedByTime
+            ? `${t.count} call${t.count === 1 ? '' : 's'}`
+            : `${fmtTalkTime(t.duration_seconds)} talk`;
         return `
         <div class="ta-row">
             <span class="ta-rank">${i + 1}</span>
@@ -7165,14 +7205,23 @@ function renderTopActivity(topTargets) {
                     ${t.via ? `<span class="ta-via">TG ${escapeHtml(t.via)}</span>` : ''}
                 </div>
                 <div class="ta-bar-track"><div class="ta-bar-fill" style="width:${pct}%"></div></div>
+                <div class="ta-sub-metric">${secondary}</div>
             </div>
-            <span class="ta-count">${t.count}</span>
+            <span class="ta-count primary">${primary}</span>
         </div>`;
     }).join('');
 }
 
+function setTopActivityRankBy(rankBy) {
+    topActivityRankBy = rankBy;
+    document.querySelectorAll('#top-activity-card .fleet-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.rank === rankBy);
+    });
+    fetchTopActivity();
+}
+
 function fetchTopActivity() {
-    fetch(`/api/activity?hours=${TOP_ACTIVITY_HOURS}`)
+    fetch(`/api/activity?hours=${TOP_ACTIVITY_HOURS}&rank_by=${topActivityRankBy}`)
         .then(r => r.json())
         .then(data => renderTopActivity(data.top_targets))
         .catch(() => {});

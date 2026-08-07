@@ -971,6 +971,7 @@ def api_activity():
     default_interval = config.FLEET_ACTIVITY_HOUR_OPTIONS.get(default_hours, 15)
     hours            = request.args.get("hours", default=default_hours, type=int)
     interval_minutes = request.args.get("interval_minutes", default=default_interval, type=int)
+    rank_by          = request.args.get("rank_by", default="count")
     result   = storage_activity.query_activity(hours=hours, interval_minutes=interval_minutes)
     hotspots = load_hotspots()
     snap     = monitor.snapshot()
@@ -984,7 +985,7 @@ def api_activity():
         "hotspots_total":          len(hotspots),
         "last_activity":           result["last_activity"],
         "dashboard_uptime_seconds": time.time() - START_TIME,
-        "top_targets":             storage_activity.top_targets(hours=hours, limit=5),
+        "top_targets":             storage_activity.top_targets(hours=hours, limit=5, rank_by=rank_by),
     })
 
 @app.route("/api/weather")
