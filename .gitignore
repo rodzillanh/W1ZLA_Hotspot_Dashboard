@@ -228,3 +228,8 @@ BUILD_COMMIT
 # (falls back to $FORGEJO_TOKEN if this file doesn't exist) -- a secret,
 # never commit this.
 .forgejo-token
+
+# Hotspot Dashboard: generated wiki-illustration screenshots (see
+# generate_screenshots.py) -- a build artifact copied into the Forgejo
+# wiki's own images/ folder by sync-wiki.sh, not source for this repo.
+screenshots/

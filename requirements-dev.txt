@@ -1,0 +1,8 @@
+# Dev-only tooling -- NOT installed by install.sh/update.sh/Dockerfile
+# (all three only ever read requirements.txt by exact filename, confirmed
+# before adding this file, so this is invisible to every real deployment).
+# Used only by generate_screenshots.py to produce wiki-illustration images.
+#
+#   pip install -r requirements-dev.txt
+#   playwright install chromium   # one-time, downloads a browser binary
+playwright>=1.40

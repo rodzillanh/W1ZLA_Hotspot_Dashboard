@@ -3823,6 +3823,62 @@ Always clean up `__pycache__` before zipping/packaging a build.
   single-page dump), then ran it again immediately after with no README
   changes and confirmed it correctly reported "already up to date,
   nothing to push" rather than force-committing an identical tree.
+- **`generate_screenshots.py` produces real screenshots of the actual
+  running dashboard for wiki illustrations, seeded with synthetic demo
+  data (fake hotspots/QSOs/activity, never the real fleet) -- a dev-only
+  tool (`requirements-dev.txt`, Playwright + a Chromium binary via
+  `playwright install chromium`), not part of the deployed app.** The
+  core problem this had to solve: a `HotspotStatus` is normally only ever
+  populated by `monitor.py`'s real SSH polling -- writing a fake
+  `hotspots.json` alone only supplies STATIC config (ip/name/type), there
+  was no existing way to make a card show a realistic "active call" state
+  without either real hardware or faking an entire SSH server. Solved by
+  importing `app.py` directly (confirmed live, by reading `app.py`, that
+  background polling threads only ever start inside `main()`'s
+  `if __name__ == "__main__":` block, never as an import side effect) and
+  writing fake `HotspotStatus` objects straight into `app.monitor._data`
+  under its lock, bypassing SSH/the network entirely -- then running
+  `app.py`'s own `waitress.serve()` (same as production, not the Flask
+  dev server) in a background thread so a real Playwright-driven browser
+  hits the real routes/templates/JS against this seeded state. Two real
+  gotchas found and fixed live, not assumed:
+  - **openSPOT4 is deliberately excluded from the demo hotspot set.**
+    `app.py` eagerly calls `openspot_manager.reconcile(load_hotspots())`
+    at import time (confirmed by reading app.py) -- a demo openSPOT4
+    entry would spin up a REAL WebSocket worker trying to reach whatever
+    fake IP was used, and that worker's own real reconnect-with-backoff
+    logic could call `mark_external_offline()` and overwrite the seeded
+    "Online"/active status before the screenshot ever fires. WPSD/ASL3
+    have no such risk -- the only thing that ever touches their
+    `monitor._data` entries is `monitor.run_forever()`'s poll loop, which
+    (like every other background thread) only starts inside `main()`.
+  - **A hotspot card's element id embeds its IP address**
+    (`id="card-198.51.100.10"`) -- a bare `#card-198.51.100.10` CSS
+    selector misparses the dots as class-selector separators (confirmed
+    live: Playwright raised `Unexpected token '.51'`). Fixed by using the
+    `[id="..."]` attribute-equality selector form for every per-card
+    screenshot instead of `#id` -- safe regardless of what characters the
+    id contains, not just a fix for this one case.
+  Fake hotspot IPs use RFC 5737 TEST-NET-2 (`198.51.100.0/24`), which is
+  reserved for documentation and never assignable on a real network --
+  deliberate, so a generated screenshot can never be mistaken for
+  pointing at a real reachable address. HF Conditions/Satellites/Band
+  Activity/weather are left enabled in the demo settings and genuinely
+  hit their real free/no-auth APIs during generation (same ones already
+  used elsewhere in this app's own dev workflow) rather than being
+  faked -- credential-gated integrations (QRZ/RadioID/Brandmeister/MQTT/
+  cameras/DigiPi/DVSwitch/HamAlert/WSJT-X/APRS messaging) are left
+  disabled instead of faked, since they'd just show an unconfigured empty
+  state either way and faking believable credentials/hardware for each
+  would be a lot of added complexity for little screenshot value. Output
+  goes to `screenshots/` (gitignored -- a generated artifact, same
+  category as `BUILD_COMMIT`), which `sync-wiki.sh` then copies into the
+  wiki's own `images/` folder (tracked in the same `.wiki-sync-manifest`
+  pruning scheme the text pages already use -- see that script's own
+  updated header comment) if the directory exists and isn't empty.
+  Deliberately does NOT auto-insert any `![...]()` image reference into a
+  generated wiki page -- which screenshot illustrates which page is an
+  editorial call, left to be added by hand.
 
 ## Conventions
 
