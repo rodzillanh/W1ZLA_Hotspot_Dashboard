@@ -589,6 +589,7 @@ via SSH; a protocol ceiling, not a bug.
 
 <!-- wiki-group: Hotspot Types -->
 ## DVSwitch card
+<!-- wiki-image: dvswitch-card.png -->
 
 A separate, optional card for an ASL3 node that also runs a DVSwitch
 (Analog_Bridge) audio bridge — distinct from the DVSwitch mode on the
@@ -601,31 +602,39 @@ one node, each identified by its own port). All of this reuses the same
 SSH connection/credentials already configured for that node — no separate
 login or remote-access setup needed.
 
-The card shows:
+When there's genuinely nothing to report — no bridge tuned, no call in
+progress, nothing heard yet this session — the card collapses to a single
+quiet status line instead of always showing the full layout below.
+Otherwise it shows:
 
-- **Header badge** — how many configured bridges are currently tuned to
-  something vs. idle.
-- **Bridge chips** — one per configured port, with the talkgroup/reflector
-  it's currently tuned to when tuned. "Tuned" reflects whether
+- **Header badge** — lights up only while a transmission is actually in
+  progress, alongside how many configured bridges are currently tuned to
+  something vs. idle. A bridge sitting tuned to a static talkgroup with
+  nobody talking through it doesn't light the badge on its own — that's a
+  configuration fact, not activity.
+- **Bridge chips** — one per configured port that's currently tuned, with
+  the talkgroup/reflector it's tuned to. "Tuned" reflects whether
   Analog_Bridge's own live status file has a value set, not a fully
-  verified connect/link state — see the caveat below.
+  verified connect/link state — see the caveat below. Untuned ports are
+  summarized in a single muted line rather than a full chip each.
 - **Last heard** — the two most recent callers heard through any of this
   node's bridges, with elapsed time. Callsign links go to QRZ if
   configured, RadioID.net otherwise, same as every other clickable
   callsign in this app.
-- **Vocoder line** — whether Analog_Bridge is using its hardware AMBE chip
-  or has fallen back to a software vocoder, based on a real log line
-  logged the moment that fallback happens (not just what's configured to
-  be tried).
+- **Vocoder pill** — whether Analog_Bridge is using its hardware AMBE chip
+  or has fallen back to a software vocoder. Read from each bridge's own
+  live status file every poll (so it can't go stale), falling back to a
+  one-time log line from Analog_Bridge's own startup only if that live
+  data isn't available.
 - **Sparkline** — a small recent-activity trend, reusing the same logged
   data the Fleet Activity card's DVSwitch mode already writes.
-- **Live RX/TX row** — a pulsing "RX DMR — W1ZLA → TG 603" style
-  indicator (or "Listening" when idle) for a transmission that's actually
-  in progress right now, plus DMR master / D-Star link status. Unlike
-  everything else on this card, this is sourced from a *second* DVSwitch
-  log file (`MMDVM_Bridge.log`, not `Analog_Bridge.log`) that has real
-  start-and-end transmission markers — scoped to DMR and D-Star only;
-  YSF/P25/NXDN each log to their own separate file and aren't covered.
+- **Live RX/TX row** — a pulsing "W1ZLA → TG 603" style indicator for a
+  transmission that's actually in progress right now, plus DMR master /
+  D-Star link status. Unlike everything else on this card, this is
+  sourced from a *second* DVSwitch log file (`MMDVM_Bridge.log`, not
+  `Analog_Bridge.log`) that has real start-and-end transmission markers —
+  scoped to DMR and D-Star only; YSF/P25/NXDN each log to their own
+  separate file and aren't covered.
 
 **Three honest caveats, not hidden anywhere else in this app's docs:**
 Analog_Bridge's own log has no confirmed "transmission ended" line, so

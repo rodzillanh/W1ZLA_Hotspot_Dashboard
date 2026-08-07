@@ -3603,7 +3603,7 @@ function dvswitchCardHtml(hs) {
             : 'No bridge ports configured — add one in Settings → Hotspots';
         const portList = bridges.map(b => ':' + escapeHtml(b.port)).join(' · ');
         return `
-            <div class="metrics-card dvs-card"${orderStyle}>
+            <div class="metrics-card dvs-card" id="dvswitch-card-${escapeHtml(hs.ip)}"${orderStyle}>
                 <div class="metrics-header">
                     ${nameHtml}
                     <div class="dvs-badge ${badgeClass}">${badgeText}</div>
@@ -3671,7 +3671,7 @@ function dvswitchCardHtml(hs) {
     const sparkSvg = sparkline.length ? sparklineSvg(sparkline, hs.ip) : '';
 
     return `
-        <div class="metrics-card dvs-card${live ? ' dvs-live-accent' : ''}"${orderStyle}>
+        <div class="metrics-card dvs-card${live ? ' dvs-live-accent' : ''}" id="dvswitch-card-${escapeHtml(hs.ip)}"${orderStyle}>
             <div class="metrics-header">
                 ${nameHtml}
                 <div class="dvs-badge ${badgeClass}">${badgeText}</div>

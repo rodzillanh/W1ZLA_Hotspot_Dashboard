@@ -70,6 +70,7 @@ HOTSPOT_ASL3 = {
     "ip": "198.51.100.12", "name": "W1ZLA Hub", "type": "asl3",
     "user": "root", "pass": "demo", "enabled": True, "asl_node": "59929",
     "lat": "43.2162", "lon": "-71.0132",
+    "dvswitch_enabled": True, "dvswitch_ports": "31000,31001",
 }
 HOTSPOTS = [HOTSPOT_WPSD_ACTIVE, HOTSPOT_WPSD_IDLE, HOTSPOT_ASL3]
 
@@ -181,6 +182,21 @@ asl3 = models.HotspotStatus(
          "location": None, "mode": "R", "keyed": False},
     ],
     is_active=True, active_call="W2ECR", tx_start=now - 6,
+    # DVSwitch card demo data -- one bridge actively tuned/keyed, one idle,
+    # a real (fake) transmission in progress via dvswitch_live so the
+    # screenshot shows the redesigned card's active/tinted state, not just
+    # its collapsed idle line.
+    dvswitch_bridges=[
+        {"port": "31000", "tuned": "TG 603", "mode": "AMBE+2", "use_fallback": False},
+        {"port": "31001", "tuned": None, "mode": None, "use_fallback": None},
+    ],
+    dvswitch_vocoder="hardware",
+    dvswitch_heard=[
+        {"call": "W1ZLA", "dmr_id": "3100486", "dst": "603", "seen_at": now},
+        {"call": "KC1ABC", "dmr_id": "3141592", "dst": "603", "seen_at": now - 240},
+    ],
+    dvswitch_live={"mode": "DMR", "call": "W1ZLA", "target": "TG 603"},
+    dvswitch_dmr_linked=True,
 )
 
 with app.monitor._lock:
@@ -197,6 +213,13 @@ for call, mode, tg in [
     storage_activity.log_activity(
         HOTSPOT_WPSD_ACTIVE["ip"], HOTSPOT_WPSD_ACTIVE["name"], mode,
         target=call, target_type="callsign", via=tg,
+    )
+# DVSwitch card's own footer sparkline reads the same activity_log table,
+# filtered to mode="DVSwitch" -- see storage_activity.dvswitch_sparkline().
+for call in ("W1ZLA", "KC1ABC", "W1ZLA", "N1LCP"):
+    storage_activity.log_activity(
+        HOTSPOT_ASL3["ip"], HOTSPOT_ASL3["name"], "DVSwitch",
+        target=call, target_type="callsign",
     )
 
 # --- 5. Start the real app the same way main() does (waitress, not the
@@ -218,6 +241,7 @@ CARD_SHOTS = [
     (f"card-{HOTSPOT_WPSD_ACTIVE['ip']}", "hotspot-card-wpsd-active.png"),
     (f"card-{HOTSPOT_WPSD_IDLE['ip']}", "hotspot-card-wpsd-idle.png"),
     (f"card-{HOTSPOT_ASL3['ip']}", "hotspot-card-asl3.png"),
+    (f"dvswitch-card-{HOTSPOT_ASL3['ip']}", "dvswitch-card.png"),
     ("fleet-activity-card", "fleet-activity-card.png"),
     ("asl-favorites-card", "asl-favorites-card.png"),
     ("satellites-card", "satellites-card.png"),
