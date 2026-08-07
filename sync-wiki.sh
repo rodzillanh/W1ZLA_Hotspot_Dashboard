@@ -37,10 +37,13 @@
 # copied into the wiki's images/ folder and tracked in the same
 # .wiki-sync-manifest as the text pages, so a screenshot regenerated under
 # a different name gets pruned the same safe way a renamed group's stale
-# page does. This script does NOT reference any image from a wiki page's
-# own Markdown automatically -- which screenshot illustrates which page is
-# an editorial call, made by hand (a plain `![alt](images/whatever.png)`
-# in the relevant page once it exists).
+# page does. To actually show one on a page, put a
+# `<!-- wiki-image: <filename> -->` line in README.md right after the `##`
+# heading (or at the very top, before the first heading, for Home.md) --
+# same invisible-everywhere-else trick as wiki-group, but this one gets
+# turned into a real `![heading](images/<filename>)` line in the
+# GENERATED wiki page. Which screenshot goes where is still an editorial
+# call, made in README.md itself -- not automatic/guessed.
 
 set -e
 
@@ -84,14 +87,21 @@ if [ -f "${WORK_DIR}/.wiki-sync-manifest" ]; then
 fi
 
 echo "==> Splitting README.md into grouped wiki pages..."
-python3 - "${SCRIPT_DIR}/README.md" "$WORK_DIR" <<'PY'
+python3 - "${SCRIPT_DIR}/README.md" "$WORK_DIR" "$SCRIPT_DIR" <<'PY'
 import re
 import sys
 import os
 
-readme_path, work_dir = sys.argv[1], sys.argv[2]
+readme_path, work_dir, script_dir = sys.argv[1], sys.argv[2], sys.argv[3]
 
 MARKER_RE  = re.compile(r'^<!--\s*wiki-group:\s*(.+?)\s*-->\s*$')
+# A wiki-image marker turns into a real ![alt](images/<file>) line in the
+# GENERATED wiki page at that exact position -- but stays a plain invisible
+# HTML comment everywhere README.md is rendered as-is (GitHub, this app's
+# own /readme via marked.js), since the images/ folder it points at only
+# exists in the WIKI repo, not this one. Keeps README.md as the single
+# source of truth for wiki content, same reasoning as wiki-group.
+IMAGE_RE   = re.compile(r'^<!--\s*wiki-image:\s*(.+?)\s*-->\s*$')
 HEADING_RE = re.compile(r'^## (.+)$')  # exactly two #'s -- ###+ subheadings stay inside their section's body
 
 
@@ -123,6 +133,16 @@ for line in lines:
             )
         current = {'group': pending_group, 'heading': m_heading.group(1), 'body': [line]}
         pending_group = None
+        continue
+    m_image = IMAGE_RE.match(line)
+    if m_image:
+        filename = m_image.group(1)
+        if not os.path.exists(os.path.join(script_dir, 'screenshots', filename)):
+            print(f"==> WARNING: wiki-image {filename!r} not found in screenshots/ -- "
+                  f"the wiki page will still reference it, but the image may not exist "
+                  f"yet (run generate_screenshots.py first if it's new).", file=sys.stderr)
+        alt = current['heading'] if current is not None else 'Dashboard overview'
+        (current['body'] if current is not None else intro_lines).append(f"![{alt}](images/{filename})")
         continue
     (current['body'] if current is not None else intro_lines).append(line)
 if current is not None:

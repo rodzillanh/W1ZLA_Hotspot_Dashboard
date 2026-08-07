@@ -3914,6 +3914,30 @@ Always clean up `__pycache__` before zipping/packaging a build.
   place** -- don't assume a redirect "probably" preserves the wiki
   suffix just because it correctly preserves the main repo path; this
   is a confirmed, live-reproduced case where it doesn't.
+- **Screenshots actually SHOW UP on wiki pages via a second marker type,
+  `<!-- wiki-image: <filename> -->`, not by hand-editing the wiki repo.**
+  Hand-editing would be silently destroyed the next time anyone runs
+  `sync-wiki.sh`, since every group page is fully regenerated from
+  README.md on each run by design (that's the whole point of the
+  wiki-group scheme -- one source of truth). So a `wiki-image` marker
+  placed right after a `## ` heading in README.md (or at the very top,
+  before the first heading, for Home.md's own hero image) gets turned
+  into a real `![heading](images/<filename>)` line at that exact
+  position in the GENERATED wiki page -- same "invisible HTML comment
+  everywhere else README.md is rendered, meaningfully interpreted only
+  by sync-wiki.sh's own split step" trick `wiki-group` already
+  established, reused rather than inventing a second mechanism. If the
+  referenced file isn't found in `screenshots/` at sync time, the
+  script warns (non-fatal, since generate_screenshots.py might just not
+  have been re-run yet) rather than silently producing a dead link with
+  no indication anything's wrong. Current placements (16 of the 17
+  generated images -- `hotspot-card-wpsd-idle.png` deliberately has no
+  placement, redundant with the active-card example, but still sits in
+  the wiki's `images/` folder and is reachable directly if wanted):
+  Home's hero is `dashboard-full.png`; the rest are one-per-matching-
+  README-section, most densely in Optional Cards (a real screenshot for
+  literally every card in that group) since that's where the 1:1
+  section-to-card correspondence is cleanest.
 
 ## Conventions
 

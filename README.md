@@ -1,5 +1,7 @@
 # W1ZLA Hotspot Dashboard
 
+<!-- wiki-image: dashboard-full.png -->
+
 Live status dashboard for a fleet of Pi-Star / WPSD hotspots, AllStarLink
 (ASL3) nodes (polled over SSH), and openSPOT 4 (SharkRF) nodes (monitored
 over HTTP/WebSocket).
@@ -261,6 +263,7 @@ it up.
 
 <!-- wiki-group: Dashboard and Live Map -->
 ## Dashboard look
+<!-- wiki-image: hotspot-card-wpsd-active.png -->
 
 The dashboard uses an "instrument panel" visual identity — graphite panel
 surfaces, a warm amber accent, a separate cyan color meaning "on-air right
@@ -317,6 +320,7 @@ beyond the base card/map UI:
 
 <!-- wiki-group: Dashboard and Live Map -->
 ## Dashboard customization
+<!-- wiki-image: settings.png -->
 
 Everything below is configured from the **Settings** page (`/setup`) —
 no environment variables or code changes needed, and changes are saved
@@ -507,6 +511,7 @@ that piece rather than showing a placeholder.
 
 <!-- wiki-group: Hotspot Types -->
 ## AllStarLink (ASL3) nodes
+<!-- wiki-image: hotspot-card-asl3.png -->
 
 A second node type alongside WPSD/Pi-Star, added in v3.0 — Settings →
 Hotspots → **Node type** → "AllStarLink (ASL3)" instead of the default
@@ -775,6 +780,7 @@ LAN.
 
 <!-- wiki-group: Hotspot Types -->
 ## ASL Favorites & Control
+<!-- wiki-image: asl-favorites-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show ASL favorites &
 control card", off by default), inspired by
@@ -1038,6 +1044,7 @@ Activity/APRS Messages/etc.
 
 <!-- wiki-group: Optional Cards -->
 ## HF Conditions card
+<!-- wiki-image: hf-conditions-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show HF Conditions
 card", off by default) — solar and band propagation data from
@@ -1063,6 +1070,7 @@ list.
 
 <!-- wiki-group: Optional Cards -->
 ## Band Plan card
+<!-- wiki-image: band-plan-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show Band Plan card", off
 by default) — a static FCC Part 97.301 frequency/mode reference for the
@@ -1082,6 +1090,7 @@ module of its own, just data baked into the template.
 
 <!-- wiki-group: Optional Cards -->
 ## License Quiz card
+<!-- wiki-image: license-quiz-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show License Quiz card",
 off by default) — one random practice question at a time from any of the
@@ -1121,6 +1130,7 @@ each poll fetches exactly one question.
 
 <!-- wiki-group: Optional Cards -->
 ## Satellites card
+<!-- wiki-image: satellites-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show Satellites card", off
 by default) — upcoming pass predictions for a small list of amateur radio
@@ -1156,6 +1166,7 @@ satellites, plus a live ground-track overlay on the **Live map**.
 
 <!-- wiki-group: Optional Cards -->
 ## Recent Contacts card
+<!-- wiki-image: recent-contacts-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show Recent Contacts card",
 off by default) — a newest-first list of your logged QSOs, drawing on
@@ -1186,6 +1197,7 @@ for exploring further on the actual Live map.
 
 <!-- wiki-group: Optional Cards -->
 ## QSO Stats card
+<!-- wiki-image: qso-stats-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show QSO Stats card", off
 by default) — a quick summary over the same logged QSOs Recent Contacts
@@ -1198,6 +1210,7 @@ source or backend query.
 
 <!-- wiki-group: Optional Cards -->
 ## Top 5 Activity card
+<!-- wiki-image: top-activity-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show Top 5 Activity card",
 off by default) — ranks **your own fleet's** most active callsigns (who
@@ -1221,6 +1234,7 @@ Brandmeister live connection, for a different, narrower purpose).
 
 <!-- wiki-group: Optional Cards -->
 ## Big Ass Clock card
+<!-- wiki-image: big-clock-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show Big Ass Clock card",
 off by default) — a large clock, purely client-side (no backend module,
@@ -1250,6 +1264,7 @@ styles via a dropdown in the card header:
 
 <!-- wiki-group: Optional Cards -->
 ## Band Activity card
+<!-- wiki-image: band-activity-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show Band Activity card",
 off by default, needs a **station grid square** set below the toggle) —
@@ -1293,6 +1308,7 @@ same person).
 
 <!-- wiki-group: Dashboard and Live Map -->
 ## Live map
+<!-- wiki-image: live-map.png -->
 
 The **Live map** tab shows an interactive map (Leaflet.js + OpenStreetMap,
 with an optional satellite tile view, no API key required for either) with:
@@ -1407,6 +1423,7 @@ appear as pins — the QRZ subscription caveat above applies here too.
   long the checkbox has been on.
 <!-- wiki-group: Dashboard and Live Map -->
 ## Fleet activity
+<!-- wiki-image: fleet-activity-card.png -->
 
 Optional — off by default (Settings → Cards → "Show fleet activity
 card"), since it adds a small SQLite log (`activity.db` in the appdata
