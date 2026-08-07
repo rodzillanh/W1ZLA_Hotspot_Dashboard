@@ -1,4 +1,4 @@
-# W1ZLA WPSD Hotspot Dashboard
+# W1ZLA Hotspot Dashboard
 
 Live status dashboard for a fleet of Pi-Star / WPSD hotspots, AllStarLink
 (ASL3) nodes (polled over SSH), and openSPOT 4 (SharkRF) nodes (monitored
