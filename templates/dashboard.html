@@ -7796,6 +7796,30 @@ function openAslDrawer() {
     renderAslDrawer();
 }
 
+// True while the user has an interactive element INSIDE the open ASL
+// drawer focused -- used to skip PASSIVE (poll/background-triggered)
+// rebuilds specifically, never explicit ones. A real, reported bug:
+// renderAslDrawer() rebuilds the whole drawer via innerHTML, which
+// destroys and recreates every element -- for a native <select> (the
+// "Control from" hotspot picker), that force-closes an open dropdown
+// popup INSTANTLY the moment a background poll tick fires, discarding
+// whatever choice was mid-click before it could complete. Unlike a text
+// input's value (restorable after the fact, see v3.88), an open popup
+// simply cannot be reopened once its anchor element is gone -- so for
+// this case the only real fix is not rebuilding at all while focus is
+// inside the drawer, not a smarter restore. Explicit user-triggered
+// calls (the dropdown's own onchange, Add favorite's save callback,
+// clicking a favorite row) call renderAslDrawer() directly and
+// deliberately do NOT go through this guard -- by the time onchange
+// fires the popup has already closed and the new value is what should
+// be rendered.
+function isAslDrawerFocused() {
+    const el = document.getElementById('asl-drawer');
+    return !!(el && el.classList.contains('open')
+        && document.activeElement && document.activeElement !== document.body
+        && el.contains(document.activeElement));
+}
+
 function renderAslDrawer() {
     const drawer = document.getElementById('asl-drawer');
     if (!drawer || !drawer.classList.contains('open')) return; // cheap no-op while closed, same as other drawers' own precedent
@@ -8022,7 +8046,7 @@ function fetchAslFavoriteStats() {
         .then(data => {
             aslFavoriteStats = data;
             renderAslFavorites(); // always visible whenever ASL Favorites is enabled, unlike the drawer
-            renderAslDrawer(); // no-op if closed by the time this resolves
+            if (!isAslDrawerFocused()) renderAslDrawer(); // no-op if closed by the time this resolves
         })
         .catch(() => {});
 }
@@ -8133,7 +8157,10 @@ function refresh() {
             lastApiData = data;
             if (SHOW_ASL_FAVORITES) {
                 renderAslFavorites();
-                renderAslDrawer(); // no-op unless the sidebar is currently open
+                // Skip PASSIVE (poll/background-triggered) rebuilds while the
+                // user has an interactive element inside the drawer focused
+                // -- see isAslDrawerFocused()'s own comment for why.
+                if (!isAslDrawerFocused()) renderAslDrawer(); // no-op unless the sidebar is currently open
             }
         });
     if (SHOW_FLEET_ACTIVITY) fetchFleetActivity();

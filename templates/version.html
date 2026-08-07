@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.95 "Kath"</span>
+                <span class="release-version">v3.96 "Whitten"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed: ASL Control drawer interrupting you mid-edit</span> — switching the "Control from" hotspot dropdown or typing into Add favorite could get cut off, because the drawer rebuilds itself every few seconds to stay live, which force-closes an open dropdown the instant it happens to fire mid-choice. The drawer now simply skips its own background refresh while you have something inside it focused, and picks back up the moment you're done — confirmed live that typing, an open dropdown, and normal live updates all keep working correctly</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.95 "Kath"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Quick Settings: "About this dashboard" status panel</span> — shows the running version (with an update-available badge when one exists), how long this dashboard process has been up, how long the host machine itself has been up, and live CPU/temperature/memory — right below the Jump to Settings shortcuts, no new page needed. All of it reuses data already being polled for the toolbar's CPU/memory bar and the update indicator, so it stays populated even with that bar turned off, and needed no new network requests except the one-time version lookup</li>

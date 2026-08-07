@@ -3310,6 +3310,44 @@ config for per-integration credentials; put it in
   trusting the feature, then deleted the throwaway script, same "never
   committed, exists only to prove the styling renders correctly"
   discipline as the ASL Control "recently active" verification above.
+- **A real, reported bug: the ASL Control drawer's "Control from"
+  hotspot dropdown couldn't be switched, and Add favorite felt like it
+  was constantly fighting back while typing (v3.96).** v3.88 had
+  already fixed typed VALUES vanishing across the drawer's poll-driven
+  rebuild (snapshot the value, restore it after `innerHTML` runs again)
+  -- but that fix can't help a native `<select>` popup: destroying the
+  DOM subtree that anchors an open dropdown closes it INSTANTLY, and
+  there is no browser API to reopen a popup after the fact the way a
+  text value can simply be reassigned. So every ~3s poll tick that
+  happened to land while the user had the dropdown open force-closed it
+  mid-choice, and even for text fields, the constant full rebuild (even
+  with the value/focus successfully restored a moment later) was
+  visibly disruptive rather than actually fixed.
+  **Root-cause fix, not another per-widget patch**: `isAslDrawerFocused()`
+  checks whether `document.activeElement` is currently inside the open
+  `#asl-drawer`, and the two PASSIVE call sites (`refresh()`'s poll loop,
+  `fetchAslFavoriteStats()`'s background callback) skip calling
+  `renderAslDrawer()` entirely while that's true -- the drawer simply
+  doesn't rebuild AT ALL while the user has anything inside it focused,
+  rather than rebuilding and trying to patch around the damage. EXPLICIT
+  user-triggered calls (the dropdown's own `onchange`, Add favorite's
+  save callback, clicking a favorite row to select it) call
+  `renderAslDrawer()` directly and deliberately do NOT go through this
+  guard -- by the time `onchange` fires the popup has already closed and
+  the new hotspot's data is exactly what should render.
+  **Verified behaviorally, not just by reading the code**: a live
+  Playwright test stamped a custom `data-test-marker` attribute onto the
+  REAL DOM node (the Add-favorite input, then the source `<select>`)
+  after focusing it, waited through more than one full poll cycle
+  (4s > the 3s interval), and confirmed the marker attribute was still
+  present -- proof the node was never destroyed/recreated, not just that
+  its value happened to end up correct. A third check confirmed the
+  opposite case still works: after `document.activeElement.blur()`, the
+  SAME wait DID wipe a marker placed on the drawer's title, confirming
+  the guard resumes normal rebuilds the moment focus leaves rather than
+  getting stuck permanently on. All three checks passed before this
+  shipped; the throwaway test script was deleted afterward, same
+  discipline as the other live-verified ASL Control entries in this file.
 
 - **ASL Favorites' "ASL Control" sidebar (v3.75) is styled and laid out
   closer to [AllScan](https://github.com/davidgsd/AllScan)'s node-control
