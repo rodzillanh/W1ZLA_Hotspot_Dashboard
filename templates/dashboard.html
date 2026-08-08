@@ -1529,6 +1529,16 @@
         .dvs-card.dvs-live-accent::before { background: linear-gradient(90deg, var(--live), transparent 75%); }
         .dvs-name-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
         .dvs-icon { font-size: 15px; line-height: 1; flex-shrink: 0; }
+        /* Node picker (v3.99) -- same "group the header-right controls so
+           .metrics-header's space-between doesn't spread a bare third
+           child across the card" reasoning as .asl-fav-header-right, and
+           the select itself mirrors .asl-fav-source's styling exactly. */
+        .dvs-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .dvs-source { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+        .dvs-source select {
+            background: var(--input-bg); border: 1px solid var(--toolbar-border);
+            color: var(--text); border-radius: 5px; padding: 4px 8px; font-size: 12px;
+        }
         .dvs-badge {
             font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
             color: var(--text-dim); border: 1px solid var(--border);
@@ -2695,6 +2705,10 @@ const QSO_STATS_POSITION = {{ settings.get('qso_stats_position', 0) }};
 const QSO_STATS_POLL_MS = 20000;  // same cadence as Recent Contacts/the map -- same qsos.json source
 const SHOW_TOP_ACTIVITY = {{ 'true' if settings.get('show_top_activity', False) else 'false' }};
 const TOP_ACTIVITY_POSITION = {{ settings.get('top_activity_position', 0) }};
+// No matching SHOW_DVSWITCH -- enablement is derived per-poll from
+// data.some(hs => hs.dvswitch_enabled), not a settings.json toggle (see
+// _overflow_sentinels()'s DVSwitch comment in app.py).
+const DVSWITCH_POSITION = {{ settings.get('dvswitch_position', 0) }};
 // let, not const -- Quick Settings (openSettingsDrawer) can flip these
 // live from the dashboard without a page reload, unlike every other
 // Jinja-rendered *_ENABLED constant in this file.
@@ -3092,11 +3106,10 @@ const SENTINEL_KEY_TO_DATA_IP = {
     wspractivity: '__wspr_activity__', digipi: '__digipi__', bigclock: '__big_clock__',
     notifications: '__notifications__', satellites: '__satellites__',
     recentcontacts: '__recent_contacts__', qsostats: '__qso_stats__',
-    topactivity: '__top_activity__',
+    topactivity: '__top_activity__', dvswitch: '__dvswitch__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
-    if (key.startsWith('dvs-')) return '__dvswitch__' + key.slice(4);
     return SENTINEL_KEY_TO_DATA_IP[key] || key;
 }
 
@@ -3251,18 +3264,18 @@ function renderCards(data) {
             sentinels.push({ key: 'cam-' + cam.id, pos: Math.max(0, cam.position || 0) });
         });
     }
-    // DVSwitch cards -- dynamic 0-N like cameras above, but sourced from
-    // the SAME `data` array already in hand (dvswitch_enabled/
-    // dvswitch_position both come straight from /api/data), not a
-    // separate async fetch -- no race window to worry about the way
-    // cameras' own independent /api/cameras poll has.
-    data.filter(hs => hs.dvswitch_enabled).forEach(hs => {
-        sentinels.push({ key: 'dvs-' + hs.ip, pos: Math.max(0, hs.dvswitch_position || 0) });
-    });
+    // DVSwitch -- ONE consolidated card (v3.99) covering every
+    // DVSwitch-enabled hotspot via its own "Show:" picker, not one
+    // sentinel per hotspot -- enabled if ANY hotspot has dvswitch_enabled
+    // set, sourced from the SAME `data` array already in hand, not a
+    // separate async fetch.
+    if (data.some(hs => hs.dvswitch_enabled)) {
+        sentinels.push({ key: 'dvswitch', pos: Math.max(0, DVSWITCH_POSITION) });
+    }
     const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);
     // renderDvswitchCards() (called separately, right after renderCards()
-    // in refresh()) needs these same DVSwitch entries' resolved order --
-    // stashed here since its own cards don't exist as DOM nodes yet at
+    // in refresh()) needs this same DVSwitch entry's resolved order --
+    // stashed here since its card doesn't exist as a DOM node yet at
     // this point for a direct .style.order assignment the way the fixed
     // sentinels/cameras get below.
     lastSentinelOrders = sentinelOrders;
@@ -3609,28 +3622,73 @@ function renderCards(data) {
     clearStaleTones(data);
 }
 
-// --- DVSwitch card -- one per ASL3 hotspot with dvswitch_enabled, dynamic
-// (0-N), rebuilt from scratch every /api/data poll (same "full re-render,
-// no persisted DOM" shape as renderCards() itself uses for hotspot cards --
-// this doesn't hold a live stream/connection the way camera cards do, so
-// there's no teardown cost to worry about). Wired into the Card order drag
-// list the same way Cameras are -- see renderCards()'s own DVSwitch
-// sentinels.push() block, which stashes the resolved order here since
-// these cards don't exist as DOM nodes yet at the point renderCards()
-// itself computes it.
+// --- DVSwitch card -- ONE consolidated card (v3.99) covering every
+// ASL3 hotspot with dvswitch_enabled, with a "Show:" node picker in the
+// header (same pattern as ASL Favorites' own "Control from" select --
+// see CLAUDE.md for the multi-node mockup this replaced a one-card-per-
+// hotspot layout with). The card SHELL (name row, select, badge, body
+// placeholder) is only ever built once, the first time any DVSwitch
+// hotspot is enabled -- rebuilding it every poll the way the old
+// per-node card list did would destroy and recreate the <select> each
+// time, force-closing it mid-choice the same way the ASL Control
+// drawer's full-rebuild used to (see CLAUDE.md's isAslDrawerFocused()
+// entry). Only the select's own <option>s and the body's innerHTML are
+// touched on later polls, mirroring renderAslFavorites()'s own
+// preserve-the-selection-across-rebuilds handling of its select.
 let lastSentinelOrders = {};
+let dvsSelectedHotspotIp = null;
 
 function renderDvswitchCards(data) {
     const container = document.getElementById('dvswitch-cards');
     const dvsHotspots = data.filter(hs => hs.dvswitch_enabled);
     if (!dvsHotspots.length) {
         container.innerHTML = '';
+        dvsSelectedHotspotIp = null;
         return;
     }
-    container.innerHTML = dvsHotspots.map(hs => dvswitchCardHtml(hs)).join('');
+
+    if (!document.getElementById('dvswitch-card')) {
+        const sentinelKey = 'dvswitch';
+        const orderStyle = sentinelKey in lastSentinelOrders ? ` style="order:${lastSentinelOrders[sentinelKey]}"` : '';
+        container.innerHTML = `
+            <div class="metrics-card dvs-card" id="dvswitch-card"${orderStyle}>
+                <div class="metrics-header">
+                    <div class="dvs-name-row"><span class="dvs-icon">📻</span><div class="card-name">DVSwitch</div></div>
+                    <div class="dvs-header-right">
+                        <div class="dvs-source">
+                            <label for="dvswitch-node-select">Show:</label>
+                            <select id="dvswitch-node-select" onchange="renderDvswitchCards(lastApiData || [])"></select>
+                        </div>
+                        <div class="dvs-badge" id="dvswitch-badge"></div>
+                    </div>
+                </div>
+                <div id="dvswitch-body"></div>
+            </div>`;
+    }
+
+    // Populate the node selector, preserving the current selection if
+    // it's still valid, since this rebuilds on every poll -- same
+    // pattern renderAslFavorites() already uses for its own select.
+    const select = document.getElementById('dvswitch-node-select');
+    const prevSelection = select.value || dvsSelectedHotspotIp;
+    select.innerHTML = dvsHotspots.map(hs =>
+        `<option value="${escapeHtml(hs.ip)}">${escapeHtml(hs.name)}</option>`
+    ).join('');
+    if (dvsHotspots.some(hs => hs.ip === prevSelection)) {
+        select.value = prevSelection;
+    }
+    dvsSelectedHotspotIp = select.value || null;
+
+    const hs = dvsHotspots.find(h => h.ip === dvsSelectedHotspotIp) || dvsHotspots[0];
+    renderDvswitchBody(hs);
 }
 
-function dvswitchCardHtml(hs) {
+function renderDvswitchBody(hs) {
+    const card  = document.getElementById('dvswitch-card');
+    const badge = document.getElementById('dvswitch-badge');
+    const body  = document.getElementById('dvswitch-body');
+    if (!card || !badge || !body) return;
+
     const bridges = hs.dvswitch_bridges || [];
     // "Tuned" reflects ABInfo.json's own digital.tg/last_tune fields being
     // present -- NOT a confirmed true link/connect state (see CLAUDE.md),
@@ -3658,7 +3716,9 @@ function dvswitchCardHtml(hs) {
     const badgeText = bridges.length
         ? `${tunedBridges.length} tuned · ${idleBridges.length} idle`
         : 'No bridges configured';
-    const badgeClass = live ? 'live' : '';
+    badge.textContent = badgeText;
+    badge.className = 'dvs-badge' + (live ? ' live' : '');
+    card.classList.toggle('dvs-live-accent', !!live);
 
     // Both "software"/"hardware" are real, directly-detected states (see
     // monitor.py's _parse_dvswitch_vocoder()) -- primarily from each
@@ -3677,12 +3737,8 @@ function dvswitchCardHtml(hs) {
 
     const heard = (hs.dvswitch_heard || []).slice(0, 2);
 
-    const sentinelKey = 'dvs-' + hs.ip;
-    const orderStyle = sentinelKey in lastSentinelOrders ? ` style="order:${lastSentinelOrders[sentinelKey]}"` : '';
-    const nameHtml = `<div class="dvs-name-row"><span class="dvs-icon">📻</span><div class="card-name">DVSwitch — ${escapeHtml(hs.name)}</div></div>`;
-
     // Nothing worth reporting: no open transmission, nothing tuned, and
-    // nothing heard yet this session -- collapse the whole card to one
+    // nothing heard yet this session -- collapse the whole body to one
     // quiet line + the vocoder pill instead of the full live-row/bridges/
     // last-heard stack rendered below, all of which would otherwise just
     // be idle placeholders. This is the common resting state for most
@@ -3692,19 +3748,14 @@ function dvswitchCardHtml(hs) {
             ? 'Listening — no activity this session'
             : 'No bridge ports configured — add one in Settings → Hotspots';
         const portList = bridges.map(b => ':' + escapeHtml(b.port)).join(' · ');
-        return `
-            <div class="metrics-card dvs-card" id="dvswitch-card-${escapeHtml(hs.ip)}"${orderStyle}>
-                <div class="metrics-header">
-                    ${nameHtml}
-                    <div class="dvs-badge ${badgeClass}">${badgeText}</div>
-                </div>
-                <div class="dvs-idle-line">
-                    <span class="dot"></span>
-                    <span>${idleText}</span>
-                    ${portList ? `<span class="dvs-idle-ports">${portList}</span>` : ''}
-                </div>
-                <div class="dvs-footer">${vocoderPillHtml}</div>
-            </div>`;
+        body.innerHTML = `
+            <div class="dvs-idle-line">
+                <span class="dot"></span>
+                <span>${idleText}</span>
+                ${portList ? `<span class="dvs-idle-ports">${portList}</span>` : ''}
+            </div>
+            <div class="dvs-footer">${vocoderPillHtml}</div>`;
+        return;
     }
 
     const linkBits = [];
@@ -3760,19 +3811,13 @@ function dvswitchCardHtml(hs) {
     const sparkline = hs.dvswitch_sparkline || [];
     const sparkSvg = sparkline.length ? sparklineSvg(sparkline, hs.ip) : '';
 
-    return `
-        <div class="metrics-card dvs-card${live ? ' dvs-live-accent' : ''}" id="dvswitch-card-${escapeHtml(hs.ip)}"${orderStyle}>
-            <div class="metrics-header">
-                ${nameHtml}
-                <div class="dvs-badge ${badgeClass}">${badgeText}</div>
-            </div>
-            ${liveRowHtml}
-            ${bridgesHtml}
-            ${heardHtml}
-            <div class="dvs-footer">
-                ${vocoderPillHtml}
-                <div class="dvs-spark-wrap">${sparkSvg}</div>
-            </div>
+    body.innerHTML = `
+        ${liveRowHtml}
+        ${bridgesHtml}
+        ${heardHtml}
+        <div class="dvs-footer">
+            ${vocoderPillHtml}
+            <div class="dvs-spark-wrap">${sparkSvg}</div>
         </div>`;
 }
 
@@ -8163,9 +8208,10 @@ function refresh() {
             renderCards(data);
             renderDvswitchCards(data);
             refreshMap();
-            // lastApiData is used both by renderAslFavorites() below and
-            // by openHotspotDrawer() (card click -> detail drawer) -- kept
-            // unconditional now that a second consumer needs it regardless
+            // lastApiData is used by renderAslFavorites() below,
+            // openHotspotDrawer() (card click -> detail drawer), and the
+            // DVSwitch card's "Show:" select onchange handler -- kept
+            // unconditional now that multiple consumers need it regardless
             // of whether ASL Favorites is enabled.
             lastApiData = data;
             if (SHOW_ASL_FAVORITES) {

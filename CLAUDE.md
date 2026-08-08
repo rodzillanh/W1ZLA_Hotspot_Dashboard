@@ -3987,6 +3987,74 @@ config for per-integration credentials; put it in
   APRS symbol icons on the Live map, shipped in the same v3.78 release,
   were NOT part of this removal and are still live.
 
+- **The DVSwitch card was consolidated from one card per DVSwitch-enabled
+  ASL3 hotspot into ONE card with a "Show:" node picker (v3.99), mockup-
+  first via a published Artifact showing both this dropdown approach and
+  a merged/combined-card alternative side by side -- the user picked the
+  dropdown explicitly, which was also what they'd asked for by name
+  ("similar as to how ASL Favorites functions").** Mirrors ASL Favorites'
+  own "Control from" select as closely as the underlying data allows --
+  same header-right grouping (`.dvs-header-right`, same reasoning as
+  `.asl-fav-header-right`: `.metrics-header`'s `space-between` spreads a
+  bare third child across the card otherwise), same select styling
+  (`.dvs-source select` is a verbatim copy of `.asl-fav-source select`),
+  labeled "Show:" rather than "Control from:" since this card is
+  read-only (no connect/monitor/disconnect actions the way ASL Control
+  has) -- picking a label that claims control it doesn't have would be
+  actively misleading.
+  **The card shell (name row, select, badge, body placeholder) is built
+  ONCE, not rebuilt every poll** -- `renderDvswitchCards()` guards on
+  `!document.getElementById('dvswitch-card')` before writing the
+  container's `innerHTML`, and every later poll only touches the
+  select's `<option>`s (preserving `.value`, exact same
+  `prevSelection`/`select.value = prevSelection` pattern
+  `renderAslFavorites()` already uses for its own select) and a separate
+  `#dvswitch-body` div's `innerHTML` via a new `renderDvswitchBody(hs)`
+  function split out of the old per-card `dvswitchCardHtml()`. This is
+  the same class of bug the ASL Control drawer's `isAslDrawerFocused()`
+  guard exists for (destroying and recreating a `<select>` force-closes
+  an open native dropdown popup instantly) -- but here the fix is
+  structural (never destroy the select node at all) rather than a
+  focus-gated skip, since this card has no equivalent of the drawer's
+  "user is actively typing" problem, just "user has the dropdown open."
+  Verified live with Playwright, not just read through: stamped a
+  `data-test-marker` attribute onto the real `<select>` DOM node,
+  waited through more than one full 3s poll cycle, and confirmed both
+  the marker AND the selected value survived -- proof the node was never
+  replaced, not just that the value happened to end up correct.
+  **Backend collapsed from "N per-hotspot positions" to "one
+  settings.json position," same shape as every other single-instance
+  card (`asl_favorites_position` etc.), not the dynamic per-id shape
+  cameras use.** `hotspots.json`'s `dvswitch_position` field (one entry
+  per hotspot, used for the old per-card ordering) and the
+  `/api/reorder_dvswitch` route that wrote it are both gone entirely --
+  unlike most orphaned-setting cases elsewhere in this file, there was
+  no real installed base yet relying on multiple simultaneous DVSwitch
+  positions to preserve (same reasoning as the Awards card removal
+  above: ship-and-revert-fast features don't need backward-compat
+  shims). The new `settings.json` key `dvswitch_position` is saved via
+  the normal `/api/settings` POST path (a new explicit
+  `if "dvswitch_position" in data` block, same pattern as
+  `top_activity_position`) rather than a dedicated route.
+  `_overflow_sentinels()`'s DVSwitch block collapsed from a per-hotspot
+  loop to a single `if any(hs.get("dvswitch_enabled") for hs in
+  hotspots)` check appending one `data_ip: "__dvswitch__"` entry (no
+  hotspot ip suffix, unlike the old `__dvswitch__<ip>` scheme) --
+  `setup.html`'s Cards-tab drag list gained a matching single
+  `{% if loop.index0 == dvswitch_pos %}` block (enablement computed
+  inline via `hotspots | selectattr('dvswitch_enabled') | list |
+  length > 0`, the same "no settings.json show_* toggle, hotspot-derived
+  instead" shape `show_cams` doesn't need but this does) replacing the
+  old `{% for hs2 in hotspots if hs2.get('dvswitch_enabled') and ... %}`
+  loop. `saveCardOrder()`'s `dvswitchPositions` per-ip object became a
+  single `dvswitchIdx = sentinelIndex('__dvswitch__')` saved through the
+  same `/api/settings` POST every other single-card sentinel already
+  uses, not a `/api/reorder_dvswitch`-shaped bulk call.
+  `/api/data`'s per-hotspot `dvswitch_position` echo was removed too --
+  the dashboard JS no longer reads a per-hotspot position for this card
+  at all, only the one `DVSWITCH_POSITION` constant seeded from
+  `settings.dvswitch_position`.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

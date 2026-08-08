@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.98 "Jones"</span>
+                <span class="release-version">v3.99 "Frehley"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>DVSwitch card: one card, a "Show:" node picker</span> — enabling DVSwitch on a second ASL3 hotspot used to add a whole second dashboard card. Now every DVSwitch-enabled node shares one card with a small selector in the header (same idea as ASL Favorites' own "Control from" picker) to switch which node's bridges/live call/last-heard you're looking at</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.98 "Jones"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>"Test ASL node" now shows the real reason for a failure</span> — this test previously only looked at stdout, so a permission error on the remote host (e.g. sudo needing a password) went to stderr and was invisible, showing a generic "didn't return link status" either way. The test now captures stderr and a short preview of what it actually got back, so a real cause — a permission error, an empty response, anything else — shows up directly instead of needing a manual SSH session to track down</li>

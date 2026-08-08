@@ -797,6 +797,11 @@
             {% set recent_contacts_pos = settings.get('recent_contacts_position', 0) if settings.get('show_recent_contacts', False) else -1 %}
             {% set qso_stats_pos = settings.get('qso_stats_position', 0) if settings.get('show_qso_stats', False) else -1 %}
             {% set top_activity_pos = settings.get('top_activity_position', 0) if settings.get('show_top_activity', False) else -1 %}
+            {# DVSwitch (v3.99) -- one consolidated card, enabled if ANY
+               hotspot has dvswitch_enabled set (no matching show_* toggle,
+               same as show_cameras below but hotspot-derived instead of a
+               settings.json flag). #}
+            {% set dvswitch_pos = settings.get('dvswitch_position', 0) if (hotspots | selectattr('dvswitch_enabled') | list | length > 0) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -899,13 +904,13 @@
                     </div>
                     {% endfor %}
                 {% endif %}
-                {% for hs2 in hotspots if hs2.get('dvswitch_enabled') and hs2.get('dvswitch_position', 0) == loop.index0 %}
-                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__dvswitch__{{ hs2.ip }}">
+                {% if loop.index0 == dvswitch_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__dvswitch__">
                     <span class="drag-handle">⠿</span>
-                    <span class="node-name">📻 DVSwitch — {{ hs2.name }}</span>
+                    <span class="node-name">📻 DVSwitch</span>
                     <span class="node-meta">DVSwitch card</span>
                 </div>
-                {% endfor %}
+                {% endif %}
             <div class="drag-row" draggable="true" data-ip="{{ hs.ip }}">
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">{{ hs.name }}</span>
@@ -2071,15 +2076,10 @@ function saveCardOrder() {
     const recentContactsIdx = sentinelIndex('__recent_contacts__');
     const qsoStatsIdx = sentinelIndex('__qso_stats__');
     const topActivityIdx = sentinelIndex('__top_activity__');
+    const dvswitchIdx = sentinelIndex('__dvswitch__');
     const cameraPositions = {};
     allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
         cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
-    });
-    // DVSwitch cards -- same dynamic-list shape as cameras above, keyed by
-    // hotspot ip instead of a camera id (see /api/reorder_dvswitch).
-    const dvswitchPositions = {};
-    allIds.filter(id => id.startsWith('__dvswitch__')).forEach(key => {
-        dvswitchPositions[key.slice('__dvswitch__'.length)] = sentinelIndex(key);
     });
 
     // Explicit relative-order tiebreak -- *_position only ever records
@@ -2207,11 +2207,11 @@ function saveCardOrder() {
             body: JSON.stringify(cameraPositions)
         }));
     }
-    if (Object.keys(dvswitchPositions).length > 0) {
-        saves.push(fetch('/api/reorder_dvswitch', {
+    if (dvswitchIdx !== -1) {
+        saves.push(fetch('/api/settings', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(dvswitchPositions)
+            body: JSON.stringify({ dvswitch_position: dvswitchIdx })
         }));
     }
     Promise.all(saves).then(() => {

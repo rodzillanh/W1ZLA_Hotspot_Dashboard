@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.98"
+APP_VERSION = "3.99"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -67,6 +67,7 @@ VERSION_CODENAMES = [
     "Bloomfield",       # v3.97 -- Mike Bloomfield, guitarist, Paul
                         # Butterfield Blues Band (1943-1981)
     "Jones",            # v3.98 -- Davy Jones, The Monkees (1945-2012)
+    "Frehley",          # v3.99 -- Ace Frehley, KISS guitarist (1951-2025)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -713,6 +714,13 @@ DEFAULT_SETTINGS = {
     # YSF research that ruled that out as a clean REST-pollable option.
     "show_top_activity": False,
     "top_activity_position": 0,
+    # DVSwitch card position (v3.99) -- one consolidated card covering
+    # every DVSwitch-enabled ASL3 hotspot via its own "Show:" node picker,
+    # not one card per hotspot. Unlike every other *_position setting
+    # here there's no matching "show_*" toggle -- enablement is derived
+    # from hotspots.json (any hotspot with dvswitch_enabled set), the
+    # same way show_cameras' absence is handled for cameras.
+    "dvswitch_position": 0,
     # Live WSJT-X QSO logging -- off by default. Listens for WSJT-X's own
     # UDP telemetry protocol (the same feed GridTracker/JTAlert use) and
     # appends each logged QSO to the same qsos.json the ADIF importer
