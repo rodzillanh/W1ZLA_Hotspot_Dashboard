@@ -1349,8 +1349,15 @@ def test_asl_node():
     try:
         client.connect(ip, username=user, password=password, timeout=config.SSH_TIMEOUT)
         cmd = config.build_asl_status_cmd(node)
-        _, stdout, _ = client.exec_command(cmd, timeout=config.SSH_TIMEOUT)
-        output = stdout.read().decode("utf-8", errors="ignore").splitlines()
+        _, stdout, stderr = client.exec_command(cmd, timeout=config.SSH_TIMEOUT)
+        stdout_text = stdout.read().decode("utf-8", errors="ignore")
+        # Previously discarded entirely -- a real, reported case (node
+        # confirmed working when the user ran the exact same `rpt xnode`
+        # command by hand over SSH) showed this test still failing with no
+        # way to see WHY, since a permission/sudo error on the remote host
+        # goes to stderr and this app was never even looking at it.
+        stderr_text = stderr.read().decode("utf-8", errors="ignore").strip()
+        output = stdout_text.splitlines()
         alinks_raw = None
         for line in output[3:]:
             m = re.match(config.ASL_ALINKS_LINE_PATTERN, line.strip())
@@ -1358,9 +1365,19 @@ def test_asl_node():
                 alinks_raw = m.group(1)
                 break
         if alinks_raw is None:
+            detail_parts = []
+            if stderr_text:
+                detail_parts.append(f"stderr: {stderr_text[:300]}")
+            if output:
+                detail_parts.append(f"output: {' | '.join(output[:8])}"[:400])
+            else:
+                detail_parts.append("command produced no output at all")
             return jsonify({
                 "success": False,
-                "message": f"Connected, but node {node} didn't return link status — check the node number",
+                "message": (
+                    f"Connected, but node {node} didn't return link status — "
+                    f"check the node number ({'; '.join(detail_parts)})"
+                ),
             })
         count = len(alinks_raw.split(",")[1:])
         return jsonify({

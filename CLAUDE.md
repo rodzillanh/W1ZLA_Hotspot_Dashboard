@@ -3502,6 +3502,38 @@ config for per-integration credentials; put it in
     `<a>` tag's `href` attribute reflects the override (not just that the
     JSON field round-trips) and that the drawer's own field populates
     from it correctly.
+  - **"Test ASL node" (`/api/test_asl_node`) discarded stderr entirely
+    (v3.98) -- a real, reported case where this made the failure
+    undiagnosable from the dashboard's own side.** A user's node showed
+    "Connected, but node N didn't return link status" in the UI, but
+    running the EXACT same `sudo asterisk -rx "rpt xnode N"` by hand over
+    SSH returned a perfectly normal `RPT_ALINKS=0` -- no permission
+    prompt, no error, node clearly fine. The gap: `build_asl_status_cmd()`
+    already prepends 3 lines of host stats (temp/uptime/CPU) before the
+    asterisk command in the SAME one-shot SSH command (see its own
+    docstring on why -- one connection, one exec, no persistent session
+    to attach a second command to), and the parser searches every line
+    from position 4 onward for `RPT_ALINKS=` -- so extra output lines
+    before it were never actually the problem (confirmed by re-reading
+    the matching loop itself: it's a full scan of the remaining lines,
+    not a fixed-position read). The REAL blind spot was simpler and more
+    basic: `_, stdout, _ = client.exec_command(...)` never even looked at
+    the returned `stderr` stream at all -- so if the full combined
+    command failed for a reason that only showed up in stderr (a sudo
+    permission error being the obvious case, but genuinely anything
+    else too), there was no way to see it from this app's side, only by
+    separately SSHing in and reproducing it by hand. Fixed by reading
+    `stderr` alongside `stdout` and folding both a stderr excerpt and an
+    output-line preview into the failure message when the RPT_ALINKS
+    line isn't found -- verified with three mocked
+    `paramiko.SSHClient` scenarios (a stderr-only permission-style
+    failure, completely empty output, and the pre-existing success path)
+    before trusting the new message format, not just reading the diff.
+    This specific user's underlying root cause was never actually
+    confirmed (retrying still failed after they'd already shown the node
+    works fine manually) -- this fix makes the NEXT occurrence
+    diagnosable from the message alone, it doesn't claim to have found
+    what's different about the app's own SSH exec context yet.
   - **The sidebar's AllScan link (v3.81) went through a real mockup-
     iteration cycle before landing on its current shape, worth noting
     since it's the kind of thing that looks obviously fine on the first
