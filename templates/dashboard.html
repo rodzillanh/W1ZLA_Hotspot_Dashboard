@@ -3475,7 +3475,13 @@ function renderCards(data) {
         // to the bare IP for every hotspot type uniformly; the ASL
         // Control drawer's own "Open AllScan Control Panel" button is
         // still there for anyone who does want the /allscan shortcut.
-        const cardNameHref = `http://${hs.ip}`;
+        // card_url (Settings -> Hotspots, ASL3 only) overrides the default
+        // bare-IP link -- e.g. AllScan, a custom port, or anything else at
+        // that node's own address. escapeHtml() here matters: unlike hs.ip
+        // (never free text), card_url is a user-typed URL rendered straight
+        // into an href attribute -- an unescaped `"` in it would break out
+        // of the attribute into arbitrary HTML/attribute injection.
+        const cardNameHref = hs.card_url ? escapeHtml(hs.card_url) : `http://${hs.ip}`;
 
         return `
         <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}">
@@ -6449,6 +6455,11 @@ function renderHotspotSettingsFields(hs, cfg) {
             <button class="hs-test-btn" onclick="runHotspotTest(this, 'hs-test-asl-result', '/api/test_asl_node', () => ({ip: getVal('hsf-ip'), user: getVal('hsf-user'), pass: getVal('hsf-pass'), asl_node: getVal('hsf-aslnode')}))">Test ASL node</button>
             <span class="hs-test-result" id="hs-test-asl-result"></span>
         </div>
+        <div class="hs-field">
+            <div class="hs-field-label-row"><label>Card title link</label><span class="hs-field-status" id="hsf-status-cardurl">✓ Saved</span></div>
+            <input type="text" id="hsf-cardurl" placeholder="defaults to http://<node ip>" onblur="saveHotspotField('card_url', this.value)">
+            <div class="hs-help">Where clicking this card's title goes -- leave blank for the node's own IP, or point it at AllScan (http://&lt;ip&gt;/allscan) or anything else.</div>
+        </div>
         <div class="hs-toggle-row">
             <span class="hs-toggle-label">DVSwitch bridge (Analog_Bridge)</span>
             <div class="hs-switch" id="hsf-dvswitch-enabled" onclick="hsToggleDvswitch(this)"></div>
@@ -6490,6 +6501,7 @@ function renderHotspotSettingsFields(hs, cfg) {
     setVal('hsf-lon', cfg.lon != null ? cfg.lon : '');
     if (isAsl) {
         setVal('hsf-aslnode', cfg.asl_node);
+        setVal('hsf-cardurl', cfg.card_url);
         setVal('hsf-dvports', cfg.dvswitch_ports);
         document.getElementById('hsf-dvswitch-enabled').classList.toggle('on', !!cfg.dvswitch_enabled);
         document.getElementById('hsf-dvports-field').style.display = cfg.dvswitch_enabled ? '' : 'none';
@@ -6562,6 +6574,7 @@ function flashFieldStatus(field, ok, message) {
     const key = field === 'openspot4_extra_pass' ? 'os4extra'
         : field === 'dvswitch_ports' ? 'dvports'
         : field === 'asl_node' ? 'aslnode'
+        : field === 'card_url' ? 'cardurl'
         : field;
     const span = document.getElementById('hsf-status-' + key);
     if (!span) return;

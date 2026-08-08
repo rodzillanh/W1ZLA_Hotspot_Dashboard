@@ -250,9 +250,14 @@ def api_data():
     by_ip     = {h["ip"]: h for h in hotspots}
     for ip, entry in snap.items():
         hs = by_ip.get(ip, {})
-        entry["lat"]  = hs.get("lat")
-        entry["lon"]  = hs.get("lon")
-        entry["type"] = hs.get("type", "wpsd")
+        entry["lat"]      = hs.get("lat")
+        entry["lon"]      = hs.get("lon")
+        entry["type"]     = hs.get("type", "wpsd")
+        # Card title's link override -- static config, same reason type/
+        # lat/lon are passed through here rather than being part of the
+        # live-polled HotspotStatus. None when unset -- renderCards()'s
+        # cardNameHref falls back to the bare IP in that case.
+        entry["card_url"] = hs.get("card_url")
         # DVSwitch card -- dvswitch_enabled/dvswitch_ports come straight from
         # hotspots.json (static config, same reason type/lat/lon do); the
         # sparkline is the one piece not already on the live snapshot, since
@@ -788,6 +793,14 @@ def setup():
             ports = [p.strip() for p in re.split(r"[,\n]+", raw_ports) if p.strip().isdigit()]
             if ports:
                 new_hotspot["dvswitch_ports"] = ",".join(ports)
+            # Optional override for the card title's link -- defaults to the
+            # bare IP (see renderCards()'s cardNameHref) when blank. Scheme
+            # restricted to http(s) so a stray "javascript:" value can't
+            # become a click-to-run XSS vector -- this app's own /setup has
+            # no auth, so this is real defense-in-depth, not theoretical.
+            card_url = request.form.get("card_url", "").strip()
+            if card_url and re.match(r"^https?://", card_url, re.IGNORECASE):
+                new_hotspot["card_url"] = card_url
         elif node_type == "openspot4":
             new_hotspot["type"] = "openspot4"
             # "pass" (already set unconditionally above) is the primary
@@ -904,6 +917,11 @@ def api_update_hotspot():
             hotspot["dvswitch_ports"] = ",".join(ports)
         else:
             hotspot.pop("dvswitch_ports", None)
+        card_url = (data.get("card_url") or "").strip()
+        if card_url and re.match(r"^https?://", card_url, re.IGNORECASE):
+            hotspot["card_url"] = card_url
+        else:
+            hotspot.pop("card_url", None)
     elif node_type == "openspot4":
         extra_pass = data.get("openspot4_extra_pass", "") or ""
         if extra_pass.strip():
@@ -1868,6 +1886,13 @@ def api_import_backup():
                     h["dvswitch_ports"] = ",".join(ports)
                 else:
                     h.pop("dvswitch_ports", None)
+            # Re-validated the same way as /setup and /api/update_hotspot --
+            # not shell-interpolated like the fields above, but rendered
+            # into an href attribute client-side, so a "javascript:" value
+            # from an untrusted import file needs to be screened out here too.
+            card_url = str(h.get("card_url", "")).strip()
+            if card_url and not re.match(r"^https?://", card_url, re.IGNORECASE):
+                h.pop("card_url", None)
             imported.append(h)
         if mode == "replace":
             hotspots = imported

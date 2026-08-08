@@ -1338,11 +1338,12 @@
                         data-pass="{{ hs.pass }}" data-lat="{{ hs.lat }}" data-lon="{{ hs.lon }}"
                         data-bmid="{{ hs.brandmeister_id }}" data-type="{{ hs.get('type', 'wpsd') }}"
                         data-asl-node="{{ hs.get('asl_node', '') }}"
+                        data-card-url="{{ hs.get('card_url', '') }}"
                         data-openspot4-extra-pass="{{ hs.get('openspot4_extra_pass', '') }}"
                         data-enabled="{{ hs.get('enabled', True) }}"
                         data-dvswitch-enabled="{{ hs.get('dvswitch_enabled', False) }}"
                         data-dvswitch-ports="{{ hs.get('dvswitch_ports', '') }}"
-                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.dvswitchEnabled, this.dataset.dvswitchPorts)">
+                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.cardUrl, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.dvswitchEnabled, this.dataset.dvswitchPorts)">
                     Edit
                 </button>
                 <form action="/api/delete_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
@@ -1416,6 +1417,12 @@
                 </label>
                 <textarea id="hs-dvswitch-ports" rows="2" placeholder="e.g. 31000, 31001"></textarea>
             </div>
+            <div style="grid-column:1/-1">
+                <label>Card title link
+                    <span style="font-size:10px;color:var(--text-dim)">(optional — where clicking this card's title goes. Blank defaults to the node's own IP; point it at AllScan, e.g. http://&lt;ip&gt;/allscan, or anything else)</span>
+                </label>
+                <input type="text" id="hs-card-url" placeholder="e.g. http://192.168.1.50/allscan">
+            </div>
         </div>
         <div class="form-grid" style="margin-bottom:10px;display:none" id="hs-openspot4-fields">
             <div style="grid-column:1/-1;font-size:12px;color:var(--text-dim);margin-bottom:8px">
@@ -1446,6 +1453,7 @@
                 <input type="hidden" name="brandmeister_id" id="form-bmid">
                 <input type="hidden" name="type" id="form-type">
                 <input type="hidden" name="asl_node" id="form-aslnode">
+                <input type="hidden" name="card_url" id="form-card-url">
                 <input type="hidden" name="openspot4_extra_pass" id="form-openspot4-extra-pass">
                 <input type="checkbox" name="enabled" id="form-enabled" style="display:none">
                 <input type="checkbox" name="dvswitch_enabled" id="form-dvswitch-enabled" style="display:none">
@@ -2224,13 +2232,14 @@ function submitHotspot(e) {
     document.getElementById('form-bmid').value    = document.getElementById('hs-bmid').value;
     document.getElementById('form-type').value    = document.getElementById('hs-type').value;
     document.getElementById('form-aslnode').value = document.getElementById('hs-aslnode').value;
+    document.getElementById('form-card-url').value = document.getElementById('hs-card-url').value;
     document.getElementById('form-openspot4-extra-pass').value = document.getElementById('hs-openspot4-extra-pass').value;
     document.getElementById('form-enabled').checked = document.getElementById('hs-enabled-toggle').classList.contains('on');
     document.getElementById('form-dvswitch-enabled').checked = document.getElementById('hs-dvswitch-enabled').checked;
     document.getElementById('form-dvswitch-ports').value = document.getElementById('hs-dvswitch-ports').value;
 }
 
-function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, openspot4ExtraPass, enabled, dvswitchEnabled, dvswitchPorts) {
+function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, cardUrl, openspot4ExtraPass, enabled, dvswitchEnabled, dvswitchPorts) {
     document.getElementById('hs-name').value    = name;
     document.getElementById('hs-ip').value      = ip;
     document.getElementById('hs-orig-ip').value = ip;
@@ -2241,6 +2250,7 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, opensp
     document.getElementById('hs-bmid').value    = (bmid    && bmid    !== 'None') ? bmid    : '';
     document.getElementById('hs-type').value    = (type    && type    !== 'None') ? type    : 'wpsd';
     document.getElementById('hs-aslnode').value = (aslNode && aslNode !== 'None') ? aslNode : '';
+    document.getElementById('hs-card-url').value = (cardUrl && cardUrl !== 'None') ? cardUrl : '';
     document.getElementById('hs-openspot4-extra-pass').value = (openspot4ExtraPass && openspot4ExtraPass !== 'None') ? openspot4ExtraPass : '';
     document.getElementById('hs-enabled-toggle').classList.toggle('on', enabled !== 'False');
     document.getElementById('hs-dvswitch-enabled').checked = dvswitchEnabled === 'True';
@@ -2254,7 +2264,7 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, opensp
 }
 
 function clearHotspotForm() {
-    ['hs-name','hs-ip','hs-orig-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-openspot4-extra-pass','hs-dvswitch-ports'].forEach(id => document.getElementById(id).value = '');
+    ['hs-name','hs-ip','hs-orig-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-card-url','hs-openspot4-extra-pass','hs-dvswitch-ports'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('hs-type').value = 'wpsd';
     document.getElementById('hs-enabled-toggle').classList.add('on');
     document.getElementById('hs-dvswitch-enabled').checked = false;

@@ -3463,6 +3463,45 @@ config for per-integration credentials; put it in
     `asl-ctrl-allscan-btn` (still `http://<ip>/allscan`) is untouched --
     that's still there as an explicit, opt-in way to reach AllScan,
     just no longer also hijacking the card title for everyone.
+  - **A per-hotspot `card_url` override (v3.97) generalizes the v3.94
+    revert instead of re-litigating it -- rather than guessing at ONE
+    universal default for what an ASL3 card title should link to
+    (bare IP vs. AllScan vs. something else), it's now a per-hotspot
+    setting, ASL3-only, blank by default (falls back to the bare IP
+    exactly like every other hotspot type).** Editable from BOTH
+    existing per-hotspot config surfaces, kept in sync by hand the same
+    way every other ASL3-only field (`asl_node`/`dvswitch_ports`)
+    already is: the full Settings -> Hotspots form (`hs-card-url` /
+    `form-card-url`, inside the existing `hs-asl-fields` conditional
+    block) and the hotspot card's own gear-icon drawer
+    (`hsf-cardurl`, instant-save via the existing `saveHotspotField()`
+    path). `renderCards()`'s `cardNameHref` now falls back to the bare
+    IP only when `hs.card_url` is unset, escaping it with `escapeHtml()`
+    when it is.
+    **The `escapeHtml()` call is load-bearing, not decorative** -- unlike
+    `hs.ip` (never free text), `card_url` is a user-typed string
+    rendered straight into an `href="..."` attribute; an unescaped `"`
+    in it would break out of the attribute into arbitrary HTML/attribute
+    injection, the same class of bug already documented elsewhere in
+    this file for onclick-string interpolation, just in a plain
+    attribute context this time (where HTML-entity-escaping alone -- no
+    secondary JS-string re-parsing involved -- is actually sufficient,
+    unlike that onclick case).
+    **Scheme-restricted server-side, not just client-side-escaped**: all
+    three write paths that can set `card_url` (`/setup`'s POST handler,
+    `/api/update_hotspot`, `/api/import_backup`) require it to match
+    `^https?://` (case-insensitive) or the value is silently dropped --
+    closes off a `javascript:`/`data:` URI click-to-run vector at the
+    source, real defense-in-depth on an app where `/setup` itself has no
+    auth (a documented, existing tradeoff, not new). Verified live with
+    `app.test_client()`, not just read through: a valid `card_url` saves
+    and round-trips correctly through `/setup`, `/api/update_hotspot`
+    (including clearing it back out), `/api/data`'s passthrough, and
+    `/api/import_backup`; a `javascript:` value is rejected at all three
+    write paths; a live Playwright check confirmed the ACTUAL rendered
+    `<a>` tag's `href` attribute reflects the override (not just that the
+    JSON field round-trips) and that the drawer's own field populates
+    from it correctly.
   - **The sidebar's AllScan link (v3.81) went through a real mockup-
     iteration cycle before landing on its current shape, worth noting
     since it's the kind of thing that looks obviously fine on the first
