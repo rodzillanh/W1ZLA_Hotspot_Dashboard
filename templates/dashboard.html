@@ -8713,7 +8713,22 @@ function fetchAslFavoriteStats() {
 // digits-only guard as addAslFavorite()'s node field).
 function aslDrawerQuickConnect(ip, action) {
     const input = document.getElementById('asl-drawer-qc-node');
-    const node  = input.value.trim();
+    let node = input.value.trim();
+    // Defensive fallback (v4.10) -- a real, reported case: clicking a
+    // Quick Connect button right after selecting a favorite failed with
+    // "Node # must be digits only," meaning the visible field wasn't
+    // holding that favorite's node number despite the field being
+    // populated from it at render time (root cause not pinned down
+    // despite several realistic reproduction attempts -- see CLAUDE.md).
+    // Rather than trust the field alone, fall back to the node the
+    // SELECTION itself already knows about (a favorite's own node is
+    // guaranteed digits-only, validated on save) whenever a favorite is
+    // selected and the field fails validation -- and visibly correct
+    // the field to match, so what fires matches what's now shown.
+    if (!/^\d+$/.test(node) && aslSelectedFavoriteNode) {
+        node = aslSelectedFavoriteNode;
+        input.value = node;
+    }
     if (!/^\d+$/.test(node)) {
         const status = document.getElementById('asl-drawer-status');
         status.textContent = 'Node # must be digits only';

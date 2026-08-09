@@ -321,6 +321,11 @@ BIOS = {
         "blurb": "A singer-songwriter best known for “Everybody's Talkin'” and his cover of “Without You,” and for a close, hard-partying friendship with John Lennon in the 1970s.",
         "wiki": "Harry_Nilsson",
     },
+    "Lee": {
+        "name": "Alvin Lee",
+        "blurb": "Ten Years After's blazingly fast lead guitarist, best remembered for a marathon performance of “I'm Going Home” at Woodstock in 1969.",
+        "wiki": "Alvin_Lee",
+    },
 }
 
 

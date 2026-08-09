@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.9 "Nilsson"</span>
+                <span class="release-version">v4.10 "Lee"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed: Quick Connect could fail with "Node # must be digits only" right after selecting a favorite</span> — the field is supposed to auto-fill with that favorite's node number, but could end up out of sync in some real-world sequence not pinned down in testing. Connect/Monitor/Local Monitor now fall back to the selected favorite's own (always-valid) node number whenever the visible field fails validation, instead of just failing the action</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.9 "Nilsson"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>ASL Control: tighter favorites list</span> — each row in the drawer's favorites list is smaller (less padding, smaller text) now that fleets with a lot of saved favorites are a real, reported case. Still fully tappable, just denser — 20 favorites now fit comfortably without excess scrolling</li>

@@ -4667,6 +4667,47 @@ config for per-integration credentials; put it in
   prior implicit ~34-36px, confirmed all 20 rows still render fully
   legible via a real screenshot, not just a computed-height number.
 
+- **A real, reported bug: Quick Connect could fail with "Node # must be
+  digits only" immediately after selecting a favorite (v4.10), with the
+  root cause NOT fully pinned down despite genuine reproduction
+  attempts -- worth recording as-is rather than overselling certainty.**
+  Reported against a real screenshot: user selected a favorite whose
+  label happened to embed a trailing number matching its own real node
+  ("KC5HWB Ham Radio 2.0 Hub , Grapevine, Texas 43136", node 43136 --
+  the exact label this file's own tile-overflow gotcha already
+  documents from the same user's real fleet), clicked Local Monitor, and
+  got the digits-only error. Their own theory ("it is using the
+  description as the node number") doesn't match how the code actually
+  works -- `renderAslDrawer()`'s template always sets the Quick Connect
+  input's `value` from `selectedFav.node` specifically, never the label
+  -- but scripted attempts to reproduce the underlying desync (select a
+  favorite, read the input value immediately; select then wait through a
+  full poll cycle and re-check; force a stats-fetch-driven re-render)
+  all correctly showed "43136" every time, never the label text and
+  never empty. The verification discipline this file usually asks for
+  (reproduce live, don't just reason about the code) was genuinely
+  attempted here and came up empty -- rather than keep guessing at
+  timing scenarios or claim a fix for an unconfirmed cause, shipped a
+  defensive fallback that fixes the REPORTED SYMPTOM regardless of what
+  actually desynced the field: `aslDrawerQuickConnect()` now checks
+  `aslSelectedFavoriteNode` (guaranteed digits-only -- every favorite's
+  node is validated on save) whenever the visible field fails the
+  digits-only test AND a favorite is currently selected, using that
+  instead of failing outright, and visibly corrects the field to match
+  so what fires matches what's now shown rather than acting invisibly
+  behind a still-wrong-looking field. Verified live by deliberately
+  forcing the input blank via `page.evaluate()` right before clicking
+  Local Monitor (the most direct way to prove the FALLBACK works,
+  independent of ever finding what actually blanks it in the wild) --
+  confirmed the correct `ilink 8 43136` command still fires and no error
+  shows. **If this recurs with a debuggable browser session available,
+  worth checking**: whether the user is running multiple hotspots and
+  switching "Control from" between selecting a favorite and clicking (a
+  path not exercised in this investigation), or a browser extension/
+  autofill interfering with the input's value -- neither was ruled in or
+  out here, only the more obvious poll-cycle/stats-fetch timing paths
+  were.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
