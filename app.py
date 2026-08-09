@@ -1422,10 +1422,12 @@ def test_openspot4():
 
 @app.route("/api/asl_connect", methods=["POST"])
 def api_asl_connect():
-    """Connect, monitor (receive-only), or disconnect a link on an ASL3
-    hotspot -- the dashboard's "ASL Favorites & Control" card and ASL
-    Control sidebar. Uses `rpt cmd <node> ilink <code> <remotenode>`
-    (confirmed against a real node, and matches how AllScan
+    """Connect, monitor (receive-only), local-monitor (receive-only, no
+    relay to other links), disconnect one link, or disconnect_all
+    (every link on the node at once) on an ASL3 hotspot -- the
+    dashboard's "ASL Favorites & Control" card and ASL Control sidebar.
+    Uses `rpt cmd <node> ilink <code> <remotenode>` (confirmed against a
+    real node, and matches how AllScan
     -- https://github.com/davidgsd/AllScan -- does the same thing), NOT the
     DTMF-simulated `rpt fun <node> *3<remotenode>` form, which requires
     replicating app_rpt's digit-collection state machine and proved
@@ -1439,15 +1441,27 @@ def api_asl_connect():
     if hotspot is None or hotspot.get("type") != "asl3":
         return jsonify({"success": False, "message": "Not an ASL3 hotspot"}), 400
     local_node = hotspot.get("asl_node", "")
-    if not local_node.isdigit() or not node.isdigit():
+    if not local_node.isdigit():
         return jsonify({"success": False, "message": "Invalid node number"}), 400
     ilink_code = {
-        "connect":    config.ASL_ILINK_CONNECT,
-        "monitor":    config.ASL_ILINK_MONITOR,
-        "disconnect": config.ASL_ILINK_DISCONNECT,
+        "connect":        config.ASL_ILINK_CONNECT,
+        "monitor":        config.ASL_ILINK_MONITOR,
+        "localmonitor":   config.ASL_ILINK_LOCAL_MONITOR,
+        "disconnect":     config.ASL_ILINK_DISCONNECT,
+        "disconnect_all": config.ASL_ILINK_DISCONNECT_ALL,
     }.get(action)
     if ilink_code is None:
         return jsonify({"success": False, "message": "Invalid action"}), 400
+
+    # disconnect_all targets EVERY link on the node (AllScan's own
+    # convention: remotenode "0" means "all"), never a caller-supplied
+    # node -- hardcoded here rather than trusting whatever the client
+    # sent, so a stray/wrong node value in the request can never turn
+    # this into a targeted disconnect of the wrong link.
+    if action == "disconnect_all":
+        node = "0"
+    elif not node.isdigit():
+        return jsonify({"success": False, "message": "Invalid node number"}), 400
 
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -1456,7 +1470,8 @@ def api_asl_connect():
         cmd = config.build_asl_ilink_cmd(local_node, ilink_code, node)
         _, stdout, _ = client.exec_command(cmd, timeout=config.SSH_TIMEOUT)
         output = stdout.read().decode("utf-8", errors="ignore").strip()
-        return jsonify({"success": True, "message": output or f"{action.capitalize()}ed {node}"})
+        default_message = "Disconnected all links" if action == "disconnect_all" else f"{action.capitalize()}ed {node}"
+        return jsonify({"success": True, "message": output or default_message})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
     finally:

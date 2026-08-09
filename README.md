@@ -842,6 +842,18 @@ below, any ASL3 hotspot's own card):
 - **Monitor mode** — receive-only, no transmit capability, for any node
   number whether or not it's a saved favorite (Quick Connect itself lives
   on the card now — see above).
+- **Local Monitor** — a third Quick Connect option next to Connect and
+  Monitor. Also receive-only, but unlike Monitor it does **not** relay
+  what it hears onward to your other linked nodes — useful for quietly
+  listening in on a node without exposing it (or your own traffic) to
+  whatever else you're connected to.
+- **Disconnect all links on this node** — a separate, deliberately
+  de-emphasized action near the bottom of the drawer, behind a confirm
+  dialog that names the actual node. Unlike every other action here,
+  this affects the node's **entire** link table at once, not just
+  favorites this app tracks — including any permanent/backbone
+  connections — so it gets real friction instead of sitting next to
+  Connect/Monitor as a peer button.
 - **Local node status** — the *controlling* hotspot's own live state
   (idle/keyed, uptime, temperature), which the compact card itself never
   shows since it's only ever displaying favorites' state.

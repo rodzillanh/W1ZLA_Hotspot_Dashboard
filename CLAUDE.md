@@ -4581,6 +4581,74 @@ config for per-integration credentials; put it in
     confirmed TIX still shows zero chips and its own disabled-note,
     unchanged.
 
+- **ASL Control: Local Monitor + Disconnect All (v4.8) -- prompted by the
+  user asking for a look at AllStarLink's own `allmon3` project for
+  ideas, not a user-reported gap.** Before building anything, re-fetched
+  AllScan's `connect.php` fresh (the same source this project's existing
+  Connect/Monitor/Disconnect ilink codes were originally verified
+  against) rather than trusting allmon3's own JS secondhand -- confirmed
+  directly: `'localmonitor'` (non-permanent) -> ilink `8`; `'disconnect'`
+  with `remotenode=='0'` -> ilink `6` (disconnects EVERY link on the
+  node, a materially different action from the existing per-node
+  Disconnect at ilink `11`). Both added as `config.ASL_ILINK_LOCAL_MONITOR`
+  /`ASL_ILINK_DISCONNECT_ALL`, and -- per this file's own repeated
+  "adding a new ilink action means updating `build_asl_ilink_cmd()`'s
+  validation tuple too, or it 500s despite the route/JS both being
+  correct" gotcha -- both were added to that tuple in the same change,
+  not forgotten the way it's been forgotten before.
+  - **`disconnect_all` never trusts a caller-supplied node number** --
+    `api_asl_connect()` hardcodes `node = "0"` server-side the moment
+    `action == "disconnect_all"`, ignoring whatever the client actually
+    sent, specifically so a stray/wrong value in the request body can
+    never turn this into a targeted disconnect of some OTHER specific
+    link by accident.
+  - **Disconnect All deliberately is NOT a third peer button next to
+    Connect/Monitor/Local Monitor.** This is the one action in the
+    drawer whose blast radius extends beyond what this app itself
+    tracks -- it can drop a permanent/backbone link the same way the
+    earlier "don't offer an easy Disconnect on your own other hotspot's
+    link" fix (a few sessions ago, same drawer) was specifically about.
+    Given its own de-emphasized zone (muted text-button styling, only
+    turning danger-red on hover) plus a REQUIRED confirm dialog naming
+    the actual node/callsign before it can fire -- more friction than
+    every other action in this drawer gets, on purpose.
+  - **A real bug caught by the verification Playwright run, not by
+    inspection: the Disconnect All button's onclick initially
+    interpolated `controlHotspot.name` directly into an inline JS string
+    literal (`onclick="confirmAslDisconnectAll('...', '${escapeHtml(
+    controlHotspot.name)}', ...)"`) -- textbook instance of this file's
+    own documented onclick-string-interpolation gotcha.** The test
+    hotspot's name ("THE '603'") contains an apostrophe;
+    `escapeHtml()` turned it into `&#39;` in the HTML source as expected,
+    but the browser's HTML parser decodes that back to a literal `'`
+    before handing the onclick text to the JS engine, terminating the
+    string early and silently breaking the whole handler -- clicking the
+    button did nothing, no console-visible exception, no dialog. Caught
+    immediately by the test asserting the confirm backdrop actually
+    gained its `open` class after a click, not just that the button
+    existed. Fixed the same documented way: moved the three values to
+    `data-ip`/`data-name`/`data-node` attributes on the button
+    (HTML-attribute-escaping is the ONLY parsing `data-*` values ever go
+    through -- nothing re-decodes and re-parses them as JS afterward) and
+    read them back via `this.dataset.*` inside the handler. Re-ran the
+    same test after the fix and the dialog opened correctly, apostrophe
+    and all -- this is exactly the "one wrong guess already shipped
+    here" pattern the original gotcha entry warned never to repeat for a
+    "probably safe" field, and a hotspot's own display NAME is
+    absolutely one of the fields most likely to contain a quote
+    eventually (an operator's own callsign/repeater name, not a
+    controlled value).
+  - Verified live end-to-end with a mocked `paramiko.SSHClient` (no real
+    device available) capturing the exact SSH command string for each
+    action: Local Monitor with a typed node number produced `ilink 8
+    <node>`; clicking Disconnect All then Cancel sent NOTHING (confirmed
+    the command list was unchanged after Cancel, not just that the
+    dialog visually closed); clicking Disconnect All then confirming
+    produced `ilink 6 0` -- literal `0`, not whatever node happened to be
+    in the Quick Connect input at the time, confirming the server-side
+    hardcoding actually took effect end-to-end and not just in the route
+    handler in isolation.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

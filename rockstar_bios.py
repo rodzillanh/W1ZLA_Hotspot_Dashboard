@@ -311,6 +311,11 @@ BIOS = {
         "blurb": "A prolific session pianist who played on records by the Rolling Stones, the Kinks, the Beatles, and many others without ever being a household name himself.",
         "wiki": "Nicky_Hopkins",
     },
+    "Stewart": {
+        "name": "Ian Stewart",
+        "blurb": "A founding member and pianist of the Rolling Stones, dropped from the official lineup for image reasons but kept on as a touring/session player for the rest of his life.",
+        "wiki": "Ian_Stewart_(musician)",
+    },
 }
 
 

@@ -950,8 +950,52 @@
         .asl-ctrl-qc-btn.monitor:hover { background: var(--live-dim); }
         .asl-ctrl-qc-btn.disconnect { color: var(--text-muted); border-color: var(--border); }
         .asl-ctrl-qc-btn.disconnect:hover { background: var(--panel); }
+        /* Local Monitor (v4.8) -- deliberately quieter than Connect
+           (amber)/Monitor (cyan), a dashed neutral outline since it's the
+           least-used of the three, not a primary action. */
+        .asl-ctrl-qc-btn.localmonitor { color: var(--text-muted); border-color: var(--text-dim); border-style: dashed; }
+        .asl-ctrl-qc-btn.localmonitor:hover { background: var(--panel-2); color: var(--text); }
+        .asl-ctrl-qc-hint { font-size: 10px; color: var(--text-dim); margin-top: 6px; line-height: 1.5; }
+        .asl-ctrl-qc-hint b { color: var(--text-muted); }
         .asl-ctrl-qc-selected { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
         .asl-ctrl-qc-selected b { color: var(--text); font-weight: 600; }
+        /* "Disconnect all links on this node" (v4.8) -- deliberately NOT a
+           peer button next to Connect/Monitor/Local Monitor. This is a
+           per-NODE action (ilink 6, remotenode "0") that can disconnect a
+           permanent/backbone link this app itself doesn't track as a
+           favorite -- exactly the class of thing the "don't offer an easy
+           Disconnect on your own other hotspot's link" fix earlier this
+           project was about. Its own de-emphasized zone, muted until
+           hover, plus a required confirm step (see the confirm dialog
+           CSS below) before it can fire. */
+        .asl-ctrl-discall-zone { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
+        .asl-ctrl-discall-btn {
+            display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+            padding: 7px; border-radius: 7px; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+            background: transparent; color: var(--text-muted); font-size: 11.5px; font-weight: 500;
+            cursor: pointer; font-family: inherit; transition: color .15s, border-color .15s, background .15s;
+        }
+        .asl-ctrl-discall-btn:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-dim); }
+        .asl-ctrl-discall-note { font-size: 10px; color: var(--text-dim); text-align: center; margin-top: 6px; line-height: 1.5; }
+        /* Confirm dialog -- z-index above .hs-drawer-backdrop's 1000 (see
+           that class's own comment for why 1000 specifically), since this
+           has to appear on top of an already-open ASL Control drawer. */
+        .asl-discall-confirm-backdrop {
+            position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none;
+            align-items: center; justify-content: center; z-index: 1100;
+        }
+        .asl-discall-confirm-backdrop.open { display: flex; }
+        .asl-discall-confirm-box {
+            width: min(320px, 90vw); background: var(--panel); border: 1px solid var(--danger); border-radius: 10px;
+            padding: 18px; box-shadow: 0 12px 32px rgba(0,0,0,.4);
+        }
+        .asl-discall-confirm-box h3 { margin: 0 0 8px; font-size: 14px; color: var(--danger); display: flex; align-items: center; gap: 6px; }
+        .asl-discall-confirm-box p { margin: 0 0 14px; font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
+        .asl-discall-confirm-box p b { color: var(--text); }
+        .asl-discall-confirm-actions { display: flex; gap: 8px; }
+        .asl-discall-confirm-actions button { flex: 1; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; border: 1px solid; }
+        .asl-discall-confirm-cancel { background: var(--panel-2); border-color: var(--border); color: var(--text); }
+        .asl-discall-confirm-danger { background: var(--danger); border-color: var(--danger); color: #2a0e10; }
         /* Single-line, clickable favorite rows -- click anywhere on a row
            (except the remove button) to load that node into Quick connect
            above, same "click a favorite, act elsewhere" interaction AllScan
@@ -2657,6 +2701,14 @@
 <div class="hs-drawer" id="settings-drawer"></div>
 <div class="hs-drawer" id="camera-drawer"></div>
 <div class="hs-drawer" id="asl-drawer"></div>
+
+<!-- ASL Control's "Disconnect all links on this node" confirm dialog
+     (v4.8) -- a standalone overlay, not one more hs-drawer, since it
+     needs to sit ABOVE the already-open ASL Control drawer (higher
+     z-index) rather than replacing it. See confirmAslDisconnectAll(). -->
+<div class="asl-discall-confirm-backdrop" id="asl-discall-confirm-backdrop" onclick="cancelAslDisconnectAll()">
+    <div class="asl-discall-confirm-box" id="asl-discall-confirm-box" onclick="event.stopPropagation()"></div>
+</div>
 
 <!-- One-time "what's available" feature tour -- see checkOnboarding()/
      dismissOnboardingTour() in the script below. Reopenable anytime from
@@ -8311,8 +8363,13 @@ function aslConnect(ip, node, action, statusElId) {
     aslSendConnect(ip, node, action, status);
 }
 
+const ASL_ACTION_PROGRESS_TEXT = {
+    connect: 'Connecting...', monitor: 'Monitoring...', localmonitor: 'Monitoring (local)...',
+    disconnect: 'Disconnecting...', disconnect_all: 'Disconnecting all...',
+};
+
 function aslSendConnect(ip, node, action, status) {
-    status.textContent = action === 'connect' ? 'Connecting...' : action === 'monitor' ? 'Monitoring...' : 'Disconnecting...';
+    status.textContent = ASL_ACTION_PROGRESS_TEXT[action] || 'Working...';
     fetch('/api/asl_connect', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -8544,10 +8601,15 @@ function renderAslDrawer() {
     const qcSelectedHtml = selectedFav
         ? `<div class="asl-ctrl-qc-selected">Selected: <b>${escapeHtml(selectedLabel)}</b> · ${escapeHtml(selectedFav.node)}</div>`
         : '';
+    // Local Monitor (v4.8) -- a 3rd button alongside Connect/Monitor,
+    // receive-only like Monitor but does NOT relay to your other linked
+    // nodes (ilink 8 vs. Monitor's ilink 2 -- see config.py's own
+    // comment for the AllScan-verified distinction).
     const qcButtonsHtml = selectedFav && selectedLink
         ? `<button class="asl-ctrl-qc-btn disconnect" onclick="aslDrawerQuickConnect('${controlHotspot.ip}', 'disconnect')">Disconnect</button>`
         : `<button class="asl-ctrl-qc-btn connect" onclick="aslDrawerQuickConnect('${controlHotspot.ip}', 'connect')">Connect</button>
-           <button class="asl-ctrl-qc-btn monitor" onclick="aslDrawerQuickConnect('${controlHotspot.ip}', 'monitor')">Monitor</button>`;
+           <button class="asl-ctrl-qc-btn monitor" onclick="aslDrawerQuickConnect('${controlHotspot.ip}', 'monitor')">Monitor</button>
+           <button class="asl-ctrl-qc-btn localmonitor" onclick="aslDrawerQuickConnect('${controlHotspot.ip}', 'localmonitor')" title="Receive-only, doesn't relay to your other linked nodes">Local Mon</button>`;
 
     drawer.innerHTML = `
         <div class="hs-drawer-header">
@@ -8567,6 +8629,7 @@ function renderAslDrawer() {
                 <input type="text" id="asl-drawer-qc-node" placeholder="Node # (any node, not just favorites)" value="${selectedFav ? escapeHtml(selectedFav.node) : ''}">
                 ${qcButtonsHtml}
             </div>
+            ${selectedFav && selectedLink ? '' : `<div class="asl-ctrl-qc-hint"><b>Local Monitor</b> connects receive-only and does NOT relay to your other linked nodes.</div>`}
             <div class="hs-drawer-section-title" id="asl-drawer-favorites-section">Favorites <span style="font-weight:400;color:var(--text-dim)">(${pinnedCount}/${ASL_FAV_CARD_CAP} pinned · ${aslFavorites.length} total)</span></div>
             ${rowsHtml}
             ${statsLegend}
@@ -8587,6 +8650,10 @@ function renderAslDrawer() {
                 <label class="asl-ctrl-import-label" for="asl-drawer-import-file">📄 Choose a favorites.ini file…</label>
             </div>
             <div id="asl-drawer-import-preview"></div>
+            <div class="asl-ctrl-discall-zone">
+                <button class="asl-ctrl-discall-btn" data-ip="${escapeHtml(controlHotspot.ip)}" data-name="${escapeHtml(controlHotspot.name)}" data-node="${escapeHtml(controlHotspot.asl_node || '?')}" onclick="confirmAslDisconnectAll(this.dataset.ip, this.dataset.name, this.dataset.node)">⛔ Disconnect all links on this node</button>
+                <div class="asl-ctrl-discall-note">Disconnects EVERY link on ${escapeHtml(controlHotspot.asl_node || 'this node')} — not just your favorites. Includes any permanent/backbone connections.</div>
+            </div>
             <a class="asl-ctrl-allscan-btn" href="http://${controlHotspot.ip}/allscan" target="_blank" rel="noopener" style="margin:14px 0 0">🔗 Open AllScan Control Panel</a>
         </div>`;
 
@@ -8649,6 +8716,39 @@ function aslDrawerQuickConnect(ip, action) {
     }
     aslConnect(ip, node, action, 'asl-drawer-status');
     input.value = '';
+}
+
+// "Disconnect all links on this node" (v4.8) -- a per-NODE action (ilink
+// 6, remotenode "0" -- see config.ASL_ILINK_DISCONNECT_ALL) that can
+// disconnect a link this app doesn't track as a favorite at all (a
+// permanent backbone connection, something someone else connected).
+// Deliberately gated behind a confirm dialog naming the actual node,
+// not just the muted button styling alone -- the one drawer action with
+// blast radius bigger than "one link you already know about".
+let aslDiscallIp = null;
+
+function confirmAslDisconnectAll(ip, name, nodeNum) {
+    aslDiscallIp = ip;
+    document.getElementById('asl-discall-confirm-box').innerHTML = `
+        <h3>⛔ Disconnect all links?</h3>
+        <p>This disconnects <b>every</b> link currently on node <b>${escapeHtml(nodeNum)}</b> ("${escapeHtml(name)}") — not just your saved favorites. Any permanent or backbone connections will be dropped too.</p>
+        <div class="asl-discall-confirm-actions">
+            <button class="asl-discall-confirm-cancel" onclick="cancelAslDisconnectAll()">Cancel</button>
+            <button class="asl-discall-confirm-danger" onclick="doAslDisconnectAll()">Disconnect all</button>
+        </div>`;
+    document.getElementById('asl-discall-confirm-backdrop').classList.add('open');
+}
+
+function cancelAslDisconnectAll() {
+    aslDiscallIp = null;
+    document.getElementById('asl-discall-confirm-backdrop').classList.remove('open');
+}
+
+function doAslDisconnectAll() {
+    const ip = aslDiscallIp;
+    cancelAslDisconnectAll();
+    if (!ip) return;
+    aslSendConnect(ip, '0', 'disconnect_all', document.getElementById('asl-drawer-status'));
 }
 
 // --- favorites.ini import -- AllScan's own favorites file format,

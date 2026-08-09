@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.7"
+APP_VERSION = "4.8"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -81,6 +81,8 @@ VERSION_CODENAMES = [
                         # (1942-2018)
     "Hopkins",          # v4.7 -- Nicky Hopkins, session pianist for the
                         # Rolling Stones, the Kinks, the Beatles (1944-1994)
+    "Stewart",          # v4.8 -- Ian Stewart, pianist and founding member
+                        # of the Rolling Stones (1938-1985)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -380,11 +382,22 @@ ASL_ILINK_DISCONNECT = 11  # disconnect specified link
 # statement maps button=='monitor' -> ilink 2 (non-permanent) / 12
 # (permanent). This app has no "permanent" connection concept anywhere
 # (every ASL3 link here is a session link), so only the non-permanent
-# code is used. AllScan also has a stricter "Local Monitor" mode (ilink
-# 8/12->18 permanent) that doesn't relay onward to other connected
-# links -- NOT implemented here; only plain Monitor was ever mocked up
-# and asked for.
+# code is used.
 ASL_ILINK_MONITOR = 2
+# Local Monitor -- also receive-only, but does NOT relay what it hears
+# onward to your other connected links the way plain Monitor above does.
+# Re-confirmed against a fresh fetch of AllScan's connect.php (2026-08):
+# button=='localmonitor' -> ilink 8 (non-permanent) / 18 (permanent) --
+# only the non-permanent code is used, same reasoning as Monitor.
+ASL_ILINK_LOCAL_MONITOR = 8
+# Disconnect ALL links on the node -- NOT the same code as
+# ASL_ILINK_DISCONNECT above (which targets one specific node). AllScan's
+# connect.php sends this exact code (6) whenever its 'disconnect' button
+# is invoked with remotenode=='0' -- confirmed from the same fetch as
+# ASL_ILINK_LOCAL_MONITOR. Deliberately never exposed with a
+# caller-supplied remote node; see api_asl_connect() in app.py, which
+# hardcodes "0" server-side rather than trusting whatever the client sent.
+ASL_ILINK_DISCONNECT_ALL = 6
 
 
 def build_asl_ilink_cmd(local_node: str, ilink_code: int, remote_node: str) -> str:
@@ -397,7 +410,8 @@ def build_asl_ilink_cmd(local_node: str, ilink_code: int, remote_node: str) -> s
         raise ValueError(f"invalid ASL node number: {local_node!r}")
     if not remote_node.isdigit():
         raise ValueError(f"invalid ASL node number: {remote_node!r}")
-    if ilink_code not in (ASL_ILINK_CONNECT, ASL_ILINK_MONITOR, ASL_ILINK_DISCONNECT):
+    if ilink_code not in (ASL_ILINK_CONNECT, ASL_ILINK_MONITOR, ASL_ILINK_DISCONNECT,
+                           ASL_ILINK_LOCAL_MONITOR, ASL_ILINK_DISCONNECT_ALL):
         raise ValueError(f"invalid ilink code: {ilink_code!r}")
     return f'sudo asterisk -rx "rpt cmd {local_node} ilink {ilink_code} {remote_node}"'
 
