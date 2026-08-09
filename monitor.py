@@ -1079,9 +1079,12 @@ class FleetMonitor:
         # land here but never get an RPT_ALINKS entry at all). Both are
         # scanned from the same output in one pass -- no `break` on the
         # first match, since the conn-table lines appear BEFORE RPT_ALINKS
-        # in real output and we need both.
+        # in real output and we need both. conn_info also carries IP/
+        # duration (v4.13) for every node it sees, regardless of state --
+        # merged onto BOTH RPT_ALINKS-derived entries and the inferred
+        # Local Monitor ones below, not just the latter.
         alinks_raw = None
-        established_conn_nodes = []
+        conn_info  = {}  # node -> {"ip", "direction", "duration", "state"}
         for line in output[3:]:
             stripped = line.strip()
             m = re.match(config.ASL_ALINKS_LINE_PATTERN, stripped)
@@ -1089,13 +1092,16 @@ class FleetMonitor:
                 alinks_raw = m.group(1)
                 continue
             cm = re.match(config.ASL_CONNTABLE_LINE_PATTERN, stripped)
-            if cm and cm.group(3) == "ESTABLISHED":
-                established_conn_nodes.append(cm.group(1))
+            if cm:
+                conn_info[cm.group(1)] = {
+                    "ip": cm.group(2), "direction": cm.group(3),
+                    "duration": cm.group(4), "state": cm.group(5),
+                }
 
         linked_nodes = []
         keyed_entry  = None
         seen_nodes   = set()
-        node_info = self._aslstats.linked_node_info(node) if (alinks_raw or established_conn_nodes) else {}
+        node_info = self._aslstats.linked_node_info(node) if (alinks_raw or conn_info) else {}
         if alinks_raw:
             for entry in alinks_raw.split(",")[1:]:  # first field is the count
                 em = re.match(config.ASL_ALINK_ENTRY_PATTERN, entry.strip())
@@ -1103,6 +1109,7 @@ class FleetMonitor:
                     continue
                 link_node, mode_char, key_char = em.groups()
                 info = node_info.get(link_node) or {}
+                conn = conn_info.get(link_node) or {}
                 entry_dict = {
                     "node":        link_node,
                     "callsign":    info.get("callsign"),
@@ -1110,6 +1117,8 @@ class FleetMonitor:
                     "location":    info.get("location"),
                     "mode":        mode_char,
                     "keyed":       key_char == "K",
+                    "peer_ip":     conn.get("ip"),
+                    "duration":    conn.get("duration"),
                 }
                 linked_nodes.append(entry_dict)
                 seen_nodes.add(link_node)
@@ -1122,8 +1131,8 @@ class FleetMonitor:
         # `keyed` can't be determined for these (only RPT_ALINKS reports
         # keyed/unkeyed) -- always False, same as this app already can't
         # tell you if a Local-Monitor'd remote party is currently talking.
-        for link_node in established_conn_nodes:
-            if link_node in seen_nodes:
+        for link_node, conn in conn_info.items():
+            if link_node in seen_nodes or conn["state"] != "ESTABLISHED":
                 continue
             info = node_info.get(link_node) or {}
             linked_nodes.append({
@@ -1133,6 +1142,8 @@ class FleetMonitor:
                 "location":    info.get("location"),
                 "mode":        "L",
                 "keyed":       False,
+                "peer_ip":     conn.get("ip"),
+                "duration":    conn.get("duration"),
             })
             seen_nodes.add(link_node)
         updates["asl_linked_nodes"] = linked_nodes

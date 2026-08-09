@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.12"
+APP_VERSION = "4.13"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -91,6 +91,8 @@ VERSION_CODENAMES = [
                         # (1946-1990)
     "Federici",         # v4.12 -- Danny Federici, keyboardist, Bruce
                         # Springsteen's E Street Band (1950-2008)
+    "Squire",           # v4.13 -- Chris Squire, bassist and founding
+                        # member of Yes (1948-2015)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -460,7 +462,11 @@ ASL_ALINK_ENTRY_PATTERN = r"^(\d+)([TRLC])([KU])$"
 # this is the correction). monitor.py treats any node ESTABLISHED here
 # but absent from RPT_ALINKS as an inferred Local Monitor link -- a
 # reasonable, evidence-based inference, not a directly-reported fact.
-ASL_CONNTABLE_LINE_PATTERN = r"^(\d+)\s+\S+\s+\S+\s+(IN|OUT)\s+[\d:]+\s+(\S+)\s*$"
+# IP and duration are captured (v4.13) too -- every RPT_ALINKS-derived
+# entry gets them merged in from this same table, not just the inferred
+# Local Monitor ones, since this table covers every currently-connected
+# node regardless of app_rpt link-table membership.
+ASL_CONNTABLE_LINE_PATTERN = r"^(\d+)\s+(\S+)\s+\S+\s+(IN|OUT)\s+([\d:]+)\s+(\S+)\s*$"
 
 END_OF_TRANSMISSION_MARKERS = (
     "end of voice transmission",   # DMR network

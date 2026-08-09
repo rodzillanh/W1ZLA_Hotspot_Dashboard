@@ -4844,6 +4844,77 @@ config for per-integration credentials; put it in
     entry point) shows all 5 links with 2 correctly tagged "LOCAL MON" --
     not just that the parser's return value looked right in isolation.
 
+- **Monitor + Connecting indicators, and per-link duration/peer IP
+  (v4.13) -- a direct follow-up ask after the v4.12 fix, not a separately
+  reported bug.** Asked "any other gaps you see," offered three candidates
+  (Monitor mode might have the same invisibility problem Local Monitor
+  had; the connection table's duration/IP were being parsed and thrown
+  away; Connecting only had a badge in one of the 4 surfaces) -- user
+  confirmed all three, and directly confirmed the Monitor guess from
+  their own real usage: "monitored nodes show connected but nothing
+  indicating its just monitored."
+  - **Monitor (R) does NOT have Local Monitor's invisibility problem** --
+    unlike `L`, a real `R` entry was never actually captured live in this
+    session (no confirmed real Monitor connection was available to
+    observe), so the synthetic `R99001` test case in this entry's own
+    verification is exactly that -- synthetic, not live-confirmed the way
+    the L-mode discovery was. The user's own report ("shows connected but
+    nothing indicates monitor") already implies `R` DOES appear in
+    `RPT_ALINKS` on their real node (otherwise it would be invisible like
+    L was, not "shown as connected") -- this was a display-only gap, not
+    a detection gap, and was fixed as such. If a future report suggests
+    Monitor mode is ALSO sometimes invisible, don't assume it's the same
+    class of bug as Local Monitor without re-verifying against real raw
+    output the same way -- these are two different app_rpt behaviors,
+    confirmed independently.
+  - **Duration/IP were already sitting in `config.ASL_CONNTABLE_LINE_PATTERN`
+    matches (added in v4.12) and simply discarded** -- the v4.12 code
+    only ever used the connection table to detect nodes ABSENT from
+    `RPT_ALINKS`; it never captured IP/duration for entries the RPT_ALINKS
+    branch already had. v4.13 builds one `conn_info` dict (node -> ip/
+    direction/duration/state) from the SAME single pass over `output[3:]`,
+    merged onto BOTH the RPT_ALINKS-derived entries and the inferred
+    Local Monitor ones -- every linked node gets duration/IP now, not
+    just the ones this app had to infer.
+  - **Duration is shown as-is (app_rpt's own raw `HH:MM:SS` string, e.g.
+    "36:35:07"), not reformatted into "1d 12h."** app_rpt's own hour
+    field isn't clamped to 24 (a real captured sample showed exactly this
+    -- 36 hours, not day-wrapped), so reparsing it into a day/hour split
+    would need to handle an unbounded hour count correctly; showing the
+    device's own string verbatim avoids introducing a new parsing bug for
+    a purely cosmetic reformat.
+  - **Generalized `.lm-tag`/`.asl-ctrl-lm-badge` (Local-Monitor-only,
+    v4.11) into `.mode-tag`/`.asl-ctrl-mode-badge` (any mode, color set
+    by a modifier class)** rather than adding parallel Monitor-specific
+    classes alongside -- one shape, `.localmon`/`.monitor`/`.connecting`
+    modifiers, reused across the compact card and the ASL Control drawer.
+    The hotspot's own detail drawer's `.hs-link-mode` already had this
+    shape from v4.11 (text-map based), so that one only needed a new
+    `.monitor` color rule, not a restructure.
+  - **Connecting deliberately gets NO dot/row background color anywhere,
+    on all 4 surfaces** -- only a text tag/badge. It's a transient,
+    not-yet-settled state (the real captured sample showed 622630 sitting
+    in `CONNECTING` for at least one full poll cycle, so it's not
+    instantaneous, but it's still fundamentally "not yet a real link
+    type") -- giving it the same visual weight as an actual established
+    Transceive/Monitor/Local-Monitor link would overstate what's known
+    about it.
+  - **Duration only gets a visible line in the hotspot's own detail
+    drawer** (the surface with the most room); the other 3 surfaces
+    (compact card chip, ASL Favorites tile, ASL Control drawer row) get
+    it as a hover `title` tooltip instead, specifically to avoid adding a
+    4th text line to an already-space-constrained tile/chip/row -- a
+    deliberate density tradeoff, not an oversight.
+  - Verified live end-to-end through the real production poll path
+    (`monitor.check_one()`) with a combined real+synthetic SSH output
+    (the user's actual captured data, plus one synthetic `R99001` entry
+    to exercise Monitor specifically) -- confirmed all 4 surfaces show
+    the amber Monitor state with correct text, confirmed the Connecting
+    badge appears on the ASL Control drawer's ad hoc slot and the hotspot
+    drawer, confirmed a real duration+IP tooltip renders correctly on a
+    compact-card chip, and confirmed the hotspot drawer shows a visible
+    duration line for every one of the 6 linked nodes in the sample.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

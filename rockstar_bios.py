@@ -336,6 +336,11 @@ BIOS = {
         "blurb": "A founding member of Bruce Springsteen's E Street Band, known for his organ and glockenspiel work over a four-decade partnership.",
         "wiki": "Danny_Federici",
     },
+    "Squire": {
+        "name": "Chris Squire",
+        "blurb": "Progressive rock band Yes's founding bassist and only member to appear on every one of their studio albums, known for an unusually melodic, treble-heavy bass tone.",
+        "wiki": "Chris_Squire",
+    },
 }
 
 
