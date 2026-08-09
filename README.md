@@ -803,17 +803,21 @@ disconnect them from one of your ASL3 hotspots with one tap.
 The card itself is deliberately minimal — a glance-and-tap surface, not a
 management screen:
 
-- **Tile grid** — up to 5 pinned favorites, each one a tile you tap to
+- **Tile grid** — 5 pinned favorites, each one a tile you tap to
   connect or disconnect. A tile's color/dot shows its live state (🔴
   keyed, 🟢 connected, amber for "recently active elsewhere on the
   network but not through your hub right now") straight from the
   selected hotspot's already-polled link table — no extra polling or
   external API calls.
-- **A 6th, dynamic tile** — whatever you're connected to *outside* your 5
-  pinned favorites, or, when nothing extra is connected, a bare
-  quick-connect field (type any node #, no need to save it as a favorite
-  first). Tap the ☆ on a live ad hoc connection to promote it into a real
-  pinned favorite.
+- **A 6th, reserved tile** — always set aside for whatever you're
+  connected to *outside* your 5 pinned favorites, never a 6th favorite.
+  A quiet placeholder when nothing extra is connected; fills in with its
+  own status and ☆ Pin / Disconnect buttons the moment something is.
+- **Quick connect** — a field next to the "ASL Control" button, right on
+  the card. Type any node # and hit Go — no need to save it as a
+  favorite first, and no need to open the drawer. Hover it for a
+  reminder of what it does and where the connection shows up.
+- **Multi-connect** — a checkbox right on the card (see below).
 - **Control from** — a dropdown picks which of your configured ASL3
   hotspots originates the connect/disconnect command, if you have more
   than one.
@@ -822,9 +826,9 @@ management screen:
   everything's idle.
 
 Everything else — adding/removing favorites, choosing *which* favorites
-are pinned to the card, Monitor mode, and a Quick Connect field for any
-node number — lives one tap away in the **ASL Control drawer** (the
-card's own button, or, per below, any ASL3 hotspot's own card):
+are pinned to the card, and Monitor mode — lives one tap away in the
+**ASL Control drawer** (the card's own "ASL Control" button, or, per
+below, any ASL3 hotspot's own card):
 
 - **Pin/unpin** — a ★/☆ next to each favorite in the drawer's list
   chooses whether it takes one of the card's 5 tile slots. Pin a 6th
@@ -835,9 +839,9 @@ card's own button, or, per below, any ASL3 hotspot's own card):
   callsign (via the same `aslstats.py` lookup ASL3 cards already use) is
   shown automatically if the label is left blank. A newly added favorite
   is pinned by default (same "step the oldest one aside if full" rule).
-- **Quick connect** — connect, disconnect, or **Monitor** (receive-only,
-  no transmit capability) any node number, whether or not it's a saved
-  favorite.
+- **Monitor mode** — receive-only, no transmit capability, for any node
+  number whether or not it's a saved favorite (Quick Connect itself lives
+  on the card now — see above).
 - **Local node status** — the *controlling* hotspot's own live state
   (idle/keyed, uptime, temperature), which the compact card itself never
   shows since it's only ever displaying favorites' state.
@@ -859,12 +863,12 @@ tools for that.
 
 By default, connecting to a favorite first disconnects any *other*
 favorite currently connected/keyed on that same hotspot, so you don't end
-up stacking links by accident. **Multi-connect** (a toggle in the
-drawer, next to the favorites list) skips that and just connects,
-same as before this existed — one shared setting for every connect
-action, on the card or in the drawer. This only ever touches favorites
-tracked in this app — it won't disconnect a link made some other way
-(e.g. a permanent link configured directly on the node).
+up stacking links by accident. **Multi-connect** (a checkbox on the card
+itself, and again next to the favorites list in the drawer — both toggle
+the same shared setting, so checking one instantly checks the other)
+skips that and just connects. This only ever touches favorites tracked in
+this app — it won't disconnect a link made some other way (e.g. a
+permanent link configured directly on the node).
 
 **ASL Control stays reachable even with this card turned off entirely** —
 every ASL3 hotspot's own card has an "Open in ASL Control" button in its

@@ -4249,6 +4249,101 @@ config for per-integration credentials; put it in
     known value (`False`), not stuck permanently on the first value ever
     seen -- the fix carries forward state, it doesn't freeze it.
 
+- **ASL Favorites card, round 2: quick connect and Multi-connect moved
+  BACK onto the compact card (v4.2), after the v4.0 redesign had moved
+  both into the drawer -- an 8-round mockup conversation, not a single
+  ask, with the user reversing course on specifics twice along the way.**
+  Worth recording the sequence since each round was a real, deliberate
+  correction, not just polish:
+  1. v4.0 shipped with two full-width buttons ("ASL Control" / "Manage
+     favorites"). Reported directly as redundant -- both opened the
+     identical drawer.
+  2. Round 5 merged them to one full-width "ASL Control" button and made
+     the ad hoc connection its own strip above the grid (freeing the 6th
+     tile).
+  3. Round 6, in response to "there still needs to be a multi connect
+     select... the default should always be to disconnect existing
+     connection before connecting to a new node", added a `<select>` for
+     connect-mode plus made the freed 6th tile a permanent quick-connect
+     tile (6 real favorites total).
+  4. Round 7, in response to "half of that could be for the quick connect
+     selection allowing 6 favorites instead of 5 and the replace existing
+     should just be a check box", replaced the select with a plain
+     checkbox and split the button row into half "ASL Control" / half an
+     inline quick-connect field.
+  5. **Round 8, the one actually built**, in response to "lets keep it as
+     5 favorites but reser[ve] that 6th place for the ad-hock connection"
+     -- reverted the tile count back to 5 real favorites + 1 reserved
+     slot (round 6/7's "6 real favorites" idea explicitly un-done), kept
+     round 7's half-width button row and plain checkbox, and added a
+     floating tooltip on the quick-connect field answering a direct "will
+     there be a floating tip on hover?" question.
+  **Net effect vs. the v4.0 code this replaced**: the 6th slot's job (ad
+  hoc connection display, with its own ☆ Pin/Disconnect actions) is
+  unchanged in concept, but quick connect moved OUT of that slot into the
+  top row, and Multi-connect gained a real checkbox on the card itself
+  for the first time (previously drawer-only).
+  - **Quick connect (`#asl-fav-qc-node`) moved from being regenerated
+    inside `dynamicFavTileHtml()`'s `innerHTML` (the 6th tile, when
+    nothing ad hoc is connected) to static Jinja markup in the card's own
+    top row.** This wasn't just a layout change -- it removed a real
+    piece of complexity: the old in-grid version needed the same
+    focus/value-preservation snapshot-and-restore dance `renderAslDrawer()`
+    documents for ITS inputs (a poll-driven `innerHTML` rebuild silently
+    wipes whatever's mid-typed in a destroyed-and-recreated `<input>`).
+    Being static markup now, `renderAslFavorites()`'s `gridEl.innerHTML =
+    ...` rebuild never touches it at all, so that preservation code was
+    deleted outright rather than adapted -- there's nothing left to
+    preserve since the element is never destroyed.
+  - **Multi-connect needed a NEW two-way sync mechanism, `setAslMultiConnect(val)`,
+    once the card gained its own checkbox (`#asl-fav-multi-connect`,
+    static markup) alongside the drawer's existing one
+    (`#asl-multi-connect`, regenerated every `renderAslDrawer()` call).**
+    Both read/write the same shared `aslMultiConnect` variable
+    `aslConnect()` already consulted -- but the CARD's checkbox is static,
+    so toggling it from the DRAWER wouldn't otherwise update it until
+    some other unrelated render happened to touch the card (it never
+    does, since the card's own render path never re-touches static
+    markup). `setAslMultiConnect()` sets the variable and explicitly
+    syncs BOTH checkboxes' `.checked` by id (guarded null-checks, since
+    either one may not be in the DOM -- card disabled, or drawer closed),
+    and both checkboxes' `onchange` call it instead of writing
+    `aslMultiConnect` directly. Verified live with a real bidirectional
+    Playwright check: toggled the card's checkbox, opened the drawer,
+    confirmed its checkbox reflected the change immediately (not "on next
+    poll"); toggled the drawer's checkbox, confirmed the card's checkbox
+    (still in the DOM, drawer just overlays it) updated immediately too.
+  - **The reserved 6th slot's occupied state changed interaction pattern
+    slightly, matching the approved mockup exactly rather than preserving
+    the old one**: v4.0 had the whole ad hoc tile clickable (tap to
+    disconnect) plus a small floating ☆ corner button (pin). v4.2's
+    occupied tile is non-interactive as a whole (`cursor: default`, no
+    tile-level `onclick`) with two explicit bottom-row buttons instead
+    ("☆ Pin" / "Disconnect") -- a real, deliberate UX difference the
+    mockup rounds settled on, not an oversight; `.fav-tile-pin-btn`'s
+    corner-positioned CSS was removed entirely rather than kept
+    alongside the new `.fav-tile-actions` row.
+  - **The empty reserved-slot placeholder (`.fav-tile.adhoc-empty`) is
+    new in v4.2** -- v4.0's dynamic tile only ever had two states (ad hoc
+    connection, or the quick-connect field); now that quick connect lives
+    elsewhere, an empty 6th slot needed its OWN quiet, non-interactive
+    placeholder (dashed border, ⊕ icon, "Ad hoc connections show here")
+    so the grid doesn't read as visually broken/missing a tile when
+    nothing extra is connected. Deliberately low-contrast and
+    non-clickable -- a real, named trade-off from the mockup's own
+    closing note: the grid reads as "5 of 6 full" at rest rather than a
+    clean 5 or 6, accepted because it keeps the slot's purpose legible at
+    a glance rather than having it silently change shape.
+  - Verified live end-to-end via Playwright against a real seeded ASL3
+    hotspot + 5 favorites (not just a JS syntax check): confirmed the
+    empty-slot state renders correctly at rest (6 tiles, 5 real + 1
+    placeholder), confirmed the tooltip's opacity genuinely changes on
+    `:hover`, confirmed a real quick-connect action (simulated by seeding
+    `asl_linked_nodes` the way a real connect+poll cycle would, since a
+    live SSH connect isn't available in this sandbox) fills the reserved
+    slot in with a real occupied tile and its two action buttons, and
+    confirmed the bidirectional Multi-connect sync both directions.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

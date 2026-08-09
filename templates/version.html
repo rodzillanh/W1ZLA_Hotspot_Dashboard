@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.1 "Lynott"</span>
+                <span class="release-version">v4.2 "Bruce"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL Favorites card: quick connect and Multi-connect moved back onto the card</span> — the "ASL Control" and "Manage favorites" buttons were reported as redundant (both opened the identical drawer), so that row is now half "ASL Control", half an inline quick-connect field with its own floating tooltip explaining what it does. A plain Multi-connect checkbox (matching the drawer's own) sits right below it, staying in sync with the drawer's copy in both directions</li>
+                <li><span>The 6th grid slot is reserved for ad hoc connections again, not a 6th favorite</span> — the grid stays at 5 pinned favorites; the last slot is a quiet placeholder until something's connected outside them, then fills in with its own Pin/Disconnect actions</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.1 "Lynott"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed: ASL Favorites tiles could overflow past the card</span> — a long favorite label (e.g. a name imported from a favorites.ini file with a city/state baked in) could push a tile wider than its column instead of truncating, breaking the whole grid out past the card's own border</li>
