@@ -125,14 +125,42 @@ def favorites_set() -> set:
 # --- ASL favorites (node numbers, distinct from the callsign favorites above) ---
 
 def load_asl_favorites() -> list:
-    """Return list of dicts: [{node, label}, ...]"""
+    """Return list of dicts: [{node, label, pinned, pinned_at}, ...].
+
+    `pinned` (shown as a tile on the compact ASL Favorites card, capped at
+    config.ASL_FAV_CARD_CAP -- the rest are still real favorites, just
+    pin-managed from the ASL Control drawer instead) is migrated in place
+    the first time an entry is seen without the key: the first CAP such
+    entries (in existing list order) default to pinned, the rest don't --
+    preserves "roughly the same favorites show up" for an existing install
+    upgrading, rather than surprising it with an empty tile grid or an
+    arbitrary cutoff. `pinned_at` (a Unix timestamp, used to pick which
+    pinned favorite gets bumped when a new one is pinned past the cap)
+    defaults to 0 for migrated entries -- deliberately the oldest possible
+    value, so a real future pin action always outranks a migrated default
+    for eviction purposes. Self-healing: any write path that doesn't know
+    about these fields (e.g. a bulk backup import) just omits them, and
+    they get backfilled the same way the next time this loads."""
     if not os.path.exists(config.ASL_FAVORITES_FILE):
         return []
     try:
         with _file_lock, open(config.ASL_FAVORITES_FILE, "r") as f:
-            return json.load(f)
+            favorites = json.load(f)
     except (json.JSONDecodeError, OSError):
         return []
+
+    migrated = False
+    pinned_count = sum(1 for f in favorites if f.get("pinned") is True)
+    for f in favorites:
+        if "pinned" not in f:
+            f["pinned"] = pinned_count < config.ASL_FAV_CARD_CAP
+            if f["pinned"]:
+                pinned_count += 1
+            f["pinned_at"] = 0
+            migrated = True
+    if migrated:
+        save_asl_favorites(favorites)
+    return favorites
 
 
 def save_asl_favorites(favorites: list) -> None:

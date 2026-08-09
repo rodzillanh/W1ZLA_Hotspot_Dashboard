@@ -599,12 +599,26 @@ def api_asl_favorites_get():
 @app.route("/api/asl_favorites", methods=["POST"])
 def api_asl_favorites_post():
     """Accept full list of ASL favorite node numbers and overwrite --
-    distinct from the callsign favorites above."""
+    distinct from the callsign favorites above. Preserves pinned/pinned_at
+    (see storage.load_asl_favorites()'s docstring) -- this route is the
+    active, frequent write path (every pin toggle/add/remove from the
+    redesigned card or drawer goes through it), so dropping those fields
+    here would wipe a just-set pin the moment it's saved, not just leave
+    it for the read-side migration to backfill later."""
     data = request.json or []
-    cleaned = [
-        {"node": f["node"].strip(), "label": f.get("label", "").strip()}
-        for f in data if f.get("node", "").strip().isdigit()
-    ]
+    cleaned = []
+    for f in data:
+        node = f.get("node", "").strip()
+        if not node.isdigit():
+            continue
+        entry = {"node": node, "label": f.get("label", "").strip()}
+        if "pinned" in f:
+            entry["pinned"] = bool(f["pinned"])
+        try:
+            entry["pinned_at"] = float(f.get("pinned_at", 0))
+        except (TypeError, ValueError):
+            entry["pinned_at"] = 0
+        cleaned.append(entry)
     save_asl_favorites(cleaned)
     return jsonify({"ok": True})
 

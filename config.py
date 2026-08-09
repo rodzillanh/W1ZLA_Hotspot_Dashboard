@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "3.99"
+APP_VERSION = "4.0"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -68,6 +68,7 @@ VERSION_CODENAMES = [
                         # Butterfield Blues Band (1943-1981)
     "Jones",            # v3.98 -- Davy Jones, The Monkees (1945-2012)
     "Frehley",          # v3.99 -- Ace Frehley, KISS guitarist (1951-2025)
+    "Allman",           # v4.0 -- Duane Allman, Allman Brothers Band (1946-1971)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -77,6 +78,13 @@ CONFIG_FILE  = os.path.join(CONFIG_DIR, "hotspots.json")
 SETTINGS_FILE = os.path.join(CONFIG_DIR, "settings.json")
 FAVORITES_FILE = os.path.join(CONFIG_DIR, "favorites.json")
 ASL_FAVORITES_FILE = os.path.join(CONFIG_DIR, "asl_favorites.json")
+# Max ASL favorites shown as tiles on the compact ASL Favorites card at
+# once (v4.0) -- the rest still exist as real favorites, managed/pinnable
+# from the ASL Control drawer, they just don't take up card space. Kept
+# in sync manually with dashboard.html's own ASL_FAV_CARD_CAP JS constant,
+# same "no shared source of truth across Python/JS" tradeoff as every
+# other client-side-mirrored constant in this project.
+ASL_FAV_CARD_CAP = 5
 BM_TG_FAVORITES_FILE = os.path.join(CONFIG_DIR, "bm_tg_favorites.json")
 CAMERAS_FILE = os.path.join(CONFIG_DIR, "cameras.json")
 QSOS_FILE    = os.path.join(CONFIG_DIR, "qsos.json")

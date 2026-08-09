@@ -714,14 +714,15 @@
             text-align: center;
         }
 
-        /* --- ASL favorites & control card --- */
-        /* Groups the gear icon + "Control from" select on the right side of
-           .metrics-header, same reasoning as .card-header-right elsewhere --
-           .metrics-header is justify-content:space-between, and a bare THIRD
-           child there would spread across the full card width instead of
-           clustering on the right (the exact documented bug class this
-           wrapper pattern exists to avoid). */
-        .asl-fav-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        /* --- ASL favorites card (v4.0 tile-grid redesign, mockup-approved
+           over several rounds -- see CLAUDE.md) -- a tap-to-toggle tile
+           grid instead of a table, since a separate status chip + Connect/
+           Disconnect button + remove icon per row was functionally a
+           smaller copy of what the ASL Control drawer already does.
+           Management (add/remove, pin/unpin which favorites show here,
+           Monitor mode, Multi-connect) all moved to the drawer -- this
+           card's whole job now is "see what's on, tap to join or leave." */
+        .card-name-group { display: flex; align-items: center; gap: 8px; min-width: 0; }
         .asl-fav-source {
             display: flex; align-items: center; gap: 6px;
             font-size: 12px; color: var(--text-muted); flex-shrink: 0;
@@ -730,71 +731,102 @@
             background: var(--input-bg); border: 1px solid var(--toolbar-border);
             color: var(--text); border-radius: 5px; padding: 4px 8px; font-size: 12px;
         }
-        .asl-fav-mode-row {
-            display: flex; align-items: center; gap: 7px;
-            font-size: 11.5px; color: var(--text-muted);
-            padding: 7px 9px; margin-bottom: 8px;
-            background: var(--toolbar-bg); border: 1px solid var(--toolbar-border);
-            border-radius: 6px;
+        /* Compact inline status pill -- replaces the old 3-column Favorites/
+           Keyed/Connected stats row entirely. Each segment only renders
+           when its count is non-zero, so the common "nothing keyed, nothing
+           connected" case shows no pill at all rather than a row of zeros. */
+        .fav-mini-status { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+        .mini-stat {
+            display: flex; align-items: center; gap: 3px; font-family: var(--font-mono);
+            font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 20px;
         }
-        .asl-fav-mode-row input[type="checkbox"] { accent-color: var(--accent); width: 13px; height: 13px; margin: 0; }
-        .asl-fav-mode-row label { cursor: pointer; }
-        /* Caps the card's height once favorites pile up -- rows scroll
-           internally instead of the card growing taller indefinitely. */
-        .asl-fav-scroll {
-            max-height: 118px; overflow-y: auto; margin: 10px -4px; padding: 0 4px;
-            scrollbar-width: thin; scrollbar-color: var(--toolbar-border) transparent;
+        .mini-stat .dot { width: 5px; height: 5px; border-radius: 50%; }
+        .mini-stat.keyed { background: var(--danger-dim); color: var(--danger); }
+        .mini-stat.keyed .dot { background: var(--danger); animation: pulse 1.2s infinite; }
+        .mini-stat.connected { background: var(--good-dim); color: var(--good); }
+        .mini-stat.connected .dot { background: var(--good); }
+        /* Two half-width buttons instead of one full-width gear icon --
+           "Manage favorites" deep-links straight to the drawer's pin list
+           (see openAslDrawer()'s focusFavorites param), since curating
+           which 5 are pinned is the one workflow this redesign pushed off
+           the card entirely and deserves a direct shortcut. */
+        .ctrl-btn-row { display: flex; gap: 8px; margin-bottom: 12px; }
+        .ctrl-btn-row button {
+            flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 8px 6px; border-radius: 7px; font-size: 11.5px; font-weight: 600;
+            cursor: pointer; font-family: inherit; background: transparent;
+            transition: background .15s, border-color .15s; white-space: nowrap;
         }
-        .asl-fav-scroll::-webkit-scrollbar { width: 7px; }
-        .asl-fav-scroll::-webkit-scrollbar-track  { background: transparent; }
-        .asl-fav-scroll::-webkit-scrollbar-button { display: none; height: 0; width: 0; }
-        .asl-fav-scroll::-webkit-scrollbar-thumb {
-            background: var(--toolbar-border); border-radius: 4px;
+        .open-ctrl-btn { border: 1px solid color-mix(in srgb, var(--live) 45%, var(--border)); color: var(--live); }
+        .open-ctrl-btn:hover { background: var(--live-dim); border-color: var(--live); }
+        .manage-fav-btn { border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); color: var(--accent); }
+        .manage-fav-btn:hover { background: var(--accent-dim); border-color: var(--accent); }
+
+        .tile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 10px; }
+        .fav-tile {
+            position: relative; text-align: left; cursor: pointer; font-family: inherit;
+            background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+            padding: 9px 10px; display: flex; flex-direction: column; gap: 3px;
+            transition: background .15s, border-color .15s, transform .1s;
+            min-height: 64px; color: inherit;
         }
-        .asl-fav-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
-        .asl-fav-table { width: 100%; border-collapse: collapse; }
-        .asl-fav-row td { padding: 4px 6px; font-size: 13px; vertical-align: middle; }
-        .asl-fav-row td:first-child { border-radius: 8px 0 0 8px; }
-        .asl-fav-row td:last-child  { border-radius: 0 8px 8px 0; }
-        .asl-fav-row.keyed     { background: var(--danger-dim); }
-        .asl-fav-row.connected { background: var(--good-dim); }
-        .asl-fav-row.recent    { background: var(--accent-dim); }
-        .asl-fav-callsign { font-weight: 500; }
-        .asl-fav-desc { display: block; font-size: 11px; color: var(--text-muted); }
-        .asl-status-chip {
-            display: inline-flex; align-items: center; gap: 5px;
-            font-size: 10.5px; font-weight: 500; padding: 2px 8px; border-radius: 10px;
-            white-space: nowrap;
+        .fav-tile:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--text-dim) 60%, var(--border)); }
+        .fav-tile.keyed     { background: var(--danger-dim); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+        .fav-tile.connected { background: var(--good-dim); border-color: color-mix(in srgb, var(--good) 40%, var(--border)); }
+        .fav-tile.recent    { background: var(--accent-dim); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+        .fav-tile-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+        .fav-tile-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+        .fav-tile.keyed .fav-tile-dot { background: var(--danger); animation: pulse 1.2s infinite; }
+        .fav-tile.connected .fav-tile-dot { background: var(--good); }
+        .fav-tile.recent .fav-tile-dot { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
+        .fav-tile-name { font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fav-tile-node { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); }
+        .fav-tile-meta { font-size: 10.5px; color: var(--text-muted); line-height: 1.35; }
+        .fav-tile.keyed .fav-tile-meta { color: var(--danger); font-weight: 600; }
+        .fav-tile.connected .fav-tile-meta { color: var(--good); }
+        .fav-tile-hint { font-size: 9.5px; color: var(--text-dim); margin-top: auto; padding-top: 2px; }
+        .fav-tile:hover .fav-tile-hint { color: var(--text-muted); }
+
+        /* The 6th grid slot -- whatever's connected outside the 5 pinned
+           favorites, or, when nothing extra is connected, the quick-connect
+           entry itself. Mutually exclusive in practice, so one slot covers
+           both instead of a separate quick-connect row underneath the grid. */
+        .qc-tile {
+            background: var(--panel-2); border: 1px dashed var(--border); border-radius: 8px;
+            padding: 8px 9px; display: flex; flex-direction: column; gap: 5px; justify-content: center;
+            min-height: 64px;
         }
-        .asl-status-chip.keyed     { background: var(--danger-dim); color: var(--danger); animation: pulse 1.4s infinite; }
-        .asl-status-chip.connected { background: var(--good-dim); color: var(--good); }
-        .asl-status-chip.idle      { background: var(--toolbar-bg); color: var(--text-dim); }
-        .asl-fav-actions { text-align: right; white-space: nowrap; }
-        .asl-btn-connect, .asl-btn-disconnect, .asl-btn-remove {
-            font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
-            border: 1px solid; background: none;
+        .qc-tile-label { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--text-dim); font-weight: 600; }
+        .qc-plus { font-size: 12px; line-height: 1; color: var(--text-dim); }
+        .qc-tile-row { display: flex; gap: 4px; }
+        .qc-tile-row input {
+            width: 100%; min-width: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 4px;
+            color: var(--text); padding: 4px 6px; font-size: 11px; font-family: var(--font-mono);
         }
-        .asl-btn-connect { color: var(--accent); border-color: var(--accent); }
-        .asl-btn-connect:hover { background: var(--accent-dim); }
-        .asl-btn-disconnect, .asl-btn-remove { color: var(--text-muted); border-color: var(--toolbar-border); }
-        .asl-btn-disconnect:hover, .asl-btn-remove:hover { background: var(--toolbar-bg); }
-        .asl-fav-add-row {
-            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-            padding-top: 10px; border-top: 1px solid var(--card-border);
+        .qc-tile-row button {
+            flex-shrink: 0; font-size: 10.5px; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--accent);
+            background: transparent; color: var(--accent); cursor: pointer; font-family: inherit;
         }
-        .asl-fav-add-row input {
-            background: var(--input-bg); border: 1px solid var(--toolbar-border); color: var(--text);
-            border-radius: 6px; padding: 6px 9px; font-size: 12px;
+        .qc-tile-row button:hover { background: var(--accent-dim); }
+        /* An ad hoc (not-yet-pinned) live connection reuses .fav-tile's own
+           "connected"/"keyed" look so it reads identically to a pinned
+           favorite that happens to be connected -- the only tell is the
+           small ☆ corner button (pin it as a real favorite) and the
+           "not saved" tag. */
+        .fav-tile.adhoc { padding-right: 26px; }
+        .fav-tile-pin-btn {
+            position: absolute; top: 6px; right: 6px; background: none; border: none;
+            color: var(--text-dim); font-size: 13px; line-height: 1; cursor: pointer; padding: 2px;
+            transition: color .15s, transform .1s;
         }
-        .asl-fav-add-row input.asl-node-input  { width: 80px; }
-        .asl-fav-add-row input.asl-label-input { flex: 1; min-width: 100px; }
-        .asl-btn-add {
-            font-size: 12px; padding: 6px 12px; border-radius: 6px; cursor: pointer;
-            border: 1px solid var(--link); color: var(--link); background: none;
+        .fav-tile-pin-btn:hover { color: var(--accent); transform: scale(1.15); }
+
+        .fav-overflow-hint {
+            font-size: 10.5px; color: var(--text-dim); margin: -2px 0 8px; cursor: pointer;
+            text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px;
         }
-        .asl-btn-add:hover { background: rgba(91,192,222,.08); }
-        .asl-fav-empty { color: var(--text-dim); font-size: 12.5px; padding: 6px 0 10px; }
-        .asl-fav-status-txt { font-size: 11px; color: var(--text-muted); margin-left: 8px; }
+        .fav-overflow-hint:hover { color: var(--text-muted); }
+        .asl-fav-status-txt { font-size: 11px; color: var(--text-muted); }
 
         /* --- ASL Control sidebar (asl-drawer) -- gear icon on the ASL
            Favorites card. See openAslDrawer()/renderAslDrawer(). --- */
@@ -827,10 +859,25 @@
             flex: 1; min-width: 0; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px;
             padding: 7px 9px; color: var(--text); font-family: var(--font-mono); font-size: 12.5px;
         }
-        .asl-ctrl-keep-row {
-            display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted);
-            padding: 8px 0 2px; cursor: pointer;
+        /* Multi-connect (v4.0) -- relocated here from a "Keep existing
+           connections" checkbox that used to sit right below the local-node
+           strip, and renamed since "keep others" on its own didn't say what
+           it was keeping others FROM. Now the one shared setting for every
+           connect action across both this drawer and the compact card's own
+           tile taps (aslConnect() reads the module-level aslMultiConnect
+           var directly, not a per-surface checkbox -- see its own comment). */
+        .asl-ctrl-multi-row {
+            display: flex; align-items: flex-start; gap: 7px; font-size: 12px; color: var(--text-muted);
+            padding: 10px 0 2px; margin-top: 10px; border-top: 1px solid var(--border-soft); cursor: pointer;
         }
+        .asl-ctrl-multi-row input[type="checkbox"] { accent-color: var(--accent); width: 13px; height: 13px; margin: 2px 0 0; flex-shrink: 0; }
+        .asl-ctrl-multi-row .hint { display: block; font-size: 10.5px; color: var(--text-dim); margin-top: 1px; }
+        .asl-ctrl-pin-star {
+            background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1;
+            color: var(--text-dim); flex-shrink: 0; padding: 2px; transition: color .15s, transform .1s;
+        }
+        .asl-ctrl-pin-star.pinned { color: var(--accent); }
+        .asl-ctrl-pin-star:hover { transform: scale(1.15); }
         .asl-ctrl-qc-btn {
             font-size: 11px; padding: 6px 10px; border-radius: 6px; cursor: pointer; border: 1px solid;
             background: none; white-space: nowrap; font-family: var(--font-mono);
@@ -1531,7 +1578,7 @@
         .dvs-icon { font-size: 15px; line-height: 1; flex-shrink: 0; }
         /* Node picker (v3.99) -- same "group the header-right controls so
            .metrics-header's space-between doesn't spread a bare third
-           child across the card" reasoning as .asl-fav-header-right, and
+           child across the card" reasoning used throughout this file, and
            the select itself mirrors .asl-fav-source's styling exactly. */
         .dvs-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
         .dvs-source { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
@@ -1675,6 +1722,19 @@
            openHotspotDrawer()/renderHotspotSettingsFields(). --- */
         .hs-settings-link { font-size: 11px; color: var(--text-muted); text-decoration: none; font-weight: 400; }
         .hs-settings-link:hover { color: var(--live); text-decoration: underline; }
+        /* ASL3-only entry point into the ASL Control drawer (v4.0) -- same
+           row/placement as .hs-settings-link one section up, accent-colored
+           instead of muted so it reads as "jump to a different surface"
+           rather than "jump to Settings". Exists so ASL Control stays
+           reachable even with the ASL Favorites card turned off entirely --
+           see CLAUDE.md, openAslDrawer() was previously only ever called
+           from that card's own button. */
+        .open-asl-ctrl-link {
+            font-size: 11px; color: var(--accent); text-decoration: none; font-weight: 600;
+            display: inline-flex; align-items: center; gap: 3px; cursor: pointer;
+            border: none; background: none; font-family: inherit; padding: 0;
+        }
+        .open-asl-ctrl-link:hover { text-decoration: underline; }
         .hs-field-block { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-top: 4px; }
         .hs-health-line { font-size: 11px; color: var(--text-dim); margin: -2px 0 12px; display: flex; align-items: center; gap: 5px; }
         .hs-health-line .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
@@ -2073,36 +2133,22 @@
         <div class="metrics-card" id="asl-favorites-card"
              style="order:{{ settings.get('asl_favorites_position', 0) }}">
             <div class="metrics-header">
-                <div class="card-name">📡 ASL Favorites</div>
-                <div class="asl-fav-header-right">
-                    <div class="asl-fav-source">
-                        <label for="asl-fav-hotspot-select">Control from:</label>
-                        <select id="asl-fav-hotspot-select" onchange="renderAslFavorites()"></select>
-                    </div>
-                    <button class="card-gear-btn" title="ASL control sidebar" onclick="openAslDrawer()">⚙</button>
+                <div class="card-name-group">
+                    <div class="card-name">📡 ASL Favorites</div>
+                    <div class="fav-mini-status" id="asl-fav-mini-status"></div>
+                </div>
+                <div class="asl-fav-source">
+                    <label for="asl-fav-hotspot-select">From:</label>
+                    <select id="asl-fav-hotspot-select" onchange="renderAslFavorites()"></select>
                 </div>
             </div>
-            <div class="fleet-stats-grid">
-                <div>Favorites: <span class="stat-val" id="asl-fav-count">—</span></div>
-                <div>Keyed: <span class="stat-val" id="asl-fav-keyed">—</span></div>
-                <div>Connected: <span class="stat-val" id="asl-fav-connected">—</span></div>
+            <div class="ctrl-btn-row">
+                <button class="open-ctrl-btn" onclick="openAslDrawer()">🎛️ ASL Control</button>
+                <button class="manage-fav-btn" onclick="openAslDrawer(null, true)">★ Manage favorites</button>
             </div>
-            <div class="asl-fav-mode-row">
-                <input type="checkbox" id="asl-fav-keep-connections">
-                <label for="asl-fav-keep-connections">Keep existing connections</label>
-            </div>
-            <div class="asl-fav-scroll">
-                <table class="asl-fav-table"><tbody id="asl-fav-tbody"></tbody></table>
-            </div>
-            <div class="asl-fav-empty" id="asl-fav-empty" style="display:none">
-                No ASL3 hotspots configured yet — add one in Settings → Hotspots.
-            </div>
-            <div class="asl-fav-add-row">
-                <input class="asl-node-input" type="text" id="asl-fav-node-input" placeholder="Node #">
-                <input class="asl-label-input" type="text" id="asl-fav-label-input" placeholder="Label (optional)">
-                <button class="asl-btn-add" onclick="addAslFavorite()">+ Add favorite</button>
-                <span class="asl-fav-status-txt" id="asl-fav-status"></span>
-            </div>
+            <div class="tile-grid" id="asl-fav-tile-grid"></div>
+            <div class="fav-overflow-hint" id="asl-fav-overflow-hint" onclick="openAslDrawer(null, true)" style="display:none"></div>
+            <span class="asl-fav-status-txt" id="asl-fav-status"></span>
         </div>
         {% endif %}
         {% set notif_source_count = (1 if settings.get('aprs_inbox_enabled', False) else 0) + (1 if settings.get('hamalert_enabled', False) else 0) + (1 if settings.get('fleet_alerts_enabled', False) else 0) + (1 if settings.get('solar_alerts_enabled', False) else 0) + (1 if settings.get('brandmeister_alerts_enabled', False) else 0) %}
@@ -6262,7 +6308,10 @@ function openHotspotDrawer(ip) {
         const nodes = hs.asl_linked_nodes || [];
         linkedHtml = `
         <div class="hs-drawer-section" style="margin-top:10px">
-            <div class="hs-drawer-section-title">Linked nodes <span class="count">(${nodes.length})</span></div>
+            <div class="hs-drawer-section-title" style="justify-content:space-between">
+                <span>Linked nodes <span class="count">(${nodes.length})</span></span>
+                <button class="open-asl-ctrl-link" onclick="openAslDrawer('${escapeHtml(hs.ip)}')">🎛️ Open in ASL Control →</button>
+            </div>
             <div class="hs-link-quickconnect">
                 <input type="text" id="hs-quickconnect-node" placeholder="Node # to connect…">
                 <button class="hs-test-btn" onclick="hotspotQuickConnect()">Connect</button>
@@ -7591,17 +7640,39 @@ function renderFleetActivity(data) {
 }
 
 // --- ASL favorites & control ---
-let aslFavorites          = [];    // [{node, label}, ...] from /api/asl_favorites
+let aslFavorites          = [];    // [{node, label, pinned, pinned_at}, ...] from /api/asl_favorites
 let lastApiData           = null;  // most recent /api/data response, reused for status lookup
 let aslSelectedHotspotIp   = null; // which ASL3 hotspot the "Control from" select is on
 let aslSelectedFavoriteNode = null; // ASL Control sidebar: which favorite row is selected -- drives Quick connect's context (see renderAslDrawer())
+// Max favorites shown as tiles on the compact card at once -- kept in
+// sync manually with config.ASL_FAV_CARD_CAP server-side.
+const ASL_FAV_CARD_CAP = 5;
+// Shared "don't disconnect others first" preference (v4.0) -- ONE setting
+// now, not a per-surface checkbox (the compact card's own tile taps and
+// the drawer's Quick connect/favorite-row actions all read this same
+// variable via aslConnect() below). Session-only, same as the checkbox
+// it replaced never persisted across a reload either.
+let aslMultiConnect = false;
+
+// Frees exactly one pinned slot if `list` is already at the cap, by
+// unpinning whichever pinned favorite has the OLDEST pinned_at -- used
+// both when pinning an ad hoc connection from the card and when pinning
+// a favorite from the drawer's star, so a newly-pinned favorite always
+// has room. Returns a NEW array; never mutates `list` in place.
+function evictOldestPinned(list) {
+    const pinnedNow = list.filter(f => f.pinned !== false);
+    if (pinnedNow.length < ASL_FAV_CARD_CAP) return list;
+    const oldest = pinnedNow.slice().sort((a, b) => (a.pinned_at || 0) - (b.pinned_at || 0))[0];
+    return list.map(f => f.node === oldest.node ? { ...f, pinned: false } : f);
+}
 
 function fetchAslFavorites() {
     fetch('/api/asl_favorites')
         .then(r => r.json())
         .then(data => {
             aslFavorites = data;
-            renderAslFavorites();
+            renderAslFavorites(); // no-op if the compact card isn't in the DOM (show_asl_favorites off)
+            renderAslDrawer();    // no-op if the drawer isn't currently open
         });
 }
 
@@ -7615,10 +7686,11 @@ function fetchBmTgFavorites() {
 }
 
 function renderAslFavorites() {
-    const select   = document.getElementById('asl-fav-hotspot-select');
-    const tbody    = document.getElementById('asl-fav-tbody');
-    const emptyEl  = document.getElementById('asl-fav-empty');
-    if (!select || !tbody) return;
+    const select  = document.getElementById('asl-fav-hotspot-select');
+    const gridEl  = document.getElementById('asl-fav-tile-grid');
+    const miniEl  = document.getElementById('asl-fav-mini-status');
+    const hintEl  = document.getElementById('asl-fav-overflow-hint');
+    if (!select || !gridEl || !miniEl) return;
 
     const aslHotspots = (lastApiData || []).filter(hs => hs.type === 'asl3');
 
@@ -7626,7 +7698,7 @@ function renderAslFavorites() {
     // it's still valid, since this rebuilds on every poll.
     const prevSelection = select.value || aslSelectedHotspotIp;
     select.innerHTML = aslHotspots.map(hs =>
-        `<option value="${hs.ip}">${hs.name} (${hs.asl_node || '?'})</option>`
+        `<option value="${hs.ip}">${escapeHtml(hs.name)} (${escapeHtml(hs.asl_node || '?')})</option>`
     ).join('');
     if (aslHotspots.some(hs => hs.ip === prevSelection)) {
         select.value = prevSelection;
@@ -7634,109 +7706,198 @@ function renderAslFavorites() {
     aslSelectedHotspotIp = select.value || null;
 
     if (aslHotspots.length === 0) {
-        tbody.innerHTML = '';
-        emptyEl.style.display = 'block';
-        document.getElementById('asl-fav-count').textContent      = aslFavorites.length;
-        document.getElementById('asl-fav-keyed').textContent      = '—';
-        document.getElementById('asl-fav-connected').textContent  = '—';
+        miniEl.innerHTML = '';
+        gridEl.innerHTML = '<div class="hs-empty-note">No ASL3 hotspots configured yet — add one in Settings → Hotspots.</div>';
+        if (hintEl) hintEl.style.display = 'none';
         return;
     }
-    emptyEl.style.display = 'none';
 
     const controlHotspot = aslHotspots.find(hs => hs.ip === aslSelectedHotspotIp) || aslHotspots[0];
     // Live status comes from the already-polled asl_linked_nodes on whichever
-    // hotspot is selected -- no separate status API needed. A favorite not
-    // currently linked to this hotspot has no live status to show, since
-    // keyed/connected state is only knowable from our own link table.
+    // hotspot is selected -- no separate status API needed.
     const linkedByNode = {};
     (controlHotspot.asl_linked_nodes || []).forEach(link => { linkedByNode[link.node] = link; });
 
-    // Keyed/connected favorites always sort to the top -- so whatever's
-    // live stays visible above the fold even once the list scrolls.
-    const rank = fav => {
-        const link = linkedByNode[fav.node];
-        return !link ? 2 : (link.keyed ? 0 : 1);
-    };
-    const sortedFavorites = aslFavorites.slice().sort((a, b) => rank(a) - rank(b));
+    // Which favorites earn a tile -- oldest-pinned first (matches
+    // evictOldestPinned()'s own "oldest gets bumped first" rule, so the
+    // tile order hints at eviction risk), capped defensively even though
+    // the pin/evict logic should never let more than CAP end up true.
+    const pinnedFavs = aslFavorites
+        .filter(f => f.pinned !== false)
+        .sort((a, b) => (a.pinned_at || 0) - (b.pinned_at || 0))
+        .slice(0, ASL_FAV_CARD_CAP);
+    const pinnedNodes = new Set(pinnedFavs.map(f => f.node));
+    const hiddenCount = aslFavorites.filter(f => !pinnedNodes.has(f.node)).length;
+
+    // The dynamic 6th tile: whatever's linked outside the pinned set
+    // (preferring a keyed one if more than one, since that's the most
+    // relevant), or -- when there's nothing extra connected -- the
+    // quick-connect entry itself. Mutually exclusive in practice, so one
+    // grid slot covers both instead of a separate row under the grid.
+    const extras = (controlHotspot.asl_linked_nodes || []).filter(l => !pinnedNodes.has(l.node));
+    const extraLink = extras.find(l => l.keyed) || extras[0] || null;
 
     let keyedCount = 0, connectedCount = 0;
-    tbody.innerHTML = sortedFavorites.map(fav => {
-        const link      = linkedByNode[fav.node];
-        const isKeyed   = !!(link && link.keyed);
-        const isConn    = !!link;
-        if (isKeyed) keyedCount++;
-        if (isConn)  connectedCount++;
-
-        const chip      = isKeyed
-            ? `<span class="asl-status-chip keyed">🔴 KEYED</span>`
-            : (isConn
-                ? `<span class="asl-status-chip connected">🟢 Connected</span>`
-                : `<span class="asl-status-chip idle">Not connected</span>`);
-        // Rx%/LCnt/status dot -- same aslFavoriteStats source and same
-        // keyed/webtx/active/recent convention the ASL Control drawer
-        // already uses (see renderAslDrawer()), just also surfaced on the
-        // compact card now. No new fetch: fetchAslFavoriteStats() below is
-        // called from here too, sharing the same 60s-throttled cache as
-        // the drawer. "recent" (amber -- some activity on this node since
-        // the last check, per aslstats.py's totalkeyups/totaltxtime diff)
-        // only applies when NOT already linked to this hub -- a linked
-        // favorite already has a more precise, real-time keyed/connected
-        // signal, which wins.
-        //
-        // Folded into the existing secondary text line rather than a new
-        // table column -- a real layout bug caught by actually rendering
-        // this (via generate_screenshots.py), not just reading the code: a
-        // 4th column stole width from the name column, wrapping a longer
-        // favorite name onto 2 lines and clipping it against the row
-        // list's fixed scroll height. Plain text costs far less horizontal
-        // room than the drawer's own pill-styled Rx%/LCnt spans, which
-        // have more breathing room in the sidebar than this compact card
-        // does.
-        const stats = aslFavoriteStats[fav.node];
-        let dotClass = '';
-        const descBits = [];
-        if (isKeyed) {
-            dotClass = 'keyed';
-        } else if (stats && stats.found === true) {
-            dotClass = stats.recently_active === true ? 'recent'
-                : stats.webtransceiver ? 'webtx'
-                : (stats.status === 'Active' ? 'active' : '');
-            descBits.push(stats.rx_pct != null ? stats.rx_pct + '% rx' : '— rx');
-            descBits.push(stats.lcnt != null ? stats.lcnt + ' links' : '— links');
-            if (stats.recently_active === true) descBits.push('<span style="color:var(--accent)">recently active</span>');
-        } else if (stats && stats.found === false) {
-            descBits.push('Not in ASL DB');
-        } else if (stats && stats.error) {
-            descBits.push('Stats unavailable');
+    pinnedFavs.forEach(f => {
+        const link = linkedByNode[f.node];
+        if (link) {
+            connectedCount++;
+            if (link.keyed) keyedCount++;
         }
-        const rowClass  = isKeyed ? 'keyed' : (isConn ? 'connected' : (dotClass === 'recent' ? 'recent' : ''));
+    });
+    if (extraLink) {
+        connectedCount++;
+        if (extraLink.keyed) keyedCount++;
+    }
+    const miniParts = [];
+    if (keyedCount > 0)     miniParts.push(`<span class="mini-stat keyed"><span class="dot"></span>${keyedCount}</span>`);
+    if (connectedCount > 0) miniParts.push(`<span class="mini-stat connected"><span class="dot"></span>${connectedCount}</span>`);
+    miniEl.innerHTML = miniParts.join('');
 
-        const label      = fav.label || (link && link.callsign) || '';
-        const primaryText = label || `Node ${fav.node}`;
-        if (label) descBits.unshift(`Node ${fav.node}`);
-        const nameLine = descBits.length
-            ? `<span class="asl-fav-callsign">${primaryText}</span><span class="asl-fav-desc">${descBits.join(' · ')}</span>`
-            : `<span class="asl-fav-callsign">${primaryText}</span>`;
-        const actionBtn = isConn
-            ? `<button class="asl-btn-disconnect" onclick="aslConnect('${controlHotspot.ip}','${fav.node}','disconnect')">Disconnect</button>`
-            : `<button class="asl-btn-connect" onclick="aslConnect('${controlHotspot.ip}','${fav.node}','connect')">Connect</button>`;
+    // Preserve the quick-connect tile's typed value/focus across this
+    // rebuild -- same reasoning renderAslDrawer() documents for its own
+    // inputs: a poll-driven innerHTML rebuild would otherwise wipe
+    // whatever's mid-typed every few seconds.
+    const qcInputBefore = document.getElementById('asl-fav-qc-node');
+    const qcFocused  = !!(qcInputBefore && document.activeElement === qcInputBefore);
+    const qcValue    = qcInputBefore ? qcInputBefore.value : '';
+    const qcSelStart = qcFocused && typeof qcInputBefore.selectionStart === 'number' ? qcInputBefore.selectionStart : null;
+    const qcSelEnd   = qcFocused && typeof qcInputBefore.selectionEnd   === 'number' ? qcInputBefore.selectionEnd   : null;
 
-        return `
-        <tr class="asl-fav-row ${rowClass}">
-            <td><span class="asl-ctrl-node-dot ${dotClass}" style="margin-right:7px"></span>${nameLine}</td>
-            <td>${chip}</td>
-            <td class="asl-fav-actions">
-                ${actionBtn}
-                <button class="asl-btn-remove" onclick="removeAslFavorite('${fav.node}')" title="Remove favorite">✕</button>
-            </td>
-        </tr>`;
-    }).join('');
+    gridEl.innerHTML = pinnedFavs.map(fav => favTileHtml(fav, linkedByNode)).join('')
+        + dynamicFavTileHtml(extraLink);
+
+    const qcInputAfter = document.getElementById('asl-fav-qc-node');
+    if (qcInputAfter && qcValue) {
+        qcInputAfter.value = qcValue;
+        if (qcFocused) {
+            qcInputAfter.focus();
+            if (qcSelStart !== null) qcInputAfter.setSelectionRange(qcSelStart, qcSelEnd);
+        }
+    }
+
+    if (hintEl) {
+        if (hiddenCount > 0) {
+            hintEl.style.display = 'block';
+            hintEl.textContent = `+${hiddenCount} more favorite${hiddenCount === 1 ? '' : 's'} saved — open ASL Control to pin or manage`;
+        } else {
+            hintEl.style.display = 'none';
+        }
+    }
 
     fetchAslFavoriteStats();
+}
 
-    document.getElementById('asl-fav-count').textContent     = aslFavorites.length;
-    document.getElementById('asl-fav-keyed').textContent     = keyedCount;
-    document.getElementById('asl-fav-connected').textContent = connectedCount;
+// One pinned favorite's tile -- same keyed/connected/recent language and
+// aslFavoriteStats source the ASL Control drawer's own rows already use.
+function favTileHtml(fav, linkedByNode) {
+    const link    = linkedByNode[fav.node];
+    const isKeyed = !!(link && link.keyed);
+    const isConn  = !!link;
+    const stats   = aslFavoriteStats[fav.node];
+    let cls = '', meta = '— rx · — links', hint = 'tap to connect';
+    if (isKeyed) {
+        cls = 'keyed'; meta = '🔴 KEYED'; hint = 'tap to disconnect';
+    } else if (isConn) {
+        cls = 'connected'; meta = 'Connected'; hint = 'tap to disconnect';
+    } else if (stats && stats.found === true) {
+        if (stats.recently_active === true) cls = 'recent';
+        const bits = [stats.rx_pct != null ? stats.rx_pct + '% rx' : '— rx', stats.lcnt != null ? stats.lcnt + ' links' : '— links'];
+        if (stats.recently_active === true) bits.push('recently active');
+        meta = bits.join(' · ');
+    } else if (stats && stats.found === false) {
+        meta = 'Not in ASL DB';
+    } else if (stats && stats.error) {
+        meta = 'Stats unavailable';
+    }
+    const name = fav.label || (link && link.callsign) || ('Node ' + fav.node);
+    return `
+        <button class="fav-tile ${cls}" onclick="tileToggleConnect('${escapeHtml(fav.node)}')" title="${escapeHtml(name)} — Node ${escapeHtml(fav.node)}">
+            <div class="fav-tile-top"><span class="fav-tile-dot"></span><span class="fav-tile-name">${escapeHtml(name)}</span></div>
+            <span class="fav-tile-node">Node ${escapeHtml(fav.node)}</span>
+            <span class="fav-tile-meta">${meta}</span>
+            <span class="fav-tile-hint">${hint}</span>
+        </button>`;
+}
+
+// The dynamic 6th tile -- see renderAslFavorites()'s own comment for why
+// this one slot covers both "what am I connected to outside my pinned
+// favorites" and "quick connect to a node number" instead of two.
+function dynamicFavTileHtml(extraLink) {
+    if (extraLink) {
+        const name = extraLink.callsign || ('Node ' + extraLink.node);
+        return `
+            <div class="fav-tile ${extraLink.keyed ? 'keyed' : 'connected'} adhoc" onclick="tileToggleConnect('${escapeHtml(extraLink.node)}')">
+                <button class="fav-tile-pin-btn" onclick="event.stopPropagation(); pinAdhocConnection('${escapeHtml(extraLink.node)}', '${escapeHtml(extraLink.callsign || '')}')" title="Save as a pinned favorite">☆</button>
+                <div class="fav-tile-top"><span class="fav-tile-dot"></span><span class="fav-tile-name">${escapeHtml(name)}</span></div>
+                <span class="fav-tile-node">Node ${escapeHtml(extraLink.node)} · not saved</span>
+                <span class="fav-tile-meta">${extraLink.keyed ? '🔴 KEYED' : 'Connected'}</span>
+                <span class="fav-tile-hint">tap to disconnect · ☆ to save</span>
+            </div>`;
+    }
+    return `
+        <div class="qc-tile">
+            <div class="qc-tile-label"><span class="qc-plus">＋</span>Quick connect</div>
+            <div class="qc-tile-row">
+                <input type="text" id="asl-fav-qc-node" placeholder="Node #" onkeydown="if(event.key==='Enter') quickConnectFromCard()">
+                <button onclick="quickConnectFromCard()">Go</button>
+            </div>
+        </div>`;
+}
+
+// A pinned favorite's tile was tapped -- toggle connect/disconnect
+// against whichever hotspot is currently controlling.
+function tileToggleConnect(node) {
+    const aslHotspots = (lastApiData || []).filter(hs => hs.type === 'asl3');
+    const controlHotspot = aslHotspots.find(hs => hs.ip === aslSelectedHotspotIp) || aslHotspots[0];
+    if (!controlHotspot) return;
+    const linkedByNode = {};
+    (controlHotspot.asl_linked_nodes || []).forEach(link => { linkedByNode[link.node] = link; });
+    aslConnect(controlHotspot.ip, node, linkedByNode[node] ? 'disconnect' : 'connect', 'asl-fav-status');
+}
+
+function quickConnectFromCard() {
+    const input = document.getElementById('asl-fav-qc-node');
+    if (!input) return;
+    const node = input.value.trim();
+    const status = document.getElementById('asl-fav-status');
+    if (!/^\d+$/.test(node)) {
+        status.textContent = 'Node # must be digits only';
+        setTimeout(() => status.textContent = '', 2500);
+        return;
+    }
+    const aslHotspots = (lastApiData || []).filter(hs => hs.type === 'asl3');
+    const controlHotspot = aslHotspots.find(hs => hs.ip === aslSelectedHotspotIp) || aslHotspots[0];
+    if (!controlHotspot) return;
+    aslConnect(controlHotspot.ip, node, 'connect', 'asl-fav-status');
+    input.value = '';
+}
+
+// The dynamic tile's ☆ -- promotes a live, not-yet-saved connection into
+// a real pinned favorite, evicting the oldest pin first if already full.
+function pinAdhocConnection(node, callsign) {
+    const now = Date.now() / 1000;
+    let updated = evictOldestPinned(aslFavorites.slice());
+    const existing = updated.find(f => f.node === node);
+    updated = existing
+        ? updated.map(f => f.node === node ? { ...f, pinned: true, pinned_at: now } : f)
+        : updated.concat([{ node, label: callsign || '', pinned: true, pinned_at: now }]);
+    saveAslFavorites(updated);
+}
+
+// The drawer's own ★/☆ per favorite row -- pin/unpin which favorites
+// show as tiles on the compact card, same eviction rule as above.
+function toggleFavPin(node) {
+    const fav = aslFavorites.find(f => f.node === node);
+    if (!fav) return;
+    let updated;
+    if (fav.pinned !== false) {
+        updated = aslFavorites.map(f => f.node === node ? { ...f, pinned: false } : f);
+    } else {
+        updated = evictOldestPinned(aslFavorites.slice())
+            .map(f => f.node === node ? { ...f, pinned: true, pinned_at: Date.now() / 1000 } : f);
+    }
+    saveAslFavorites(updated);
 }
 
 function saveAslFavorites(list) {
@@ -7751,11 +7912,14 @@ function saveAslFavorites(list) {
     });
 }
 
-// nodeInputId/labelInputId/statusElId let the ASL Control sidebar reuse
-// this exact function against its own input ids instead of duplicating
-// the validation/save logic -- undefined falls back to the compact
-// card's own ids, so the card's own "+ Add favorite" call site (no args)
-// is unchanged.
+// Drawer-only since v4.0 -- the compact card's own "add favorite" form
+// was replaced by its quick-connect tile (see pinAdhocConnection() for
+// that surface's own way to create a favorite). nodeInputId/labelInputId/
+// statusElId always point at the drawer's own "Add favorite" inputs now.
+// A newly added favorite defaults to pinned (evicting the oldest pin
+// first if already at the cap) -- matches pinAdhocConnection()'s own
+// "adding a favorite should show up somewhere unless you're already full"
+// default.
 function addAslFavorite(nodeInputId, labelInputId, statusElId) {
     const nodeInput  = document.getElementById(nodeInputId || 'asl-fav-node-input');
     const labelInput = document.getElementById(labelInputId || 'asl-fav-label-input');
@@ -7767,7 +7931,8 @@ function addAslFavorite(nodeInputId, labelInputId, statusElId) {
         setTimeout(() => status.textContent = '', 2500);
         return;
     }
-    const updated = aslFavorites.filter(f => f.node !== node).concat([{ node, label }]);
+    const updated = evictOldestPinned(aslFavorites.filter(f => f.node !== node))
+        .concat([{ node, label, pinned: true, pinned_at: Date.now() / 1000 }]);
     saveAslFavorites(updated).then(() => {
         nodeInput.value = '';
         labelInput.value = '';
@@ -7788,23 +7953,20 @@ function selectAslFavorite(node) {
     renderAslDrawer();
 }
 
-// statusElId lets the ASL Control sidebar target its own status line
-// instead of the compact card's -- undefined falls back to the card's
-// own element, so every existing call site (no 4th arg) is unchanged.
-// keepCbId lets the ASL Control sidebar point this at its OWN "Keep
-// existing connections" checkbox instead of the compact card's --
-// undefined falls back to the card's own id, so every existing call site
-// (3 args or fewer) is unchanged.
-function aslConnect(ip, node, action, statusElId, keepCbId) {
+// statusElId lets a caller (the compact card's tiles, the drawer's Quick
+// connect/favorite rows) target its own status line -- undefined falls
+// back to the compact card's own element. Multi-connect (aslMultiConnect,
+// toggled from the drawer only) is now ONE shared setting read directly
+// here, not a per-surface checkbox -- see that variable's own comment for
+// why v4.0 dropped the old per-caller keepCbId param entirely.
+function aslConnect(ip, node, action, statusElId) {
     const status = document.getElementById(statusElId || 'asl-fav-status');
-    const keepCb = document.getElementById(keepCbId || 'asl-fav-keep-connections');
 
     // Default behavior: connecting to a favorite first disconnects any
     // other favorite currently connected/keyed on this same controlling
-    // hotspot, so you don't end up stacking links by accident. Checking
-    // "Keep existing connections" skips this and just connects, same as
-    // before this feature existed.
-    if (action === 'connect' && !(keepCb && keepCb.checked)) {
+    // hotspot, so you don't end up stacking links by accident.
+    // Multi-connect skips this and just connects, same as before.
+    if (action === 'connect' && !aslMultiConnect) {
         const hs = (lastApiData || []).find(h => h.ip === ip);
         const linkedByNode = {};
         ((hs && hs.asl_linked_nodes) || []).forEach(link => { linkedByNode[link.node] = link; });
@@ -7841,17 +8003,41 @@ function aslSendConnect(ip, node, action, status) {
         });
 }
 
-// --- ASL Control sidebar -- gear icon on the ASL Favorites card. Adds a
-// local-node status strip (the CONTROLLING hotspot's own live state,
-// which the compact card never shows -- it only shows the favorites'
-// state) and a "connect to any node #" quick-connect that doesn't
+// --- ASL Control drawer -- reachable from the ASL Favorites card's own
+// buttons, and (v4.0) from any ASL3 hotspot's own detail drawer, so
+// Control stays reachable even with the Favorites card turned off
+// entirely (see the "Open in ASL Control" button in that drawer's own
+// Linked nodes section). Adds a local-node status strip (the
+// CONTROLLING hotspot's own live state, which the compact card never
+// shows) and a "connect to any node #" quick-connect that doesn't
 // require saving a favorite first. The favorites list/add/remove and
 // aslConnect()/aslSendConnect() are all reused as-is, not duplicated.
-function openAslDrawer() {
+// `ip`, if given, pre-selects that hotspot in "Control from" -- e.g. so
+// jumping here from a specific node's own drawer lands on that node, not
+// whatever was last selected. `focusFavorites` scrolls the Favorites/pin
+// section into view once rendered, for the card's "★ Manage favorites"
+// shortcut.
+function openAslDrawer(ip, focusFavorites) {
+    if (ip) aslSelectedHotspotIp = ip;
     closeAllDrawers();
     document.getElementById('asl-drawer').classList.add('open');
     document.getElementById('hs-drawer-backdrop').classList.add('open');
     renderAslDrawer();
+    // Favorites are only ever eagerly fetched at page load when the
+    // compact card is enabled (SHOW_ASL_FAVORITES) -- this entry point
+    // can now be reached with that card turned off (see the hotspot
+    // drawer's own "Open in ASL Control" button), so re-fetch here too.
+    // Renders once immediately above with whatever's already in hand,
+    // then again once this resolves (fetchAslFavorites() itself calls
+    // renderAslDrawer()) -- same "render now, catch up async" shape
+    // fetchAslFavoriteStats() already uses.
+    fetchAslFavorites();
+    if (focusFavorites) {
+        setTimeout(() => {
+            const el = document.getElementById('asl-drawer-favorites-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+    }
 }
 
 // True while the user has an interactive element INSIDE the open ASL
@@ -7887,14 +8073,18 @@ function renderAslDrawer() {
     // save/select -- without this, anything mid-typed into "Add favorite"
     // or "Quick connect" got silently wiped every few seconds (a real,
     // reported bug: the field would clear itself while typing). Node #/
-    // Label/Keep-connections have no competing logic, so they always
-    // restore verbatim regardless of focus. asl-drawer-qc-node ALSO gets
+    // Label have no competing logic, so they always restore verbatim
+    // regardless of focus (Multi-connect, formerly "Keep existing
+    // connections", no longer needs this treatment at all since v4.0 --
+    // it's rendered straight from the module-level aslMultiConnect
+    // variable every time, not read from the checkbox first, so there's
+    // nothing for a rebuild to lose). asl-drawer-qc-node ALSO gets
     // auto-populated from the current favorite selection further down
     // (selectedFav), so its typed value is only snapshotted while it's
     // the actually-focused element -- otherwise a stale typed value would
     // fight the selection-driven value on every later re-render even
     // after the user moved on to something else.
-    const PRESERVE_IDS = ['asl-drawer-add-node', 'asl-drawer-add-label', 'asl-drawer-keep-connections', 'asl-drawer-qc-node'];
+    const PRESERVE_IDS = ['asl-drawer-add-node', 'asl-drawer-add-label', 'asl-drawer-qc-node'];
     const activeEl   = document.activeElement;
     const focusedId  = (activeEl && drawer.contains(activeEl)) ? activeEl.id : null;
     const selStart   = (focusedId && typeof activeEl.selectionStart === 'number') ? activeEl.selectionStart : null;
@@ -7990,14 +8180,24 @@ function renderAslDrawer() {
         }
         const rowClass = (isKeyed ? 'keyed' : (isConn ? 'connected' : (dotClass === 'recent' ? 'recent' : ''))) + (isSelected ? ' selected' : '');
 
+        // ★/☆ pins/unpins this favorite for the compact card's own tile
+        // grid (v4.0) -- independent of selectAslFavorite()'s click-to-
+        // select behavior on the row body, same stopPropagation()
+        // convention the remove button already uses.
+        const isPinned = fav.pinned !== false;
+        const pinStar = `<button class="asl-ctrl-pin-star ${isPinned ? 'pinned' : ''}" onclick="event.stopPropagation(); toggleFavPin('${fav.node}')" title="${isPinned ? 'Shown on the card — click to unpin' : 'Not on the card — click to pin'}">${isPinned ? '★' : '☆'}</button>`;
+
         return `
         <div class="asl-ctrl-node-row ${rowClass}" onclick="selectAslFavorite('${fav.node}')">
+            ${pinStar}
             <span class="asl-ctrl-node-dot ${dotClass}"></span>
             <div class="asl-ctrl-node-body">${callHtml}</div>
             ${statsHtml}
             <button class="asl-ctrl-btn-remove" onclick="event.stopPropagation(); removeAslFavorite('${fav.node}')" title="Remove favorite">✕</button>
         </div>`;
     }).join('') : '<div class="hs-empty-note">No favorites yet — add one below.</div>';
+
+    const pinnedCount = aslFavorites.filter(f => f.pinned !== false).length;
 
     const statsLegend = sortedFavorites.length ? `
         <div class="asl-ctrl-stats-legend">
@@ -8037,18 +8237,19 @@ function renderAslDrawer() {
         </div>
         <div class="hs-drawer-body">
             ${localStrip}
-            <label class="asl-ctrl-keep-row">
-                <input type="checkbox" id="asl-drawer-keep-connections"> Keep existing connections
-            </label>
             <div class="hs-drawer-section-title">Quick connect</div>
             ${qcSelectedHtml}
             <div class="asl-ctrl-qc-row">
                 <input type="text" id="asl-drawer-qc-node" placeholder="Node # (any node, not just favorites)" value="${selectedFav ? escapeHtml(selectedFav.node) : ''}">
                 ${qcButtonsHtml}
             </div>
-            <div class="hs-drawer-section-title">Favorites <span style="font-weight:400;color:var(--text-dim)">(${aslFavorites.length})</span> <span style="font-weight:400;color:var(--text-dim);font-size:10.5px">click to select</span></div>
+            <div class="hs-drawer-section-title" id="asl-drawer-favorites-section">Favorites <span style="font-weight:400;color:var(--text-dim)">(${pinnedCount}/${ASL_FAV_CARD_CAP} pinned · ${aslFavorites.length} total)</span></div>
             ${rowsHtml}
             ${statsLegend}
+            <label class="asl-ctrl-multi-row">
+                <input type="checkbox" id="asl-multi-connect" ${aslMultiConnect ? 'checked' : ''} onchange="aslMultiConnect = this.checked">
+                <span>Multi-connect<span class="hint">New connections stay alongside existing ones instead of disconnecting them first</span></span>
+            </label>
             <div class="hs-drawer-section-title">Add favorite</div>
             <div class="asl-ctrl-add-row">
                 <input class="asl-ctrl-node-in" type="text" id="asl-drawer-add-node" placeholder="Node #">
@@ -8110,9 +8311,9 @@ function fetchAslFavoriteStats() {
 }
 
 // Not a saved favorite -- connects/monitors directly without first
-// adding one, reusing aslConnect() verbatim (the sidebar's OWN "Keep
-// existing connections" checkbox applies -- see aslConnect()'s keepCbId
-// param -- same digits-only guard as addAslFavorite()'s node field).
+// adding one, reusing aslConnect() verbatim (Multi-connect applies here
+// too, same shared aslMultiConnect setting every caller reads -- same
+// digits-only guard as addAslFavorite()'s node field).
 function aslDrawerQuickConnect(ip, action) {
     const input = document.getElementById('asl-drawer-qc-node');
     const node  = input.value.trim();
@@ -8122,7 +8323,7 @@ function aslDrawerQuickConnect(ip, action) {
         setTimeout(() => status.textContent = '', 2500);
         return;
     }
-    aslConnect(ip, node, action, 'asl-drawer-status', 'asl-drawer-keep-connections');
+    aslConnect(ip, node, action, 'asl-drawer-status');
     input.value = '';
 }
 

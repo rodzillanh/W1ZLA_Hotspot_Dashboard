@@ -117,9 +117,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v3.99 "Frehley"</span>
+                <span class="release-version">v4.0 "Allman"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL Favorites card redesigned: a tap-to-toggle tile grid</span> — the old table (a status chip, a Connect/Disconnect button, and a ✕ remove per row, plus a stats grid and a permanent add-favorite form) is replaced by a compact grid of 5 pinned favorites, each one tap to connect or disconnect. A 6th tile is dynamic — whatever you're connected to outside those 5, or a quick-connect field when nothing extra is connected. Choose which favorites are pinned from the ASL Control drawer's own ★ toggle; a tiny status pill next to the card name replaces the old stats row</li>
+                <li><span>ASL Control is reachable even with the Favorites card turned off</span> — every ASL3 hotspot's own card now has an "Open in ASL Control" button in its own detail drawer, landing you on that node already selected. Previously, ASL Control (Quick Connect, Monitor mode, favorite management, the AllScan link) was only reachable through the Favorites card's own button — turning that card off meant losing all of it</li>
+                <li><span>"Keep existing connections" renamed to "Multi-connect"</span> and moved into the ASL Control drawer next to the favorites list — one shared setting now instead of a separate checkbox on the card and in the drawer</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v3.99 "Frehley"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>DVSwitch card: one card, a "Show:" node picker</span> — enabling DVSwitch on a second ASL3 hotspot used to add a whole second dashboard card. Now every DVSwitch-enabled node shares one card with a small selector in the header (same idea as ASL Favorites' own "Control from" picker) to switch which node's bridges/live call/last-heard you're looking at</li>

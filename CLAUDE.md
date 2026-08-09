@@ -4055,6 +4055,135 @@ config for per-integration credentials; put it in
   at all, only the one `DVSWITCH_POSITION` constant seeded from
   `settings.dvswitch_position`.
 
+- **ASL Favorites card + ASL Control entry point (v4.0) — a four-round
+  mockup-approved redesign, built together since they share state
+  (`aslFavorites`, the pin cap, `aslMultiConnect`).** The compact card
+  went from a table (status chip + Connect/Disconnect button + ✕ remove
+  per row, a stats grid, a permanent add-favorite form) to a tap-to-toggle
+  tile grid -- functionally the old table was a smaller copy of what the
+  ASL Control drawer already did, so management moved to the drawer
+  entirely and the card's job narrowed to "see what's on, tap to join or
+  leave."
+  - **5 pinned favorites + 1 dynamic tile, not 6 static ones.** Only
+    favorites with `pinned !== false` render as tiles, capped at
+    `ASL_FAV_CARD_CAP` (5, mirrored as `config.ASL_FAV_CARD_CAP` server-
+    side and a same-named JS constant in dashboard.html -- kept in sync
+    manually, same as every other client-mirrored constant in this
+    project). The 6th grid slot is genuinely dynamic: whatever's linked
+    outside the pinned set (`asl_linked_nodes` filtered against the
+    pinned node numbers, preferring a keyed one), or, when nothing extra
+    is connected, the quick-connect entry itself -- the two are mutually
+    exclusive in practice, so one slot covers both instead of a separate
+    quick-connect row under the grid. A ☆ on that tile promotes the ad
+    hoc connection to a real pinned favorite (`pinAdhocConnection()`).
+  - **Which favorites are pinned is now something you set, not
+    automatic** -- a ★/☆ toggle per row in the ASL Control drawer's own
+    Favorites list (`toggleFavPin()`), with the section title showing
+    `pinned/CAP · total`. Pin a favorite while already at the cap and
+    `evictOldestPinned()` unpins whichever pinned favorite has the
+    OLDEST `pinned_at` first, so the newly-pinned one always has room --
+    same logic reused by `pinAdhocConnection()` and `addAslFavorite()`
+    (a newly added favorite defaults to pinned, on the same "should show
+    up somewhere unless you're already full" reasoning).
+  - **Storage schema gained `pinned`/`pinned_at` per favorite
+    (`asl_favorites.json`), migrated automatically, not a breaking
+    change.** `storage.load_asl_favorites()` backfills any entry missing
+    `pinned` the first time it's seen: the first `ASL_FAV_CARD_CAP`
+    entries in existing list order default to pinned, the rest don't --
+    preserves "roughly the same favorites show up" for an install
+    upgrading, rather than surprising it with an empty tile grid or an
+    arbitrary cutoff, and self-heals (any write path that doesn't know
+    about these fields, e.g. a bulk backup import, just omits them and
+    they get backfilled the next time this loads). `pinned_at` defaults
+    to `0` for migrated entries -- the oldest possible value, so a real
+    future pin action always outranks a migrated default for eviction.
+    **`/api/asl_favorites` POST had to be taught to preserve these
+    fields explicitly** -- unlike the self-healing read-side migration,
+    this route is the ACTIVE, frequent write path (every pin toggle/add/
+    remove goes through it), so silently dropping `pinned`/`pinned_at`
+    here (the original route only ever kept `node`/`label`) would wipe a
+    just-set pin the moment it saved, not just leave it for later
+    backfill -- caught and fixed before shipping, verified with a live
+    round-trip test, not assumed safe.
+  - **The compact card's own "Favorites/Keyed/Connected" stats row is
+    gone entirely, replaced by a tiny inline pill next to the card name**
+    (`.fav-mini-status`/`.mini-stat`) -- a colored dot + count per
+    non-zero state only, so the common "nothing keyed, nothing
+    connected" case shows no pill at all rather than a row of zeros.
+  - **Multi-connect (formerly a "Keep existing connections" checkbox)
+    is now ONE shared setting, not a per-surface checkbox.** The
+    original design (see the earlier "Keep existing connections" gotcha
+    entry above) deliberately gave the compact card and the drawer their
+    OWN independent checkboxes, read fresh at click time via
+    `aslConnect()`'s `keepCbId` param. v4.0 removes that param entirely
+    -- `aslConnect()` now reads a single module-level `aslMultiConnect`
+    boolean directly, toggled only from the drawer (relocated next to
+    the Favorites list, renamed since "keep others" alone didn't say
+    what it was keeping others FROM). This was a deliberate reversal of
+    the earlier per-surface design, forced by the redesign itself: the
+    compact card's own checkbox row is gone (no room for it once the
+    add-favorite form became a single quick-connect tile), so tile taps
+    and the drawer's Quick connect need ONE shared answer to "should
+    this disconnect others first," not two that could disagree.
+    Session-only (resets to `false` on reload), matching what the
+    checkbox it replaced already did -- not a new persistence
+    commitment.
+  - **Two half-width buttons replaced the single gear icon** --
+    `🎛️ ASL Control` (`openAslDrawer()`) and `★ Manage favorites`
+    (`openAslDrawer(null, true)`, which scrolls the drawer's Favorites
+    section into view via a new `id="asl-drawer-favorites-section"` on
+    that section's own title). The second button is a direct shortcut
+    into the one workflow this whole redesign pushed off the card --
+    curating which 5 are pinned -- rather than a second general-purpose
+    control.
+  - **ASL Control gained a second entry point (v4.0): every ASL3
+    hotspot's own detail drawer now has an "🎛️ Open in ASL Control →"
+    button in its "Linked nodes" section, same row/placement as the
+    "Settings" section's existing "Open in full Settings →" link one
+    section up.** Before this, `openAslDrawer()` was reachable from
+    exactly one place -- the ASL Favorites card's own button -- so
+    turning that card off made the ENTIRE ASL Control feature set
+    (Quick Connect to any node, Monitor mode, favorite pinning, the
+    local-node status strip, the AllScan link) completely unreachable.
+    Confirmed this was real before building the fix, not assumed: grepped
+    for every `openAslDrawer` call site and found only the one. The new
+    button calls `openAslDrawer(hs.ip)`, which pre-selects that hotspot
+    in "Control from" -- landing on the node you came from, not whatever
+    was last selected. Zero backend changes -- a pure client-side
+    navigation shortcut into a drawer (`#asl-drawer`) that's ALREADY
+    unconditionally present in the page DOM regardless of
+    `show_asl_favorites`, confirmed by checking before assuming.
+  - **A real gap this surfaced and had to be fixed separately: favorites
+    were only ever eagerly fetched at page load when the compact card
+    was enabled (`if (SHOW_ASL_FAVORITES) fetchAslFavorites();`).**
+    Before the new entry point existed this was harmless (the drawer was
+    only ever reachable when that same condition was already true) --
+    but the whole point of the new hotspot-drawer button is reaching ASL
+    Control with the card OFF, which meant `aslFavorites` would still be
+    `[]` the first time the drawer opened that way, showing "No
+    favorites yet" even with real favorites saved on disk. Fixed by
+    having `openAslDrawer()` call `fetchAslFavorites()` on every open
+    (not just relying on the page-load fetch) and having
+    `fetchAslFavorites()` itself call `renderAslDrawer()` after loading
+    (a no-op if closed, same pattern `fetchAslFavoriteStats()` already
+    uses) -- renders once immediately with whatever's in hand, then
+    again once the fetch resolves. Verified live with the card OFF from
+    the start (not retrofitted onto a card-on test) -- confirmed a real
+    favorite shows up correctly in the drawer despite the card never
+    having existed in the DOM to trigger the original page-load fetch.
+  - **Verified with three separate live Playwright passes**, not just
+    Jinja/JS syntax checks: (1) card-on scenario -- 7 seeded favorites
+    (5 pinned/2 not) render as exactly 6 tiles + a correct overflow hint,
+    the mini-status pill reflects a live keyed node, drawer stars show
+    5/7 pinned and unpinning one persists to disk; (2) card-OFF scenario
+    -- confirmed the card is genuinely absent from the DOM, then that the
+    new hotspot-drawer button still reaches a correctly-populated ASL
+    Control drawer; (3) interaction plumbing -- intercepted the real
+    `/api/asl_connect` POST bodies from both a tile tap and the quick-
+    connect tile to confirm the right node/action/ip go out, and toggled
+    the drawer's Multi-connect checkbox to confirm it actually flips the
+    shared `aslMultiConnect` variable.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
