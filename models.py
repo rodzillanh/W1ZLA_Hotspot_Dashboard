@@ -76,6 +76,14 @@ class HotspotStatus:
     # an SSH hiccup on this 30-min cadence shouldn't blank a known-good
     # frequency for half an hour.
     sa818_status: Optional[str] = None
+    # CTCSS/DCS tone, from the SAME /etc/sa818.conf read -- only set when
+    # sa818_status == "recorded" AND CURRENT_TONE is genuinely "CTCSS" or
+    # "DCS" (not "None"/blank/anything else). Pre-formatted for display,
+    # same convention as frequency above: "CTCSS 110.9" (RX/TX combined
+    # when equal, the overwhelmingly common case) or "CTCSS RX .../TX
+    # ..." if they differ; likewise "DCS <code>". None whenever no tone
+    # is configured, sa818_status isn't "recorded", or not ASL3.
+    sa818_tone: Optional[str] = None
     # The hotspot's own registered callsign/DMR ID (e.g. "W1ZLA (3100486)")
     # -- distinct from active_call, which is whoever's currently keying up
     # THROUGH this hotspot, not the hotspot's own identity.

@@ -3746,11 +3746,19 @@ function renderCards(data) {
               }</span></div>`
             : '';
 
+        // CTCSS/DCS tone (see monitor.py's _check_asl3_sa818) -- shown
+        // directly under Freq since it's a sub-detail of that same
+        // frequency, only when a real one is actually configured.
+        const sa818ToneStat = (hs.sa818_status === 'recorded' && hs.sa818_tone)
+            ? `<div>Tone<span class="stat-val">${escapeHtml(hs.sa818_tone)}</span></div>`
+            : '';
+
         const aslCardSplit = isAsl
             ? `<div class="card-split">
                  <div class="split-stats">
                    <div>Node<span class="stat-val">${hs.asl_node || '—'}</span></div>
                    ${sa818FreqStat}
+                   ${sa818ToneStat}
                    <div>Temp<span class="stat-val">${hs.temperature}</span></div>
                    <div>CPU<span class="stat-val">${hs.cpu}</span></div>
                  </div>
@@ -6832,7 +6840,8 @@ function openHotspotDrawer(ip) {
         <div class="hs-drawer-section" style="margin-top:10px">
             <div class="hs-drawer-section-title">Radio (SA818)</div>
             ${hs.sa818_status === 'recorded'
-                ? `<div class="hs-bm-status">Frequency: <b>${escapeHtml(hs.frequency)}</b>${hs.duplex === 'Duplex' ? ' <span style="color:var(--text-dim)">(Duplex)</span>' : ''}</div>`
+                ? `<div class="hs-bm-status">Frequency: <b>${escapeHtml(hs.frequency)}</b>${hs.duplex === 'Duplex' ? ' <span style="color:var(--text-dim)">(Duplex)</span>' : ''}</div>
+                   ${hs.sa818_tone ? `<div class="hs-bm-status">Tone: <b>${escapeHtml(hs.sa818_tone)}</b></div>` : ''}`
                 : `<div class="hs-empty-note">${
                     hs.sa818_status === 'placeholder'
                         ? 'sa818-menu has been run on this host, but no real frequency has been programmed yet (still the 000.0000 placeholder).'

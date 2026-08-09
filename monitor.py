@@ -320,6 +320,7 @@ class FleetMonitor:
                 status.sa818_status = "not_recorded"
                 status.frequency = "N/A"
                 status.duplex = "N/A"
+                status.sa818_tone = None
                 return
 
             values = {}
@@ -347,6 +348,7 @@ class FleetMonitor:
                 status.sa818_status = "placeholder"
                 status.frequency = "N/A"
                 status.duplex = "N/A"
+                status.sa818_tone = None
                 return
 
             try:
@@ -355,6 +357,7 @@ class FleetMonitor:
                 status.sa818_status = "placeholder"
                 status.frequency = "N/A"
                 status.duplex = "N/A"
+                status.sa818_tone = None
                 return
 
             status.sa818_status = "recorded"
@@ -366,6 +369,34 @@ class FleetMonitor:
                 else f"{rx:.4f}/{tx:.4f} MHz"
             )
             status.duplex = "Simplex" if abs(tx - rx) < 0.0001 else "Duplex"
+
+            # CTCSS/DCS tone -- CURRENT_TONE selects which pair of
+            # RX/TX fields is actually meaningful (confirmed live: a node
+            # with CTCSS set still carries CURRENT_DCS_RX/TX="None", so
+            # this can't just check "is either pair non-null", it has to
+            # follow CURRENT_TONE's own selection). "None"/blank/anything
+            # else means no tone configured -- confirmed live for the
+            # "None" case (node 600672); DCS never confirmed against a
+            # real node, so its raw value is shown as-is, unparsed/
+            # unvalidated, same "never fabricate, show what's there"
+            # posture as the frequency parsing above.
+            def _null_tone_val(v):
+                return not v or v.strip().lower() in ("none", "", "0", "disabled")
+
+            def _fmt_tone(label, tone_rx, tone_tx):
+                if _null_tone_val(tone_rx):
+                    return None
+                tone_rx = tone_rx.strip()
+                tone_tx = (tone_tx or "").strip() or tone_rx
+                return f"{label} {tone_rx}" if tone_tx == tone_rx else f"{label} RX {tone_rx}/TX {tone_tx}"
+
+            tone_type = (values.get("TONE") or "").strip().upper()
+            if tone_type == "CTCSS":
+                status.sa818_tone = _fmt_tone("CTCSS", values.get("CTCSS_RX"), values.get("CTCSS_TX"))
+            elif tone_type == "DCS":
+                status.sa818_tone = _fmt_tone("DCS", values.get("DCS_RX"), values.get("DCS_TX"))
+            else:
+                status.sa818_tone = None
 
     # --- per-hotspot check ---
 
