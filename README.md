@@ -591,16 +591,18 @@ via SSH; a protocol ceiling, not a bug.
 ## DVSwitch card
 <!-- wiki-image: dvswitch-card.png -->
 
-A separate, optional card for an ASL3 node that also runs a DVSwitch
+One optional card, shared by every ASL3 node that also runs a DVSwitch
 (Analog_Bridge) audio bridge — distinct from the DVSwitch mode on the
 **Fleet Activity** card above; that's just an activity count, this is a
-full status card. Turn it on the same place as the Fleet Activity mode
-(Settings → Hotspots → edit the ASL3 node → "This node also runs DVSwitch
-(Analog_Bridge)"), then list one or more **bridge ports** (comma or
-newline separated — Analog_Bridge supports running multiple instances on
-one node, each identified by its own port). All of this reuses the same
-SSH connection/credentials already configured for that node — no separate
-login or remote-access setup needed.
+full status card. A **"Show:" picker** in the header switches between
+nodes if you have more than one — enabling DVSwitch on a second node adds
+it to that list, not a second card. Turn it on per node the same place as
+the Fleet Activity mode (Settings → Hotspots → edit the ASL3 node →
+"This node also runs DVSwitch (Analog_Bridge)"), then list one or more
+**bridge ports** (comma or newline separated — Analog_Bridge supports
+running multiple instances on one node, each identified by its own port).
+All of this reuses the same SSH connection/credentials already configured
+for that node — no separate login or remote-access setup needed.
 
 When there's genuinely nothing to report — no bridge tuned, no call in
 progress, nothing heard yet this session — the card collapses to a single
@@ -649,9 +651,9 @@ unusually long transmission's own start line scrolls out of the recent
 log window before the call ends, the indicator can under-report idle
 rather than guess.
 
-Like camera cards, its position is part of the same drag-and-drop
-**Card order** list as everything else (Settings → Hotspots) — drag it
-anywhere in that list to move it.
+Its position is part of the same drag-and-drop **Card order** list as
+everything else (Settings → Hotspots) — one position for the whole card,
+same as Fleet Activity/ASL Favorites, not one per node.
 
 <!-- wiki-group: Hotspot Types -->
 ## openSPOT 4 (SharkRF) nodes
@@ -796,43 +798,80 @@ control card", off by default), inspired by
 [AllScan](https://github.com/davidgsd/AllScan)'s favorites/scan/connect
 model. Lets you keep a list of ASL node numbers you care about (a
 different list from the DMR callsign Favorites tab) and connect or
-disconnect them from one of your ASL3 hotspots with one click.
+disconnect them from one of your ASL3 hotspots with one tap.
 
-- **Add a favorite** — node number + optional label, right on the card.
-  A resolved callsign (via the same `aslstats.py` lookup ASL3 cards
-  already use) is shown automatically if the label is left blank.
+The card itself is deliberately minimal — a glance-and-tap surface, not a
+management screen:
+
+- **Tile grid** — up to 5 pinned favorites, each one a tile you tap to
+  connect or disconnect. A tile's color/dot shows its live state (🔴
+  keyed, 🟢 connected, amber for "recently active elsewhere on the
+  network but not through your hub right now") straight from the
+  selected hotspot's already-polled link table — no extra polling or
+  external API calls.
+- **A 6th, dynamic tile** — whatever you're connected to *outside* your 5
+  pinned favorites, or, when nothing extra is connected, a bare
+  quick-connect field (type any node #, no need to save it as a favorite
+  first). Tap the ☆ on a live ad hoc connection to promote it into a real
+  pinned favorite.
 - **Control from** — a dropdown picks which of your configured ASL3
   hotspots originates the connect/disconnect command, if you have more
   than one.
-- **Live status** — 🔴 **Keyed**, 🟢 **Connected**, or **Not connected**,
-  derived entirely from the selected hotspot's already-polled link table
-  (the same data its own card's "Linked:" row uses) — no extra polling or
-  external API calls for status. A favorite not currently linked to the
-  selected hotspot has no live status to show, since keyed/connected state
-  is only knowable from your own node's link table in the first place.
-- **Connect / Disconnect** — runs `asterisk -rx "rpt cmd <node> ilink
-  <code> <remotenode>"` over the same SSH connection already used for
-  polling. This is **not** the DTMF-simulated `rpt fun <node> *3<node>`
-  form (which requires replicating `app_rpt`'s digit-collection state
-  machine and proved unreliable in testing) — `rpt cmd` takes the
-  function code and node as plain separate arguments, confirmed both
-  against a real node and by checking how AllScan itself — a mature,
-  widely-used tool — does the same thing.
-- Connects are temporary (transceive), not permanent — there's no
-  "connect permanently" option in this card. Use WPSD/AllStarLink's own
-  admin tools for permanent link changes.
-- **Auto-disconnect on connect** — by default, connecting to a favorite
-  first disconnects any *other* favorite currently connected/keyed on
-  that same hotspot, so you don't end up stacking links by accident.
-  Check "Keep existing connections when connecting" (above the list) to
-  skip that and just connect, same as before this existed. This only
-  ever touches favorites tracked in this card — it won't disconnect a
-  link made some other way (e.g. a permanent link configured directly on
-  the node).
-- **List stays compact** — the row list caps at ~3 visible rows and
-  scrolls internally once you have more favorites than that, so the card
-  doesn't keep growing taller. Whichever favorite is currently keyed or
-  connected always sorts to the top, so it's visible without scrolling.
+- A small status pill next to the card's name shows keyed/connected
+  counts across every pinned favorite — nothing shown at all when
+  everything's idle.
+
+Everything else — adding/removing favorites, choosing *which* favorites
+are pinned to the card, Monitor mode, and a Quick Connect field for any
+node number — lives one tap away in the **ASL Control drawer** (the
+card's own button, or, per below, any ASL3 hotspot's own card):
+
+- **Pin/unpin** — a ★/☆ next to each favorite in the drawer's list
+  chooses whether it takes one of the card's 5 tile slots. Pin a 6th
+  while already full and the longest-pinned favorite steps aside
+  automatically to make room — the card always shows exactly who you
+  chose, never an arbitrary "most recent" or "most active" cutoff.
+- **Add / remove a favorite** — node number + optional label. A resolved
+  callsign (via the same `aslstats.py` lookup ASL3 cards already use) is
+  shown automatically if the label is left blank. A newly added favorite
+  is pinned by default (same "step the oldest one aside if full" rule).
+- **Quick connect** — connect, disconnect, or **Monitor** (receive-only,
+  no transmit capability) any node number, whether or not it's a saved
+  favorite.
+- **Local node status** — the *controlling* hotspot's own live state
+  (idle/keyed, uptime, temperature), which the compact card itself never
+  shows since it's only ever displaying favorites' state.
+- **Import a `favorites.ini`** — pulls in AllScan's own favorites file
+  format directly, for anyone migrating from an existing AllScan setup.
+- **AllScan link** — jumps straight to that node's own AllScan control
+  panel, if it's running one, at `http://<node ip>/allscan`.
+
+**Connect / Disconnect** runs `asterisk -rx "rpt cmd <node> ilink <code>
+<remotenode>"` over the same SSH connection already used for polling.
+This is **not** the DTMF-simulated `rpt fun <node> *3<node>` form (which
+requires replicating `app_rpt`'s digit-collection state machine and
+proved unreliable in testing) — `rpt cmd` takes the function code and
+node as plain separate arguments, confirmed both against a real node and
+by checking how AllScan itself — a mature, widely-used tool — does the
+same thing. Connects are temporary (transceive), not permanent — there's
+no "connect permanently" option here; use WPSD/AllStarLink's own admin
+tools for that.
+
+By default, connecting to a favorite first disconnects any *other*
+favorite currently connected/keyed on that same hotspot, so you don't end
+up stacking links by accident. **Multi-connect** (a toggle in the
+drawer, next to the favorites list) skips that and just connects,
+same as before this existed — one shared setting for every connect
+action, on the card or in the drawer. This only ever touches favorites
+tracked in this app — it won't disconnect a link made some other way
+(e.g. a permanent link configured directly on the node).
+
+**ASL Control stays reachable even with this card turned off entirely** —
+every ASL3 hotspot's own card has an "Open in ASL Control" button in its
+own detail drawer (the ⚙ on that card), landing you on that node already
+selected. Turning off the compact Favorites card only removes the
+glanceable multi-node tile view; Quick Connect, Monitor mode, and
+favorite management are still one tap away from any ASL3 node.
 
 By default the card appears first, before any hotspot cards. Its position
 is part of the same drag-and-drop **Card order** list as the hotspot cards

@@ -72,7 +72,17 @@ HOTSPOT_ASL3 = {
     "lat": "43.2162", "lon": "-71.0132",
     "dvswitch_enabled": True, "dvswitch_ports": "31000,31001",
 }
-HOTSPOTS = [HOTSPOT_WPSD_ACTIVE, HOTSPOT_WPSD_IDLE, HOTSPOT_ASL3]
+# A second DVSwitch-enabled ASL3 node -- purely so the redesigned DVSwitch
+# card's "Show:" picker (v3.99) has a real second option in its screenshot,
+# not just a dropdown with one entry that undersells the whole point of
+# consolidating what used to be one card per node into one card total.
+HOTSPOT_ASL3_RELAY = {
+    "ip": "198.51.100.13", "name": "Northeast Relay", "type": "asl3",
+    "user": "root", "pass": "demo", "enabled": True, "asl_node": "60067",
+    "lat": "42.3601", "lon": "-71.0589",
+    "dvswitch_enabled": True, "dvswitch_ports": "31000",
+}
+HOTSPOTS = [HOTSPOT_WPSD_ACTIVE, HOTSPOT_WPSD_IDLE, HOTSPOT_ASL3, HOTSPOT_ASL3_RELAY]
 
 SETTINGS = {
     "dashboard_name": "W1ZLA Hotspot Dashboard",
@@ -94,10 +104,22 @@ SETTINGS = {
     "show_top_activity": True,
 }
 
+# 7 favorites, no "pinned" key -- deliberately legacy-shaped so this run
+# also exercises storage.load_asl_favorites()'s own migration (the first
+# ASL_FAV_CARD_CAP in list order default to pinned) the same way a real
+# upgrading install would, rather than hand-writing the post-migration
+# shape. 27339/2020 stay first so they land in the pinned 5 and the tile
+# grid screenshot shows a real keyed + a real connected tile, not just
+# idle ones; the last two (48496/68204) are deliberately left unpinned to
+# demonstrate the "+N more" overflow hint.
 ASL_FAVORITES = [
     {"node": "27339", "label": "East Coast AllStar HUB"},
     {"node": "2020", "label": "TAC-2 National"},
+    {"node": "31700", "label": "New England Link"},
+    {"node": "51000", "label": "Granite State Repeater"},
+    {"node": "60672", "label": "W2ECR Hub"},
     {"node": "48496", "label": "Northeast Repeater Group"},
+    {"node": "68204", "label": "Southern Maine ARC"},
 ]
 
 QSOS = [
@@ -198,9 +220,19 @@ asl3 = models.HotspotStatus(
     dvswitch_live={"mode": "DMR", "call": "W1ZLA", "target": "TG 603"},
     dvswitch_dmr_linked=True,
 )
+# Idle -- deliberately quiet (collapsed one-line DVSwitch state, no linked
+# nodes) so the DVSwitch card's "Show:" picker screenshot has a genuinely
+# different second option to switch to, not a copy of the first.
+asl3_relay = models.HotspotStatus(
+    name=HOTSPOT_ASL3_RELAY["name"], ip=HOTSPOT_ASL3_RELAY["ip"],
+    status="Online", last_poll_at=now, uptime="6d 11h 40m",
+    asl_node="60067", asl_linked_nodes=[],
+    dvswitch_bridges=[{"port": "31000", "tuned": None, "mode": None, "use_fallback": None}],
+    dvswitch_vocoder="software",
+)
 
 with app.monitor._lock:
-    for hs in (wpsd_active, wpsd_idle, asl3):
+    for hs in (wpsd_active, wpsd_idle, asl3, asl3_relay):
         app.monitor._data[hs.ip] = hs
 
 # --- 4. Seed Fleet Activity / Top 5 Activity (storage_activity.py) --
@@ -251,7 +283,7 @@ CARD_SHOTS = [
     (f"card-{HOTSPOT_WPSD_ACTIVE['ip']}", "hotspot-card-wpsd-active.png"),
     (f"card-{HOTSPOT_WPSD_IDLE['ip']}", "hotspot-card-wpsd-idle.png"),
     (f"card-{HOTSPOT_ASL3['ip']}", "hotspot-card-asl3.png"),
-    (f"dvswitch-card-{HOTSPOT_ASL3['ip']}", "dvswitch-card.png"),
+    ("dvswitch-card", "dvswitch-card.png"),  # one consolidated card since v3.99, not one per node
     ("fleet-activity-card", "fleet-activity-card.png"),
     ("asl-favorites-card", "asl-favorites-card.png"),
     ("satellites-card", "satellites-card.png"),
