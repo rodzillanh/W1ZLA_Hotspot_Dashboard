@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.13 "Squire"</span>
+                <span class="release-version">v4.14 "Peart"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL3 hotspot cards now show SA818 radio frequency</span> — reads the last-programmed RX/TX frequency straight from <code>/etc/sa818.conf</code> (written by the <code>sa818-menu</code> tool that many simplex ASL3 builds use to configure their radio module), on the same slow background cadence as WPSD's own frequency check. Shown as a "Freq" stat on the compact card and in a dedicated "Radio (SA818)" section in the hotspot's detail drawer — which also distinguishes a real programmed frequency from a node where <code>sa818-menu</code> was run but nothing was ever set (still its 000.0000 placeholder), or one with no SA818 config file at all</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.13 "Squire"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Plain Monitor and Connecting links now get their own indicator too</span> — Monitor (receive-only, but relays to your other links, unlike Local Monitor) shows an amber "🎧 Monitor" state everywhere Local Monitor already shows its cyan one; a node still mid-handshake shows a "Connecting…" tag instead of reading as an already-settled connection</li>

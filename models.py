@@ -51,11 +51,31 @@ class HotspotStatus:
     ber: str = "N/A"
     rssi: str = "N/A"
     mode: str = "N/A"
-    # WPSD-only (read from /etc/mmdvmhost, a slow check -- see
-    # config.HOTSPOT_INFO_CHECK_CMD). All already formatted for display;
-    # all stay "N/A" for ASL3/openSPOT4, which have no equivalent.
+    # WPSD reads this from /etc/mmdvmhost (a slow check -- see
+    # config.HOTSPOT_INFO_CHECK_CMD). ASL3 reads it from /etc/sa818.conf
+    # instead -- the SA818 RF module's own last-programmed frequency, on
+    # the same slow cadence (see monitor.py's _check_asl3_sa818 /
+    # config.SA818_CONF_CMD) -- reusing this same field rather than a
+    # separate one so every existing consumer (card identity line, drawer
+    # subline, etc.) picks it up with no changes. Both already formatted
+    # for display; stays "N/A" for openSPOT4 (no equivalent), and for an
+    # ASL3 node whose SA818 config isn't a known real frequency yet --
+    # see sa818_status below for why.
     frequency: str = "N/A"  # "433.750 MHz", or "433.750/434.350 MHz" if RX != TX (duplex)
     duplex: str = "N/A"  # "Simplex" or "Duplex"
+    # ASL3-only: why `frequency` above is or isn't set, sourced from the
+    # SAME /etc/sa818.conf read. "recorded" (a real, non-zero frequency),
+    # "placeholder" (sa818-menu wrote the file but its 000.0000 skeleton
+    # was never overwritten -- confirmed live, this is what a freshly
+    # imaged node looks like), "not_recorded" (no /etc/sa818.conf on this
+    # host at all -- not an SA818-based node, or sa818-menu never run),
+    # or None (not ASL3, or not checked yet). The SA818 module itself
+    # can't be read back over the air -- this is only ever a record of
+    # what THIS host last wrote, same caveat sa818-menu itself carries.
+    # Sticky across polls like DVSwitch's dmr_linked/dstar_status above --
+    # an SSH hiccup on this 30-min cadence shouldn't blank a known-good
+    # frequency for half an hour.
+    sa818_status: Optional[str] = None
     # The hotspot's own registered callsign/DMR ID (e.g. "W1ZLA (3100486)")
     # -- distinct from active_call, which is whoever's currently keying up
     # THROUGH this hotspot, not the hotspot's own identity.

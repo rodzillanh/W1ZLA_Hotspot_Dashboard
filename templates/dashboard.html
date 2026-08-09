@@ -3728,10 +3728,29 @@ function renderCards(data) {
                          ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
                    </div>`;
 
+        // SA818 RF module frequency (ASL3 simplex nodes only) -- reuses
+        // hs.frequency/hs.duplex, the same fields WPSD populates from
+        // /etc/mmdvmhost (see monitor.py's _check_asl3_sa818). Row is
+        // omitted entirely until this hotspot's first successful SA818
+        // check (sa818_status stays null forever for a node with no
+        // SA818 module at all -- indistinguishable from "never checked").
+        const sa818FreqStat = hs.sa818_status
+            ? `<div>Freq<span class="stat-val" title="${
+                  hs.sa818_status === 'recorded' ? 'From /etc/sa818.conf on this host'
+                      : hs.sa818_status === 'placeholder' ? 'sa818-menu has been run here, but no real frequency has been programmed yet'
+                      : 'No /etc/sa818.conf on this host'
+              }">${
+                  hs.sa818_status === 'recorded' ? escapeHtml(hs.frequency)
+                      : hs.sa818_status === 'placeholder' ? 'Not set'
+                      : '—'
+              }</span></div>`
+            : '';
+
         const aslCardSplit = isAsl
             ? `<div class="card-split">
                  <div class="split-stats">
                    <div>Node<span class="stat-val">${hs.asl_node || '—'}</span></div>
+                   ${sa818FreqStat}
                    <div>Temp<span class="stat-val">${hs.temperature}</span></div>
                    <div>CPU<span class="stat-val">${hs.cpu}</span></div>
                  </div>
@@ -6807,6 +6826,21 @@ function openHotspotDrawer(ip) {
         </div>`;
     }
 
+    let sa818Html = '';
+    if (isAsl && hs.sa818_status) {
+        sa818Html = `
+        <div class="hs-drawer-section" style="margin-top:10px">
+            <div class="hs-drawer-section-title">Radio (SA818)</div>
+            ${hs.sa818_status === 'recorded'
+                ? `<div class="hs-bm-status">Frequency: <b>${escapeHtml(hs.frequency)}</b>${hs.duplex === 'Duplex' ? ' <span style="color:var(--text-dim)">(Duplex)</span>' : ''}</div>`
+                : `<div class="hs-empty-note">${
+                    hs.sa818_status === 'placeholder'
+                        ? 'sa818-menu has been run on this host, but no real frequency has been programmed yet (still the 000.0000 placeholder).'
+                        : 'No /etc/sa818.conf on this host — this node may not use an SA818 radio module, or sa818-menu has never been run here.'
+                  }</div>`}
+        </div>`;
+    }
+
     let bmHtml = '';
     if (!isAsl && !isOpenSpot4) {
         const bmTgs = hs.bm_static_tgs || [];
@@ -6904,6 +6938,7 @@ function openHotspotDrawer(ip) {
             <div class="hs-field-block" id="hs-settings-fields"><div class="hs-empty-note">Loading…</div></div>
             ${talkersHtml}
             ${linkedHtml}
+            ${sa818Html}
             ${bmHtml}
             ${updateHtml}
             ${openspot4Html}

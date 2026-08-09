@@ -199,12 +199,20 @@ class FleetMonitor:
                         self._data[ip].bm_status_text = bm_info["status_text"]
                         self._data[ip].bm_static_tgs   = bm_info["static_talkgroups"]
 
+        node_type = hotspot.get("type", "wpsd")
+
+        # ASL3-specific -- its own slow check (SA818 radio config), not the
+        # WPSD git-checkout/mmdvmhost checks below at all.
+        if node_type == "asl3":
+            self._check_asl3_sa818(hotspot)
+            return
+
         # WPSD/Pi-Star-specific -- ASL3 nodes have no git-based dashboard
         # checkout to compare against a remote, so this whole check would
         # just be a wasted SSH round-trip (and could print meaningless
         # check_repo output if those hardcoded paths happen to exist for
-        # unrelated reasons on an ASL3 image).
-        if hotspot.get("type", "wpsd") != "wpsd":
+        # unrelated reasons on an ASL3 image). openSPOT4 has neither.
+        if node_type != "wpsd":
             return
 
         try:
@@ -280,6 +288,84 @@ class FleetMonitor:
                             setattr(status, field_name, value)
         except Exception:
             pass  # best-effort, same as the update check above
+
+    def _check_asl3_sa818(self, hotspot: dict) -> None:
+        """SA818 RF module config (/etc/sa818.conf) for ASL3 hotspots that
+        use one -- see config.SA818_CONF_CMD. Populates the SAME
+        frequency/duplex fields WPSD's own slow check populates from
+        /etc/mmdvmhost, plus sa818_status explaining why they might still
+        be "N/A" (see models.py's own comment on that field). Best-effort
+        AND sticky: on any failure (SSH down, this poll's connection
+        hiccups), this simply returns without touching anything -- same
+        "don't blank a known value just because this poll's evidence is
+        missing" reasoning as DVSwitch's dmr_linked/dstar_status fields,
+        since this only runs once per config.VERSION_CHECK_INTERVAL (30
+        min default) and a single missed cycle shouldn't flash a
+        known-good frequency back to N/A for that long."""
+        ip = hotspot["ip"]
+        try:
+            output = self._ssh_exec(hotspot, config.SA818_CONF_CMD, config.SSH_TIMEOUT).strip()
+        except Exception:
+            return
+
+        with self._lock:
+            if ip not in self._data:
+                return
+            status = self._data[ip]
+
+            if not output:
+                # SSH succeeded but the file isn't there -- a real, distinct
+                # result (this node likely isn't SA818-based at all), not
+                # the same as "never checked" (sa818_status still None).
+                status.sa818_status = "not_recorded"
+                status.frequency = "N/A"
+                status.duplex = "N/A"
+                return
+
+            values = {}
+            for raw in output.splitlines():
+                line = raw.strip()
+                if not line or "=" not in line:
+                    continue
+                key, _, val = line.partition("=")
+                key = key.strip().upper()
+                if key.startswith("CURRENT_"):
+                    key = key[len("CURRENT_"):]
+                values[key] = val.strip().strip("'\"")
+
+            def _is_placeholder(v):
+                # sa818-menu writes "000.0000" for an unprogrammed skeleton
+                # file -- confirmed live (node 59929). Missing/unparseable
+                # counts as placeholder too, never a fabricated frequency.
+                try:
+                    return not v or float(v) == 0.0
+                except ValueError:
+                    return True
+
+            freq_rx, freq_tx = values.get("FREQ_RX"), values.get("FREQ_TX")
+            if _is_placeholder(freq_rx) and _is_placeholder(freq_tx):
+                status.sa818_status = "placeholder"
+                status.frequency = "N/A"
+                status.duplex = "N/A"
+                return
+
+            try:
+                rx, tx = float(freq_rx), float(freq_tx)
+            except (TypeError, ValueError):
+                status.sa818_status = "placeholder"
+                status.frequency = "N/A"
+                status.duplex = "N/A"
+                return
+
+            status.sa818_status = "recorded"
+            # SA818 hotspots are overwhelmingly simplex (one radio, not a
+            # duplexer) -- shown as one number, matching WPSD's own
+            # simplex display; only both if RX/TX genuinely differ.
+            status.frequency = (
+                f"{rx:.4f} MHz" if abs(tx - rx) < 0.0001
+                else f"{rx:.4f}/{tx:.4f} MHz"
+            )
+            status.duplex = "Simplex" if abs(tx - rx) < 0.0001 else "Duplex"
 
     # --- per-hotspot check ---
 
