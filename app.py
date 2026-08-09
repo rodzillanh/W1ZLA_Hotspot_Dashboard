@@ -49,6 +49,7 @@ from hamalert import HamAlertListener
 from brandmeister_lastheard import BrandmeisterLastHeardListener
 from satellites import SatelliteTracker
 from aslstats import AslStatsClient
+from rockstar_bios import get_bio as get_codename_bio
 
 import host_stats as host_stats_mod
 
@@ -1272,7 +1273,8 @@ def api_satellites():
 def version_page():
     embed = request.args.get("embed") == "1"
     return render_template("version.html", settings=load_settings(), embed=embed,
-                           app_version=config.APP_VERSION, app_codename=config.APP_CODENAME)
+                           app_version=config.APP_VERSION, app_codename=config.APP_CODENAME,
+                           codename_bio=get_codename_bio(config.APP_CODENAME))
 
 @app.route("/api/check_for_updates")
 def api_check_for_updates():

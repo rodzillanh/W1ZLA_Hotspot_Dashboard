@@ -4467,6 +4467,45 @@ config for per-integration credentials; put it in
   after (still shows "not saved", confirming the fix didn't just remove
   the label for everyone).
 
+- **A codename Easter egg (v4.5, `rockstar_bios.py`) -- a one-line bio +
+  Wikipedia link for the current build's namesake, shown at the very
+  bottom of `/version`.** Same "not a network client, just a static dict
+  served from memory" shape as `license_quiz.py` -- no cache/TTL/fetch,
+  `get_bio(codename)` is a plain dict lookup returning `None` for any
+  codename not (yet) covered, which `version.html`'s `{% if codename_bio
+  %}` treats as "don't render the card" rather than a broken/empty one.
+  **Explicitly written from general knowledge, NOT independently
+  re-verified against a live source per person** -- a deliberate,
+  disclosed departure from this project's usual discipline around factual
+  claims (WPSD config fields, ASL ilink codes, real API response shapes,
+  etc.), made after asking the user directly whether the ~57 bios should
+  be verified one-by-one or written from recall; they chose recall for
+  faster turnaround. If a birth/death year, band, or detail here is ever
+  found to be wrong, fix it the same way a wrong `VERSION_CODENAMES` year
+  would be fixed (see that gotcha's own "Morrison"/duplicate-"Cobain"
+  correction) -- don't treat this file as more authoritative than it is.
+  **Wikipedia URLs are plain `/wiki/<Slug>` links built from the
+  standard article-title convention** (e.g. `Elvis_Presley`), including
+  disambiguated titles where a bare name collides with something else
+  (`Prince_(musician)`, `Davy_Jones_(musician)`) and the one genuinely
+  mononymous case (`Lemmy`, not `Lemmy_Kilmister` -- that's the real
+  Wikipedia article title) -- these slugs were written the same
+  recall-based way as the bios themselves, not confirmed live against
+  Wikipedia, so a dead link is possible if a title has since moved.
+  **A live test (`python -c "..."` diffing `config.VERSION_CODENAMES`
+  against `rockstar_bios.BIOS.keys()`) confirmed zero missing entries at
+  ship time** -- but this file does NOT auto-grow with
+  `VERSION_CODENAMES` -- appending a new codename there without also
+  adding its entry here means that one future release simply won't show
+  a bio card, not an error. Worth adding to the existing "bump
+  `APP_VERSION` and append the codename" checklist mentally, though nothing
+  enforces it in code -- a missing bio degrades silently by design, same
+  contract as every other optional/best-effort piece of this app.
+  `install.sh`/`update.sh` needed NO new explicit `cp` line for this file
+  -- unlike `extra_2024_2028.json`/`README.md` elsewhere in this project,
+  a plain `.py` module is already covered by those scripts' existing
+  `*.py` glob copies.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
