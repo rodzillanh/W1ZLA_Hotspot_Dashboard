@@ -4433,6 +4433,40 @@ config for per-integration credentials; put it in
     were compared directly against the approved mockups before shipping,
     not just checked for "renders without erroring."
 
+- **A real, reported bug: the ASL Favorites card's reserved 6th slot
+  mislabeled your own saved-but-unpinned favorites as "not saved" (v4.4)
+  -- reported directly against a real screenshot showing "W1REN" in that
+  slot with a raw node number instead of its saved label.** Root cause:
+  `renderAslFavorites()`'s `extras` computation only ever excluded the 5
+  currently-PINNED favorites (`!pinnedNodes.has(l.node)`), not the FULL
+  `aslFavorites` list -- so a favorite you'd saved (one of the "+N more"
+  beyond the 5 tile slots) but didn't currently have pinned looked
+  identical to a genuinely-never-saved ad hoc connection the instant it
+  connected: `dynamicFavTileHtml()` always rendered "not saved" and fell
+  back to the live callsign/bare node number, never checking whether the
+  node matched a saved favorite at all. This is exactly the kind of
+  disconnect a real user's fleet (dozens of favorites, most unpinned at
+  any given time) would hit constantly and a small demo/test fleet (a
+  handful of favorites, most pinned) would never surface -- confirmed by
+  reproducing it with a live Playwright test using a 6-favorite set (5
+  pinned + 1 deliberately unpinned), not by reasoning about the code
+  alone. Fixed by adding one more lookup in `renderAslFavorites()`,
+  `extraFav = aslFavorites.find(f => f.node === extraLink.node)` (against
+  the full list, not `pinnedNodes`), threaded through to
+  `dynamicFavTileHtml(extraLink, extraFav)` -- when `extraFav` exists,
+  the tile shows its real saved `label` and "saved, not pinned" instead
+  of the node number and "not saved"; the Pin button's title also
+  changes ("Pin to the tile grid" vs. "Save as a pinned favorite") since
+  the action itself was already correct either way -- `pinAdhocConnection()`
+  already looked up an existing favorite by node before deciding whether
+  to update it in place or append a new one, so clicking Pin on an
+  unpinned-but-saved favorite was never actually broken, only the LABEL
+  describing it was. Verified live with two scenarios in one Playwright
+  run: a saved-but-unpinned favorite connecting (shows its real label +
+  "saved, not pinned") and a genuinely-never-saved node connecting right
+  after (still shows "not saved", confirming the fix didn't just remove
+  the label for everyone).
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

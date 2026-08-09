@@ -8028,6 +8028,13 @@ function renderAslFavorites() {
     // in this slot -- see dynamicFavTileHtml().
     const extras = (controlHotspot.asl_linked_nodes || []).filter(l => !pinnedNodes.has(l.node));
     const extraLink = extras.find(l => l.keyed) || extras[0] || null;
+    // A real, reported bug: "extras" only excludes the PINNED subset, so
+    // a favorite you've saved but simply don't have pinned right now
+    // (e.g. any of the "+N more" beyond the 5 tile slots) showed up here
+    // mislabeled "not saved" the moment it connected -- it IS saved, just
+    // not one of the 5 currently shown. Look it up in the full list so
+    // dynamicFavTileHtml() can tell the two cases apart.
+    const extraFav = extraLink ? aslFavorites.find(f => f.node === extraLink.node) : null;
 
     let keyedCount = 0, connectedCount = 0;
     pinnedFavs.forEach(f => {
@@ -8050,7 +8057,7 @@ function renderAslFavorites() {
     // row now, not part of this innerHTML rebuild -- no focus/value
     // preservation needed here the way the old in-grid version required.
     gridEl.innerHTML = pinnedFavs.map(fav => favTileHtml(fav, linkedByNode)).join('')
-        + dynamicFavTileHtml(extraLink);
+        + dynamicFavTileHtml(extraLink, extraFav);
 
     if (hintEl) {
         if (hiddenCount > 0) {
@@ -8097,21 +8104,30 @@ function favTileHtml(fav, linkedByNode) {
 }
 
 // The reserved 6th slot (v4.2) -- occupied by whatever's connected outside
-// the 5 pinned favorites, or a quiet, non-interactive placeholder when
+// the 5 PINNED favorites, or a quiet, non-interactive placeholder when
 // nothing ad hoc is going on. No longer doubles as quick connect's home --
 // that moved to the top row (see the "Quick connect" input in the card's
 // own Jinja markup) -- so this slot's only job now is showing/managing an
 // ad hoc connection via its own Pin/Disconnect buttons.
-function dynamicFavTileHtml(extraLink) {
+// `extraFav` (v4.4) -- looked up against the FULL favorites list, not
+// just the pinned subset -- distinguishes a genuinely ad hoc connection
+// (never saved at all) from one of your OWN saved favorites that just
+// isn't one of the 5 currently pinned. A real, reported bug: the latter
+// used to show "not saved" and its raw callsign/node number instead of
+// its saved label, which reads as if the app forgot you already saved
+// it -- it's really just not pinned right now.
+function dynamicFavTileHtml(extraLink, extraFav) {
     if (extraLink) {
-        const name = extraLink.callsign || ('Node ' + extraLink.node);
+        const name = (extraFav && extraFav.label) || extraLink.callsign || ('Node ' + extraLink.node);
+        const savedNote = extraFav ? 'saved, not pinned' : 'not saved';
+        const pinTitle = extraFav ? 'Pin to the tile grid' : 'Save as a pinned favorite';
         return `
             <div class="fav-tile ${extraLink.keyed ? 'keyed' : 'connected'} adhoc">
                 <div class="fav-tile-top"><span class="fav-tile-dot"></span><span class="fav-tile-name">${escapeHtml(name)}</span></div>
-                <span class="fav-tile-node">Node ${escapeHtml(extraLink.node)} · not saved</span>
+                <span class="fav-tile-node">Node ${escapeHtml(extraLink.node)} · ${savedNote}</span>
                 <span class="fav-tile-meta">${extraLink.keyed ? '🔴 KEYED' : 'Connected'}</span>
                 <div class="fav-tile-actions">
-                    <button onclick="pinAdhocConnection('${escapeHtml(extraLink.node)}', '${escapeHtml(extraLink.callsign || '')}')" title="Save as a pinned favorite">☆ Pin</button>
+                    <button onclick="pinAdhocConnection('${escapeHtml(extraLink.node)}', '${escapeHtml(extraLink.callsign || '')}')" title="${pinTitle}">☆ Pin</button>
                     <button class="disc" onclick="tileToggleConnect('${escapeHtml(extraLink.node)}')">Disconnect</button>
                 </div>
             </div>`;
