@@ -4184,6 +4184,71 @@ config for per-integration credentials; put it in
     the drawer's Multi-connect checkbox to confirm it actually flips the
     shared `aslMultiConnect` variable.
 
+- **Two real bugs found in the v4.0 ASL Favorites redesign within a day of
+  shipping, both from a real user's own data/fleet, not from further
+  testing with synthetic demo data (v4.1).**
+  - **The tile grid could overflow past the card's own border with a long
+    favorite label** -- reported with a real screenshot showing tiles
+    rendering outside the card entirely. Root cause: `.fav-tile` is a CSS
+    Grid item containing a flex row (`.fav-tile-top`) with the favorite's
+    name/label inside it. A flex/grid item's default `min-width: auto`
+    means it won't shrink below its own content's intrinsic width no
+    matter what `overflow`/`text-overflow: ellipsis` say -- `min-width: 0`
+    has to be set explicitly at EVERY nesting level for truncation to
+    actually engage, and it was only set on `.fav-tile-top` (the
+    container), not on `.fav-tile-name` (the actual text element) or on
+    `.fav-tile`/`.qc-tile` themselves as grid items. A long unbroken
+    label -- confirmed via the user's own real, favorites.ini-imported
+    labels with embedded city/state text
+    (`"KC5HWB Ham Radio 2.0 Hub , Grapevine, Texas 43136"`) -- forced its
+    own grid track wider than the 3-column layout, blowing the whole grid
+    out past the card. Never caught in this project's own testing because
+    every demo/mockup favorite label used so far was short. Fixed by
+    adding `min-width: 0` at both missing levels; verified live by
+    reproducing the user's exact label strings and confirming (via
+    Playwright bounding-box comparison, not just a visual glance) that
+    every tile's right edge stays within the grid's, and the grid's within
+    the card's, plus that the long label's `scrollWidth` now genuinely
+    exceeds its `clientWidth` (proof the ellipsis is actually doing
+    something, not that the string just happened to be short).
+  - **The DVSwitch card's "DMR linked" bar showed on one node and not
+    another, both genuinely connected** -- reported as a second bug, with
+    a screenshot from a real two-DVSwitch-node fleet. Root cause:
+    `monitor._parse_dvswitch_mmdvm_live()` derives `dmr_linked` from
+    scanning the current 40-line `MMDVM_Bridge.log` tail for one of two
+    discrete event lines (`"DMR, Logged into the master successfully"` /
+    `"DMR, Closing DMR Network"`) -- correctly returns `None` when NEITHER
+    line is in the current tail, which the method's own docstring already
+    documented as "unknown," not "disconnected." The bug was one level up:
+    `_check_one_asl3()`'s caller unconditionally did
+    `status.dvswitch_dmr_linked = dmr_linked` every single poll, so a
+    `None` result (the connect-line simply scrolled out of the tail after
+    enough OTHER log activity, with no reason for DVSwitch to re-log
+    "still connected" as a heartbeat) blanked a previously-known `True`
+    right back to unknown -- explaining exactly why a long-stably-
+    connected node shows nothing while a node that JUST reconnected (so
+    its login line is still fresh in the tail) shows the bar. Fixed by
+    making `dmr_linked`/`dstar_status` sticky at the call site: only
+    overwrite `status.dvswitch_dmr_linked`/`dvswitch_dstar_status` when
+    the parse actually found fresh evidence this poll, otherwise carry the
+    previous value forward. Deliberately did NOT apply this same treatment
+    to `live` (the active-transmission indicator) in the same block --
+    that one is correctly re-derived fresh every poll on purpose (a
+    transmission is a genuinely momentary event with its own start/end
+    lines, not a persistent link state with no re-announcement), and this
+    project already has an established, documented precedent for exactly
+    this asymmetry: `is_active`/`active_call`/`offline_since` etc. across
+    the rest of this file are similarly never blanket-cleared on missing
+    evidence, while genuinely momentary state is. Verified live with a
+    mocked multi-poll sequence (not just reading the diff): poll 1 sets
+    `dmr_linked=True` from real evidence; poll 2 (no evidence, the exact
+    reported scenario) confirms it STAYS `True` instead of reverting to
+    `None`; poll 3 (real new disconnect evidence) confirms it still
+    updates correctly to `False` when there genuinely is fresh evidence;
+    poll 4 (no evidence again) confirms it carries forward the LATEST
+    known value (`False`), not stuck permanently on the first value ever
+    seen -- the fix carries forward state, it doesn't freeze it.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

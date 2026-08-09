@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.0 "Allman"</span>
+                <span class="release-version">v4.1 "Lynott"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed: ASL Favorites tiles could overflow past the card</span> — a long favorite label (e.g. a name imported from a favorites.ini file with a city/state baked in) could push a tile wider than its column instead of truncating, breaking the whole grid out past the card's own border</li>
+                <li><span>Fixed: DVSwitch card's "DMR linked" bar disappearing on a stably-connected node</span> — it's derived from a recent log line that only appears again if the connection actually changes, so a node that's been connected for a while (with that line long since scrolled out of the tail) would show nothing, while a freshly-reconnected node would show the bar correctly. It now remembers the last known state instead of blanking it back to unknown every poll that doesn't happen to see a fresh line</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.0 "Allman"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>ASL Favorites card redesigned: a tap-to-toggle tile grid</span> — the old table (a status chip, a Connect/Disconnect button, and a ✕ remove per row, plus a stats grid and a permanent add-favorite form) is replaced by a compact grid of 5 pinned favorites, each one tap to connect or disconnect. A 6th tile is dynamic — whatever you're connected to outside those 5, or a quick-connect field when nothing extra is connected. Choose which favorites are pinned from the ASL Control drawer's own ★ toggle; a tiny status pill next to the card name replaces the old stats row</li>

@@ -769,6 +769,16 @@
             padding: 9px 10px; display: flex; flex-direction: column; gap: 3px;
             transition: background .15s, border-color .15s, transform .1s;
             min-height: 64px; color: inherit;
+            /* Grid items default to min-width:auto, which lets a long
+               unbroken favorite name/label (a real, reported case -- a
+               favorites.ini-imported label with an embedded city/state,
+               e.g. "KC5HWB Ham Radio 2.0 Hub , Grapevine, Texas 43136")
+               force this tile's grid TRACK wider than the 3-column layout
+               allows, blowing the whole grid out past the card's own
+               border instead of wrapping/truncating. min-width:0 lets the
+               tile actually shrink to its track width so .fav-tile-name's
+               own ellipsis (below) has room to kick in. */
+            min-width: 0;
         }
         .fav-tile:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--text-dim) 60%, var(--border)); }
         .fav-tile.keyed     { background: var(--danger-dim); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
@@ -779,7 +789,12 @@
         .fav-tile.keyed .fav-tile-dot { background: var(--danger); animation: pulse 1.2s infinite; }
         .fav-tile.connected .fav-tile-dot { background: var(--good); }
         .fav-tile.recent .fav-tile-dot { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
-        .fav-tile-name { font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* min-width:0 is the actual fix -- a flex item's default
+           min-width:auto means it won't shrink below its own text's
+           intrinsic width no matter what overflow/text-overflow say,
+           which is what let a long label force .fav-tile-top (and from
+           there the whole tile/grid track) wide instead of truncating. */
+        .fav-tile-name { font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
         .fav-tile-node { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); }
         .fav-tile-meta { font-size: 10.5px; color: var(--text-muted); line-height: 1.35; }
         .fav-tile.keyed .fav-tile-meta { color: var(--danger); font-weight: 600; }
@@ -794,7 +809,7 @@
         .qc-tile {
             background: var(--panel-2); border: 1px dashed var(--border); border-radius: 8px;
             padding: 8px 9px; display: flex; flex-direction: column; gap: 5px; justify-content: center;
-            min-height: 64px;
+            min-height: 64px; min-width: 0; /* same grid-item shrink fix as .fav-tile */
         }
         .qc-tile-label { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--text-dim); font-weight: 600; }
         .qc-plus { font-size: 12px; line-height: 1; color: var(--text-dim); }

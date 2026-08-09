@@ -344,8 +344,25 @@ class FleetMonitor:
                     status.dvswitch_bridges = bridges
                     status.dvswitch_vocoder = self._parse_dvswitch_vocoder(sections, bridges)
                     status.dvswitch_live = live
-                    status.dvswitch_dmr_linked = dmr_linked
-                    status.dvswitch_dstar_status = dstar_status
+                    # dmr_linked/dstar_status are STICKY across polls, unlike
+                    # `live` above (a genuinely momentary event, correctly
+                    # re-derived fresh every time). MMDVM_Bridge.log only
+                    # logs a link-status CHANGE, never a "still connected"
+                    # heartbeat -- so _parse_dvswitch_mmdvm_live() returning
+                    # None here means "no fresh evidence in this poll's
+                    # 40-line tail" (the connect/disconnect line has simply
+                    # scrolled out), not "actually unlinked". A real,
+                    # reported case: two DVSwitch nodes side by side, one
+                    # showing "DMR linked" and the other showing nothing at
+                    # all even though both were genuinely connected -- caused
+                    # by this exact unconditional overwrite blanking a known
+                    # state back to unknown every time the tail happened not
+                    # to contain a fresh line. Only overwrite the carried-
+                    # forward value when this poll actually found one.
+                    if dmr_linked is not None:
+                        status.dvswitch_dmr_linked = dmr_linked
+                    if dstar_status is not None:
+                        status.dvswitch_dstar_status = dstar_status
         except Exception:
             self._record_failure(ip)
 
@@ -560,9 +577,14 @@ class FleetMonitor:
           lines), this under-reports idle rather than guessing -- a real,
           accepted limitation of a stateless re-scan, not a bug.
           dmr_linked: True/False/None (unknown -- no master connect/
-          disconnect line seen in this tail).
+          disconnect line seen in this tail). Unlike `live`, this method's
+          caller (_check_one_asl3) treats a None result as "no fresh
+          evidence," carrying forward the previously known value instead
+          of blanking it -- this function itself always just reports what
+          it actually found in THIS tail, nothing more.
           dstar_status: the raw quoted string from D-Star's own explicit
-          "link status set to ..." line, or None if not seen.
+          "link status set to ..." line, or None if not seen. Same
+          carry-forward treatment by the caller as dmr_linked.
 
         "network watchdog has expired" is treated as an end-of-transmission
         event too (confirmed live: it fired mid-call, immediately followed
