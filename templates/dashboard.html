@@ -8026,7 +8026,19 @@ function renderAslFavorites() {
     // the most relevant) -- an empty placeholder when there's nothing ad
     // hoc connected. Quick connect lives in the top row now (v4.2), not
     // in this slot -- see dynamicFavTileHtml().
-    const extras = (controlHotspot.asl_linked_nodes || []).filter(l => !pinnedNodes.has(l.node));
+    //
+    // A real, reported case: a node that's actually ANOTHER of your own
+    // configured ASL3 hotspots (permanent backbone connectivity between
+    // your own stations, not something anyone "connected" through this
+    // app) was showing up here as if it were a disconnectable ad hoc
+    // link -- confusing and risky, since tapping Disconnect on it would
+    // actually break real inter-hub connectivity you never meant to
+    // touch from this card. Excluded the same way pinned favorites are:
+    // any linked node whose number matches another configured ASL3
+    // hotspot's own asl_node never lands in this slot at all.
+    const ownHotspotNodes = new Set(aslHotspots.map(hs => hs.asl_node).filter(Boolean));
+    const extras = (controlHotspot.asl_linked_nodes || [])
+        .filter(l => !pinnedNodes.has(l.node) && !ownHotspotNodes.has(l.node));
     const extraLink = extras.find(l => l.keyed) || extras[0] || null;
     // A real, reported bug: "extras" only excludes the PINNED subset, so
     // a favorite you've saved but simply don't have pinned right now

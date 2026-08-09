@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.5 "Winter"</span>
+                <span class="release-version">v4.6 "Balin"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed: ASL Favorites' reserved 6th slot could show a link to your OWN other hotspot as if it were a disconnectable ad hoc connection</span> — if one of your ASL3 nodes has a permanent backbone link to another of your own configured hotspots, it used to land in that slot with a Disconnect button, which is exactly the wrong invitation for a link nobody "connected" through this app and nobody should casually break from here. That slot now excludes any node matching another of your configured ASL3 hotspots, the same way it already excludes your pinned favorites — a genuine ad hoc connection from someone else still shows up normally</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.5 "Winter"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>A version codename Easter egg</span> — every release since v3.49 has been named after a real deceased rock musician; the Version info page now shows a one-line bio and a Wikipedia link for this build's namesake, right at the bottom of the page</li>

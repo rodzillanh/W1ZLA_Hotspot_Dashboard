@@ -301,6 +301,11 @@ BIOS = {
         "blurb": "An albino Texas blues-rock guitarist known for his blistering slide playing and a long solo career alongside session work for Muddy Waters.",
         "wiki": "Johnny_Winter",
     },
+    "Balin": {
+        "name": "Marty Balin",
+        "blurb": "Co-founder and lead vocalist of Jefferson Airplane, a defining voice of the 1960s San Francisco psychedelic rock scene.",
+        "wiki": "Marty_Balin",
+    },
 }
 
 

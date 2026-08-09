@@ -4506,6 +4506,40 @@ config for per-integration credentials; put it in
   a plain `.py` module is already covered by those scripts' existing
   `*.py` glob copies.
 
+- **A real, reported follow-up to the "saved, not pinned" fix above: the
+  reserved 6th slot could ALSO show a link to another of the user's OWN
+  configured ASL3 hotspots as if it were a disconnectable ad hoc
+  connection (v4.6).** Reported directly against a real screenshot
+  showing "W1ZLA , Barrington..." (the user's own callsign/QTH) in that
+  slot with an active Disconnect button -- confirmed by asking the user
+  directly (rather than assuming) that node 600671 is in fact another of
+  their own configured hotspots, permanently backbone-linked to the
+  controlling node, not something anyone connected through this app.
+  Offering a casual Disconnect button on real infrastructure connectivity
+  nobody meant to touch from this card is a worse failure mode than just
+  under-showing something -- confirmed this was the right read before
+  building anything, not guessed from the callsign alone. Fixed the same
+  way the "saved, not pinned" case was fixed: one more exclusion set in
+  `renderAslFavorites()`, `ownHotspotNodes = new Set(aslHotspots.map(hs
+  => hs.asl_node).filter(Boolean))`, applied alongside the existing
+  `pinnedNodes` exclusion when computing `extras`. There is currently no
+  way for this app to detect a genuinely PERMANENT link configured
+  directly in `rpt.conf` on a node that ISN'T also one of this
+  dashboard's own configured hotspots (see the existing ASL3 gotchas
+  above on `RPT_ALINKS` not exposing a permanence bit) -- this fix
+  specifically covers "linked to another hotspot this dashboard itself
+  knows about," not "any permanent link in general." If a future report
+  describes a permanent link to a node that ISN'T one of the user's own
+  configured hotspots, this exclusion won't catch it and a different
+  mechanism (e.g. a manual per-hotspot "always ignore this node number"
+  setting) would be the right next step, not an extension of this
+  heuristic. Verified live with two Playwright scenarios in one run: the
+  own-hotspot link alone (reserved slot correctly stays the empty
+  placeholder) and the own-hotspot link connected AT THE SAME TIME as a
+  genuinely unrelated ad hoc node (the real ad hoc node still correctly
+  occupies the slot) -- confirming the exclusion is neither too broad
+  nor too narrow.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
