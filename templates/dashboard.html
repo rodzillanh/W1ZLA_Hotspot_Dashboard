@@ -620,7 +620,7 @@
         .split-stats {
             flex: 0 0 84px;
             display: flex; flex-direction: column; gap: 6px;
-            font-size: 13px; color: var(--text-muted);
+            font-size: 12px; color: var(--text-muted);
             padding-right: 14px; border-right: 1px solid var(--card-border);
         }
         .split-stats .stat-val { color: var(--text); display: block; }
@@ -3736,11 +3736,14 @@ function renderCards(data) {
         // SA818 module at all -- indistinguishable from "never checked").
         const sa818FreqStat = hs.sa818_status
             ? `<div>Freq<span class="stat-val" title="${
-                  hs.sa818_status === 'recorded' ? 'From /etc/sa818.conf on this host'
+                  hs.sa818_status === 'recorded' ? escapeHtml(hs.frequency) + ' — from /etc/sa818.conf on this host'
                       : hs.sa818_status === 'placeholder' ? 'sa818-menu has been run here, but no real frequency has been programmed yet'
                       : 'No /etc/sa818.conf on this host'
               }">${
-                  hs.sa818_status === 'recorded' ? escapeHtml(hs.frequency)
+                  // MHz omitted here (unlike the fuller drawer section) --
+                  // this narrow column is tight on room and every value
+                  // here is a frequency anyway, so the unit's implied.
+                  hs.sa818_status === 'recorded' ? escapeHtml(hs.frequency.replace(/\s*MHz$/, ''))
                       : hs.sa818_status === 'placeholder' ? 'Not set'
                       : '—'
               }</span></div>`
