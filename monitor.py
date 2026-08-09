@@ -1071,17 +1071,32 @@ class FleetMonitor:
             prev_call = current.active_call
             history   = list(current.history)
 
+        # Two different tables in the same output: RPT_ALINKS (app_rpt's
+        # own link table -- what ilink connect/disconnect/monitor act on)
+        # and the raw IAX2 connection table above it, which can list a
+        # node RPT_ALINKS never does (see config.ASL_CONNTABLE_LINE_PATTERN's
+        # own comment -- confirmed live that Local Monitor links, ilink 8,
+        # land here but never get an RPT_ALINKS entry at all). Both are
+        # scanned from the same output in one pass -- no `break` on the
+        # first match, since the conn-table lines appear BEFORE RPT_ALINKS
+        # in real output and we need both.
         alinks_raw = None
+        established_conn_nodes = []
         for line in output[3:]:
-            m = re.match(config.ASL_ALINKS_LINE_PATTERN, line.strip())
+            stripped = line.strip()
+            m = re.match(config.ASL_ALINKS_LINE_PATTERN, stripped)
             if m:
                 alinks_raw = m.group(1)
-                break
+                continue
+            cm = re.match(config.ASL_CONNTABLE_LINE_PATTERN, stripped)
+            if cm and cm.group(3) == "ESTABLISHED":
+                established_conn_nodes.append(cm.group(1))
 
         linked_nodes = []
         keyed_entry  = None
+        seen_nodes   = set()
+        node_info = self._aslstats.linked_node_info(node) if (alinks_raw or established_conn_nodes) else {}
         if alinks_raw:
-            node_info = self._aslstats.linked_node_info(node)
             for entry in alinks_raw.split(",")[1:]:  # first field is the count
                 em = re.match(config.ASL_ALINK_ENTRY_PATTERN, entry.strip())
                 if not em:
@@ -1097,8 +1112,29 @@ class FleetMonitor:
                     "keyed":       key_char == "K",
                 }
                 linked_nodes.append(entry_dict)
+                seen_nodes.add(link_node)
                 if entry_dict["keyed"] and keyed_entry is None:
                     keyed_entry = entry_dict
+
+        # Any node ESTABLISHED at the IAX2 layer but not already accounted
+        # for by RPT_ALINKS is treated as an inferred Local Monitor link --
+        # see config.ASL_CONNTABLE_LINE_PATTERN's own comment for why.
+        # `keyed` can't be determined for these (only RPT_ALINKS reports
+        # keyed/unkeyed) -- always False, same as this app already can't
+        # tell you if a Local-Monitor'd remote party is currently talking.
+        for link_node in established_conn_nodes:
+            if link_node in seen_nodes:
+                continue
+            info = node_info.get(link_node) or {}
+            linked_nodes.append({
+                "node":        link_node,
+                "callsign":    info.get("callsign"),
+                "description": info.get("description"),
+                "location":    info.get("location"),
+                "mode":        "L",
+                "keyed":       False,
+            })
+            seen_nodes.add(link_node)
         updates["asl_linked_nodes"] = linked_nodes
 
         if keyed_entry:

@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.11"
+APP_VERSION = "4.12"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -89,6 +89,8 @@ VERSION_CODENAMES = [
                         # (1944-2013)
     "Grech",            # v4.11 -- Ric Grech, bassist, Blind Faith/Family
                         # (1946-1990)
+    "Federici",         # v4.12 -- Danny Federici, keyboardist, Bruce
+                        # Springsteen's E Street Band (1950-2008)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -432,10 +434,33 @@ SLOT_PATTERN       = r"DMR Slot (\d+)"               # matches "DMR Slot 2"
 
 # ASL3 (AllStarLink): `rpt xnode <node>` prints this dialplan-variable line,
 # e.g. "RPT_ALINKS=3,1603TU,622630CU,600671TU" -- count, then one
-# <node><mode T/R/L/C><K keyed/U unkeyed> entry per linked node. Confirmed
+# <node><mode T/R/C><K keyed/U unkeyed> entry per linked node. Confirmed
 # against a real ASL3 node (source: apps/app_rpt/rpt_link.c's __mklinklist()).
+# NOTE: `L` was originally believed to be a real mode letter seen here too
+# (same source), but live verification (2026-08, see CLAUDE.md) found a
+# confirmed Local Monitor link (ilink 8) NEVER appears in RPT_ALINKS at
+# all, under any letter -- see ASL_CONNTABLE_LINE_PATTERN below for how
+# this app actually detects Local Monitor links instead. The regex still
+# accepts L defensively in case some app_rpt version/config does emit it.
 ASL_ALINKS_LINE_PATTERN = r"^RPT_ALINKS=(.*)$"
 ASL_ALINK_ENTRY_PATTERN = r"^(\d+)([TRLC])([KU])$"
+
+# The raw IAX2-level connection table at the very TOP of `rpt xnode`'s own
+# output (before RPT_ALINKS), e.g.:
+#   43136     208.113.166.28      0           OUT        01:02:06            ESTABLISHED
+# Columns: node, IP/host, an unidentified numeric field (unused here),
+# direction (IN/OUT), duration, state. Confirmed live (2026-08, a real
+# W1ZLA node, reported directly by the user) that a Local Monitor link
+# (ilink 8) shows up HERE but gets NO entry in RPT_ALINKS at all --
+# presumably because "doesn't relay to your other links" is implemented
+# by app_rpt as "never added to the link table in the first place," not
+# as a distinct mode letter the way the ASL_ALINK_ENTRY_PATTERN comment
+# above previously assumed (that assumption was sourced from reading
+# rpt_link.c, not live-tested against a real Local Monitor connection --
+# this is the correction). monitor.py treats any node ESTABLISHED here
+# but absent from RPT_ALINKS as an inferred Local Monitor link -- a
+# reasonable, evidence-based inference, not a directly-reported fact.
+ASL_CONNTABLE_LINE_PATTERN = r"^(\d+)\s+\S+\s+\S+\s+(IN|OUT)\s+[\d:]+\s+(\S+)\s*$"
 
 END_OF_TRANSMISSION_MARKERS = (
     "end of voice transmission",   # DMR network

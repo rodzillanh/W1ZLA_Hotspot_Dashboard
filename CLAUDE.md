@@ -4773,6 +4773,77 @@ config for per-integration credentials; put it in
     directly against the approved mockup, not just checked for
     "renders without erroring."
 
+- **Correction to the v4.11 entry above, found within the same session:
+  Local Monitor links NEVER get an `RPT_ALINKS` entry at all on a real
+  node -- the v4.11 work above was verified only with a SYNTHETIC
+  `mode: "L"` link, never a genuine one, and that synthetic assumption
+  turned out to be wrong (v4.12).** Reported directly: the user's real
+  ASL Control drawer showed only 3 of their 5 actually-linked nodes
+  (comparing directly against their own real `allmon3` install's view of
+  the same node) -- asked for, and received, the exact raw output of
+  `sudo asterisk -rx "rpt xnode 59929"` run live over SSH on their real
+  hub. That output settled it definitively:
+  ```
+  1603      127.0.0.1        0   OUT   36:35:07   ESTABLISHED
+  622630    68.113.164.100   0   OUT   00:00:30   CONNECTING
+  600671    24.233.212.178   0   IN    01:44:43   ESTABLISHED
+  43136     208.113.166.28   0   OUT   01:02:06   ESTABLISHED
+  27339     12.17.28.195     0   OUT   00:12:44   ESTABLISHED
+  ...
+  RPT_ALINKS=3,600671TU,622630CU,1603TU
+  ```
+  Two ESTABLISHED connections (27339, 43136) that the user confirmed
+  directly they'd connected via Local Monitor are completely ABSENT from
+  `RPT_ALINKS` -- not present with an `L` mode letter, not present at
+  all. `RPT_ALINKS` only ever had 3 entries. **The likely mechanism**:
+  ilink 8's whole point ("doesn't relay to your other links") is
+  probably implemented by app_rpt as "never joined to the link table in
+  the first place," not as a distinct mode flag on an existing link-table
+  entry -- a coherent theory, but still an inference from this one real
+  sample, not confirmed against `rpt_link.c` source the way the original
+  T/R/L/C mode-letter claim was (that original claim, sourced from
+  reading `__mklinklist()`, was itself apparently incomplete/wrong for
+  this case -- source-reading alone wasn't sufficient here, live
+  verification caught what it missed).
+  - **Fix: parse BOTH tables in the same SSH output, not just
+    `RPT_ALINKS`.** The raw IAX2 connection table sits at the very TOP of
+    `rpt xnode`'s own output (before `RPT_ALINKS`), in the SAME SSH
+    response this app already fetches every poll -- no new round-trip
+    needed, just more parsing of data already in hand. New
+    `config.ASL_CONNTABLE_LINE_PATTERN` matches those lines (node, IP,
+    an unidentified always-`0` numeric field left unused, IN/OUT
+    direction, duration, state). `monitor._parse_asl_output()` now scans
+    the whole output in one pass collecting BOTH `RPT_ALINKS` and
+    ESTABLISHED-state connection-table nodes (no more early `break` on
+    the first regex match, since the conn-table lines appear earlier in
+    real output and both are needed) -- any node ESTABLISHED at the IAX2
+    layer but not already accounted for by `RPT_ALINKS` gets added as an
+    INFERRED Local Monitor entry (`mode: "L"`, `keyed: False` always,
+    since only `RPT_ALINKS` ever reports real keyed/unkeyed state). This
+    is a correlation-based inference, disclosed as such in the code
+    comment -- not a directly-reported fact the way T/R/C mode letters
+    from `RPT_ALINKS` are.
+  - **A real bug caught by the FIRST test run of the new parser, not by
+    inspection**: the initial implementation checked
+    `cm.group(2) == "ESTABLISHED"` against the new regex, but group 2 is
+    the IN/OUT direction capture, not the state (group 3) -- a plain
+    off-by-one in the caller's own regex-group indexing. Every
+    connection-table node was silently excluded (test showed only the 3
+    `RPT_ALINKS` nodes, matching the OLD broken behavior exactly) until
+    caught by asserting the full expected node SET against the real
+    captured output, not just checking the parse didn't crash.
+  - **Verified two ways**: (1) a direct unit-style test feeding the
+    exact real output the user pasted into `_parse_asl_output()`
+    directly, asserting all 5 nodes appear with the right modes
+    (600671/1603 -> T, 622630 -> C, 43136/27339 -> inferred L); (2) a
+    full end-to-end test through the REAL production poll path
+    (`monitor.check_one()`, not a shortcut), with `_ssh_exec` and
+    `aslstats.linked_node_info()` mocked to return the user's exact real
+    data, confirming the actual rendered dashboard (compact card's chip
+    row AND the hotspot's own detail drawer, via the real `.card-gear-btn`
+    entry point) shows all 5 links with 2 correctly tagged "LOCAL MON" --
+    not just that the parser's return value looked right in isolation.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

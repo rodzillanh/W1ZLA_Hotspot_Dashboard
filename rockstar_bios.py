@@ -331,6 +331,11 @@ BIOS = {
         "blurb": "A bassist and violinist who played with Family, the short-lived supergroup Blind Faith, and later Traffic.",
         "wiki": "Ric_Grech",
     },
+    "Federici": {
+        "name": "Danny Federici",
+        "blurb": "A founding member of Bruce Springsteen's E Street Band, known for his organ and glockenspiel work over a four-decade partnership.",
+        "wiki": "Danny_Federici",
+    },
 }
 
 

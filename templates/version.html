@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.11 "Grech"</span>
+                <span class="release-version">v4.12 "Federici"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed: Local Monitor links were completely invisible, not just unlabeled</span> — it turns out a Local-Monitor'd node never appears in AllStarLink's own link table (<code>RPT_ALINKS</code>) at all, under any letter, so last release's "Local Mon" indicator had nothing to show for a real Local Monitor connection. This app now also reads the raw connection list further up in the same data it already polls, and treats any node connected there but absent from the link table as Local Monitor — confirmed against a real node where 2 of 5 actual links were being missed entirely by every view in this app</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.11 "Grech"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Local Monitor now has a visible indicator, everywhere it can show up</span> — a Local-Monitor'd link used to look identical to a normal connection (or, in one spot, just a bare unexplained "L" letter). It now shows its own cyan "🎧 Local Mon" state on the hotspot's own card, the ASL Favorites card, the ASL Control drawer, and the hotspot's detail drawer — and Disconnect already worked on it everywhere, it just wasn't obvious where to look</li>
