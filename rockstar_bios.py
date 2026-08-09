@@ -316,6 +316,11 @@ BIOS = {
         "blurb": "A founding member and pianist of the Rolling Stones, dropped from the official lineup for image reasons but kept on as a touring/session player for the rest of his life.",
         "wiki": "Ian_Stewart_(musician)",
     },
+    "Nilsson": {
+        "name": "Harry Nilsson",
+        "blurb": "A singer-songwriter best known for “Everybody's Talkin'” and his cover of “Without You,” and for a close, hard-partying friendship with John Lennon in the 1970s.",
+        "wiki": "Harry_Nilsson",
+    },
 }
 
 

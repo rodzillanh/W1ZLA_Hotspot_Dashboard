@@ -4649,6 +4649,24 @@ config for per-integration credentials; put it in
     hardcoding actually took effect end-to-end and not just in the route
     handler in isolation.
 
+- **ASL Control's favorites-list rows tightened (v4.9)** -- reported
+  directly against a real 20-favorite fleet screenshot ("just slightly
+  smaller... to free up some screen real estate"). Pure CSS density
+  pass on `.asl-ctrl-node-row` and its children only (padding 6px 9px ->
+  4px 8px, gap 8px -> 6px, margin-bottom 4px -> 3px, node-call/rx/lcnt/
+  notdb/recent/remove-button font-sizes each down roughly 1px, the pin
+  star icon 14px -> 12.5px) -- no markup/behavior changes at all.
+  Deliberately did NOT touch `.hs-drawer-section-title` (the "FAVORITES
+  (5/5 PINNED · 20 TOTAL)" header) even though it's part of the same
+  visual complaint -- that class is shared across every drawer's section
+  headers (hotspot drawer, QSO drawer, Settings drawer), not
+  ASL-drawer-specific, so shrinking it would have silently affected
+  drawers that were never part of this report. Verified live with a
+  seeded 20-favorite fleet (matching the real reported scale, not a
+  token 3-4 favorite test fleet): row height dropped to 29px from the
+  prior implicit ~34-36px, confirmed all 20 rows still render fully
+  legible via a real screenshot, not just a computed-height number.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

@@ -935,8 +935,8 @@
         .asl-ctrl-multi-row input[type="checkbox"] { accent-color: var(--accent); width: 13px; height: 13px; margin: 2px 0 0; flex-shrink: 0; }
         .asl-ctrl-multi-row .hint { display: block; font-size: 10.5px; color: var(--text-dim); margin-top: 1px; }
         .asl-ctrl-pin-star {
-            background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1;
-            color: var(--text-dim); flex-shrink: 0; padding: 2px; transition: color .15s, transform .1s;
+            background: none; border: none; cursor: pointer; font-size: 12.5px; line-height: 1;
+            color: var(--text-dim); flex-shrink: 0; padding: 1px; transition: color .15s, transform .1s;
         }
         .asl-ctrl-pin-star.pinned { color: var(--accent); }
         .asl-ctrl-pin-star:hover { transform: scale(1.15); }
@@ -1003,9 +1003,15 @@
            Connect/Monitor/Disconnect buttons, which needed two full lines
            per favorite once Rx%/LCnt joined the row -- a real "takes up a
            lot of room" complaint with more than a couple favorites saved. */
+        /* Rows tightened (v4.9 -- "the list of favorites in the drawer
+           takes up a lot of room" with a real 20-favorite fleet): less
+           padding/margin/gap, and every text element a notch smaller.
+           Still comfortably tappable, just denser -- same instinct as
+           the earlier Connect/Monitor/Disconnect-per-row -> single-line
+           redesign this section's own comment above already documents. */
         .asl-ctrl-node-row {
-            display: flex; align-items: center; gap: 8px;
-            padding: 6px 9px; border-radius: 8px; margin-bottom: 4px;
+            display: flex; align-items: center; gap: 6px;
+            padding: 4px 8px; border-radius: 7px; margin-bottom: 3px;
             background: var(--panel-2); border: 1px solid var(--border);
             cursor: pointer; transition: border-color .15s, background .15s;
         }
@@ -1014,19 +1020,19 @@
         .asl-ctrl-node-row.connected { background: var(--good-dim); border-color: color-mix(in srgb, var(--good) 40%, var(--border)); }
         .asl-ctrl-node-row.recent { background: var(--accent-dim); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
         .asl-ctrl-node-row.selected { border-color: var(--live); box-shadow: 0 0 0 1px var(--live) inset; }
-        .asl-ctrl-node-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+        .asl-ctrl-node-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
         .asl-ctrl-node-dot.keyed { background: var(--danger); animation: pulse 1.2s infinite; }
         .asl-ctrl-node-dot.webtx { background: var(--good); box-shadow: 0 0 4px var(--good); }
         .asl-ctrl-node-dot.active { background: color-mix(in srgb, var(--good) 55%, var(--text-dim)); }
         .asl-ctrl-node-dot.recent { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
         .asl-ctrl-node-body { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .asl-ctrl-node-call { font-weight: 600; font-size: 12.5px; }
-        .asl-ctrl-rx { font-size: 10px; font-family: var(--font-mono); color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
-        .asl-ctrl-lcnt { font-size: 10px; font-family: var(--font-mono); color: var(--text-dim); background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 0 6px; white-space: nowrap; flex-shrink: 0; }
-        .asl-ctrl-notdb { font-size: 10px; color: var(--text-dim); font-style: italic; flex-shrink: 0; }
-        .asl-ctrl-recent { font-size: 10px; color: var(--accent); font-style: italic; flex-shrink: 0; }
+        .asl-ctrl-node-call { font-weight: 600; font-size: 11.5px; }
+        .asl-ctrl-rx { font-size: 9.5px; font-family: var(--font-mono); color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
+        .asl-ctrl-lcnt { font-size: 9.5px; font-family: var(--font-mono); color: var(--text-dim); background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 0 5px; white-space: nowrap; flex-shrink: 0; }
+        .asl-ctrl-notdb { font-size: 9.5px; color: var(--text-dim); font-style: italic; flex-shrink: 0; }
+        .asl-ctrl-recent { font-size: 9.5px; color: var(--accent); font-style: italic; flex-shrink: 0; }
         .asl-ctrl-btn-remove {
-            font-size: 10px; padding: 3px 6px; border-radius: 5px; cursor: pointer; border: 1px solid var(--border);
+            font-size: 9.5px; padding: 2px 5px; border-radius: 5px; cursor: pointer; border: 1px solid var(--border);
             background: none; color: var(--text-dim); flex-shrink: 0; font-family: var(--font-mono);
         }
         .asl-ctrl-btn-remove:hover { color: var(--danger); border-color: var(--danger); }
