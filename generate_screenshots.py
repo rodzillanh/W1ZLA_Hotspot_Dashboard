@@ -197,6 +197,10 @@ asl3 = models.HotspotStatus(
     name=HOTSPOT_ASL3["name"], ip=HOTSPOT_ASL3["ip"],
     status="Online", last_poll_at=now, uptime="41d 3h 0m",
     asl_node="59929",
+    # SA818 card (v4.14/v4.15) -- real values from this exact node's own
+    # /etc/sa818.conf, not fabricated.
+    sa818_status="recorded", frequency="443.5000 MHz", duplex="Simplex",
+    sa818_tone="CTCSS 110.9",
     asl_linked_nodes=[
         {"node": "27339", "callsign": "W2ECR", "description": "East Coast AllStar HUB",
          "location": "New York, NY", "mode": "T", "keyed": True},

@@ -567,6 +567,21 @@ an ASL3 card — and the WPSD-specific git update check is skipped for
 this node type entirely, rather than running a check that could never
 apply.
 
+**SA818 radio frequency (and CTCSS/DCS tone, if set).** Many simplex
+ASL3 builds (e.g. a SHARI-style Pi hotspot) use an SA818 RF module,
+configured via the `sa818-menu` tool. If `/etc/sa818.conf` is present,
+its last-programmed frequency shows as a **Freq** stat right in the
+node/temp/CPU column, with a **Tone** stat underneath it whenever a
+CTCSS or DCS tone is actually configured (e.g. "CTCSS 110.9" or "DCS
+023") — omitted entirely if no tone is set. The hotspot's own detail
+drawer (gear icon) has a fuller "Radio (SA818)" section, which also
+explains *why* there's no frequency shown when there isn't one: either
+`sa818-menu` was run but nothing was ever programmed (still its
+`000.0000` placeholder), or there's no SA818 config file on that host
+at all. Since the module can't be read back over the air, this is only
+ever a record of what that specific host last wrote — if the radio was
+reprogrammed from a different machine, this won't reflect it.
+
 **Brief keyups can be missed between polls.** Unlike the WPSD path (which
 tails a log with a short rolling history buffer), each ASL3 poll only
 sees the *instant* it connects — there's no history. A keyup shorter than
