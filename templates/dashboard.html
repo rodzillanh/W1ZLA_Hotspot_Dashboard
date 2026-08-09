@@ -4734,11 +4734,20 @@ const CLOCK_STYLE_KEY = 'w1zla_clock_style';
 const CLOCK_12HR_KEY = 'w1zla_clock_12hr';
 const CLOCK_DUAL_KEY = 'w1zla_clock_dual';
 const CLOCK_DUAL_TZ_KEY = 'w1zla_clock_dual_tz';
+const CLOCK_FACE_SHAPE_KEY = 'w1zla_clock_face_shape';
+const CLOCK_SHOW_DATE_KEY = 'w1zla_clock_show_date';
 
 let clockStyle = localStorage.getItem(CLOCK_STYLE_KEY) || 'digital';
 let clockDualEnabled = localStorage.getItem(CLOCK_DUAL_KEY) === '1';
 let clockDualTz = localStorage.getItem(CLOCK_DUAL_TZ_KEY) || 'UTC';
 let clockUse12Hour = localStorage.getItem(CLOCK_12HR_KEY) === '1';  // 24hr default, matches ham radio/aviation convention
+// Analog-only extras (mockup-approved, see CLAUDE.md): a square
+// "instrument panel" face as an alternative to the round dial, and a
+// watch-style date window. Both default off -- the existing round face
+// with no date is unchanged behavior for every install upgrading into
+// this.
+let clockFaceShape = localStorage.getItem(CLOCK_FACE_SHAPE_KEY) || 'round';
+let clockShowDate = localStorage.getItem(CLOCK_SHOW_DATE_KEY) === '1';
 let clockTixState = {};  // per-digit-position cached dot layout, keyed by "position:value:dotCount"
 
 const CLOCK_TZ_OPTIONS = [
@@ -4780,7 +4789,18 @@ function renderClockControls() {
         el.innerHTML = `<div class="clock-disabled-note">TIX is always 12-hour, and has no second clock -- kept simple/glanceable by design.</div>`;
         return;
     }
-    el.innerHTML = (clockStyle === 'digital' ? renderClockFormatToggle() : '') + `
+    // Face shape + date window are Analog-only -- Digital has no dial to
+    // reshape, TIX already bailed out above.
+    const analogRows = clockStyle === 'analog' ? `
+        <div class="clock-ctl-row">
+            <div class="clock-toggle-mini ${clockFaceShape === 'square' ? 'on' : ''}" onclick="toggleClockFaceShape()"></div>
+            Square face
+        </div>
+        <div class="clock-ctl-row">
+            <div class="clock-toggle-mini ${clockShowDate ? 'on' : ''}" onclick="toggleClockShowDate()"></div>
+            Show date
+        </div>` : '';
+    el.innerHTML = (clockStyle === 'digital' ? renderClockFormatToggle() : '') + analogRows + `
         <div class="clock-ctl-row">
             <div class="clock-toggle-mini ${clockDualEnabled ? 'on' : ''}" onclick="toggleClockDual()"></div>
             Show a second clock
@@ -4796,6 +4816,20 @@ function renderClockControls() {
 function toggleClockFormat() {
     clockUse12Hour = !clockUse12Hour;
     localStorage.setItem(CLOCK_12HR_KEY, clockUse12Hour ? '1' : '0');
+    renderClockControls();
+    renderClock();
+}
+
+function toggleClockFaceShape() {
+    clockFaceShape = clockFaceShape === 'square' ? 'round' : 'square';
+    localStorage.setItem(CLOCK_FACE_SHAPE_KEY, clockFaceShape);
+    renderClockControls();
+    renderClock();
+}
+
+function toggleClockShowDate() {
+    clockShowDate = !clockShowDate;
+    localStorage.setItem(CLOCK_SHOW_DATE_KEY, clockShowDate ? '1' : '0');
     renderClockControls();
     renderClock();
 }
@@ -4868,7 +4902,49 @@ function clockHandPath(cx, cy, angleDeg, length, width, color) {
             stroke="${color}" stroke-width="${(width * 0.55).toFixed(1)}" stroke-linecap="round"/>`;
 }
 
-function renderClockAnalog(container, tz, size) {
+// Point on a RECTANGLE's perimeter at clock-angle theta (0 = top/12,
+// clockwise) -- a ray from center, clipped independently against each
+// half-extent (the generalized form of the classic "square clock face"
+// trick: halfW===halfH degenerates to the square case exactly). This is
+// what lets the square/rectangular instrument-panel face's ticks and
+// numerals hug the actual case edges/corners instead of sitting on an
+// inscribed circle the way a plain rounded-rect-with-a-circle-inside
+// version would.
+function rectPerimeterPoint(cx, cy, halfW, halfH, thetaDeg) {
+    const a = thetaDeg * Math.PI / 180;
+    const dx = Math.sin(a), dy = -Math.cos(a);
+    const scale = 1 / Math.max(Math.abs(dx) / halfW, Math.abs(dy) / halfH);
+    return [cx + dx * scale, cy + dy * scale];
+}
+
+const CLOCK_DATE_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+// A recessed "date window" like an old watch's date complication --
+// month + day only (real device date), in the app's own monospace face.
+// `basis` drives every proportional dimension so it stays legible at
+// both the single-clock and dual-clock sizes without a second set of
+// magic numbers. Only ever called when clockShowDate is on.
+function clockDateWindowSvg(cx, cy, basis) {
+    const now = new Date();
+    const label = `${CLOCK_DATE_MONTHS[now.getMonth()]} ${now.getDate()}`;
+    const w = basis * 0.30, h = basis * 0.135;
+    const x = cx - w / 2, y = cy - h / 2;
+    return `<g>
+        <rect x="${(x - 1).toFixed(1)}" y="${(y - 1).toFixed(1)}" width="${(w + 2).toFixed(1)}" height="${(h + 2).toFixed(1)}"
+            rx="2" fill="none" stroke="var(--text-dim)" stroke-width="1" opacity="0.5"/>
+        <rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"
+            rx="1.5" fill="var(--bg)" stroke="var(--card-border)" stroke-width="1"/>
+        <text x="${cx.toFixed(1)}" y="${(cy + basis * 0.026).toFixed(1)}" text-anchor="middle"
+            font-size="${(basis * 0.072).toFixed(1)}" font-family="var(--font-mono)" font-weight="600"
+            letter-spacing="0.5" fill="var(--text)">${label}</text>
+    </g>`;
+}
+
+// Round dial -- the original face, now also date-window-aware. The 3
+// o'clock numeral steps aside while the date window is on, same as
+// almost every real watch with one does (otherwise the two visually
+// collide).
+function renderClockRoundFace(container, tz, size, showDate) {
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: resolveClockTz(tz) }));
     const h = now.getHours() % 12, m = now.getMinutes(), s = now.getSeconds();
     const hAng = (h + m/60) * 30, mAng = (m + s/60) * 6, sAng = s * 6;
@@ -4890,6 +4966,7 @@ function renderClockAnalog(container, tz, size) {
 
     const numerals = showNumerals ? Array.from({length: 12}, (_, i) => {
         const n = i === 0 ? 12 : i;
+        if (n === 3 && showDate) return '';
         const a = i * 30 * Math.PI / 180;
         const nr = r - size * 0.165;
         const x = cx + Math.sin(a) * nr, y = cy - Math.cos(a) * nr;
@@ -4900,6 +4977,7 @@ function renderClockAnalog(container, tz, size) {
 
     const hourHand = clockHandPath(cx, cy, hAng, r * 0.52, size * 0.052, 'var(--text)');
     const minuteHand = clockHandPath(cx, cy, mAng, r * 0.74, size * 0.036, 'var(--text)');
+    const dateWindow = showDate ? clockDateWindowSvg(cx + r * 0.42, cy, size) : '';
 
     const wrap = document.createElement('div');
     wrap.style.textAlign = 'center';
@@ -4919,6 +4997,7 @@ function renderClockAnalog(container, tz, size) {
             <circle cx="${cx}" cy="${cy}" r="${r - 2}" fill="url(#face-${uid})" stroke="url(#bezel-${uid})" stroke-width="3"/>
             ${ticks}
             ${numerals}
+            ${dateWindow}
             ${hourHand}
             ${minuteHand}
             <line x1="${cx}" y1="${cy}" x2="${(cx + Math.sin(sAng*Math.PI/180)*r*0.8).toFixed(1)}" y2="${(cy - Math.cos(sAng*Math.PI/180)*r*0.8).toFixed(1)}"
@@ -4930,6 +5009,109 @@ function renderClockAnalog(container, tz, size) {
         </svg>
         <div class="clock-zone-label">${tz === 'UTC' ? 'UTC / Zulu' : tz.split('/').pop().replace('_',' ')}</div>`;
     container.appendChild(wrap);
+}
+
+// Square/rectangular "instrument panel" face (mockup-approved over
+// several rounds -- see CLAUDE.md) -- a gauge-bezel alternative to the
+// round dial, not a circle stuffed inside a rounded-rect case. Ticks and
+// the 4 cardinal numerals (12/3/6/9 only, in the app's own monospace
+// face) are traced directly on the case perimeter via rectPerimeterPoint()
+// rather than an inscribed circle. `width`/`height` can differ -- when
+// this is the only clock shown, renderClock() passes a WIDER width than
+// height so the case fills the card horizontally; dual mode passes equal
+// width/height like the round face's square SVG always has. `basis`
+// (the shorter dimension) drives every proportional detail so nothing
+// looks stretched -- only the case shape and tick/numeral/date-window
+// positions reproject onto the wider aspect, hands stay sized off the
+// shorter dimension so they never reach oddly far sideways.
+function renderClockSquareFace(container, tz, width, height, showDate) {
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: resolveClockTz(tz) }));
+    const h = now.getHours() % 12, m = now.getMinutes(), s = now.getSeconds();
+    const hAng = (h + m/60) * 30, mAng = (m + s/60) * 6, sAng = s * 6;
+    const cx = width / 2, cy = height / 2;
+    const uid = 'clockface' + (clockAnalogIdCounter++);
+    const basis = Math.min(width, height);
+    const outerHalfW = width / 2 - basis * 0.05;
+    const outerHalfH = height / 2 - basis * 0.05;
+    const cornerR = basis * 0.035;
+    const inset = basis * 0.03;
+
+    const ticks = Array.from({length: 60}, (_, i) => {
+        const isHour = i % 5 === 0, theta = i * 6;
+        const [x1, y1] = rectPerimeterPoint(cx, cy, outerHalfW, outerHalfH, theta);
+        const shrink = isHour ? basis * 0.075 : basis * 0.035;
+        const [x2, y2] = rectPerimeterPoint(cx, cy, outerHalfW - shrink, outerHalfH - shrink, theta);
+        return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
+            stroke="${isHour ? 'var(--text)' : 'var(--text-dim)'}" stroke-width="${isHour ? 2 : 0.8}" stroke-linecap="round"/>`;
+    }).join('');
+
+    const cardinal = [[12, 0], [3, 90], [6, 180], [9, 270]];
+    const numerals = cardinal.map(([n, theta]) => {
+        if (n === 3 && showDate) return ''; // 3-o'clock index steps aside for the date window
+        const [x, y] = rectPerimeterPoint(cx, cy, outerHalfW - basis * 0.135, outerHalfH - basis * 0.135, theta);
+        return `<text x="${x.toFixed(1)}" y="${(y + basis * 0.028).toFixed(1)}" text-anchor="middle"
+            font-size="${(basis * 0.09).toFixed(1)}" font-family="var(--font-mono)" font-weight="600"
+            fill="var(--text)">${n}</text>`;
+    }).join('');
+
+    // Panel-mount details a plain rounded rect wouldn't have -- a
+    // recessed inner bezel line and a small rivet near each corner.
+    const cOff = basis * 0.115;
+    const corners = [[cOff, cOff], [width - cOff, cOff], [cOff, height - cOff], [width - cOff, height - cOff]];
+    const rivets = corners.map(([x, y]) =>
+        `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(basis * 0.014).toFixed(1)}" fill="var(--card-border)" stroke="var(--text-dim)" stroke-width="0.6"/>`
+    ).join('');
+
+    const dialR = outerHalfH - basis * 0.075; // hands sized off the shorter dimension
+    const hourHand = clockHandPath(cx, cy, hAng, dialR * 0.55, basis * 0.052, 'var(--text)');
+    const minuteHand = clockHandPath(cx, cy, mAng, dialR * 0.78, basis * 0.036, 'var(--text)');
+    const [dateX] = rectPerimeterPoint(cx, cy, outerHalfW * 0.5, outerHalfH * 0.42, 90);
+    const dateWindow = showDate ? clockDateWindowSvg(dateX, cy, basis) : '';
+
+    const wrap = document.createElement('div');
+    wrap.style.textAlign = 'center';
+    wrap.innerHTML = `
+        <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+            <defs>
+                <radialGradient id="face-${uid}" cx="35%" cy="30%" r="75%">
+                    <stop offset="0%" stop-color="var(--card-bg)"/>
+                    <stop offset="100%" stop-color="var(--bg)"/>
+                </radialGradient>
+                <linearGradient id="bezel-${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="var(--card-border)"/>
+                    <stop offset="50%" stop-color="var(--text-dim)"/>
+                    <stop offset="100%" stop-color="var(--card-border)"/>
+                </linearGradient>
+            </defs>
+            <rect x="2" y="2" width="${width - 4}" height="${height - 4}" rx="${cornerR}" fill="url(#face-${uid})" stroke="url(#bezel-${uid})" stroke-width="3"/>
+            <rect x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" rx="${cornerR * 0.5}" fill="none" stroke="var(--card-border)" stroke-width="1"/>
+            ${rivets}
+            ${ticks}
+            ${numerals}
+            ${dateWindow}
+            ${hourHand}
+            ${minuteHand}
+            <line x1="${cx}" y1="${cy}" x2="${(cx + Math.sin(sAng*Math.PI/180)*dialR*0.85).toFixed(1)}" y2="${(cy - Math.cos(sAng*Math.PI/180)*dialR*0.85).toFixed(1)}"
+                stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round"/>
+            <line x1="${cx}" y1="${cy}" x2="${(cx - Math.sin(sAng*Math.PI/180)*dialR*0.16).toFixed(1)}" y2="${(cy + Math.cos(sAng*Math.PI/180)*dialR*0.16).toFixed(1)}"
+                stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round"/>
+            <circle cx="${cx}" cy="${cy}" r="4.5" fill="var(--text)"/>
+            <circle cx="${cx}" cy="${cy}" r="2" fill="var(--accent)"/>
+        </svg>
+        <div class="clock-zone-label">${tz === 'UTC' ? 'UTC / Zulu' : tz.split('/').pop().replace('_',' ')}</div>`;
+    container.appendChild(wrap);
+}
+
+// Dispatches on clockFaceShape. `width`/`height` let the square face
+// stretch into a rectangle (see renderClock()'s single-clock sizing);
+// the round face only ever uses `height` as its single side length --
+// a circle has no separate width/height to reshape.
+function renderClockAnalog(container, tz, width, height, showDate) {
+    if (clockFaceShape === 'square') {
+        renderClockSquareFace(container, tz, width, height, showDate);
+    } else {
+        renderClockRoundFace(container, tz, height, showDate);
+    }
 }
 
 function clockTixDigitDots(position, digit, dotCount) {
@@ -4987,6 +5169,26 @@ function renderClockTix(container) {
     container.appendChild(label);
 }
 
+const CLOCK_ANALOG_SINGLE_HEIGHT = 190;
+const CLOCK_ANALOG_DUAL_SIZE = 145;
+// How far the single square face is allowed to stretch before it reads
+// more like a bar than a clock -- an explicit cap, not left unbounded,
+// since .cards-grid columns can grow quite wide (minmax(420px, 1fr)) on
+// a large monitor.
+const CLOCK_SQUARE_MAX_ASPECT = 2.2;
+
+// The single square face fills the card's actual available width
+// (measured live -- .cards-grid columns are responsive, so this can't
+// be a fixed number) rather than staying a plain fixed-size square with
+// empty space on either side, clamped to CLOCK_SQUARE_MAX_ASPECT. Round
+// always stays a fixed circle regardless of clockFaceShape -- there's
+// no sensible "wide circle" to stretch into.
+function clockSingleWidth(container, heightPx) {
+    if (clockFaceShape !== 'square') return heightPx;
+    const avail = container.clientWidth || heightPx;
+    return Math.max(heightPx, Math.min(avail, heightPx * CLOCK_SQUARE_MAX_ASPECT));
+}
+
 function renderClock() {
     const body = document.getElementById('clock-body');
     if (!body) return;
@@ -4996,22 +5198,26 @@ function renderClock() {
         return;
     }
     if (!clockDualEnabled) {
-        if (clockStyle === 'digital') renderClockDigital(body, 'local', false);
-        else renderClockAnalog(body, 'local', 190);
+        if (clockStyle === 'digital') { renderClockDigital(body, 'local', false); return; }
+        const w = clockSingleWidth(body, CLOCK_ANALOG_SINGLE_HEIGHT);
+        renderClockAnalog(body, 'local', w, CLOCK_ANALOG_SINGLE_HEIGHT, clockShowDate);
         return;
     }
     const dual = document.createElement('div');
     // Digital stacks vertically -- two full-width time rows read more
     // clearly than squeezing both side by side. Analog stays side by
-    // side -- two round faces sit naturally next to each other.
+    // side -- two faces sit naturally next to each other; square stays a
+    // plain square here (same footprint as round's own square SVG) --
+    // the width-fill stretch is single-clock only, there's no room for
+    // two wide rectangles side by side.
     if (clockStyle === 'digital') {
         dual.className = 'clock-dual stacked';
         renderClockDigital(dual, 'local', true);
         renderClockDigital(dual, clockDualTz, true);
     } else {
         dual.className = 'clock-dual';
-        renderClockAnalog(dual, 'local', 145);
-        renderClockAnalog(dual, clockDualTz, 145);
+        renderClockAnalog(dual, 'local', CLOCK_ANALOG_DUAL_SIZE, CLOCK_ANALOG_DUAL_SIZE, clockShowDate);
+        renderClockAnalog(dual, clockDualTz, CLOCK_ANALOG_DUAL_SIZE, CLOCK_ANALOG_DUAL_SIZE, clockShowDate);
     }
     body.appendChild(dual);
 }

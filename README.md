@@ -1298,7 +1298,19 @@ styles via a dropdown in the card header:
   ham radio/aviation convention).
 - **Analog** — a proper clock face: 60 minute ticks with bolder hour
   marks, numerals, tapered hands with a counterweight tail, and a
-  subtle gradient face/bezel.
+  subtle gradient face/bezel. Two extra toggles appear alongside it:
+  - **Square face** — swaps the round dial for a squared-off
+    "instrument panel" case: ticks and the 12/3/6/9 numerals are traced
+    directly on the case's own edges/corners (not a circle sitting
+    inside a rounded square), with corner rivets and a recessed inner
+    bezel line. When it's the only clock shown, the case stretches into
+    a true rectangle to fill the card's actual width instead of staying
+    a small fixed square — a second clock still shows two plain squares
+    side by side.
+  - **Show date** — a small recessed date window at 3 o'clock, watch-style,
+    showing today's month + day. Works on both the round and square
+    faces; the 3 o'clock numeral steps aside while it's on, the same way
+    a real watch's index does next to its own date window.
 - **TIX** — a dot-matrix "TIX clock" style display: each digit shown as
   a grid of lit dots, count = digit value. Tens digits get a smaller
   grid sized to what they actually need (hour tens only ever needs 0-1,
@@ -1308,10 +1320,12 @@ styles via a dropdown in the card header:
 - **Second clock** — Digital and Analog can both show a second
   clock alongside the first, in any of several common timezones or
   UTC/Zulu. Digital's pair stacks vertically; Analog's sits side by
-  side (two round faces read naturally next to each other).
-- Style, format, and second-clock/timezone choices are saved in the
-  browser's **localStorage**, not settings.json — nothing here needs to
-  sync across every device viewing the same dashboard.
+  side (two faces — round or square, matching whichever face is
+  selected — read naturally next to each other).
+- Style, format, face shape, date, and second-clock/timezone choices are
+  all saved in the browser's **localStorage**, not settings.json —
+  nothing here needs to sync across every device viewing the same
+  dashboard.
 - Same drag-and-drop **Card order** placement as every other extra card.
 
 <!-- wiki-group: Optional Cards -->

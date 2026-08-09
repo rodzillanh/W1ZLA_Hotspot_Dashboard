@@ -4344,6 +4344,95 @@ config for per-integration credentials; put it in
     slot in with a real occupied tile and its two action buttons, and
     confirmed the bidirectional Multi-connect sync both directions.
 
+- **Big Ass Clock: a square "instrument panel" face + a watch-style date
+  window + single-clock rectangular fill (v4.3) -- another multi-round
+  mockup conversation (4 published Artifacts) before any real code
+  changed, same discipline as the ASL Favorites round above.** Worth
+  recording the round-by-round shape since each ask was a real,
+  deliberate refinement, not a single spec handed over up front:
+  1. First ask: "an option in the analog clock to show a rectangular
+     clock (two square ones if a second clock is selected)" -- mocked up
+     as a plain rounded-square case with a circle-of-numerals still
+     inside it (same ticks/numerals/hands math as the round face,
+     literally just a `<rect>` swapped in for the `<circle>` background).
+  2. User confirmed the DIRECTION but explicitly wanted the more
+     "instrument panel" look they'd had in mind -- built a second round
+     where ticks/numerals are traced directly on the case's own
+     perimeter (via `rectPerimeterPoint()`, the generalized square/
+     rectangle version of the classic "ray from center, clipped to the
+     boundary" square-clock trick), only 12/3/6/9 numbered (in the app's
+     own monospace face, not all 12 in the round face's serif), plus
+     corner rivets and a recessed inner bezel line -- approved as-is.
+  3. "the date inside the analog clock face as an old watch would have" --
+     a third mockup added a recessed watch-style date window (month +
+     day, monospace, real device date) at 3 o'clock on BOTH faces, with
+     the 3 o'clock numeral/index stepping aside while it's on (matching
+     how virtually every real watch with a date window handles the same
+     collision) -- approved with one fix request: "move it in a little as
+     its almost off the edge in the round face and it is off on the
+     square" -- both positions were pulled inward (round: `dialR * 0.62`
+     -> `dialR * 0.42`; square: was clipped almost to the outer bezel
+     entirely, moved to `outerHalfW * 0.45`) and republished to the SAME
+     artifact URL (a direct fix to an already-shown mockup, not a new
+     design round -- unlike the four numbered rounds, which each got
+     their own file/URL per this project's established "new file per
+     design round, same file for a same-round fix" convention).
+  4. "when there is only one analog clock selected... more rectangular to
+     fill the card" -- a fourth mockup generalized the square case from a
+     fixed-size square/rect to one that measures the card's actual
+     available width and stretches into it, capped so it can't become a
+     thin sliver on a very wide card; dual mode was explicitly kept as a
+     plain square pair, unchanged, since two wide rectangles side by
+     side don't fit the same card. Approved as shown -- "commit and push
+     it" was the literal go-ahead for all four rounds' worth of decisions
+     at once, not just the last mockup in isolation.
+  - **`rectPerimeterPoint(cx, cy, halfW, halfH, thetaDeg)` is the one
+    piece of new math this feature needed** -- a direct generalization of
+    the round face's existing angle-to-position formulas: a ray from the
+    center is scaled until it hits whichever of the two half-extents
+    (`halfW`/`halfH`) constrains it first (`1 / max(|dx|/halfW,
+    |dy|/halfH)`). Passing `halfW === halfH` degenerates to the exact
+    square case; passing different values is what lets the SAME function
+    serve both the plain dual-mode square (145×145) and the wide
+    single-clock rectangle (e.g. 418×190, confirmed live) with zero
+    special-casing between them.
+  - **`renderClockAnalog()` became a thin dispatcher** (`renderClockSquareFace`
+    vs. `renderClockRoundFace`, chosen by the new `clockFaceShape` module
+    state) rather than growing a large if/else inside the original
+    function -- the round face's existing circle-based math was left
+    completely untouched (just gained date-window support via the same
+    `clockDateWindowSvg()` helper the square face also calls), so there
+    was no risk of a square-specific change accidentally regressing the
+    round face that's been live since v3.44.
+  - **The single-clock width-fill measurement is a plain
+    `container.clientWidth` read, not a `ResizeObserver`** -- `renderClock()`
+    already reruns every second via the existing `setInterval(renderClock,
+    1000)` tick (the same one that advances the second hand), so a window
+    resize or the `.cards-grid`'s own responsive `minmax(420px, 1fr)`
+    columns reflowing naturally gets picked up within a second without
+    any new observer/listener plumbing -- consistent with this card's
+    existing "no build step, keep it simple" posture elsewhere.
+  - **`CLOCK_SQUARE_MAX_ASPECT = 2.2`** is a judgment call, not a value
+    the user specified -- asked directly whether there should be a cap
+    and how wide is "too wide" in the mockup's own closing note, and the
+    user's approval ("its great commit and push it") didn't specify a
+    number, so this shipped as a reasonable default rather than left
+    unbounded. Revisit if a real card width ever produces a rectangle
+    that reads as more "bar" than "clock."
+  - **Verified live with Playwright against the real running app**, not
+    just visual comparison to the mockups: confirmed the round face's
+    SVG stays exactly square regardless of card width; confirmed toggling
+    Square face widens the single-clock SVG to noticeably wider than tall
+    (418×190 at a 1600px viewport, confirmed via `bounding_box()`, not
+    assumed from reading the code); confirmed dual mode's two square SVGs
+    stay exactly 145×145 regardless of `clockFaceShape`; confirmed the
+    date window renders the real current device date ("AUG 8"); confirmed
+    all five new/changed localStorage keys persist; confirmed TIX's
+    controls still show only its own disabled-note (no stray Square
+    face/Show date rows leaking in from the Analog branch). Screenshots
+    were compared directly against the approved mockups before shipping,
+    not just checked for "renders without erroring."
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
