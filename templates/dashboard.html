@@ -1344,13 +1344,36 @@
         .clock-tix-dot.on { background: var(--accent); }
         .clock-tix-sep { align-self: center; color: var(--text-dim); font-weight: 700; padding: 0 2px; font-size: 20px; }
         .clock-controls { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--card-border); font-size: 11.5px; color: var(--text-muted); }
-        .clock-ctl-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
-        .clock-ctl-row select { background: var(--bg); color: var(--text); border: 1px solid var(--card-border); border-radius: 5px; padding: 3px 6px; font-size: 11px; }
-        .clock-toggle-mini { width: 30px; height: 17px; border-radius: 10px; background: var(--card-border); position: relative; flex-shrink: 0; cursor: pointer; transition: background .15s; }
-        .clock-toggle-mini.on { background: var(--accent); }
-        .clock-toggle-mini::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; transition: left .15s; }
-        .clock-toggle-mini.on::after { left: 15px; }
         .clock-disabled-note { color: var(--text-dim); font-style: italic; }
+        /* Compact chip-row controls (v4.7, mockup-approved -- see
+           CLAUDE.md) -- replaced a stack of full-width switch+label rows
+           (up to 4 for Analog: Square face/Show date/2nd clock/Timezone)
+           with one wrapping row of small pill toggles, since the old
+           layout ate ~140px of card height for what's fundamentally a
+           handful of booleans. */
+        /* No border/padding of its own -- the existing .clock-controls
+           wrapper (id="clock-controls") already provides the dashed
+           separator above every style's controls, TIX's disabled-note
+           included. */
+        .clock-chip-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .clock-chip {
+            display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 20px;
+            border: 1px solid var(--card-border); background: var(--bg); color: var(--text-muted);
+            font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+            transition: background .15s, border-color .15s, color .15s; white-space: nowrap;
+        }
+        .clock-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; transition: background .15s; }
+        .clock-chip:hover { color: var(--text); border-color: var(--text-dim); }
+        .clock-chip.on { background: var(--accent-dim); border-color: color-mix(in srgb, var(--accent) 55%, var(--card-border)); color: var(--accent); }
+        .clock-chip.on .dot { background: var(--accent); }
+        .clock-tz-chip {
+            display: inline-flex; align-items: center; gap: 5px; background: var(--bg); border: 1px solid var(--card-border);
+            border-radius: 20px; padding: 3px 10px 3px 12px; font-size: 11.5px; color: var(--text-muted);
+        }
+        .clock-tz-chip select {
+            background: transparent; color: var(--text); border: none; font-size: 11.5px; font-family: inherit;
+            cursor: pointer; padding: 2px 0;
+        }
 
         /* --- DigiPi card --- */
         .dp-state {
@@ -4772,14 +4795,15 @@ function setClockStyle(style) {
 // 12/24hr only applies to Digital (TIX is always 12hr by design -- see
 // renderClockTix); a normal analog face has no "24-hour mode" concept, the
 // hour hand just makes its usual two rotations per day either way.
-function renderClockFormatToggle() {
-    return `
-        <div class="clock-ctl-row">
-            <div class="clock-toggle-mini ${clockUse12Hour ? 'on' : ''}" onclick="toggleClockFormat()"></div>
-            12-hour format <span class="clock-disabled-note">(UTC/Zulu is always 24hr)</span>
-        </div>`;
+function clockFormatChipHtml() {
+    return `<button class="clock-chip ${clockUse12Hour ? 'on' : ''}" onclick="toggleClockFormat()" title="UTC/Zulu is always 24hr regardless"><span class="dot"></span>12-hour</button>`;
 }
 
+// Compact chip-row layout (v4.7) -- one wrapping row of small pill
+// toggles instead of a stack of full-width switch+label rows, which used
+// to eat ~140px of card height for Analog's 4 options. The timezone
+// control only appears as its own chip once "2nd clock" is on, rather
+// than a permanently-reserved (if hidden) row.
 function renderClockControls() {
     const el = document.getElementById('clock-controls');
     if (!el) return;
@@ -4791,26 +4815,20 @@ function renderClockControls() {
     }
     // Face shape + date window are Analog-only -- Digital has no dial to
     // reshape, TIX already bailed out above.
-    const analogRows = clockStyle === 'analog' ? `
-        <div class="clock-ctl-row">
-            <div class="clock-toggle-mini ${clockFaceShape === 'square' ? 'on' : ''}" onclick="toggleClockFaceShape()"></div>
-            Square face
-        </div>
-        <div class="clock-ctl-row">
-            <div class="clock-toggle-mini ${clockShowDate ? 'on' : ''}" onclick="toggleClockShowDate()"></div>
-            Show date
-        </div>` : '';
-    el.innerHTML = (clockStyle === 'digital' ? renderClockFormatToggle() : '') + analogRows + `
-        <div class="clock-ctl-row">
-            <div class="clock-toggle-mini ${clockDualEnabled ? 'on' : ''}" onclick="toggleClockDual()"></div>
-            Show a second clock
-        </div>
-        <div class="clock-ctl-row" id="clock-tz-row" style="display:${clockDualEnabled ? 'flex' : 'none'}">
-            Timezone:
+    const analogChips = clockStyle === 'analog' ? `
+        <button class="clock-chip ${clockFaceShape === 'square' ? 'on' : ''}" onclick="toggleClockFaceShape()"><span class="dot"></span>Square</button>
+        <button class="clock-chip ${clockShowDate ? 'on' : ''}" onclick="toggleClockShowDate()"><span class="dot"></span>Date</button>` : '';
+    const tzChip = clockDualEnabled ? `
+        <span class="clock-tz-chip">🌐
             <select id="clock-tz-select" onchange="setClockTz(this.value)">
                 ${CLOCK_TZ_OPTIONS.map(([v, label]) => `<option value="${v}" ${v === clockDualTz ? 'selected' : ''}>${label}</option>`).join('')}
             </select>
-        </div>`;
+        </span>` : '';
+    el.innerHTML = `<div class="clock-chip-row">` +
+        (clockStyle === 'digital' ? clockFormatChipHtml() : '') + analogChips +
+        `<button class="clock-chip ${clockDualEnabled ? 'on' : ''}" onclick="toggleClockDual()"><span class="dot"></span>2nd clock</button>` +
+        tzChip +
+        `</div>`;
 }
 
 function toggleClockFormat() {

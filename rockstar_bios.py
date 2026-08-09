@@ -306,6 +306,11 @@ BIOS = {
         "blurb": "Co-founder and lead vocalist of Jefferson Airplane, a defining voice of the 1960s San Francisco psychedelic rock scene.",
         "wiki": "Marty_Balin",
     },
+    "Hopkins": {
+        "name": "Nicky Hopkins",
+        "blurb": "A prolific session pianist who played on records by the Rolling Stones, the Kinks, the Beatles, and many others without ever being a household name himself.",
+        "wiki": "Nicky_Hopkins",
+    },
 }
 
 

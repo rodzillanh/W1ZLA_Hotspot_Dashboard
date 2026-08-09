@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.6 "Balin"</span>
+                <span class="release-version">v4.7 "Hopkins"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Big Ass Clock: compact chip-row controls</span> — Analog's stack of full-width toggle rows (Square face, Show date, 2nd clock, Timezone — up to ~140px of card height) is now one wrapping row of small pill chips. Same options, same behavior, just laid out denser; Digital's 12-hour toggle gets the same chip treatment for consistency</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.6 "Balin"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed: ASL Favorites' reserved 6th slot could show a link to your OWN other hotspot as if it were a disconnectable ad hoc connection</span> — if one of your ASL3 nodes has a permanent backbone link to another of your own configured hotspots, it used to land in that slot with a Disconnect button, which is exactly the wrong invitation for a link nobody "connected" through this app and nobody should casually break from here. That slot now excludes any node matching another of your configured ASL3 hotspots, the same way it already excludes your pinned favorites — a genuine ad hoc connection from someone else still shows up normally</li>

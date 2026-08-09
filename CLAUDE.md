@@ -4540,6 +4540,47 @@ config for per-integration credentials; put it in
   occupies the slot) -- confirming the exclusion is neither too broad
   nor too narrow.
 
+- **Big Ass Clock's Analog controls collapsed from a stack of full-width
+  toggle rows into one wrapping row of small pill chips (v4.7,
+  mockup-approved -- "the options on the clock cards take up too much
+  room").** Up to 4 rows (Square face, Show date, 2nd clock, Timezone --
+  every one of them added across v4.3-v4.6) at ~35px each was eating
+  roughly 140px of card height for what's fundamentally a handful of
+  booleans plus one select. `renderClockControls()` now builds a single
+  `.clock-chip-row` of `.clock-chip` pill buttons instead of one
+  `.clock-ctl-row` per option -- functionally identical (same
+  `toggleClockFaceShape()`/`toggleClockShowDate()`/`toggleClockDual()`/
+  `setClockTz()` handlers, same `localStorage` keys, same conditions for
+  which chips show per style), only the markup/CSS changed.
+  - **The timezone control is now a chip that only EXISTS in the DOM
+    while `clockDualEnabled` is true**, not a permanently-present row
+    toggled via `display:none` the way `#clock-tz-row` used to be --
+    simpler now that there's no separate full-width row to hide, and
+    verified live that toggling "2nd clock" off actually removes the
+    chip from the DOM (not just visually hides it) rather than leaving a
+    collapsed empty row behind.
+  - **`.clock-chip-row` deliberately has no border/padding of its own** --
+    the existing `.clock-controls` wrapper (`id="clock-controls"`,
+    present in the Jinja markup since the card was built) already
+    supplies the dashed separator above every style's controls, TIX's
+    `.clock-disabled-note` included. Adding a second border/padding
+    inside the chip row would have doubled up visually; caught before
+    shipping by checking the existing wrapper's CSS rather than assuming
+    the new component needed its own.
+  - **Digital's lone 12-hour toggle got the same chip treatment for
+    consistency**, even though a single row was never really the space
+    problem the user reported -- a single leftover old-style row next to
+    the new chip rows on Analog would have read as an inconsistency, not
+    a deliberate choice.
+  - Verified live with Playwright across all three styles: confirmed
+    zero `.clock-ctl-row` elements remain anywhere; confirmed Analog
+    shows exactly 3 chips (Square/Date/2nd clock) and clicking each one
+    produces the same effect the old switches did (Square widens the
+    SVG, the timezone chip appears/disappears with 2nd clock); confirmed
+    Digital shows only 12-hour + 2nd clock (no Square/Date leaking in);
+    confirmed TIX still shows zero chips and its own disabled-note,
+    unchanged.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
