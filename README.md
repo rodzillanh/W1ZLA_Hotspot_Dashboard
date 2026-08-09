@@ -846,7 +846,11 @@ below, any ASL3 hotspot's own card):
   Monitor. Also receive-only, but unlike Monitor it does **not** relay
   what it hears onward to your other linked nodes — useful for quietly
   listening in on a node without exposing it (or your own traffic) to
-  whatever else you're connected to.
+  whatever else you're connected to. A Local-Monitor'd link shows up as
+  its own cyan "🎧 Local Mon" state — on the hotspot's own card, the
+  ASL Favorites card, the ASL Control drawer, and the hotspot's detail
+  drawer — so it's never indistinguishable from a normal connection, and
+  Disconnect already works on it everywhere a link can show up.
 - **Disconnect all links on this node** — a separate, deliberately
   de-emphasized action near the bottom of the drawer, behind a confirm
   dialog that names the actual node. Unlike every other action here,

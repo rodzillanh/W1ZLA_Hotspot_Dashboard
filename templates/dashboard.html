@@ -635,15 +635,25 @@
             background: var(--panel-2); border: 1px solid var(--border); border-radius: 20px;
         }
         .linked-item.keyed { border-color: color-mix(in srgb, var(--live) 45%, var(--border)); }
+        /* Local Monitor (v4.11, mockup-approved -- see CLAUDE.md) -- a
+           receive-only link that doesn't relay to your other links
+           (ilink 8), distinct from a normal Transceive connect. Same
+           --live cyan token as "keyed," since it's still genuinely
+           "on-air/connected right now," just not pulsing (that
+           animation means "actively transmitting THIS instant," which
+           Local Monitor alone doesn't claim). */
+        .linked-item.localmon { border-color: color-mix(in srgb, var(--live) 40%, var(--border)); background: var(--live-dim); }
         .linked-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
         .linked-item.keyed .dot     { background: var(--live); animation: pulse 1.4s infinite; }
         .linked-item.idle-link .dot { background: var(--text-dim); }
+        .linked-item.localmon .dot { background: var(--live); }
         .linked-item .info { min-width: 0; }
         .linked-item .node-num {
             font-family: var(--font-mono);
             font-size: 10.5px; color: var(--text-dim);
         }
         .linked-item .desc { display: block; font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+        .linked-item .lm-tag { font-size: 9px; font-family: var(--font-mono); font-weight: 700; color: var(--live); margin-left: 2px; }
 
         /* --- fleet activity metrics card --- */
         .metrics-card {
@@ -837,11 +847,16 @@
         .fav-tile.keyed     { background: var(--danger-dim); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
         .fav-tile.connected { background: var(--good-dim); border-color: color-mix(in srgb, var(--good) 40%, var(--border)); }
         .fav-tile.recent    { background: var(--accent-dim); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+        /* Local Monitor (v4.11) -- same --live cyan as the compact
+           hotspot card's own .linked-item.localmon, see that class's
+           own comment for why it's cyan and non-pulsing. */
+        .fav-tile.localmon { background: var(--live-dim); border-color: color-mix(in srgb, var(--live) 40%, var(--border)); }
         .fav-tile-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
         .fav-tile-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
         .fav-tile.keyed .fav-tile-dot { background: var(--danger); animation: pulse 1.2s infinite; }
         .fav-tile.connected .fav-tile-dot { background: var(--good); }
         .fav-tile.recent .fav-tile-dot { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
+        .fav-tile.localmon .fav-tile-dot { background: var(--live); }
         /* min-width:0 is the actual fix -- a flex item's default
            min-width:auto means it won't shrink below its own text's
            intrinsic width no matter what overflow/text-overflow say,
@@ -852,6 +867,7 @@
         .fav-tile-meta { font-size: 10.5px; color: var(--text-muted); line-height: 1.35; }
         .fav-tile.keyed .fav-tile-meta { color: var(--danger); font-weight: 600; }
         .fav-tile.connected .fav-tile-meta { color: var(--good); }
+        .fav-tile.localmon .fav-tile-meta { color: var(--live); }
         .fav-tile-hint { font-size: 9.5px; color: var(--text-dim); margin-top: auto; padding-top: 2px; }
         .fav-tile:hover .fav-tile-hint { color: var(--text-muted); }
 
@@ -1019,18 +1035,25 @@
         .asl-ctrl-node-row.keyed { background: var(--danger-dim); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
         .asl-ctrl-node-row.connected { background: var(--good-dim); border-color: color-mix(in srgb, var(--good) 40%, var(--border)); }
         .asl-ctrl-node-row.recent { background: var(--accent-dim); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+        .asl-ctrl-node-row.localmon { background: var(--live-dim); border-color: color-mix(in srgb, var(--live) 40%, var(--border)); }
         .asl-ctrl-node-row.selected { border-color: var(--live); box-shadow: 0 0 0 1px var(--live) inset; }
         .asl-ctrl-node-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
         .asl-ctrl-node-dot.keyed { background: var(--danger); animation: pulse 1.2s infinite; }
         .asl-ctrl-node-dot.webtx { background: var(--good); box-shadow: 0 0 4px var(--good); }
         .asl-ctrl-node-dot.active { background: color-mix(in srgb, var(--good) 55%, var(--text-dim)); }
         .asl-ctrl-node-dot.recent { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
+        .asl-ctrl-node-dot.localmon { background: var(--live); }
         .asl-ctrl-node-body { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .asl-ctrl-node-call { font-weight: 600; font-size: 11.5px; }
         .asl-ctrl-rx { font-size: 9.5px; font-family: var(--font-mono); color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
         .asl-ctrl-lcnt { font-size: 9.5px; font-family: var(--font-mono); color: var(--text-dim); background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 0 5px; white-space: nowrap; flex-shrink: 0; }
         .asl-ctrl-notdb { font-size: 9.5px; color: var(--text-dim); font-style: italic; flex-shrink: 0; }
         .asl-ctrl-recent { font-size: 9.5px; color: var(--accent); font-style: italic; flex-shrink: 0; }
+        .asl-ctrl-lm-badge {
+            font-size: 8.5px; font-family: var(--font-mono); font-weight: 700; letter-spacing: .2px;
+            color: var(--live); background: var(--live-dim); border: 1px solid color-mix(in srgb, var(--live) 45%, var(--border));
+            border-radius: 9px; padding: 0 5px; white-space: nowrap; flex-shrink: 0;
+        }
         .asl-ctrl-btn-remove {
             font-size: 9.5px; padding: 2px 5px; border-radius: 5px; cursor: pointer; border: 1px solid var(--border);
             background: none; color: var(--text-dim); flex-shrink: 0; font-family: var(--font-mono);
@@ -1804,13 +1827,30 @@
         .hs-link-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; border-bottom: 1px solid var(--border); }
         .hs-link-row:last-child { border-bottom: none; }
         .hs-link-row.keyed { background: var(--live-dim); border-radius: 6px; padding: 7px 8px; border-bottom: none; margin: 2px 0; }
+        /* Local Monitor (v4.11) -- same highlighted-row treatment as
+           .keyed (it's still a genuinely "on air/connected" state worth
+           calling out among a list of otherwise-plain rows), but no
+           pulse animation -- that's reserved for "actively transmitting
+           this instant," which a receive-only Local Monitor link isn't
+           necessarily doing. */
+        .hs-link-row.localmon { background: var(--live-dim); border-radius: 6px; padding: 7px 8px; border-bottom: none; margin: 2px 0; }
         .hs-link-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
         .hs-link-row.keyed .hs-link-dot { background: var(--live); animation: pulse 1.6s ease-in-out infinite; }
+        .hs-link-row.localmon .hs-link-dot { background: var(--live); }
         .hs-link-node { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); width: 52px; flex-shrink: 0; }
         .hs-link-body { flex: 1; min-width: 0; }
         .hs-link-call { font-weight: 600; font-size: 13px; color: var(--text); }
         .hs-link-desc { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* Mode badge (v4.11) -- was a bare raw RPT_ALINKS letter
+           (T/R/L/C) unconditionally for every row; now a friendly word,
+           only shown for the non-default modes (Transceive, the
+           overwhelmingly common case, gets no badge at all). Local
+           Monitor gets --live coloring to match every other surface;
+           Monitor/Connecting keep the existing neutral outline pill --
+           only Local Monitor was actually mocked up with a color, so
+           the other two stay visually as before, just friendlier text. */
         .hs-link-mode { font-size: 9.5px; font-family: var(--font-mono); color: var(--text-dim); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; }
+        .hs-link-mode.localmon { color: var(--live); border-color: color-mix(in srgb, var(--live) 45%, var(--border)); }
         .hs-tg-chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
         .hs-tg-chip { font-size: 11px; font-family: var(--font-mono); background: var(--panel-2); border: 1px solid var(--border); border-radius: 14px; padding: 3px 10px; color: var(--text-muted); }
         .hs-bm-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
@@ -3661,15 +3701,24 @@ function renderCards(data) {
                  <div class="split-linked">
                    ${(hs.asl_linked_nodes && hs.asl_linked_nodes.length)
                        ? `<div class="card-tg">Linked:</div>` + hs.asl_linked_nodes.map(n => {
-                           const dotClass = n.keyed ? 'keyed' : 'idle-link';
+                           // Local Monitor (v4.11, mockup-approved -- see
+                           // CLAUDE.md): keyed still wins the dot color if
+                           // both are somehow true (the remote node keying
+                           // up is more urgent info than the link type),
+                           // but the "Local Mon" tag shows independently
+                           // of keyed state, so you always know the link
+                           // type.
+                           const isLocalMon = n.mode === 'L';
+                           const dotClass = n.keyed ? 'keyed' : (isLocalMon ? 'localmon' : 'idle-link');
                            const nameHtml = n.callsign
                                ? `<a class="recent-call" href="https://www.qrz.com/db/${n.callsign}" target="_blank" rel="noopener" onclick="event.stopPropagation()"${n.keyed ? ' style="color:var(--live)"' : ''}>${n.callsign}</a> <span class="node-num">${n.node}</span>`
                                : `<span class="recent-call" style="color:var(--text-dim)">Node ${n.node}</span>`;
                            const descText = [n.description, n.location].filter(Boolean).join(' · ') || (!n.callsign ? 'Node not in database' : '');
                            const descHtml = descText ? `<span class="desc">${descText}</span>` : '';
+                           const lmTag = isLocalMon ? '<span class="lm-tag">🎧 Local Mon</span>' : '';
                            return `<div class="linked-item ${dotClass}">
                                      <span class="dot"></span>
-                                     <span class="info">${nameHtml}${descHtml}</span>
+                                     <span class="info">${nameHtml}${lmTag}${descHtml}</span>
                                    </div>`;
                        }).join('')
                        : ''}
@@ -6675,15 +6724,26 @@ function openHotspotDrawer(ip) {
                     ? `<a class="hs-link-call" href="https://www.qrz.com/db/${encodeURIComponent(n.callsign)}" target="_blank" rel="noopener" style="text-decoration:none;${n.keyed ? 'color:var(--live)' : ''}">${escapeHtml(n.callsign)}</a>`
                     : `<span class="hs-link-call" style="color:var(--text-dim)">Node ${escapeHtml(n.node)}</span>`;
                 const desc = [n.description, n.location].filter(Boolean).join(' · ') || (!n.callsign ? 'Node not in database' : '');
+                // Mode badge (v4.11) -- was a bare raw RPT_ALINKS letter
+                // for every row; now a friendly word, Transceive (the
+                // overwhelmingly common case) gets none at all. Local
+                // Monitor gets its own --live coloring to match every
+                // other surface; Monitor/Connecting keep the existing
+                // neutral pill, just friendlier text -- only Local
+                // Monitor was actually mocked up with a color.
+                const isLocalMon = n.mode === 'L';
+                const modeLabel = { L: 'LOCAL MON', R: 'MONITOR', C: 'CONNECTING' }[n.mode] || '';
+                const modeHtml = modeLabel ? `<span class="hs-link-mode${isLocalMon ? ' localmon' : ''}">${modeLabel}</span>` : '';
+                const rowClass = n.keyed ? 'keyed' : (isLocalMon ? 'localmon' : '');
                 return `
-                <div class="hs-link-row ${n.keyed ? 'keyed' : ''}">
+                <div class="hs-link-row ${rowClass}">
                     <span class="hs-link-dot"></span>
                     <span class="hs-link-node">${escapeHtml(n.node)}</span>
                     <div class="hs-link-body">
                         ${callHtml}
                         ${desc ? `<div class="hs-link-desc">${escapeHtml(desc)}</div>` : ''}
                     </div>
-                    <span class="hs-link-mode">${escapeHtml(n.mode || '')}</span>
+                    ${modeHtml}
                     <button class="hs-link-action-btn" data-linked="true" data-node="${escapeHtml(n.node)}" onclick="hotspotLinkAction(this)">Disconnect</button>
                 </div>`;
             }).join('') : '<div class="hs-empty-note">No linked nodes right now.</div>'}
@@ -8165,10 +8225,17 @@ function favTileHtml(fav, linkedByNode) {
     const link    = linkedByNode[fav.node];
     const isKeyed = !!(link && link.keyed);
     const isConn  = !!link;
+    // Local Monitor (v4.11) -- keyed still wins if the remote node is
+    // ALSO currently keyed (more urgent than the link type), otherwise
+    // a Local-Monitor'd favorite gets its own cyan state instead of
+    // reading as a plain, indistinguishable "Connected."
+    const isLocalMon = !!(link && link.mode === 'L');
     const stats   = aslFavoriteStats[fav.node];
     let cls = '', meta = '— rx · — links', hint = 'tap to connect';
     if (isKeyed) {
         cls = 'keyed'; meta = '🔴 KEYED'; hint = 'tap to disconnect';
+    } else if (isLocalMon) {
+        cls = 'localmon'; meta = '🎧 Local Mon'; hint = 'tap to disconnect';
     } else if (isConn) {
         cls = 'connected'; meta = 'Connected'; hint = 'tap to disconnect';
     } else if (stats && stats.found === true) {
@@ -8209,11 +8276,14 @@ function dynamicFavTileHtml(extraLink, extraFav) {
         const name = (extraFav && extraFav.label) || extraLink.callsign || ('Node ' + extraLink.node);
         const savedNote = extraFav ? 'saved, not pinned' : 'not saved';
         const pinTitle = extraFav ? 'Pin to the tile grid' : 'Save as a pinned favorite';
+        const isLocalMon = extraLink.mode === 'L';
+        const cls = extraLink.keyed ? 'keyed' : (isLocalMon ? 'localmon' : 'connected');
+        const metaText = extraLink.keyed ? '🔴 KEYED' : (isLocalMon ? '🎧 Local Mon' : 'Connected');
         return `
-            <div class="fav-tile ${extraLink.keyed ? 'keyed' : 'connected'} adhoc">
+            <div class="fav-tile ${cls} adhoc">
                 <div class="fav-tile-top"><span class="fav-tile-dot"></span><span class="fav-tile-name">${escapeHtml(name)}</span></div>
                 <span class="fav-tile-node">Node ${escapeHtml(extraLink.node)} · ${savedNote}</span>
-                <span class="fav-tile-meta">${extraLink.keyed ? '🔴 KEYED' : 'Connected'}</span>
+                <span class="fav-tile-meta">${metaText}</span>
                 <div class="fav-tile-actions">
                     <button onclick="pinAdhocConnection('${escapeHtml(extraLink.node)}', '${escapeHtml(extraLink.callsign || '')}')" title="${pinTitle}">☆ Pin</button>
                     <button class="disc" onclick="tileToggleConnect('${escapeHtml(extraLink.node)}')">Disconnect</button>
@@ -8526,6 +8596,7 @@ function renderAslDrawer() {
         const link     = linkedByNode[fav.node];
         const isKeyed  = !!(link && link.keyed);
         const isConn   = !!link;
+        const isLocalMon = !!(link && link.mode === 'L');
         const isSelected = fav.node === aslSelectedFavoriteNode;
         const label    = fav.label || (link && link.callsign) || '';
         const callHtml = label
@@ -8552,6 +8623,12 @@ function renderAslDrawer() {
         let statsHtml = '';
         if (isKeyed) {
             dotClass = 'keyed';
+        } else if (isLocalMon) {
+            // Local Monitor (v4.11) -- skips the stats.allstarlink.org
+            // display the same way isKeyed already does; a badge in the
+            // row markup below covers this state instead.
+            dotClass = 'localmon';
+            statsHtml = '<span class="asl-ctrl-lm-badge">🎧 LOCAL MON</span>';
         } else if (stats && stats.found === true) {
             dotClass = stats.recently_active === true ? 'recent'
                 : stats.webtransceiver ? 'webtx'
@@ -8565,7 +8642,7 @@ function renderAslDrawer() {
         } else if (stats && stats.error) {
             statsHtml = '<span class="asl-ctrl-notdb">Stats unavailable</span>';
         }
-        const rowClass = (isKeyed ? 'keyed' : (isConn ? 'connected' : (dotClass === 'recent' ? 'recent' : ''))) + (isSelected ? ' selected' : '');
+        const rowClass = (isKeyed ? 'keyed' : (isLocalMon ? 'localmon' : (isConn ? 'connected' : (dotClass === 'recent' ? 'recent' : '')))) + (isSelected ? ' selected' : '');
 
         // ★/☆ pins/unpins this favorite for the compact card's own tile
         // grid (v4.0) -- independent of selectAslFavorite()'s click-to-

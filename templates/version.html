@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.10 "Lee"</span>
+                <span class="release-version">v4.11 "Grech"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Local Monitor now has a visible indicator, everywhere it can show up</span> — a Local-Monitor'd link used to look identical to a normal connection (or, in one spot, just a bare unexplained "L" letter). It now shows its own cyan "🎧 Local Mon" state on the hotspot's own card, the ASL Favorites card, the ASL Control drawer, and the hotspot's detail drawer — and Disconnect already worked on it everywhere, it just wasn't obvious where to look</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.10 "Lee"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed: Quick Connect could fail with "Node # must be digits only" right after selecting a favorite</span> — the field is supposed to auto-fill with that favorite's node number, but could end up out of sync in some real-world sequence not pinned down in testing. Connect/Monitor/Local Monitor now fall back to the selected favorite's own (always-valid) node number whenever the visible field fails validation, instead of just failing the action</li>

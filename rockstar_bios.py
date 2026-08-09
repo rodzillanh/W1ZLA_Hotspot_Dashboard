@@ -326,6 +326,11 @@ BIOS = {
         "blurb": "Ten Years After's blazingly fast lead guitarist, best remembered for a marathon performance of “I'm Going Home” at Woodstock in 1969.",
         "wiki": "Alvin_Lee",
     },
+    "Grech": {
+        "name": "Ric Grech",
+        "blurb": "A bassist and violinist who played with Family, the short-lived supergroup Blind Faith, and later Traffic.",
+        "wiki": "Ric_Grech",
+    },
 }
 
 

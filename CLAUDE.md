@@ -4708,6 +4708,71 @@ config for per-integration credentials; put it in
   out here, only the more obvious poll-cycle/stats-fetch timing paths
   were.
 
+- **Local Monitor visual indicator across 4 surfaces (v4.11) --
+  prompted directly by the user after building Local Monitor itself:
+  "when locally monitoring a ASL node there is now visual indication of
+  this anywhere."** Good news found before writing any code: the
+  underlying data already supported this -- `RPT_ALINKS`'s per-link
+  mode character (T/R/L/C) was already parsed into `link.mode` and sent
+  to the frontend on every poll (confirmed by reading
+  `monitor._parse_asl_output()`, not assumed), and Disconnect already
+  worked on any linked node regardless of mode everywhere a link could
+  show up. This was purely a "nothing reads `link.mode` except one spot
+  that shows the bare raw letter" gap, not a data/backend gap.
+  - **Mockup-first, and the user caught a real gap in round 1**: the
+    first mockup covered 3 surfaces (ASL Favorites card, ASL Control
+    drawer, hotspot's own detail-drawer Linked Nodes list) and skipped
+    the compact HOTSPOT CARD's own "Linked:" chip row -- asked directly
+    ("what about on the actual hotspot card will it show there?"),
+    which turned out to be the single most important surface (the only
+    one visible on the always-on dashboard with no click required) and
+    had the exact same gap (`.linked-item` only ever distinguished
+    `.keyed` vs. `.idle-link`, nothing else). Added as a 4th surface in
+    the same mockup file/URL before building anything, not as an
+    afterthought bolted onto the real code.
+  - **Cyan (`--live`) reused consistently across all 4 surfaces**, not a
+    new color -- same token this app already reserves for "on-air/
+    connected right now." Deliberately NOT using the pulsing keyed
+    animation for Local Monitor's own state (`.keyed`'s pulse means
+    "actively transmitting this instant," which a receive-only Local
+    Monitor link isn't necessarily doing) -- a static cyan fill/border
+    instead, everywhere.
+  - **Keyed still wins over Local Monitor for dot/row COLOR when both
+    are somehow true** (the remote node keying up is more urgent than
+    the link-type distinction), but the "Local Mon" tag/badge shows
+    independently of keyed state on every surface that has room for
+    both pieces of information at once (the compact card's chip, the
+    ASL Favorites tile, the ASL Control drawer row) -- so you never lose
+    the "this is a Local Monitor link" fact just because it happens to
+    be keyed at that instant.
+  - **The hotspot's own detail-drawer mode badge got a genuine
+    generalization, not just an L-specific patch**: the OLD code
+    (`<span class="hs-link-mode">${escapeHtml(n.mode || '')}</span>`)
+    unconditionally showed the bare raw letter for EVERY mode, T
+    included -- meaning most rows already had a mostly-meaningless "T"
+    badge cluttering every single link. The approved mockup's "Proposed"
+    column showed T with NO badge at all (a real, deliberate
+    simplification, not an oversight preserved from the mockup's own
+    slightly-inconsistent written commentary -- see the mockup's actual
+    rendered example, which is what was approved). Implemented as a full
+    `{L: 'LOCAL MON', R: 'MONITOR', C: 'CONNECTING'}` label map (T maps
+    to nothing) rather than only special-casing L and leaving R/C as
+    still-cryptic bare letters, which would have been an inconsistent
+    half-fix -- R/C keep the EXISTING neutral pill styling (color)
+    unchanged, only L gets the new cyan treatment, since only Local
+    Monitor was actually mocked up with a color.
+  - Verified live with Playwright against all 4 surfaces in one run,
+    seeding a real Local-Monitor'd link (`mode: "L"`) matching one of two
+    saved favorites: confirmed the compact card's chip shows "🎧 Local
+    Mon" text; confirmed the ASL Favorites tile turns cyan with the same
+    text in its meta line; confirmed the ASL Control drawer row shows
+    the "LOCAL MON" badge; confirmed the hotspot's own detail drawer
+    (reached via the real `.card-gear-btn` entry point, not a
+    whole-card click -- that changed in v3.73, see that gotcha above)
+    shows "LOCAL MON" too. All four screenshots visually compared
+    directly against the approved mockup, not just checked for
+    "renders without erroring."
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

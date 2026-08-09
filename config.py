@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.10"
+APP_VERSION = "4.11"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -87,6 +87,8 @@ VERSION_CODENAMES = [
                         # (1941-1994)
     "Lee",              # v4.10 -- Alvin Lee, guitarist, Ten Years After
                         # (1944-2013)
+    "Grech",            # v4.11 -- Ric Grech, bassist, Blind Faith/Family
+                        # (1946-1990)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
