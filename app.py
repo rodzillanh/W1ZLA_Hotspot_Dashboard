@@ -1293,7 +1293,10 @@ def api_satellites():
     positions = satellite_tracker.positions(tracked)
     qth = grid_to_latlon(settings.get("station_grid", ""))
     passes = satellite_tracker.passes(tracked, qth[0], qth[1]) if qth else []
-    return jsonify({"positions": positions, "passes": passes, "has_observer": qth is not None})
+    # Real-time az/el for the polar elevation scope -- a different
+    # question than `passes` answers, see sky_snapshot()'s own docstring.
+    sky = satellite_tracker.sky_snapshot(tracked, qth[0], qth[1], passes) if qth else None
+    return jsonify({"positions": positions, "passes": passes, "has_observer": qth is not None, "sky": sky})
 
 @app.route("/api/starlink_train")
 def api_starlink_train():

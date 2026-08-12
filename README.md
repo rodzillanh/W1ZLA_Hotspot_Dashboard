@@ -1250,6 +1250,15 @@ satellites, plus a live ground-track overlay on the **Live map**.
   shipping. Satellite operational status changes over time (satellites
   go silent, decay, or get replaced), so the default list is
   intentionally small and editable rather than exhaustive.
+- **Polar elevation scope** — a small sky-dome next to the pass list.
+  Center is straight overhead (zenith), the rim is your horizon, and
+  azimuth runs around the edge like a compass — deliberately a
+  different shape than the Flights Overhead card's radar (which plots
+  bearing + ground distance): a satellite pass is about how high in
+  the sky it is, not how far away on the ground. Any tracked satellite
+  currently above your horizon shows as a live pulsing dot at its real
+  elevation/azimuth; a dashed arc previews the next upcoming pass's
+  rise-to-set track across the sky even before it's risen.
 - **Naked-eye visibility prediction** — each pass is checked for
   whether it'd actually be visible to the eye, not just above your
   horizon: the satellite has to be sunlit (not in Earth's shadow) *and*

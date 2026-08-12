@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.17 "Gibb"</span>
+                <span class="release-version">v4.18 "Lanegan"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Satellites card gained a polar elevation scope</span> — a small sky-dome next to the pass list: center is straight overhead (zenith), the rim is your horizon, azimuth runs around the edge like a compass. Any tracked satellite currently above your horizon shows as a live pulsing dot at its real elevation/azimuth; a dashed arc previews the next upcoming pass's rise-to-set track across the sky even before it's risen. Deliberately a different shape than the Flights Overhead card's radar (which plots bearing + ground distance) — a satellite pass is about how high in the sky it is, not how far away on the ground</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.17 "Gibb"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Satellite passes now predict naked-eye visibility</span> — each pass in the Satellites card carries a new <code>visible</code> flag: satellite above the horizon, sunlit (not in Earth's shadow, standard cylindrical-shadow model), <em>and</em> your sky dark enough (Sun below -6°, nautical twilight) all at once. A pass meeting all three shows a "👁 visible" tag alongside the existing "● overhead" one. Verified against a real published sunset time before shipping, not just derived from the formula</li>

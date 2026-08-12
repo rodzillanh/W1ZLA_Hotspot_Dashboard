@@ -388,6 +388,75 @@ class SatelliteTracker:
             self._pass_cache[key] = (time.time(), all_passes)
         return all_passes
 
+    def sky_snapshot(self, satellites: list[dict], observer_lat: float, observer_lon: float,
+                      passes: list[dict]) -> dict:
+        """Real-time az/el for the Satellites card's polar elevation
+        scope -- a different question than passes() answers (upcoming
+        AOS/LOS times): this is "where in the sky is it RIGHT NOW" for
+        anything currently above the horizon, plus a coarse rise-to-set
+        track for the single soonest not-yet-started pass so the scope
+        still shows something even when nothing's up yet. Cheap enough
+        (a handful of SGP4 evaluations) to not need its own cache --
+        bounded by the card's own poll interval either way. Takes the
+        already-computed `passes` list rather than re-searching, so this
+        never redoes passes()'s own 48-hour-search work.
+
+        {"overhead": [{"norad_id", "name", "elevation", "azimuth"}, ...],
+         "next_track": {"norad_id", "name", "points": [[az, el], ...]} | None}
+        """
+        now = time.time()
+        jd, fr = jday(*time.gmtime(now)[:6])
+        theta = _gmst_rad(jd, fr)
+        observer_ecef = _geodetic_to_ecef(observer_lat, observer_lon, 0.0)
+
+        overhead = []
+        for sat_cfg in satellites:
+            got = self._get_satrec(sat_cfg["norad_id"])
+            if got is None:
+                continue
+            satrec, tle_name = got
+            e, r, _v = satrec.sgp4(jd, fr)
+            if e != 0:
+                continue
+            sat_ecef = _teme_to_ecef(*r, theta)
+            el, az, _rng = _elevation_azimuth(observer_ecef, observer_lat, observer_lon, sat_ecef)
+            if el >= 0:
+                overhead.append({
+                    "norad_id": sat_cfg["norad_id"],
+                    "name": sat_cfg.get("name") or tle_name,
+                    "elevation": round(el, 1),
+                    "azimuth": round(az, 1),
+                })
+
+        next_track = None
+        upcoming = [p for p in passes if p["aos_epoch"] > now]
+        if upcoming:
+            nxt = upcoming[0]
+            got = self._get_satrec(nxt["norad_id"])
+            if got is not None:
+                satrec, _tle_name = got
+                span = nxt["los_epoch"] - nxt["aos_epoch"]
+                steps = 12
+                points = []
+                for i in range(steps + 1):
+                    t = nxt["aos_epoch"] + span * i / steps
+                    jd2, fr2 = jday(*time.gmtime(t)[:6])
+                    e, r, _v = satrec.sgp4(jd2, fr2)
+                    if e != 0:
+                        continue
+                    theta2 = _gmst_rad(jd2, fr2)
+                    sat_ecef = _teme_to_ecef(*r, theta2)
+                    el, az, _rng = _elevation_azimuth(observer_ecef, observer_lat, observer_lon, sat_ecef)
+                    points.append([round(az, 1), round(max(el, 0.0), 1)])
+                if points:
+                    next_track = {
+                        "norad_id": nxt["norad_id"],
+                        "name": nxt["name"],
+                        "points": points,
+                    }
+
+        return {"overhead": overhead, "next_track": next_track}
+
     @staticmethod
     def _find_passes(satrec: Satrec, sat_cfg: dict, tle_name: str,
                       observer_ecef: tuple[float, float, float],
