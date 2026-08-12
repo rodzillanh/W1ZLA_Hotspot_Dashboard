@@ -1524,6 +1524,9 @@
         }
         .fd-route-unknown { font-size: 12.5px; color: var(--text-muted); padding: 4px 0 2px; line-height: 1.5; }
         .fd-badge-unverified { display: inline-block; font-size: 9px; text-transform: uppercase; letter-spacing: .4px; color: var(--caution); font-weight: 700; }
+        .fd-route-attrib { font-size: 10.5px; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
+        .fd-route-attrib a { color: var(--live); text-decoration: none; }
+        .fd-route-attrib a:hover { text-decoration: underline; }
         .fd-kv { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--card-border); font-size: 12.5px; gap: 12px; }
         .fd-kv:last-child { border-bottom: none; }
         .fd-kv .k { color: var(--text-muted); }
@@ -5292,10 +5295,12 @@ function renderFlightsCard(data) {
     }).join('');
 }
 
+let currentFlightDrawerIcao24 = null;
 function openFlightDrawer(i) {
     const a = lastFlights[i];
     if (!a) return;
     closeAllDrawers();
+    currentFlightDrawerIcao24 = a.icao24;
 
     const alt = flightAltLabel(a.altitude_ft);
     const altText = alt.val + (alt.unit ? ' ' + alt.unit : '');
@@ -5316,8 +5321,12 @@ function openFlightDrawer(i) {
         </div>
         <div class="hs-drawer-body">
             <div class="hs-drawer-section" style="margin-top:2px">
+                <div class="hs-drawer-section-title"><span>Aircraft</span></div>
+                <div id="fd-aircraft-body"><div class="fd-route-unknown">Looking up…</div></div>
+            </div>
+            <div class="hs-drawer-section">
                 <div class="hs-drawer-section-title"><span>Route</span></div>
-                <div class="fd-route-unknown">Not available &mdash; OpenSky's live position feed doesn't include route (origin/destination) or aircraft type/model, only position and flight-dynamics data. Check FlightAware below for the real route.</div>
+                <div id="fd-route-body"><div class="fd-route-unknown">Looking up…</div></div>
             </div>
             <div class="hs-drawer-section">
                 <div class="hs-drawer-section-title"><span>Live position</span></div>
@@ -5337,6 +5346,57 @@ function openFlightDrawer(i) {
 
     document.getElementById('flights-drawer').classList.add('open');
     document.getElementById('hs-drawer-backdrop').classList.add('open');
+
+    fetchFlightRoute(a);
+}
+
+// Aircraft type/registration + flight route -- adsbdb.com, fetched only
+// when a drawer actually opens for this specific aircraft (not for the
+// whole list on every poll), see adsbdb.py's own docstring for why.
+function fetchFlightRoute(a) {
+    const params = new URLSearchParams({ icao24: a.icao24 });
+    if (a.has_callsign) params.set('callsign', a.callsign);
+    fetch('/api/flight_route?' + params.toString())
+        .then(r => r.json())
+        .then(data => renderFlightRoute(a, data))
+        .catch(() => renderFlightRoute(a, null));
+}
+
+function renderFlightRoute(a, data) {
+    // The drawer may have been closed, or reopened for a DIFFERENT
+    // aircraft, by the time this async lookup resolves -- only apply
+    // the result if it's still showing the SAME flight it was fetched for.
+    const drawer = document.getElementById('flights-drawer');
+    if (!drawer || !drawer.classList.contains('open') || currentFlightDrawerIcao24 !== a.icao24) return;
+    const aircraftEl = document.getElementById('fd-aircraft-body');
+    const routeEl = document.getElementById('fd-route-body');
+    if (!aircraftEl || !routeEl) return;
+
+    if (!data || data.error) {
+        aircraftEl.innerHTML = `<div class="fd-route-unknown">Couldn't look this up right now.</div>`;
+        routeEl.innerHTML = `<div class="fd-route-unknown">Couldn't look this up right now.</div>`;
+        return;
+    }
+
+    aircraftEl.innerHTML = data.aircraft_type ? `
+        <div class="fd-kv"><span class="k">Type</span><span class="v">${escapeHtml(data.aircraft_type)}</span></div>
+        <div class="fd-kv"><span class="k">Registration</span><span class="v">${escapeHtml(data.registration || '—')}</span></div>
+        <div class="fd-kv"><span class="k">Manufacturer</span><span class="v">${escapeHtml(data.manufacturer || '—')}</span></div>
+        <div class="fd-kv"><span class="k">Owner/operator</span><span class="v">${escapeHtml(data.owner || '—')}</span></div>`
+        : `<div class="fd-route-unknown">No aircraft record found for ICAO24 ${escapeHtml(a.icao24)}.</div>`;
+
+    if (data.route) {
+        const r = data.route;
+        routeEl.innerHTML = `
+        <div class="fd-route-airports">
+            <div class="fd-airport"><div class="fd-airport-code">${escapeHtml(r.origin.code || '?')}</div><div class="fd-airport-name">${escapeHtml(r.origin.municipality || r.origin.name || '')}</div></div>
+            <div class="fd-route-arrow">&rarr;</div>
+            <div class="fd-airport"><div class="fd-airport-code">${escapeHtml(r.destination.code || '?')}</div><div class="fd-airport-name">${escapeHtml(r.destination.municipality || r.destination.name || '')}</div></div>
+        </div>
+        <div class="fd-route-attrib">${r.airline ? escapeHtml(r.airline) + ' &middot; ' : ''}this callsign's usual route, not necessarily this exact flight's live plan &middot; Route: <a href="https://www.adsbdb.com" target="_blank" rel="noopener">adsbdb.com</a></div>`;
+    } else {
+        routeEl.innerHTML = `<div class="fd-route-unknown">No filed route found${a.has_callsign ? ' for callsign ' + escapeHtml(a.callsign) : ''} &mdash; likely local/GA traffic with no scheduled route.</div>`;
+    }
 }
 
 let lastFlightsFetchedAt = null;

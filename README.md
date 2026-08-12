@@ -1298,15 +1298,18 @@ card shows a prompt instead of aircraft.
   above), and a climb/level/descend indicator. Fixed ~25 mile radius,
   not currently configurable.
 - **Click a callsign** to open a detail drawer with the full live
-  picture — position, vertical rate, squawk, and a link out to
-  FlightAware for that flight's full track and history.
-- **Deliberately doesn't show aircraft type/model or route**
-  (origin/destination) — OpenSky's live position feed doesn't carry
-  either. Aircraft type only exists in OpenSky's own ~95MB bulk
-  database dump, and route isn't in this API at all, so rather than
-  guess or bundle a large database this app doesn't have anywhere else
-  to store, the card is upfront about the gap and links to FlightAware
-  for anyone who wants it.
+  picture — position, vertical rate, squawk, aircraft type/registration/
+  manufacturer/owner, and (when known) the callsign's usual route with
+  the airline name, plus a link out to FlightAware for that flight's
+  full track and history. OpenSky's own live feed doesn't carry
+  aircraft type or route — those two fields come from a second,
+  on-demand lookup against [adsbdb.com](https://www.adsbdb.com) (a
+  free, keyless API), fetched only when you actually open a flight's
+  drawer, not for the whole list on every poll. The route shown is
+  "this callsign's usual route," not a live flight-plan lookup for
+  this exact flight — labeled as such rather than overclaiming
+  precision. GA/private aircraft with no commercial route on file say
+  so plainly instead of showing nothing.
 - Anonymous OpenSky access has a modest daily rate limit, so this card
   refreshes every 5 minutes server-side, shared across every browser
   tab viewing the dashboard.

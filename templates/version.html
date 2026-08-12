@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.18 "Lanegan"</span>
+                <span class="release-version">v4.19 "Buffett"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Flight detail drawer now shows real aircraft type and route</span> — via <a href="https://www.adsbdb.com" target="_blank" rel="noopener">adsbdb.com</a>, a free keyless API that fills in exactly the two gaps OpenSky's live feed doesn't cover (see the last release's note). Fetched on demand, only when you actually open a flight's drawer, not for the whole list every poll. Shows aircraft type/manufacturer/registration/owner, plus the callsign's usual origin → destination route with the airline name, when known — clearly labeled as "this callsign's usual route, not necessarily this exact flight's live plan" rather than overclaiming precision. GA/private traffic with no commercial route on file says so plainly instead of showing nothing</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.18 "Lanegan"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Satellites card gained a polar elevation scope</span> — a small sky-dome next to the pass list: center is straight overhead (zenith), the rim is your horizon, azimuth runs around the edge like a compass. Any tracked satellite currently above your horizon shows as a live pulsing dot at its real elevation/azimuth; a dashed arc previews the next upcoming pass's rise-to-set track across the sky even before it's risen. Deliberately a different shape than the Flights Overhead card's radar (which plots bearing + ground distance) — a satellite pass is about how high in the sky it is, not how far away on the ground</li>

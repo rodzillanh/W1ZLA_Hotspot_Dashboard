@@ -50,6 +50,7 @@ from brandmeister_lastheard import BrandmeisterLastHeardListener
 from satellites import SatelliteTracker
 from starlink_trains import StarlinkTrainClient
 from flights import FlightsClient
+from adsbdb import AdsbdbClient
 from aslstats import AslStatsClient
 from rockstar_bios import get_bio as get_codename_bio
 
@@ -73,6 +74,7 @@ satellite_tracker = SatelliteTracker()
 starlink_train_client = StarlinkTrainClient()
 wspr_activity   = WsprActivityClient()
 flights_client  = FlightsClient()
+adsbdb_client   = AdsbdbClient()
 aurora_client   = AuroraClient()
 # Separate from monitor.py's own private AslStatsClient (used internally
 # for linked-node callsign resolution) -- this one backs the ASL Control
@@ -1079,6 +1081,23 @@ def api_flights():
     same degrade-gracefully pattern as every other integration."""
     station_grid = load_settings().get("station_grid", "")
     data = flights_client.get(station_grid)
+    if data is None:
+        return jsonify({"error": "unavailable"}), 503
+    return jsonify(data)
+
+@app.route("/api/flight_route")
+def api_flight_route():
+    """On-demand aircraft type/registration + flight route lookup for
+    the Flights Overhead card's detail drawer -- see adsbdb.py.
+    Deliberately fetched per-aircraft, on drawer open, not bundled into
+    /api/flights' own list response -- most listed aircraft are never
+    clicked into, so there's no reason to look up route data for all of
+    them every poll. icao24 is required; callsign is optional but
+    substantially improves route-match accuracy (adsbdb keys routes by
+    callsign, not airframe)."""
+    icao24 = request.args.get("icao24", "")
+    callsign = request.args.get("callsign")
+    data = adsbdb_client.lookup(icao24, callsign)
     if data is None:
         return jsonify({"error": "unavailable"}), 503
     return jsonify(data)
