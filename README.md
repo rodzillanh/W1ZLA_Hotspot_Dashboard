@@ -1273,6 +1273,7 @@ satellites, plus a live ground-track overlay on the **Live map**.
 
 <!-- wiki-group: Optional Cards -->
 ## Flights Overhead card
+<!-- wiki-image: flights-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show Flights Overhead
 card", off by default) — live nearby aircraft on a small radar scope +
