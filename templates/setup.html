@@ -656,6 +656,30 @@
                      id="satellites-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show possible Starlink train sightings
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (best-effort -- adds visible-only passes for the most recent Starlink launch
+                        batch to the Satellites card, when one is currently tracked by CelesTrak.
+                        More fragile than other integrations here: relies on scraping a page with no
+                        stable API, and the satellite count can be incomplete right after a launch.
+                        Only meaningful with Satellites enabled above)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_starlink_trains', False) else '' }}"
+                     id="starlink-trains-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show Flights Overhead card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (live nearby aircraft on a radar scope -- needs a station grid square above.
+                        Position/altitude/speed only -- no aircraft type or route, OpenSky's live feed
+                        doesn't carry either)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_flights_overhead', False) else '' }}"
+                     id="flights-overhead-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show DigiPi card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (APRS/Direwolf activity + screen mirror -- needs connection details in Integrations)
@@ -794,6 +818,7 @@
             {% set big_clock_pos = settings.get('big_clock_position', 0) if settings.get('show_big_clock', False) else -1 %}
             {% set notifications_pos = settings.get('notifications_position', 0) if (settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False)) else -1 %}
             {% set satellites_pos = settings.get('satellites_position', 0) if settings.get('show_satellites', False) else -1 %}
+            {% set flights_overhead_pos = settings.get('flights_overhead_position', 0) if settings.get('show_flights_overhead', False) else -1 %}
             {% set recent_contacts_pos = settings.get('recent_contacts_position', 0) if settings.get('show_recent_contacts', False) else -1 %}
             {% set qso_stats_pos = settings.get('qso_stats_position', 0) if settings.get('show_qso_stats', False) else -1 %}
             {% set top_activity_pos = settings.get('top_activity_position', 0) if settings.get('show_top_activity', False) else -1 %}
@@ -872,6 +897,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🛰️ Satellites</span>
                     <span class="node-meta">pass prediction card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == flights_overhead_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__flights_overhead__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">✈️ Flights Overhead</span>
+                    <span class="node-meta">nearby aircraft card</span>
                 </div>
                 {% endif %}
                 {% if loop.index0 == recent_contacts_pos %}
@@ -1903,6 +1935,8 @@ function saveCards() {
             digipi_enabled: document.getElementById('digipi-toggle').classList.contains('on'),
             show_big_clock: document.getElementById('big-clock-toggle').classList.contains('on'),
             show_satellites: document.getElementById('satellites-toggle').classList.contains('on'),
+            show_starlink_trains: document.getElementById('starlink-trains-toggle').classList.contains('on'),
+            show_flights_overhead: document.getElementById('flights-overhead-toggle').classList.contains('on'),
             hamalert_enabled: document.getElementById('hamalert-toggle').classList.contains('on'),
             show_recent_contacts: document.getElementById('recent-contacts-toggle').classList.contains('on'),
             show_qso_stats: document.getElementById('qso-stats-toggle').classList.contains('on'),
@@ -2073,6 +2107,7 @@ function saveCardOrder() {
     const bigClockIdx = sentinelIndex('__big_clock__');
     const notificationsIdx = sentinelIndex('__notifications__');
     const satellitesIdx = sentinelIndex('__satellites__');
+    const flightsOverheadIdx = sentinelIndex('__flights_overhead__');
     const recentContactsIdx = sentinelIndex('__recent_contacts__');
     const qsoStatsIdx = sentinelIndex('__qso_stats__');
     const topActivityIdx = sentinelIndex('__top_activity__');
@@ -2177,6 +2212,13 @@ function saveCardOrder() {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ satellites_position: satellitesIdx })
+        }));
+    }
+    if (flightsOverheadIdx !== -1) {
+        saves.push(fetch('/api/settings', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ flights_overhead_position: flightsOverheadIdx })
         }));
     }
     if (recentContactsIdx !== -1) {

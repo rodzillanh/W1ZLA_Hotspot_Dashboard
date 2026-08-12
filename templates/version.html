@@ -117,9 +117,30 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.15 "Osbourne"</span>
+                <span class="release-version">v4.17 "Gibb"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Satellite passes now predict naked-eye visibility</span> — each pass in the Satellites card carries a new <code>visible</code> flag: satellite above the horizon, sunlit (not in Earth's shadow, standard cylindrical-shadow model), <em>and</em> your sky dark enough (Sun below -6°, nautical twilight) all at once. A pass meeting all three shows a "👁 visible" tag alongside the existing "● overhead" one. Verified against a real published sunset time before shipping, not just derived from the formula</li>
+                <li><span>New "possible Starlink train" sightings</span> (Settings → Cards, off by default) — a sub-section of the Satellites card that, when a Starlink launch batch is currently tracked by CelesTrak, shows its predicted visible-only passes. Flagged "best-effort" in the UI on purpose: unlike every other integration in this app, finding "the current launch batch" means scraping a CelesTrak page with no stable API for that lookup, and the tracked satellite count can be incomplete in the hours right after a launch (confirmed live against a real same-day launch before shipping)</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.16 "Cochran"</span>
+                <span class="release-date">August 2026</span>
+            </div>
+            <ul class="change-list">
+                <li><span>New Flights Overhead card</span> — live nearby aircraft on a radar scope + list, from OpenSky Network's free anonymous feed, within a fixed ~25mi radius of your station grid square (Settings → Cards, same grid square Band Activity/Satellites already use). Deliberately shows only what OpenSky's live position feed actually carries — callsign, distance/bearing, altitude, speed, heading, vertical rate, squawk, and a coarse aircraft-category label — <em>not</em> a specific aircraft type/model or route, since OpenSky's live feed doesn't include either (type/model only exists in their ~95MB bulk database dump, and route isn't in this API at all). Click a callsign to open a detail drawer with the full live picture and a link out to FlightAware for the type/route this card can't show</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.15 "Osbourne"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>SA818 cards now show CTCSS/DCS tone, right under the frequency</span> — reads <code>CURRENT_TONE</code> from the same <code>/etc/sa818.conf</code> check added last release: a "CTCSS" or "DCS" tone shows its actual RX/TX value ("CTCSS 110.9", "DCS 023"); anything else (no tone configured) shows nothing at all, same as before</li>

@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.15"
+APP_VERSION = "4.17"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -95,6 +95,8 @@ VERSION_CODENAMES = [
                         # member of Yes (1948-2015)
     "Peart",            # v4.14 -- Neil Peart, drummer, Rush (1952-2020)
     "Osbourne",         # v4.15 -- Ozzy Osbourne, Black Sabbath/solo (1948-2025)
+    "Cochran",          # v4.16 -- Eddie Cochran, rock and roll pioneer (1938-1960)
+    "Gibb",             # v4.17 -- Maurice/Robin Gibb, Bee Gees (1949-2003/2012)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -784,6 +786,27 @@ DEFAULT_SETTINGS = {
         {"norad_id": 43017, "name": "AO-91",  "mode": "FM",   "downlink_mhz": 145.960, "uplink_mhz": 435.250},
         {"norad_id": 43678, "name": "PO-101", "mode": "FM",   "downlink_mhz": 145.900, "uplink_mhz": 437.500},
     ],
+    # Possible Starlink train sightings -- off by default, a sub-section
+    # of the Satellites card (not its own card/position), shown only
+    # when show_satellites is also on. Genuinely more fragile than every
+    # other integration in this app -- see starlink_trains.py's own
+    # docstring for the two real, disclosed gaps (an HTML-scraped
+    # "current launch batch" lookup with no stable API, and a possibly-
+    # incomplete satellite count in the hours right after a launch) --
+    # kept as an explicit opt-in and labeled as best-effort in the UI
+    # rather than presented with the same confidence as regular passes.
+    "show_starlink_trains": False,
+    # Flights Overhead card -- off by default. Live nearby aircraft
+    # (flights.py, OpenSky Network's free anonymous /api/states/all)
+    # within flights.py's own fixed RADIUS_KM of station_grid, same
+    # reused-location convention as Band Activity/Satellites above.
+    # Deliberately shows NO aircraft type/model and NO route -- OpenSky's
+    # live feed doesn't carry either (see flights.py's docstring for what
+    # was actually checked before deciding that, not assumed) -- only
+    # position/altitude/speed/heading/vertical-rate/squawk/coarse
+    # category, all real fields off the live state vector.
+    "show_flights_overhead": False,
+    "flights_overhead_position": 0,
     # Recent Contacts card -- off by default. Reads the same qsos.json
     # both the ADIF importer and wsjtx.py's live logger write to, newest
     # first -- no separate data source, just a different view onto QSOs

@@ -99,6 +99,8 @@ SETTINGS = {
     "show_wspr_activity": True,
     "show_big_clock": True,
     "show_satellites": True,
+    "show_starlink_trains": True,
+    "show_flights_overhead": True,
     "show_recent_contacts": True,
     "show_qso_stats": True,
     "show_top_activity": True,
@@ -291,6 +293,7 @@ CARD_SHOTS = [
     ("fleet-activity-card", "fleet-activity-card.png"),
     ("asl-favorites-card", "asl-favorites-card.png"),
     ("satellites-card", "satellites-card.png"),
+    ("flights-card", "flights-card.png"),
     ("recent-contacts-card", "recent-contacts-card.png"),
     ("qso-stats-card", "qso-stats-card.png"),
     ("top-activity-card", "top-activity-card.png"),
@@ -306,6 +309,13 @@ with sync_playwright() as p:
     page = browser.new_page(viewport={"width": 1600, "height": 1200})
     page.goto(BASE_URL, wait_until="networkidle")
     page.wait_for_timeout(2500)  # let the poll cycle + card JS populate
+    # The Starlink train sub-section (inside satellites-card) does two
+    # SEQUENTIAL live fetches (a CelesTrak page scrape, then a TLE fetch)
+    # before it has anything to show -- give it a bit longer specifically,
+    # rather than raising the wait above for every card (that pushed the
+    # capture loop closer to the dashboard's own 3s poll cycle re-rendering
+    # #cards-grid mid-loop, which detached an element handle mid-screenshot).
+    page.wait_for_timeout(2000)
 
     page.screenshot(path=os.path.join(OUTPUT_DIR, "dashboard-full.png"), full_page=True)
     print("wrote dashboard-full.png")
@@ -315,12 +325,27 @@ with sync_playwright() as p:
         # ids embed a fake IP address (e.g. "card-198.51.100.10"), and a
         # bare "#" selector misparses the dots as class-selector separators
         # (confirmed live: Playwright raised "Unexpected token '.51'").
-        el = page.query_selector(f'[id="{element_id}"]')
-        if el and el.is_visible():
-            el.screenshot(path=os.path.join(OUTPUT_DIR, filename))
-            print(f"wrote {filename}")
-        else:
-            print(f"skip (not found/visible): #{element_id}")
+        #
+        # Retried once on a real, observed race: the dashboard's own 3s
+        # poll cycle can replace #cards-grid's innerHTML between querying
+        # the element and Playwright's screenshot() actually firing,
+        # detaching the handle mid-capture ("Element is not attached to
+        # the DOM") -- re-querying a moment later picks up the freshly
+        # rendered element instead of retrying against the stale handle.
+        for attempt in range(2):
+            el = page.query_selector(f'[id="{element_id}"]')
+            if not el or not el.is_visible():
+                print(f"skip (not found/visible): #{element_id}")
+                break
+            try:
+                el.screenshot(path=os.path.join(OUTPUT_DIR, filename))
+                print(f"wrote {filename}")
+                break
+            except Exception as e:
+                if attempt == 0:
+                    page.wait_for_timeout(500)
+                    continue
+                print(f"FAILED (after retry): #{element_id}: {e}")
 
     page.click('a.settings-link')  # opens the Quick Settings drawer (not /setup -- that's a separate capture below)
     page.wait_for_timeout(500)

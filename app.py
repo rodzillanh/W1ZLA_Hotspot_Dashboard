@@ -48,6 +48,8 @@ from wsjtx import WsjtxListener
 from hamalert import HamAlertListener
 from brandmeister_lastheard import BrandmeisterLastHeardListener
 from satellites import SatelliteTracker
+from starlink_trains import StarlinkTrainClient
+from flights import FlightsClient
 from aslstats import AslStatsClient
 from rockstar_bios import get_bio as get_codename_bio
 
@@ -68,7 +70,9 @@ hf_conditions   = HfConditionsClient()
 camera_manager  = CameraStreamManager()
 license_quiz    = LicenseQuizPool()
 satellite_tracker = SatelliteTracker()
+starlink_train_client = StarlinkTrainClient()
 wspr_activity   = WsprActivityClient()
+flights_client  = FlightsClient()
 aurora_client   = AuroraClient()
 # Separate from monitor.py's own private AslStatsClient (used internally
 # for linked-node callsign resolution) -- this one backs the ASL Control
@@ -442,6 +446,15 @@ def api_settings_post():
             settings["satellites_position"] = max(0, int(data["satellites_position"]))
         except (TypeError, ValueError):
             pass
+    if "show_starlink_trains" in data:
+        settings["show_starlink_trains"] = bool(data["show_starlink_trains"])
+    if "show_flights_overhead" in data:
+        settings["show_flights_overhead"] = bool(data["show_flights_overhead"])
+    if "flights_overhead_position" in data:
+        try:
+            settings["flights_overhead_position"] = max(0, int(data["flights_overhead_position"]))
+        except (TypeError, ValueError):
+            pass
     if "tracked_satellites" in data:
         # norad_id gets interpolated into a CelesTrak URL (satellites.py) --
         # validated as an int here for the same reason asl_node is checked
@@ -669,6 +682,7 @@ _SENTINEL_DEFS = [
     ("__big_clock__", "show_big_clock", "big_clock_position", "🕐", "Big Ass Clock", "clock card"),
     ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled", "solar_alerts_enabled", "brandmeister_alerts_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
     ("__satellites__", "show_satellites", "satellites_position", "🛰️", "Satellites", "pass prediction card"),
+    ("__flights_overhead__", "show_flights_overhead", "flights_overhead_position", "✈️", "Flights Overhead", "nearby aircraft card"),
     ("__recent_contacts__", "show_recent_contacts", "recent_contacts_position", "📻", "Recent Contacts", "logged QSO card"),
     ("__qso_stats__", "show_qso_stats", "qso_stats_position", "📈", "QSO Stats", "logbook summary card"),
     ("__top_activity__", "show_top_activity", "top_activity_position", "🏆", "Top 5 Activity", "fleet callsign activity ranking card"),
@@ -1057,6 +1071,18 @@ def api_wspr_activity():
         return jsonify({"error": "unavailable"}), 503
     return jsonify(data)
 
+@app.route("/api/flights")
+def api_flights():
+    """Live nearby-aircraft feed for the Flights Overhead card, within
+    flights.py's own fixed RADIUS_KM of settings' station_grid -- see
+    flights.py. 503 covers both "no grid configured" and "fetch failed",
+    same degrade-gracefully pattern as every other integration."""
+    station_grid = load_settings().get("station_grid", "")
+    data = flights_client.get(station_grid)
+    if data is None:
+        return jsonify({"error": "unavailable"}), 503
+    return jsonify(data)
+
 @app.route("/api/aurora")
 def api_aurora():
     """Live NOAA OVATION aurora-oval overlay for the Live map's optional
@@ -1268,6 +1294,29 @@ def api_satellites():
     qth = grid_to_latlon(settings.get("station_grid", ""))
     passes = satellite_tracker.passes(tracked, qth[0], qth[1]) if qth else []
     return jsonify({"positions": positions, "passes": passes, "has_observer": qth is not None})
+
+@app.route("/api/starlink_train")
+def api_starlink_train():
+    """Best-effort possible-Starlink-train sighting data -- see
+    starlink_trains.py's own docstring for why this is more fragile
+    than every other integration here (an HTML-scraped "current launch
+    batch" lookup, no stable API). A separate route from /api/satellites
+    on purpose -- this fetch is slower/less reliable, and shouldn't be
+    able to slow down or break the regular ham-satellite pass list.
+    503 covers "not enabled"/"no station grid"/"no current batch
+    tracked"/"fetch failed" alike -- the frontend shows a quiet
+    unavailable state for all of these, same degrade-gracefully
+    contract as every other integration."""
+    settings = load_settings()
+    if not settings.get("show_starlink_trains", False):
+        return jsonify({"error": "disabled"}), 503
+    qth = grid_to_latlon(settings.get("station_grid", ""))
+    if not qth:
+        return jsonify({"error": "no_station_grid"}), 503
+    data = starlink_train_client.visible_passes(qth[0], qth[1])
+    if data is None:
+        return jsonify({"error": "unavailable"}), 503
+    return jsonify(data)
 
 @app.route("/version")
 def version_page():

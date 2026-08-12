@@ -340,8 +340,8 @@ and **Version info**.
 - **Card order** — drag hotspot cards into whatever order you want them
   to appear on the dashboard (Cards tab). If the Fleet activity, ASL
   Favorites & Control, HF Conditions, Band Plan, License Quiz, Band
-  Activity, Big Ass Clock, Notifications (APRS Messages + HamAlert), or
-  Satellites card is enabled, it appears in the same drag list and can be moved to
+  Activity, Big Ass Clock, Notifications (APRS Messages + HamAlert),
+  Satellites, or Flights Overhead card is enabled, it appears in the same drag list and can be moved to
   any position among the hotspot cards, not just first. Every enabled
   camera card (Settings → Cameras) gets its own row in the same list
   too, one per camera.
@@ -1250,6 +1250,56 @@ satellites, plus a live ground-track overlay on the **Live map**.
   shipping. Satellite operational status changes over time (satellites
   go silent, decay, or get replaced), so the default list is
   intentionally small and editable rather than exhaustive.
+- **Naked-eye visibility prediction** — each pass is checked for
+  whether it'd actually be visible to the eye, not just above your
+  horizon: the satellite has to be sunlit (not in Earth's shadow) *and*
+  your own sky has to be dark enough (Sun below -6°, nautical
+  twilight). A pass meeting both gets a "👁 visible" tag next to the
+  existing "● overhead" one. Verified against a real published sunset
+  time before shipping.
+- **Possible Starlink train sightings** (Settings → Cards → "Show
+  possible Starlink train sightings", off by default) — when a
+  Starlink launch batch is currently tracked by
+  [CelesTrak](https://celestrak.org)'s supplemental-elements feed, its
+  predicted visible-only passes show in a labeled sub-section of this
+  card. Explicitly marked **best-effort** — unlike every other
+  integration in this app, finding "the current launch batch" means
+  scraping a CelesTrak page (there's no documented API for that
+  specific lookup), and the tracked satellite count can be incomplete
+  in the hours right after a launch, before the full ~20-28 satellites
+  get their own individually catalogued orbits. If nothing's currently
+  tracked, or nothing's predicted visible, the section either stays
+  hidden or says so plainly rather than showing an error.
+
+<!-- wiki-group: Optional Cards -->
+## Flights Overhead card
+
+Optional dashboard card (Settings → Cards → "Show Flights Overhead
+card", off by default) — live nearby aircraft on a small radar scope +
+list, from [OpenSky Network](https://opensky-network.org)'s free,
+anonymous, no-signup feed. Needs a **station grid square** set (Settings
+→ Cards, same field Band Activity/Satellites use) — without one, the
+card shows a prompt instead of aircraft.
+
+- **Radar scope + list** — aircraft plot on the scope by real bearing
+  and distance from your station, heading-oriented plane glyphs when a
+  heading is known. The list beside it ranks nearest-first: callsign,
+  distance/bearing/speed, altitude (feet below 18,000ft, flight level
+  above), and a climb/level/descend indicator. Fixed ~25 mile radius,
+  not currently configurable.
+- **Click a callsign** to open a detail drawer with the full live
+  picture — position, vertical rate, squawk, and a link out to
+  FlightAware for that flight's full track and history.
+- **Deliberately doesn't show aircraft type/model or route**
+  (origin/destination) — OpenSky's live position feed doesn't carry
+  either. Aircraft type only exists in OpenSky's own ~95MB bulk
+  database dump, and route isn't in this API at all, so rather than
+  guess or bundle a large database this app doesn't have anywhere else
+  to store, the card is upfront about the gap and links to FlightAware
+  for anyone who wants it.
+- Anonymous OpenSky access has a modest daily rate limit, so this card
+  refreshes every 5 minutes server-side, shared across every browser
+  tab viewing the dashboard.
 
 <!-- wiki-group: Optional Cards -->
 ## Recent Contacts card

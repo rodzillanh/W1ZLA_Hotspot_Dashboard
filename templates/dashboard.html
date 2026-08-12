@@ -1425,6 +1425,102 @@
         .ba-footer a { color: var(--text-dim); }
         .ba-unavailable { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
 
+        /* --- Flights Overhead card -- mockup-approved (radar scope beside
+           the list, not stacked on top, so the card's total footprint
+           stays in line with its siblings) -- see CLAUDE.md for the sizing
+           discussion. Reuses .card-sub for the header meta text and the
+           existing .hs-drawer/.hs-drawer-backdrop shape for the detail
+           drawer rather than inventing new ones. --- */
+        .mini-live-dot {
+            width: 6px; height: 6px; border-radius: 50%; background: var(--live); flex-shrink: 0;
+            animation: pulse 1.8s ease-in-out infinite;
+        }
+        .flights-body { display: flex; gap: 16px; align-items: flex-start; }
+        .radar-col { flex: 0 0 190px; }
+        .radar-svg { width: 190px; height: 190px; display: block; }
+        .radar-ring { fill: none; stroke: var(--card-border); stroke-width: 1; }
+        .radar-ring-label { font-family: var(--font-mono); font-size: 7px; fill: var(--text-dim); }
+        .radar-cardinal { font-family: var(--font-mono); font-size: 8px; fill: var(--text-muted); font-weight: 600; }
+        .radar-crosshair { stroke: var(--border-soft); stroke-width: 1; }
+        .radar-sweep { transform-origin: 100px 100px; animation: radarSweep 6s linear infinite; }
+        @keyframes radarSweep { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .radar-sweep { animation: none; } }
+        .radar-home { font-size: 12px; text-anchor: middle; dominant-baseline: central; }
+        .blip-plane { fill: var(--live); filter: drop-shadow(0 0 2px color-mix(in srgb, var(--live) 70%, transparent)); }
+        .blip-label { font-family: var(--font-mono); font-size: 7.5px; fill: var(--text-muted); }
+
+        .flight-col { flex: 1; min-width: 0; }
+        .flight-scroll {
+            max-height: 220px; overflow-y: auto; margin: 0 -4px; padding: 0 4px;
+            scrollbar-width: thin; scrollbar-color: var(--card-border) transparent;
+        }
+        .flight-scroll::-webkit-scrollbar { width: 6px; }
+        .flight-scroll::-webkit-scrollbar-track { background: transparent; }
+        .flight-scroll::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 4px; }
+        .flight-row { display: flex; align-items: center; gap: 8px; padding: 8px 6px; border-bottom: 1px solid var(--card-border); }
+        .flight-row:first-child { padding-top: 2px; }
+        .flight-row:last-child { border-bottom: none; }
+        .flight-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--live); flex-shrink: 0; }
+        .flight-main { min-width: 0; flex: 1; }
+        .flight-top { display: flex; align-items: baseline; gap: 6px; margin-bottom: 2px; }
+        .flight-call {
+            font: inherit; font-family: var(--font-mono); font-weight: 600; font-size: 12.5px;
+            color: var(--link); letter-spacing: .2px; background: none; border: none; padding: 0;
+            cursor: pointer; text-align: left;
+        }
+        .flight-call:hover, .flight-call:focus-visible { text-decoration: underline; }
+        .flight-call:focus-visible { outline: 2px solid var(--live); outline-offset: 2px; border-radius: 2px; }
+        .flight-type { font-size: 10.5px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .flight-sub { font-size: 10.5px; color: var(--text-muted); }
+        .flight-alt { text-align: right; flex-shrink: 0; }
+        .flight-alt-val { font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+        .flight-alt-unit { font-size: 9px; color: var(--text-dim); font-weight: 400; margin-left: 1px; }
+        .flight-trend { font-size: 9.5px; margin-top: 1px; }
+        .flight-trend.up { color: var(--good); }
+        .flight-trend.down { color: var(--caution); }
+        .flight-trend.level { color: var(--text-dim); }
+        .flights-footer {
+            margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-soft);
+            display: flex; justify-content: space-between; align-items: baseline;
+            font-size: 10.5px; color: var(--text-dim);
+        }
+        .flights-footer a { color: var(--live); text-decoration: none; }
+        .flights-footer a:hover { text-decoration: underline; }
+        .flights-empty { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
+
+        /* --- flight detail drawer content -- .hs-drawer/.hs-drawer-backdrop
+           shell is reused verbatim (defined earlier for the hotspot/QSO/
+           ASL/Settings drawers); only these content-specific bits are new --- */
+        .fd-route-airports { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .fd-airport { flex: 1; text-align: center; background: var(--panel-2); border-radius: 8px; padding: 10px 6px; }
+        .fd-airport-code { font-family: var(--font-mono); font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: .5px; }
+        .fd-airport-name { font-size: 10px; color: var(--text-dim); margin-top: 3px; }
+        .fd-route-arrow { color: var(--text-dim); font-size: 16px; flex-shrink: 0; }
+        .fd-route-note {
+            font-size: 11px; color: var(--text-dim); line-height: 1.45; background: var(--caution-dim);
+            border: 1px solid color-mix(in srgb, var(--caution) 35%, var(--border)); border-radius: 7px; padding: 8px 9px;
+        }
+        .fd-route-unknown { font-size: 12.5px; color: var(--text-muted); padding: 4px 0 2px; line-height: 1.5; }
+        .fd-badge-unverified { display: inline-block; font-size: 9px; text-transform: uppercase; letter-spacing: .4px; color: var(--caution); font-weight: 700; }
+        .fd-kv { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--card-border); font-size: 12.5px; gap: 12px; }
+        .fd-kv:last-child { border-bottom: none; }
+        .fd-kv .k { color: var(--text-muted); }
+        .fd-kv .v { font-family: var(--font-mono); color: var(--text); font-variant-numeric: tabular-nums; text-align: right; }
+
+        /* --- Starlink train sub-section (inside the Satellites card,
+           not its own card) -- deliberately visually flagged as
+           best-effort/more-fragile than the rest of this app, see
+           starlink_trains.py's own docstring. --- */
+        .starlink-train-section { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
+        .starlink-train-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+        .starlink-train-header > span:first-child { font-size: 12.5px; font-weight: 600; color: var(--text); }
+        .starlink-train-badge {
+            font-size: 9px; text-transform: uppercase; letter-spacing: .4px; font-weight: 700;
+            color: var(--caution); background: var(--caution-dim);
+            border: 1px solid color-mix(in srgb, var(--caution) 35%, var(--border));
+            border-radius: 4px; padding: 2px 6px; cursor: help;
+        }
+
         /* --- Big Ass Clock card --- */
         /* 195px -- enough for the tallest real case (single analog clock's
            190px SVG face) plus a little breathing room, not the flat 240px
@@ -2416,6 +2512,64 @@
             </div>
             <div class="msg-empty" id="sat-empty" style="display:none">No upcoming passes in the next 48h.</div>
             <div class="msg-empty" id="sat-no-qth" style="display:none">Set a station grid square in Settings → Cards to enable pass predictions.</div>
+            {% if settings.get('show_starlink_trains', False) %}
+            <div class="starlink-train-section" id="starlink-train-section" style="display:none">
+                <div class="starlink-train-header">
+                    <span>🚂 Possible Starlink train</span>
+                    <span class="starlink-train-badge" title="Best-effort: relies on scraping a CelesTrak page with no stable API, and the tracked satellite count can be incomplete right after a launch. See README for details.">best-effort</span>
+                </div>
+                <div id="starlink-train-body"></div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if settings.get('show_flights_overhead', False) %}
+        <div class="metrics-card" id="flights-card"
+             style="order:{{ settings.get('flights_overhead_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">✈️ Flights Overhead</div>
+                <span class="card-sub" id="flights-card-sub" style="display:flex;align-items:center;gap:6px">—</span>
+            </div>
+            <div class="flights-body">
+                <div class="radar-col">
+                    <svg class="radar-svg" viewBox="0 0 200 200" role="img" aria-label="Radar scope showing nearby aircraft">
+                        <circle class="radar-ring" cx="100" cy="100" r="28.3" />
+                        <circle class="radar-ring" cx="100" cy="100" r="56.7" />
+                        <circle class="radar-ring" cx="100" cy="100" r="85" />
+                        <line class="radar-crosshair" x1="100" y1="12" x2="100" y2="188" />
+                        <line class="radar-crosshair" x1="12" y1="100" x2="188" y2="100" />
+                        <text class="radar-cardinal" x="100" y="10" text-anchor="middle">N</text>
+                        <text class="radar-cardinal" x="100" y="196" text-anchor="middle">S</text>
+                        <text class="radar-cardinal" x="7" y="103" text-anchor="middle">W</text>
+                        <text class="radar-cardinal" x="193" y="103" text-anchor="middle">E</text>
+                        <text class="radar-ring-label" x="103" y="75" id="flights-ring1-label"></text>
+                        <text class="radar-ring-label" x="103" y="47" id="flights-ring2-label"></text>
+                        <text class="radar-ring-label" x="103" y="19" id="flights-ring3-label"></text>
+                        <g class="radar-sweep">
+                            <path d="M100,100 L100,15 A85,85 0 0,1 130,25 Z" fill="url(#flightsSweepGrad)" />
+                        </g>
+                        <defs>
+                            <linearGradient id="flightsSweepGrad" x1="0" y1="1" x2="0" y2="0">
+                                <stop offset="0%" stop-color="var(--live)" stop-opacity="0" />
+                                <stop offset="100%" stop-color="var(--live)" stop-opacity="0.25" />
+                            </linearGradient>
+                        </defs>
+                        <text class="radar-home" x="100" y="101">🏠</text>
+                        <g id="flights-radar-blips"></g>
+                    </svg>
+                </div>
+                <div class="flight-col">
+                    <div class="flight-scroll" id="flights-scroll">
+                        <div id="flights-list"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="flights-footer">
+                <span id="flights-radius-label">—</span>
+                <span>Data: <a href="https://opensky-network.org" target="_blank" rel="noopener">OpenSky Network</a></span>
+            </div>
+            <div class="flights-empty" id="flights-empty">No aircraft within range right now.</div>
+            <div class="flights-empty" id="flights-no-qth" style="display:none">Set a station grid square in Settings → Cards to enable this card.</div>
         </div>
         {% endif %}
         {% if settings.get('show_recent_contacts', False) %}
@@ -2784,6 +2938,7 @@
 <div class="hs-drawer" id="settings-drawer"></div>
 <div class="hs-drawer" id="camera-drawer"></div>
 <div class="hs-drawer" id="asl-drawer"></div>
+<div class="hs-drawer" id="flights-drawer"></div>
 
 <!-- ASL Control's "Disconnect all links on this node" confirm dialog
      (v4.8) -- a standalone overlay, not one more hs-drawer, since it
@@ -2969,6 +3124,15 @@ const SATELLITES_POLL_MS = 15000;  // satellite position moves fast (~7.6km/s) -
                                     // shorter than most cards' poll interval, but
                                     // /api/satellites itself caches for 10s server-side
                                     // (see satellites.py), so this doesn't hammer it.
+const SHOW_STARLINK_TRAINS = {{ 'true' if settings.get('show_starlink_trains', False) else 'false' }};
+const STARLINK_TRAIN_POLL_MS = 5 * 60 * 1000;  // matches starlink_trains.py's own
+                                                // server-side cache TTLs
+const SHOW_FLIGHTS_OVERHEAD = {{ 'true' if settings.get('show_flights_overhead', False) else 'false' }};
+const FLIGHTS_OVERHEAD_POSITION = {{ settings.get('flights_overhead_position', 0) }};
+const FLIGHTS_POLL_MS = 60000;  // /api/flights caches server-side for 5 min
+                                 // (flights.py's CACHE_TTL, OpenSky's anonymous
+                                 // credit budget) -- polling client-side more
+                                 // often than that just re-serves the same cache.
 const SHOW_RECENT_CONTACTS = {{ 'true' if settings.get('show_recent_contacts', False) else 'false' }};
 const RECENT_CONTACTS_POSITION = {{ settings.get('recent_contacts_position', 0) }};
 // Same "enabled" definition as qrz.py's QrzClient.enabled property --
@@ -3380,6 +3544,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     hfcond: '__hf_conditions__', bandplan: '__band_plan__', licensequiz: '__license_quiz__',
     wspractivity: '__wspr_activity__', digipi: '__digipi__', bigclock: '__big_clock__',
     notifications: '__notifications__', satellites: '__satellites__',
+    flightsoverhead: '__flights_overhead__',
     recentcontacts: '__recent_contacts__', qsostats: '__qso_stats__',
     topactivity: '__top_activity__', dvswitch: '__dvswitch__',
 };
@@ -3512,6 +3677,9 @@ function renderCards(data) {
     }
     if (SHOW_SATELLITES) {
         sentinels.push({ key: 'satellites', pos: Math.max(0, SATELLITES_POSITION) });
+    }
+    if (SHOW_FLIGHTS_OVERHEAD) {
+        sentinels.push({ key: 'flightsoverhead', pos: Math.max(0, FLIGHTS_OVERHEAD_POSITION) });
     }
     if (SHOW_RECENT_CONTACTS) {
         sentinels.push({ key: 'recentcontacts', pos: Math.max(0, RECENT_CONTACTS_POSITION) });
@@ -4760,10 +4928,19 @@ function renderSatellitesCard(data) {
         const dirBits = (p.aos_azimuth != null && p.los_azimuth != null)
             ? `rises ${compassDir(p.aos_azimuth)} · sets ${compassDir(p.los_azimuth)}`
             : '';
+        // "overhead" (above the horizon right now) and "visible" (predicted
+        // naked-eye visible -- sunlit satellite + dark-enough sky, see
+        // satellites.py's docstring) are independent facts and can both be
+        // true at once, so both tags render rather than one replacing the
+        // other.
+        const tags = [
+            overhead ? '<span style="color:var(--live)">● overhead</span>' : null,
+            p.visible ? '<span style="color:var(--live)" title="Predicted naked-eye visible -- satellite sunlit, your sky dark enough">👁 visible</span>' : null,
+        ].filter(Boolean).join(' ');
         return `
         <div class="msg-row ${overhead ? 'unread' : ''}">
             <div class="msg-top">
-                <a href="#" class="msg-from" onclick="jumpToSatelliteOnMap(${p.norad_id}); return false;">${escapeHtml(p.name)}</a>${overhead ? ' <span style="color:var(--live)">● overhead</span>' : ''}
+                <a href="#" class="msg-from" onclick="jumpToSatelliteOnMap(${p.norad_id}); return false;">${escapeHtml(p.name)}</a>${tags ? ' ' + tags : ''}
                 <span class="msg-time">${overhead ? 'until ' + fmtPassWhen(p.los_epoch).replace('in ', '') : fmtPassWhen(p.aos_epoch)}</span>
             </div>
             <div class="msg-text">${escapeHtml(freqBits)} · max el ${p.max_elevation.toFixed(0)}°</div>
@@ -4871,6 +5048,223 @@ function fetchSatellites() {
 if (SHOW_SATELLITES) {
     fetchSatellites();
     setInterval(fetchSatellites, SATELLITES_POLL_MS);
+}
+
+// --- Possible Starlink train sightings (sub-section of the Satellites
+// card) -- best-effort, see starlink_trains.py's own docstring. Every
+// error/unavailable case (disabled, no station grid, no current launch
+// batch tracked, fetch failed) collapses the section rather than
+// showing an alarming error -- this is explicitly opt-in, best-effort
+// data, so "nothing to show right now" is the expected common case,
+// not a fault.
+function renderStarlinkTrain(data) {
+    const section = document.getElementById('starlink-train-section');
+    if (!section) return;
+    const body = document.getElementById('starlink-train-body');
+
+    if (!data || data.error) {
+        section.style.display = 'none';
+        return;
+    }
+    section.style.display = 'block';
+
+    const passes = data.passes || [];
+    const satCount = data.satellite_count || 0;
+    if (!passes.length) {
+        // NOT .msg-empty -- that class defaults to display:none (every
+        // other use in this file is a static element JS toggles visible,
+        // not a freshly injected one), which silently hid this text
+        // despite it being correctly in the DOM -- caught by actually
+        // looking at a rendered screenshot, not just reading the code.
+        body.innerHTML = `<div style="display:block;color:var(--text-dim);font-size:12.5px;padding:4px 0 2px">${escapeHtml(data.group)} tracked (${satCount} satellite${satCount === 1 ? '' : 's'} currently) -- no visible passes predicted right now.</div>`;
+        return;
+    }
+    body.innerHTML = passes.map(p => {
+        const dirBits = (p.aos_azimuth != null && p.los_azimuth != null)
+            ? `rises ${compassDir(p.aos_azimuth)} · sets ${compassDir(p.los_azimuth)}`
+            : '';
+        return `
+        <div class="msg-row">
+            <div class="msg-top">
+                <span class="msg-from" style="cursor:default">${escapeHtml(data.group)}</span>
+                <span class="msg-time">${fmtPassWhen(p.aos_epoch)}</span>
+            </div>
+            <div class="msg-text">max el ${p.max_elevation.toFixed(0)}° &middot; 👁 visible</div>
+            <div class="msg-to">${escapeHtml(dirBits)}</div>
+        </div>`;
+    }).join('');
+}
+
+function fetchStarlinkTrain() {
+    if (!SHOW_STARLINK_TRAINS) return;
+    fetch('/api/starlink_train')
+        .then(r => r.json())
+        .then(renderStarlinkTrain)
+        .catch(() => renderStarlinkTrain({ error: true }));
+}
+
+if (SHOW_STARLINK_TRAINS) {
+    fetchStarlinkTrain();
+    setInterval(fetchStarlinkTrain, STARLINK_TRAIN_POLL_MS);
+}
+
+// --- Flights Overhead card ---
+// Live nearby aircraft (flights.py, OpenSky Network's free anonymous
+// /api/states/all) within flights.py's own fixed radius of station_grid.
+// Deliberately shows no aircraft type/model and no route -- OpenSky's
+// live feed doesn't carry either (see flights.py's docstring); the
+// detail drawer says so explicitly and links out to FlightAware instead
+// of guessing. Radar scope + list-beside-it layout mirrors the
+// approved mockup so the card's footprint matches its siblings.
+let lastFlights = [];
+
+function flightAltLabel(ft) {
+    if (ft == null) return { val: '—', unit: '' };
+    if (ft >= 18000) return { val: 'FL' + Math.round(ft / 100), unit: '' };
+    return { val: ft.toLocaleString(), unit: 'ft' };
+}
+function flightTrend(vrateFpm) {
+    if (vrateFpm == null) return { cls: 'level', label: '—' };
+    if (vrateFpm > 150) return { cls: 'up', label: '▲ climb' };
+    if (vrateFpm < -150) return { cls: 'down', label: '▼ desc' };
+    return { cls: 'level', label: '— level' };
+}
+
+function renderFlightsCard(data) {
+    const emptyEl = document.getElementById('flights-empty');
+    const noQthEl = document.getElementById('flights-no-qth');
+    const subEl = document.getElementById('flights-card-sub');
+    const radiusEl = document.getElementById('flights-radius-label');
+    if (!emptyEl) return;
+
+    if (!data || data.error) {
+        lastFlights = [];
+        document.getElementById('flights-list').innerHTML = '';
+        document.getElementById('flights-radar-blips').innerHTML = '';
+        emptyEl.style.display = 'none';
+        noQthEl.style.display = 'block';
+        if (subEl) subEl.innerHTML = '—';
+        return;
+    }
+    noQthEl.style.display = 'none';
+
+    const radiusKm = data.radius_km || 40;
+    const radiusText = fmtDistance(radiusKm);
+    document.getElementById('flights-ring1-label').textContent = fmtDistance(radiusKm / 3);
+    document.getElementById('flights-ring2-label').textContent = fmtDistance(radiusKm * 2 / 3);
+    document.getElementById('flights-ring3-label').textContent = radiusText;
+    if (radiusEl) radiusEl.textContent = `Within ${radiusText} of your station`;
+
+    const aircraft = data.aircraft || [];
+    lastFlights = aircraft;
+    if (subEl) {
+        subEl.innerHTML = aircraft.length
+            ? `<span class="mini-live-dot"></span>${aircraft.length} within ${radiusText}`
+            : 'none right now';
+    }
+    emptyEl.style.display = aircraft.length ? 'none' : 'block';
+
+    // Radar blips -- plane glyph rotated to heading when known, plain dot
+    // otherwise (heading is genuinely absent for some state vectors).
+    document.getElementById('flights-radar-blips').innerHTML = aircraft.map(a => {
+        const r = Math.min(85, 85 * (a.distance_km / radiusKm));
+        const rad = a.bearing_deg * Math.PI / 180;
+        const x = 100 + r * Math.sin(rad);
+        const y = 100 - r * Math.cos(rad);
+        const shape = a.heading_deg != null
+            ? `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${a.heading_deg})"><path class="blip-plane" d="M0,-5 L3,3.5 L0,1.1 L-3,3.5 Z" /></g>`
+            : `<circle class="blip-plane" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" />`;
+        return shape;
+    }).join('');
+
+    // List -- nearest first (server already sorts by distance_km).
+    document.getElementById('flights-list').innerHTML = aircraft.map((a, i) => {
+        const alt = flightAltLabel(a.altitude_ft);
+        const trend = flightTrend(a.vrate_fpm);
+        const sub = [
+            `${fmtDistance(a.distance_km)} ${compassDir(a.bearing_deg)}`,
+            a.speed_kt != null ? `${a.speed_kt} kt` : null,
+        ].filter(Boolean).join(' &middot; ');
+        return `
+        <div class="flight-row">
+            <div class="flight-dot"></div>
+            <div class="flight-main">
+                <div class="flight-top">
+                    <button class="flight-call" onclick="openFlightDrawer(${i})">${escapeHtml(a.callsign)}</button>
+                    <span class="flight-type">${escapeHtml(a.category || '')}</span>
+                </div>
+                <div class="flight-sub">${sub}</div>
+            </div>
+            <div class="flight-alt">
+                <div class="flight-alt-val">${alt.val}${alt.unit ? `<span class="flight-alt-unit">${alt.unit}</span>` : ''}</div>
+                <div class="flight-trend ${trend.cls}">${trend.label}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function openFlightDrawer(i) {
+    const a = lastFlights[i];
+    if (!a) return;
+    closeAllDrawers();
+
+    const alt = flightAltLabel(a.altitude_ft);
+    const altText = alt.val + (alt.unit ? ' ' + alt.unit : '');
+    const ageSec = Math.max(0, Math.round(Date.now() / 1000 - (lastFlightsFetchedAt || Date.now() / 1000)));
+
+    document.getElementById('flights-drawer').innerHTML = `
+        <div class="hs-drawer-header">
+            <div class="hs-drawer-title-row">
+                <div class="hs-drawer-title"><span class="status-dot live"></span>${escapeHtml(a.callsign)}</div>
+                <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
+            </div>
+            <div class="hs-drawer-sub">${a.has_callsign ? `ICAO24 ${escapeHtml(a.icao24)}` : `No callsign transmitted &middot; ICAO24 ${escapeHtml(a.icao24)}`}${a.category ? ' &middot; ' + escapeHtml(a.category) : ''}</div>
+            <div class="hs-drawer-stats">
+                <span>Alt <b>${escapeHtml(altText)}</b></span>
+                <span>Speed <b>${a.speed_kt != null ? a.speed_kt + ' kt' : '—'}</b></span>
+                <span>Heading <b>${a.heading_deg != null ? a.heading_deg + '°' : '—'}</b></span>
+            </div>
+        </div>
+        <div class="hs-drawer-body">
+            <div class="hs-drawer-section" style="margin-top:2px">
+                <div class="hs-drawer-section-title"><span>Route</span></div>
+                <div class="fd-route-unknown">Not available &mdash; OpenSky's live position feed doesn't include route (origin/destination) or aircraft type/model, only position and flight-dynamics data. Check FlightAware below for the real route.</div>
+            </div>
+            <div class="hs-drawer-section">
+                <div class="hs-drawer-section-title"><span>Live position</span></div>
+                <div class="fd-kv"><span class="k">Distance / bearing</span><span class="v">${fmtDistance(a.distance_km)} ${compassDir(a.bearing_deg)}</span></div>
+                <div class="fd-kv"><span class="k">Position</span><span class="v">${a.lat.toFixed(4)}, ${a.lon.toFixed(4)}</span></div>
+                <div class="fd-kv"><span class="k">Vertical rate</span><span class="v">${a.vrate_fpm != null ? a.vrate_fpm.toLocaleString() + ' fpm' : '—'}</span></div>
+                <div class="fd-kv"><span class="k">Squawk</span><span class="v">${a.squawk ? escapeHtml(a.squawk) : '—'}</span></div>
+                <div class="fd-kv"><span class="k">Last update</span><span class="v">${ageSec}s ago</span></div>
+            </div>
+            <div class="hs-drawer-section">
+                <div class="hs-drawer-section-title">
+                    <span>Full track &amp; history</span>
+                    <a class="hs-settings-link" href="https://flightaware.com/live/flight/${encodeURIComponent(a.callsign)}" target="_blank" rel="noopener">FlightAware &rarr;</a>
+                </div>
+            </div>
+        </div>`;
+
+    document.getElementById('flights-drawer').classList.add('open');
+    document.getElementById('hs-drawer-backdrop').classList.add('open');
+}
+
+let lastFlightsFetchedAt = null;
+function fetchFlights() {
+    if (!SHOW_FLIGHTS_OVERHEAD) return;
+    fetch('/api/flights')
+        .then(r => r.json())
+        .then(data => {
+            lastFlightsFetchedAt = data.fetched_at || (Date.now() / 1000);
+            renderFlightsCard(data);
+        })
+        .catch(() => renderFlightsCard({ error: true }));
+}
+
+if (SHOW_FLIGHTS_OVERHEAD) {
+    fetchFlights();
+    setInterval(fetchFlights, FLIGHTS_POLL_MS);
 }
 
 // --- DigiPi card ---
@@ -7367,6 +7761,7 @@ function closeAllDrawers() {
     document.getElementById('settings-drawer').classList.remove('open');
     document.getElementById('camera-drawer').classList.remove('open');
     document.getElementById('asl-drawer').classList.remove('open');
+    document.getElementById('flights-drawer').classList.remove('open');
     document.getElementById('hs-drawer-backdrop').classList.remove('open');
 }
 function closeHotspotDrawer() { closeAllDrawers(); }

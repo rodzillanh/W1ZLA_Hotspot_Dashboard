@@ -35,6 +35,33 @@ elevation; an observer offset by a few hundred km computes a plausible
 mid-range elevation with range slightly greater than altitude, not
 equal to it. All three matched geometric expectations exactly.
 
+Each pass also gets a `visible` flag (v4.17) -- naked-eye visibility
+needs three things true at once: satellite above the horizon (already
+computed), satellite illuminated by the Sun (not in Earth's shadow),
+and the observer's sky dark enough (Sun below the horizon by at least
+nautical twilight). The Sun's position uses a standard low-precision
+solar-position formula (mean anomaly -> equation of center -> ecliptic
+longitude -> RA/Dec, ~0.01 deg accuracy -- aa.quae.nl's "Positions of
+the Sun", the same class of formula amateur satellite-tracking tools
+use for this exact purpose) rather than a full-precision ephemeris,
+which this use case doesn't need. Verified against a real published
+reference before trusting it, same discipline as the ISS ground-truth
+check above: computed sunset for Washington DC on a specific real date
+landed at 20:03 EDT, matching published almanac sunset times (~20:00-
+20:02 EDT for that date/location) to within a couple minutes -- exactly
+the kind of small, expected gap between a geometric center-of-sun-at-
+horizon crossing (what this computes) and a refraction-corrected
+almanac time (what gets published), not an error.
+
+Earth's shadow uses the standard cylindrical model (sun treated as
+infinitely distant, so shadow rays are parallel -- valid because
+Earth-Sun distance, ~150M km, utterly dwarfs LEO altitude/Earth radius,
+a few thousand km) -- confirmed against real eclipse-prediction
+literature before using it, not derived from scratch. SUN_TWILIGHT_
+ELEVATION_DEG (-6, nautical twilight) is the threshold CelesTrak's own
+"Visually Observing Earth Satellites" article and multiple independent
+satellite-observing references cite for "a visual pass is possible."
+
 DEFAULT_SATELLITES is a small, live-verified set, not a guess from
 memory -- satellite operational status changes over time (AO-92/FOX-1D
 looked like a reasonable "well known easy sat" from general ham radio
@@ -87,6 +114,8 @@ TRACK_HALF_SPAN_MIN = 45  # +/- minutes of ground track around "now" -- covers
                            # arbitrary short arc.
 TRACK_STEP_SECONDS = 60
 _EARTH_MEAN_RADIUS_KM = 6371.0
+_AU_KM = 1.495978707e8
+SUN_TWILIGHT_ELEVATION_DEG = -6.0  # nautical twilight -- see module docstring
 
 # name, mode, downlink MHz, uplink MHz (None if none/not applicable) -- see
 # module docstring for how/when each was verified.
@@ -180,6 +209,48 @@ def _elevation_azimuth(observer_ecef: tuple[float, float, float], observer_lat: 
     elevation = math.degrees(math.asin(u_comp / rng))
     azimuth = math.degrees(math.atan2(e_comp, n_comp)) % 360.0
     return elevation, azimuth, rng
+
+
+def _sun_teme_unit(jd: float, fr: float) -> tuple[float, float, float]:
+    """Low-precision Sun direction (~0.01 deg) -- see module docstring
+    for the formula's source and verification. Returned as a unit
+    vector in the same quasi-inertial frame as SGP4's TEME output (the
+    mean/true-equinox-of-date distinction is a few arcseconds, far
+    below what a twilight/shadow check needs)."""
+    d = (jd - 2451545.0) + fr
+    m = math.radians((357.5291 + 0.98560028 * d) % 360.0)
+    c = 1.9148 * math.sin(m) + 0.0200 * math.sin(2 * m) + 0.0003 * math.sin(3 * m)
+    lam = math.radians((math.degrees(m) + 102.9373 + c + 180.0) % 360.0)
+    eps = math.radians(23.4393)
+    ra = math.atan2(math.sin(lam) * math.cos(eps), math.cos(lam))
+    dec = math.asin(math.sin(lam) * math.sin(eps))
+    return math.cos(dec) * math.cos(ra), math.cos(dec) * math.sin(ra), math.sin(dec)
+
+
+def _is_illuminated(sat_teme_km: tuple[float, float, float], sun_unit: tuple[float, float, float]) -> bool:
+    """Cylindrical Earth-shadow model -- see module docstring."""
+    proj = (sat_teme_km[0] * sun_unit[0] + sat_teme_km[1] * sun_unit[1]
+            + sat_teme_km[2] * sun_unit[2])
+    if proj > 0:
+        return True  # on the sun side of Earth's center -- can't be in shadow
+    perp_x = sat_teme_km[0] - proj * sun_unit[0]
+    perp_y = sat_teme_km[1] - proj * sun_unit[1]
+    perp_z = sat_teme_km[2] - proj * sun_unit[2]
+    perp_dist = math.sqrt(perp_x * perp_x + perp_y * perp_y + perp_z * perp_z)
+    return perp_dist > _EARTH_MEAN_RADIUS_KM
+
+
+def _sun_elevation_deg(observer_ecef: tuple[float, float, float], observer_lat: float,
+                        observer_lon: float, sun_unit: tuple[float, float, float], theta: float) -> float:
+    """Sun's elevation at the observer, reusing _elevation_azimuth by
+    scaling the Sun's unit direction out to ~1 AU first -- at that
+    distance, the observer's few-thousand-km offset from Earth's center
+    is negligible parallax, so the topocentric result is effectively
+    the geocentric direction, which is exactly what's needed here."""
+    sun_teme_km = (sun_unit[0] * _AU_KM, sun_unit[1] * _AU_KM, sun_unit[2] * _AU_KM)
+    sun_ecef = _teme_to_ecef(*sun_teme_km, theta)
+    el, _az, _rng = _elevation_azimuth(observer_ecef, observer_lat, observer_lon, sun_ecef)
+    return el
 
 
 class SatelliteTracker:
@@ -327,6 +398,7 @@ class SatelliteTracker:
         aos_epoch = None
         aos_azimuth = None
         max_el = -90.0
+        visible = False
 
         t = start
         end = start + PASS_SEARCH_HOURS * 3600
@@ -345,8 +417,19 @@ class SatelliteTracker:
                 aos_epoch = t
                 aos_azimuth = az
                 max_el = el
+                visible = False
             elif in_pass:
                 max_el = max(max_el, el)
+                # Naked-eye visibility: satellite above horizon (true here),
+                # sunlit (not in Earth's shadow), AND the observer's sky dark
+                # enough (Sun below nautical twilight). Only bother checking
+                # once per pass (not visible yet) -- see module docstring.
+                if el >= 0 and not visible:
+                    sun_unit = _sun_teme_unit(jd, fr)
+                    if _is_illuminated(r, sun_unit):
+                        sun_el = _sun_elevation_deg(observer_ecef, observer_lat, observer_lon, sun_unit, theta)
+                        if sun_el < SUN_TWILIGHT_ELEVATION_DEG:
+                            visible = True
                 if el < 0:
                     if max_el >= MIN_PASS_ELEVATION:
                         passes.append({
@@ -365,6 +448,7 @@ class SatelliteTracker:
                             # granularity, plenty for a compass reading).
                             "aos_azimuth": round(aos_azimuth, 0),
                             "los_azimuth": round(az, 0),
+                            "visible": visible,
                         })
                     in_pass = False
                     max_el = -90.0
