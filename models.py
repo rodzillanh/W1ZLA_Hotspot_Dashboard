@@ -226,6 +226,19 @@ class HotspotStatus:
     # "netstate" WS message (openspot.py's _on_netstate). None for a
     # wired/Ethernet unit, same as wifi_rssi_dbm.
     wifi_ssid: Optional[str] = None
+    # openSPOT4's OWN built-in APRS-IS connection/messaging (the "APRS
+    # chat" feature on its own admin Status page) -- entirely separate
+    # from this app's own aprs_inbox.py/aprs_messaging.py, which maintain
+    # their OWN independent APRS-IS session under settings.json's own
+    # credentials. aprs_conn_state comes from an "aprsbgstate" WS message
+    # (confirmed live across a real connect cycle: "disconnected"/
+    # "connecting"/"connected" -- other raw values unseen, dropped rather
+    # than guessed at). aprs_messages is a bounded recent-activity list
+    # (openspot.py's _on_aprsmsg/_on_aprstxmsgwaitack/_on_aprstxmsggotack),
+    # each entry {direction: "in"/"out", callsign, text, ts, acked} --
+    # acked is only meaningful for outbound entries (None for inbound).
+    aprs_conn_state: Optional[str] = None
+    aprs_messages: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return asdict(self)

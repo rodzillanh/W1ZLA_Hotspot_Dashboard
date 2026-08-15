@@ -7542,11 +7542,32 @@ function openHotspotDrawer(ip) {
             </div>
             ${battWarnHtml}
         </div>` : '';
+        // openSPOT4's OWN built-in APRS-IS messaging ("APRS chat") --
+        // entirely separate from this dashboard's own APRS Messages
+        // Notifications source (aprs_inbox.py), which is this app's own
+        // independent APRS-IS session, not the device's. aprs_conn_state
+        // tracks the device's own connection specifically.
+        const aprsConnLabels = { disconnected: ['Disconnected', 'var(--text-dim)'], connecting: ['Connecting…', 'var(--caution)'], connected: ['Connected', 'var(--live)'] };
+        const aprsConn = aprsConnLabels[hs.aprs_conn_state];
+        const aprsMsgs = (hs.aprs_messages || []).slice().reverse(); // newest first
+        const aprsHtml = (aprsConn || aprsMsgs.length) ? `
+        <div class="hs-drawer-section" style="margin-top:10px">
+            <div class="hs-drawer-section-title" style="justify-content:space-between">
+                <span>APRS Messages</span>
+                ${aprsConn ? `<span style="text-transform:none;font-weight:400;font-size:11px;color:${aprsConn[1]}">● ${aprsConn[0]}</span>` : ''}
+            </div>
+            ${aprsMsgs.length ? aprsMsgs.map(m => `
+                <div class="hs-talker-row">
+                    <span class="hs-talker-call" style="color:${m.direction === 'out' ? 'var(--accent)' : 'var(--live)'}">${m.direction === 'out' ? '→' : '←'} ${escapeHtml(m.callsign)}</span>
+                    <span class="hs-talker-meta">${escapeHtml(m.text)}${m.direction === 'out' ? (m.acked ? ' ✓' : ' …') : ''}</span>
+                </div>`).join('') : '<div class="hs-empty-note">No APRS messages yet this session.</div>'}
+        </div>` : '';
         openspot4Html = `
         <div class="hs-drawer-section" style="margin-top:10px">
             <div class="hs-empty-note">openSPOT4 has no SSH log to show Recent talkers/Brandmeister/Update status from — it's push-based over its own WebSocket, and its live call state already shows directly on the card itself.</div>
         </div>
-        ${battHtml}`;
+        ${battHtml}
+        ${aprsHtml}`;
     }
 
     // openSPOT4 has no SSH host, so Temp/CPU stay "N/A" forever for this

@@ -96,6 +96,14 @@ _MODE_BY_PREFIX = {
     "c4fmct": "YSF",
 }
 
+# openSPOT4's own APRS-IS connection state -- confirmed live against a
+# real connect cycle (see _on_aprsbgstate). Only these three values seen.
+_APRS_BGSTATE_LABELS = {
+    -1: "disconnected",
+    0: "connecting",
+    2: "connected",
+}
+
 # Battery status -- confirmed live from real captured "log" messages on a
 # battery-powered openSPOT4, e.g.:
 #   "pwr: batt 52% est. 1h41m 3886mv usb 1500ma cpu 43.2°C chg 300ma"
@@ -375,6 +383,18 @@ class _OpenSpot4Worker:
         # immediately when a call starts, regardless of which message won
         # the race.
         self._recent_csd: dict = {}
+        # openSPOT4's own built-in APRS-IS messaging ("APRS chat") --
+        # bounded recent-activity log, persists across reconnects (not
+        # reset in _run_once, same as _finalized_call_ids/_recent_csd
+        # above -- it's a log of past activity, not per-connection state).
+        # _aprs_pending_acks maps a pending OUTBOUND message's own "id"
+        # (confirmed live, e.g. "00001") to the SAME dict object stored in
+        # _aprs_messages, so a later matching aprstxmsggotack can flip
+        # that entry's "acked" flag in place via O(1) lookup rather than
+        # a linear scan, without leaking the correlation id itself into
+        # the public-facing dict.
+        self._aprs_messages: deque = deque(maxlen=20)
+        self._aprs_pending_acks: dict = {}
         self._thread = threading.Thread(target=self._loop, daemon=True)
 
     def start(self) -> None:
@@ -448,6 +468,14 @@ class _OpenSpot4Worker:
             self._on_connectedto(msg)
         elif mtype == "netstate":
             self._on_netstate(msg)
+        elif mtype == "aprsbgstate":
+            self._on_aprsbgstate(msg)
+        elif mtype == "aprsmsg":
+            self._on_aprsmsg(msg)
+        elif mtype == "aprstxmsgwaitack":
+            self._on_aprstxmsgwaitack(msg)
+        elif mtype == "aprstxmsggotack":
+            self._on_aprstxmsggotack(msg)
         # "cptimeouts" IS confirmed live now ({"type":"cptimeouts","cp":0,
         # "cp_sec":0,"null_sec":0,"null_pdown":0}, periodic, always zero
         # so far) -- still not surfaced, since every field name is a
@@ -460,11 +488,13 @@ class _OpenSpot4Worker:
         # "log" text line and as their own structured "type" message.
         # A handful of other real, confirmed-live message types
         # (state/modemmode/connector/tmpnetconnstate/pocsagstate/
-        # pocsagmsgqueue/dapnetbgstate/aprsbgstate/fwuinfo/fwustate) are
-        # deliberately not handled either -- device-internal state,
-        # disabled features (POCSAG/DAPNET/APRS background state were all
-        # -1 in every real sample), or one-shot boot-time noise, none
-        # with an established dashboard need yet.
+        # pocsagmsgqueue/dapnetbgstate/fwuinfo/fwustate) are still
+        # deliberately not handled -- device-internal state, disabled
+        # features (POCSAG/DAPNET background state were both -1 in every
+        # real sample -- unlike "aprsbgstate", which turned out to mean
+        # something narrower than "is APRS enabled" and IS handled now,
+        # see _on_aprsbgstate), or one-shot boot-time noise, none with an
+        # established dashboard need yet.
 
     def _on_resp(self, msg: dict) -> None:
         """"resp" wraps MANY different query responses (rx/tx frequency,
@@ -546,6 +576,88 @@ class _OpenSpot4Worker:
         if not ssid:
             return
         self._monitor.apply_external_update(self._ip, {"wifi_ssid": ssid})
+
+    def _on_aprsbgstate(self, msg: dict) -> None:
+        """openSPOT4's OWN built-in APRS-IS connection state (the "APRS
+        chat" feature). Confirmed live across a real connect cycle, in
+        order: -1 right before "aprs: task terminating" (disconnected),
+        0 right as "aprs: init (callsign: ... server: ...)" fires
+        (connecting), 2 right after "aprs: connected to <host>:<port>
+        (<ip>)" (connected). Other raw values not seen -- dropped rather
+        than guessed at. Entirely separate from this app's OWN
+        aprs_inbox.py/aprs_messaging.py, which maintain their own
+        independent APRS-IS session under settings.json's own
+        credentials -- this is the DEVICE's own connection, not this
+        dashboard's."""
+        label = _APRS_BGSTATE_LABELS.get(msg.get("state"))
+        if label is None:
+            return
+        self._monitor.apply_external_update(self._ip, {"aprs_conn_state": label})
+
+    def _record_aprs_update(self) -> None:
+        self._monitor.apply_external_update(self._ip, {"aprs_messages": list(self._aprs_messages)})
+
+    def _on_aprsmsg(self, msg: dict) -> None:
+        """Confirmed live -- an inbound APRS message (a reply from WXBOT,
+        a weather-query bot, in the one real sample captured so far):
+          {"type":"aprsmsg","msg":{"is_outbound":0,"is_unconfirmed":0,
+           "callsign":"WXBOT","msg":"Manchester NH. Today,Sunny High 81",
+           "id":"","ts":1786791746}}
+        NOT confirmed whether this also fires for an unsolicited message
+        from someone who isn't replying to something sent first -- the
+        only real sample so far is a direct reply to an outbound query."""
+        inner = msg.get("msg")
+        if not isinstance(inner, dict) or inner.get("is_outbound"):
+            return
+        callsign = inner.get("callsign")
+        text = inner.get("msg")
+        if not callsign or text is None:
+            return
+        self._aprs_messages.append({
+            "direction": "in", "callsign": callsign, "text": text,
+            "ts": inner.get("ts"), "acked": None,
+        })
+        self._record_aprs_update()
+
+    def _on_aprstxmsgwaitack(self, msg: dict) -> None:
+        """Confirmed live -- fires right after WE send a message, while
+        the device waits for the recipient's ack:
+          {"type":"aprstxmsgwaitack","msg":{"is_outbound":1,
+           "is_unconfirmed":0,"callsign":"WXBOT","msg":"Lincoln NH",
+           "id":"00001","ts":1786791740},"remaining_sec":30}
+        "remaining_sec" (a countdown to giving up) isn't tracked -- not
+        useful on a several-second dashboard poll cadence."""
+        inner = msg.get("msg")
+        if not isinstance(inner, dict):
+            return
+        callsign = inner.get("callsign")
+        text = inner.get("msg")
+        msg_id = inner.get("id")
+        if not callsign or text is None:
+            return
+        entry = {
+            "direction": "out", "callsign": callsign, "text": text,
+            "ts": inner.get("ts"), "acked": False,
+        }
+        self._aprs_messages.append(entry)
+        if msg_id:
+            self._aprs_pending_acks[msg_id] = entry
+            if len(self._aprs_pending_acks) > 20:
+                self._aprs_pending_acks.pop(next(iter(self._aprs_pending_acks)))
+        self._record_aprs_update()
+
+    def _on_aprstxmsggotack(self, msg: dict) -> None:
+        """Confirmed live: {"type":"aprstxmsggotack","id":"00001"} --
+        "id" matches the "id" field inside an earlier aprstxmsgwaitack's
+        own "msg" dict. Flips that SAME entry's acked flag in place
+        (via _aprs_pending_acks' shared object reference) rather than
+        appending a new row -- an ack isn't a new message."""
+        msg_id = msg.get("id")
+        entry = self._aprs_pending_acks.pop(msg_id, None) if msg_id else None
+        if entry is None:
+            return  # no matching pending entry (e.g. worker started mid-flight) -- nothing to update
+        entry["acked"] = True
+        self._record_aprs_update()
 
     def _on_time(self, msg: dict) -> None:
         """Confirmed live:
