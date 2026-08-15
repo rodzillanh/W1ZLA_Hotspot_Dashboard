@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.21 "Wright"</span>
+                <span class="release-version">v4.22 "Rhoads"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed the active-call "VU meter" not reflecting real signal</span> — reported directly: it didn't look like it was tracking anything real. Confirmed why: openSPOT4's RSSI/BER fields stay completely empty for the entire duration of a real network-received DMR call (captured live), so the meter's fallback for that case — a hardcoded middle value, wobbling through a wide swing every tick regardless of whether anything had changed — had nothing real behind it whenever a call came in over the network, which is the common case for this device. Now prefers a genuinely live metric openSPOT4 already sends but this app was discarding (audio jitter-buffer depth, confirmed to update roughly once a second during a call), falling back to RSSI for hotspot types that only ever report that (WPSD). When no real reading exists at all, it shows an honest empty bar instead of guessing. The wobble itself shrank from a wide swing to a small, realistic jitter around the real value, which now holds steady between polls rather than continuously drifting</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.21 "Wright"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>openSPOT4's own built-in APRS messaging now shows on its drawer</span> — a live connection dot for the device's own APRS-IS session (its "APRS chat" feature, entirely separate from this dashboard's own independent APRS Messages notification source) plus a recent message log, in and out, with an ack indicator on sent messages. Every message shape and the connection-state values were confirmed against a real send/receive/ack round trip on a live device</li>

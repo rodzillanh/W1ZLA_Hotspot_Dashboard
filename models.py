@@ -239,6 +239,13 @@ class HotspotStatus:
     # acked is only meaningful for outbound entries (None for inbound).
     aprs_conn_state: Optional[str] = None
     aprs_messages: List[dict] = field(default_factory=list)
+    # Live audio jitter-buffer depth, from the "status" WS message's
+    # dejitter_buf_pkts (openspot.py's _on_status) -- real per-second data
+    # while a call is active, 0 at idle. Drives the card's VU meter for
+    # openSPOT4 in place of RSSI/BER, which are usually empty for a
+    # network-received call (confirmed live -- see dashboard.html's VU
+    # meter comment for the full story).
+    dejitter_pkts: Optional[int] = None
 
     def to_dict(self) -> dict:
         return asdict(self)

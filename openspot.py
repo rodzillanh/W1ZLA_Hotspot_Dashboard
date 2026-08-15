@@ -690,6 +690,19 @@ class _OpenSpot4Worker:
             updates["rssi"] = f"{rssi_vals[-1]} dBm"
         if ber_vals:
             updates["ber"] = f"{ber_vals[-1]}%"
+        # dejitter_buf_pkts -- confirmed live to hold real, actively-
+        # changing values while a call is in progress (e.g. [15,16,17,16,16]
+        # in one status tick), and a flat [0] at idle. Genuinely live audio
+        # buffer depth, unlike rssi_values_dbm/ber_values, which stayed
+        # completely empty for the ENTIRE duration of a real DMR call
+        # captured live (network-received calls apparently never populate
+        # those two fields at all -- see the card-side VU meter comment in
+        # dashboard.html for why this field exists at all). Takes the max
+        # of the tick's own sample array, same "most recent/most extreme
+        # sample" convention rssi/ber above already use with [-1].
+        dejitter_vals = status.get("dejitter_buf_pkts") or []
+        if dejitter_vals:
+            updates["dejitter_pkts"] = max(dejitter_vals)
         # Even an empty heartbeat is proof of life -- always touch the
         # monitor so the failure counter resets / status stays Online.
         self._monitor.apply_external_update(self._ip, updates)

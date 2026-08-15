@@ -3354,6 +3354,18 @@ function rssiColor(pct) {
     if (pct >= 30) return 'var(--caution)';
     return 'var(--danger)';
 }
+// Illustrative scale only, same "real value, uncalibrated ceiling" caveat
+// as rssiBarPct's -120..-60 dBm range above -- openSPOT4 doesn't document
+// a max audio jitter-buffer depth anywhere. 30 packets is a reasonable
+// ceiling chosen from real observed values (13-17 during a real live call,
+// 0 at idle), giving headroom rather than showing "maxed out" in ordinary
+// operation. See dejitter_pkts's own comment in models.py/openspot.py for
+// why this field exists at all (RSSI/BER stay empty for a typical
+// network-received openSPOT4 call, confirmed live).
+function dejitterBarPct(pkts) {
+    if (pkts === null || pkts === undefined) return null;
+    return Math.max(0, Math.min(100, (pkts / 30) * 100));
+}
 function berBarPct(str) {
     const m = /(\d+(?:\.\d+)?)/.exec(str || '');
     if (!m) return null;
@@ -3436,30 +3448,57 @@ function batteryMeterRow(hs) {
 }
 
 // --- VU meter (replaces the RSSI/BER line while a call is active) ---
+// v4.22 rework: the base level used to fall back to a hardcoded 0.5 when
+// no real reading was available, and wobbled through a wide swing (0.55x
+// to 1.10x the base, plus randomness) every 110ms regardless of whether
+// any new data had actually arrived -- reported as "doesn't seem to
+// reflect an actual signal." Confirmed why: openSPOT4's rssi_values_dbm/
+// ber_values stayed completely empty for the ENTIRE duration of a real
+// DMR call captured live (a network-received call apparently never
+// populates them at all), so hs.rssi just sat at "N/A" the whole time --
+// meaning the meter was animating around that fake fallback with nothing
+// real behind it whenever a call came in over the network, which is the
+// common case for this device. Fixed two ways: (1) prefer a real
+// dejitter-buffer reading (openSPOT4's own genuinely live audio-flow
+// metric, confirmed to update roughly once a second while a call is
+// active, unlike RSSI which is usually empty) over RSSI, falling back to
+// RSSI for hotspot types that only ever report that (WPSD); (2) if
+// NEITHER is available, show an honest empty bar instead of a fabricated
+// mid-level guess. The wobble itself also shrank from a wide swing to a
+// small one (~±10%), reading as realistic analog-meter jitter around a
+// real, currently-held level rather than motion implying a bigger change
+// than actually happened. The base level itself only changes when
+// renderCards() runs (every poll) and a genuinely new value has arrived --
+// it holds steady between polls rather than continuously drifting.
 const VU_SEGMENTS = 20;
-let activeVu = {};  // ip -> { rssiPct } for hotspots currently showing a VU meter
+let activeVu = {};  // ip -> { pct } for hotspots currently showing a VU meter -- pct is null if no real reading exists yet
 
 function vuMeterRow(ip) {
     const segs = Array.from({ length: VU_SEGMENTS }, () => '<span class="vu-seg"></span>').join('');
     return `<div class="vu-meter" id="vu-${ip}">${segs}</div>`;
 }
 
-// Anchored to each hotspot's own real RSSI reading (rssiBarPct), not fully
-// decorative -- a weak-signal call visibly tops out lower than a strong
-// one, jittered for a "live" look rather than a static bar.
 function paintVu(ip) {
     const el = document.getElementById('vu-' + ip);
     if (!el || !activeVu[ip]) return;
-    const rssiPct = activeVu[ip].rssiPct;
-    const base = rssiPct === null ? 0.5 : Math.max(0.15, Math.min(1, rssiPct / 100));
-    const phase = Date.now() / 260 + ip.length;  // per-ip offset so simultaneous calls don't sync up
-    const level = Math.max(0, Math.min(1, base * (0.55 + Math.abs(Math.sin(phase)) * 0.55 + Math.random() * 0.12)));
     const segs = el.querySelectorAll('.vu-seg');
+    const pct = activeVu[ip].pct;
+    if (pct === null) {
+        // No real reading available yet (e.g. the very first instant of a
+        // call, before the first status/log tick has arrived) -- an
+        // honest empty bar, not a fabricated mid-level guess.
+        segs.forEach(seg => { seg.style.background = 'var(--panel-2)'; });
+        return;
+    }
+    const base = Math.max(0, Math.min(1, pct / 100));
+    const phase = Date.now() / 260 + ip.length;  // per-ip offset so simultaneous calls don't sync up
+    const wobble = 0.92 + Math.abs(Math.sin(phase)) * 0.1 + (Math.random() - 0.5) * 0.06;
+    const level = Math.max(0, Math.min(1, base * wobble));
     const lit = Math.round(level * segs.length);
     segs.forEach((seg, i) => {
         if (i >= lit) { seg.style.background = 'var(--panel-2)'; return; }
-        const pct = i / segs.length;
-        seg.style.background = pct > 0.85 ? 'var(--danger)' : pct > 0.65 ? 'var(--caution)' : 'var(--good)';
+        const segPct = i / segs.length;
+        seg.style.background = segPct > 0.85 ? 'var(--danger)' : segPct > 0.65 ? 'var(--caution)' : 'var(--good)';
     });
 }
 
@@ -4126,15 +4165,21 @@ function renderCards(data) {
     if (cardsOuter) cardsOuter.classList.toggle('spotlight', SPOTLIGHT_DIMMING_ENABLED && activeCount > 0);
 
     // VU meter tracking -- which hotspots the fast tick loop (above) should
-    // animate, and the real RSSI reading each one anchors to. Paints
-    // immediately rather than waiting for the next scheduled tick (up to
-    // 110ms away) -- the innerHTML assignment above just created brand-new,
-    // blank .vu-seg elements for every active card, and without this the
-    // browser could paint that blank frame before the tick loop ever gets
-    // to it, showing as a flicker synced to every 3s poll.
+    // animate, and the real reading each one anchors to (dejitter-buffer
+    // depth when available -- openSPOT4's genuinely live audio-flow
+    // metric -- else RSSI, for hotspot types that only ever report that).
+    // Only ever set here, once per poll, so the level HOLDS STEADY between
+    // polls rather than drifting -- paintVu()'s own wobble is a small,
+    // realistic jitter around this real value, not a substitute for it.
+    // Paints immediately rather than waiting for the next scheduled tick
+    // (up to 110ms away) -- the innerHTML assignment above just created
+    // brand-new, blank .vu-seg elements for every active card, and without
+    // this the browser could paint that blank frame before the tick loop
+    // ever gets to it, showing as a flicker synced to every 3s poll.
     data.forEach(hs => {
         if (hs.is_active) {
-            activeVu[hs.ip] = { rssiPct: rssiBarPct(hs.rssi) };
+            const dejitterPct = dejitterBarPct(hs.dejitter_pkts);
+            activeVu[hs.ip] = { pct: dejitterPct !== null ? dejitterPct : rssiBarPct(hs.rssi) };
             paintVu(hs.ip);
         } else if (activeVu[hs.ip]) {
             delete activeVu[hs.ip];
