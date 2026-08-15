@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.19 "Buffett"</span>
+                <span class="release-version">v4.20 "Green"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>openSPOT4 cards now show real device telemetry that was previously invisible</span> — battery (percent, voltage, USB/charge current, estimated time remaining, board temperature, fault/low-input warnings), WiFi signal (RSSI, with the SSID as a hover tooltip), network round-trip latency, uptime, the currently active config profile (e.g. "Profile 1 (Brandmeister)"), and which reflector/room the connector is actually linked to right now, independent of an active call. None of this exists in openSPOT4's documented HTTP API — every field was found and verified against real captured WebSocket traffic from a live device, not guessed from field names</li>
+                <li><span>Fixed two real bugs surfaced while building the above</span> — the device replays its recent call history on every fresh WebSocket connection, terminated by a "calllogend" marker; the previous code had no way to tell that apart from a call genuinely just ending, so every reconnect could spuriously re-log stale historical activity into Fleet Activity with a "just happened" timestamp. Separately, DMR caller-ID resolution can arrive slightly *before* the call-start event it belongs to (confirmed via real captured timing) — previously silently dropped, delaying a caller's real name/callsign until a lucky second resolution arrived, sometimes not until the call was nearly over</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.19 "Buffett"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Flight detail drawer now shows real aircraft type and route</span> — via <a href="https://www.adsbdb.com" target="_blank" rel="noopener">adsbdb.com</a>, a free keyless API that fills in exactly the two gaps OpenSky's live feed doesn't cover (see the last release's note). Fetched on demand, only when you actually open a flight's drawer, not for the whole list every poll. Shows aircraft type/manufacturer/registration/owner, plus the callsign's usual origin → destination route with the airline name, when known — clearly labeled as "this callsign's usual route, not necessarily this exact flight's live plan" rather than overclaiming precision. GA/private traffic with no commercial route on file says so plainly instead of showing nothing</li>

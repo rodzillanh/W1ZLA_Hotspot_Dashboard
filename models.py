@@ -172,6 +172,60 @@ class HotspotStatus:
     dvswitch_live: Optional[dict] = None
     dvswitch_dmr_linked: Optional[bool] = None
     dvswitch_dstar_status: Optional[str] = None
+    # openSPOT4 battery -- only ever populated for type=="openspot4" hotspots
+    # running on battery power, sourced from a "pwr: batt ..." line in the
+    # SAME "log" WebSocket messages _MODE_LOG_RE already opportunistically
+    # reads a mode name from (see openspot.py's _BATTERY_LOG_RE / _on_log).
+    # Not in the documented HTTP API at all -- confirmed live, this only
+    # ever shows up in the live log stream. None for a mains-powered unit,
+    # which simply never emits this line.
+    battery_pct: Optional[int] = None
+    battery_mv: Optional[int] = None
+    battery_est_min: Optional[int] = None  # device's own estimated minutes remaining
+    battery_usb_ma: Optional[int] = None   # USB input current
+    battery_charge_ma: Optional[int] = None
+    battery_charging: Optional[bool] = None  # charge_ma > 0
+    battery_cpu_temp_c: Optional[float] = None  # device board temp, from the same "pwr:" line
+    # openSPOT4's own periodic "net-chk: ok (N ms)" round-trip check, from
+    # the SAME "log" WebSocket messages battery is sourced from (see
+    # openspot.py's _NET_CHK_LOG_RE). net_check_ms is None whenever
+    # net_check_ok is False (or unknown) -- a failed check has no
+    # meaningful latency to show.
+    net_check_ok: Optional[bool] = None
+    net_check_ms: Optional[int] = None
+    # From the structured "pwr" WebSocket message only (openspot.py's
+    # _on_pwr) -- the "pwr: batt ..." log-line scrape has no equivalent of
+    # these three, so they stay None until/unless that structured message
+    # has actually been seen for this device.
+    battery_detected: Optional[bool] = None
+    battery_fault: Optional[bool] = None
+    battery_low_curr: Optional[bool] = None  # underpowered USB input warning
+    # WiFi signal -- only ever set for a unit actually connected over WiFi
+    # (openspot.py's _on_wifirssi); stays None for a wired/Ethernet unit.
+    # wifi_ap_client's exact meaning is unconfirmed (see openspot.py) --
+    # kept as a raw passthrough, not interpreted into anything more
+    # specific.
+    wifi_rssi_dbm: Optional[int] = None
+    wifi_ap_client: Optional[int] = None
+    # openSPOT4's currently active config profile (Brandmeister/TGIF/YSF/
+    # ...), resolved from an unsolicited "resp" message the device pushes
+    # right after the WebSocket opens (openspot.py's _on_resp) -- confirmed
+    # to match the device's own admin UI's "Active config profile: N
+    # (Name)" display. active_config_profile_num is 1-indexed, matching
+    # that UI convention (not the raw 0-indexed active_cp value).
+    active_config_profile_num: Optional[int] = None
+    active_config_profile_name: Optional[str] = None
+    # openSPOT4's PERSISTENT connector-level link (which reflector/room/
+    # master it's connected to right now, independent of an active call)
+    # -- from an unsolicited "connectedto" WS message (openspot.py's
+    # _on_connectedto). Deliberately separate from `talkgroup` (call-
+    # scoped, set only during an active call).
+    connector_target: Optional[str] = None   # e.g. "YSF 32592"
+    connector_server: Optional[str] = None   # e.g. "americalink.radiotechnology.xyz"
+    # Which WiFi network wifi_rssi_dbm is actually measuring -- from a
+    # "netstate" WS message (openspot.py's _on_netstate). None for a
+    # wired/Ethernet unit, same as wifi_rssi_dbm.
+    wifi_ssid: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)

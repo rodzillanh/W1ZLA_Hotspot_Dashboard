@@ -3395,6 +3395,40 @@ function rssiBerMeterRow(rssiStr, berStr) {
     return `<div class="meter-row-combined">${rssiHalf}${berHalf}</div>`;
 }
 
+// --- openSPOT4 battery (v4.14) -- only ever present on a battery-powered
+// unit; a mains-powered device never emits the "pwr: batt ..." log line
+// this is sourced from (see openspot.py), so battery_pct stays null/
+// undefined for it and this row is simply omitted.
+function batteryColor(pct) {
+    if (pct >= 50) return 'var(--good)';
+    if (pct >= 20) return 'var(--caution)';
+    return 'var(--danger)';
+}
+function fmtBatteryEst(min) {
+    if (min === null || min === undefined) return '';
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+function batteryMeterRow(hs) {
+    if (hs.battery_pct === null || hs.battery_pct === undefined) return '';
+    const pct = hs.battery_pct;
+    const estTxt = fmtBatteryEst(hs.battery_est_min);
+    const chgIcon = hs.battery_charging ? ' ⚡' : '';
+    const titleBits = [];
+    if (estTxt) titleBits.push(`${estTxt} remaining`);
+    if (hs.battery_mv !== null && hs.battery_mv !== undefined) titleBits.push(`${(hs.battery_mv / 1000).toFixed(2)}V`);
+    if (hs.battery_usb_ma !== null && hs.battery_usb_ma !== undefined) titleBits.push(`USB ${hs.battery_usb_ma}mA`);
+    const title = titleBits.join(' · ');
+    return `<div class="meter-row-combined">
+        <div class="meter-half"${title ? ` title="${escapeHtml(title)}"` : ''}>
+            <span class="meter-label">🔋</span>
+            <span class="meter-track"><span class="meter-fill" style="width:${pct}%;background:${batteryColor(pct)}"></span></span>
+            <span class="meter-val">${pct}%${chgIcon}</span>
+        </div>
+    </div>`;
+}
+
 // --- VU meter (replaces the RSSI/BER line while a call is active) ---
 const VU_SEGMENTS = 20;
 let activeVu = {};  // ip -> { rssiPct } for hotspots currently showing a VU meter
@@ -3850,6 +3884,11 @@ function renderCards(data) {
         const identityBits = [
             (hs.hotspot_callsign && hs.hotspot_callsign !== 'N/A') ? hs.hotspot_callsign : '',
             (hs.hotspot_location && hs.hotspot_location !== 'N/A') ? hs.hotspot_location : '',
+            // openSPOT4 has neither of the above (no /etc/mmdvmhost to read)
+            // -- its active config profile fills the same otherwise-empty
+            // identity line instead.
+            (isOpenSpot4 && hs.active_config_profile_name)
+                ? `Profile: ${hs.active_config_profile_name}` : '',
         ].filter(Boolean);
         const identityLine = identityBits.length
             ? `<div class="card-identity">${identityBits.join(' · ')}</div>`
@@ -3929,6 +3968,7 @@ function renderCards(data) {
                      <div>Mode: <span class="stat-val">${hs.mode}</span></div>
                      ${hs.frequency && hs.frequency !== 'N/A' ? `<div>Freq: <span class="stat-val">${hs.frequency}${hs.duplex && hs.duplex !== 'N/A' ? ' (' + hs.duplex + ')' : ''}</span></div>` : ''}
                      ${hs.is_active ? vuMeterRow(hs.ip) : rssiBerMeterRow(hs.rssi, hs.ber)}
+                     ${batteryMeterRow(hs)}
                      ${hs.bm_status_text
                          ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
                    </div>`
@@ -7309,6 +7349,16 @@ function openHotspotDrawer(ip) {
         (hs.hotspot_location && hs.hotspot_location !== 'N/A') ? hs.hotspot_location : '',
     ].filter(Boolean);
     if (isAsl && hs.asl_node) identityBits.unshift('Node ' + hs.asl_node);
+    // Connected-to is the PERSISTENT connector-level link (reflector/room),
+    // independent of whether a call is active right now -- distinct from
+    // hs.talkgroup, which is call-scoped and only meaningful during/right
+    // after an active call.
+    if (isOpenSpot4 && hs.connector_target) {
+        identityBits.unshift(`Connected: ${hs.connector_target}`);
+    }
+    if (isOpenSpot4 && hs.active_config_profile_name) {
+        identityBits.unshift(`Profile ${hs.active_config_profile_num} (${hs.active_config_profile_name})`);
+    }
     const subLine = [ip, ...identityBits].join(' · ');
 
     let talkersHtml = '';
@@ -7466,11 +7516,63 @@ function openHotspotDrawer(ip) {
 
     let openspot4Html = '';
     if (isOpenSpot4) {
+        const hasBattery = hs.battery_pct !== null && hs.battery_pct !== undefined;
+        // Fault/low_curr only ever arrive via the structured "pwr" message
+        // (see openspot.py's _on_pwr) -- the log-line scrape has no
+        // equivalent of either, so both simply stay null/undefined until
+        // that message type has actually been seen for this device.
+        const battWarnBits = [
+            hs.battery_fault ? 'Battery fault reported' : '',
+            hs.battery_low_curr ? 'Low input current (underpowered USB supply?)' : '',
+        ].filter(Boolean);
+        const battWarnHtml = battWarnBits.length
+            ? `<div class="hs-bm-status" style="margin-top:4px;color:var(--danger)">⚠ ${battWarnBits.join(' · ')}</div>` : '';
+        const battHtml = hasBattery ? `
+        <div class="hs-drawer-section" style="margin-top:10px">
+            <div class="hs-drawer-section-title">Battery</div>
+            <div class="meter-row-combined">
+                <div class="meter-half">
+                    <span class="meter-label">🔋</span>
+                    <span class="meter-track"><span class="meter-fill" style="width:${hs.battery_pct}%;background:${batteryColor(hs.battery_pct)}"></span></span>
+                    <span class="meter-val">${hs.battery_pct}%${hs.battery_charging ? ' ⚡ charging' : ''}</span>
+                </div>
+            </div>
+            <div class="hs-bm-status" style="margin-top:6px">
+                ${fmtBatteryEst(hs.battery_est_min) ? `${fmtBatteryEst(hs.battery_est_min)} remaining · ` : ''}${(hs.battery_mv / 1000).toFixed(2)}V · USB ${hs.battery_usb_ma}mA${hs.battery_charging ? ` · charging ${hs.battery_charge_ma}mA` : ''}
+            </div>
+            ${battWarnHtml}
+        </div>` : '';
         openspot4Html = `
         <div class="hs-drawer-section" style="margin-top:10px">
             <div class="hs-empty-note">openSPOT4 has no SSH log to show Recent talkers/Brandmeister/Update status from — it's push-based over its own WebSocket, and its live call state already shows directly on the card itself.</div>
-        </div>`;
+        </div>
+        ${battHtml}`;
     }
+
+    // openSPOT4 has no SSH host, so Temp/CPU stay "N/A" forever for this
+    // type -- Uptime CAN populate now (from the "time" WS message's own
+    // "up" field, see openspot.py's _on_time), same `hs.uptime` field/
+    // fmtUptime() every other type already uses. Swap the whole row for
+    // whatever openSPOT4-native stats have actually arrived over the
+    // WebSocket so far instead of the generic Uptime/Temp/CPU row,
+    // falling back to that plain row (still N/A for Temp/CPU, but not
+    // blank) until at least one of these has shown up.
+    const os4StatsBits = isOpenSpot4 ? [
+        (hs.uptime && hs.uptime !== 'Unknown')
+            ? `<span>Uptime <b>${escapeHtml(fmtUptime(hs.uptime))}</b></span>` : '',
+        (hs.battery_pct !== null && hs.battery_pct !== undefined)
+            ? `<span>Battery <b>${hs.battery_pct}%${hs.battery_charging ? ' ⚡' : ''}</b></span>` : '',
+        (hs.wifi_rssi_dbm !== null && hs.wifi_rssi_dbm !== undefined)
+            ? `<span${hs.wifi_ssid ? ` title="${escapeHtml(hs.wifi_ssid)}"` : ''}>WiFi <b>${hs.wifi_rssi_dbm} dBm</b></span>` : '',
+        (hs.net_check_ms !== null && hs.net_check_ms !== undefined)
+            ? `<span>Network <b>${hs.net_check_ms}ms</b></span>` : '',
+        (hs.battery_cpu_temp_c !== null && hs.battery_cpu_temp_c !== undefined)
+            ? `<span>Board temp <b>${hs.battery_cpu_temp_c}°C</b></span>` : '',
+    ].filter(Boolean).join('') : '';
+    const drawerStatsHtml = os4StatsBits || `
+                <span>Uptime <b>${escapeHtml(fmtUptime(hs.uptime))}</b></span>
+                <span>Temp <b>${escapeHtml(hs.temperature)}</b></span>
+                <span>CPU <b>${escapeHtml(hs.cpu)}</b></span>`;
 
     document.getElementById('hs-drawer').innerHTML = `
         <div class="hs-drawer-header">
@@ -7479,11 +7581,7 @@ function openHotspotDrawer(ip) {
                 <div class="hs-drawer-close" onclick="closeHotspotDrawer()">✕</div>
             </div>
             <div class="hs-drawer-sub">${escapeHtml(subLine)}</div>
-            <div class="hs-drawer-stats">
-                <span>Uptime <b>${escapeHtml(fmtUptime(hs.uptime))}</b></span>
-                <span>Temp <b>${escapeHtml(hs.temperature)}</b></span>
-                <span>CPU <b>${escapeHtml(hs.cpu)}</b></span>
-            </div>
+            <div class="hs-drawer-stats">${drawerStatsHtml}</div>
         </div>
         <div class="hs-drawer-body">
             <div class="hs-drawer-section-title" style="margin-top:2px;justify-content:space-between">

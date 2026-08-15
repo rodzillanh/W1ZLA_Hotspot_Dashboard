@@ -96,6 +96,110 @@ _MODE_BY_PREFIX = {
     "c4fmct": "YSF",
 }
 
+# Battery status -- confirmed live from real captured "log" messages on a
+# battery-powered openSPOT4, e.g.:
+#   "pwr: batt 52% est. 1h41m 3886mv usb 1500ma cpu 43.2°C chg 300ma"
+#   "pwr: batt 100% 4149mv usb 1500ma cpu 30.0°C chg 0ma"
+# Not in the documented HTTP API at all (checked info.cgi/status.cgi/ip.cgi
+# -- no battery field anywhere); this line only ever appears in the same
+# live "log" WebSocket message _MODE_LOG_RE already opportunistically reads
+# a mode name from, so it's parsed alongside that in _on_log rather than as
+# a separate message type. The ENTIRE "est. XhXXm" clause is optional, not
+# just its h/m halves -- confirmed by the second real sample above, captured
+# at 100% with no discharge estimate at all (nothing to estimate towards
+# when not discharging). An earlier version of this regex required "est."
+# literally, which meant that specific, common, healthy-battery state
+# matched NOTHING and silently dropped battery reporting entirely -- a real
+# regression caught from this second sample, not a hypothetical edge case.
+# The temp field's trailing unit is matched as "\S*C" rather than a literal
+# "°C" -- one captured log file had the degree sign mangled to "Â°C" by
+# whatever process saved it to a text file (a classic UTF-8-read-as-
+# Latin-1 artifact), so matching loosely up to the next literal "C" is
+# robust to that without caring what's actually in between.
+_BATTERY_LOG_RE = re.compile(
+    r"pwr:\s*batt\s+(?P<pct>\d+)%\s+"
+    r"(?:(?P<est>est\.\s+(?:(?P<est_h>\d+)h)?(?:(?P<est_m>\d+)m)?)\s+)?"
+    r"(?P<mv>\d+)mv\s+usb\s+(?P<usb_ma>\d+)ma\s+cpu\s+(?P<temp>[\d.]+)\S*C\s+"
+    r"chg\s+(?P<chg_ma>\d+)ma"
+)
+
+
+def _parse_battery_line(text: str) -> "dict | None":
+    m = _BATTERY_LOG_RE.search(text)
+    if not m:
+        return None
+    if m.group("est"):
+        est_h = int(m.group("est_h") or 0)
+        est_m = int(m.group("est_m") or 0)
+        est_min = est_h * 60 + est_m
+    else:
+        est_min = None  # no discharge estimate given -- NOT the same as "0 minutes left"
+    chg_ma = int(m.group("chg_ma"))
+    return {
+        "battery_pct": int(m.group("pct")),
+        "battery_est_min": est_min,
+        "battery_mv": int(m.group("mv")),
+        "battery_usb_ma": int(m.group("usb_ma")),
+        "battery_charge_ma": chg_ma,
+        "battery_charging": chg_ma > 0,
+        "battery_cpu_temp_c": float(m.group("temp")),
+    }
+
+
+# Network round-trip check -- also a plain "log" line, confirmed live:
+#   "net-chk: ok (25 ms)"
+# openspot.py's own _handle_message() already knew about a separate,
+# structured "netchk" message TYPE (see the comment there) and deliberately
+# left it unsurfaced "in this first pass" -- this is that same signal,
+# just read off the human-readable log line instead, the same way battery
+# and mode are. Only the "ok (N ms)" success shape has been seen in a real
+# capture; anything else (a real failure line's exact wording is
+# unconfirmed) is recorded as a non-ok check with no latency rather than
+# guessed at.
+_NET_CHK_LOG_RE = re.compile(r"net-chk:\s*(?P<status>\S+)(?:\s*\((?P<ms>\d+)\s*ms\))?")
+
+
+def _parse_net_check_line(text: str) -> "dict | None":
+    m = _NET_CHK_LOG_RE.search(text)
+    if not m:
+        return None
+    ok = m.group("status").lower() == "ok"
+    ms = int(m.group("ms")) if (ok and m.group("ms")) else None
+    return {"net_check_ok": ok, "net_check_ms": ms}
+
+
+_LEADING_FLOAT_RE = re.compile(r"[\d.]+")
+
+
+def _parse_leading_float(s) -> "float | None":
+    """Pulls the leading number off a value like "32.2°C" -- used for the
+    structured "pwr" message's cpu_temp field, which (unlike the log
+    line's bare number) arrives as a pre-formatted string with its unit
+    already attached."""
+    if not s:
+        return None
+    m = _LEADING_FLOAT_RE.match(str(s))
+    return float(m.group()) if m else None
+
+
+def _format_uptime_pretty(total_seconds) -> str:
+    """Mimics `uptime -p`'s wording closely enough for dashboard.html's
+    fmtUptime() regex, which just looks for "<N> day"/"<N> hour"/
+    "<N> minute" substrings -- singular/plural doesn't matter to it, so
+    this doesn't need to reproduce procps' exact grammar rules, just the
+    same unit words in the same order, dropping zero-value components."""
+    days, rem = divmod(int(total_seconds), 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes = rem // 60
+    parts = []
+    if days:
+        parts.append(f"{days} day{'s' if days != 1 else ''}")
+    if hours:
+        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+    if minutes or not parts:
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+    return ", ".join(parts)
+
 
 def _mode_for_prefix(prefix: str) -> str:
     if prefix in _MODE_BY_PREFIX:
@@ -236,12 +340,41 @@ class _OpenSpot4Worker:
         self._monitor = monitor
         self._stop_event = threading.Event()
         self._active_call: dict | None = None  # {"id","src","dst"} for the one in-flight call this device is tracking
+        # Confirmed live: right after the WS opens, the device replays
+        # several PAST calllog entries (src=="openSPOT4" -- its own
+        # identity, not a real caller -- for the ones observed so far, but
+        # not assumed to always be, see _on_calllog), terminated by a
+        # {"type":"calllogend"} marker. Until that marker arrives on THIS
+        # connection, calllog entries are history, not new events -- see
+        # _on_calllog's own guard. Reset per-connection in _run_once(),
+        # same as _active_call above.
+        self._replay_done = False
         # calllog entries get rebroadcast periodically even after a call has
         # ended (observed live: the same id/duration pair re-appearing
         # ~10s later, unchanged) -- dedupe so a rebroadcast doesn't
         # re-trigger "call ended" processing (re-logging Fleet activity,
         # re-touching last_heard, etc.) every time it re-arrives.
         self._finalized_call_ids: deque = deque(maxlen=50)
+        # DMR ID (str) -> (callsign, name), bounded LRU-ish cache. Real,
+        # previously-shipped bug found from a full real call-cycle capture:
+        # "csd" (the message that resolves a DMR ID to a callsign) arrived
+        # BEFORE the matching calllog "call started" event, both at the
+        # call's start AND again near its end -- the "csd: dmr id ... query
+        # took 60ms" log line confirms the device kicks off the ID lookup
+        # the instant it sees the call start internally, ahead of sending
+        # either JSON message to this app. The original _on_csd only ever
+        # applied its enrichment if self._active_call was ALREADY set, so
+        # that first, early csd was silently dropped every time -- the
+        # caller's real name/callsign wouldn't show up until a SECOND csd
+        # happened to arrive later (in the captured example: not until
+        # 06:56:45.629, for a call that started at 06:56:34.995 and ended
+        # at 06:56:45.691 -- the bare DMR ID would have shown for nearly
+        # the entire ~10.7s call). Fixed by caching every resolved DMR ID
+        # here unconditionally
+        # (see _on_csd), and having _apply_call_start check this cache
+        # immediately when a call starts, regardless of which message won
+        # the race.
+        self._recent_csd: dict = {}
         self._thread = threading.Thread(target=self._loop, daemon=True)
 
     def start(self) -> None:
@@ -273,6 +406,7 @@ class _OpenSpot4Worker:
         )
         try:
             self._active_call = None
+            self._replay_done = False
             while not self._stop_event.is_set():
                 raw = ws.recv()
                 if isinstance(raw, bytes):
@@ -300,8 +434,140 @@ class _OpenSpot4Worker:
             self._on_csd(msg)
         elif mtype == "calllog":
             self._on_calllog(msg)
-        # "wifirssi", "netchk", "cptimeouts" are intentionally not
-        # surfaced on the dashboard card in this first pass.
+        elif mtype == "calllogend":
+            self._on_calllogend(msg)
+        elif mtype == "pwr":
+            self._on_pwr(msg)
+        elif mtype == "wifirssi":
+            self._on_wifirssi(msg)
+        elif mtype == "resp":
+            self._on_resp(msg)
+        elif mtype == "time":
+            self._on_time(msg)
+        elif mtype == "connectedto":
+            self._on_connectedto(msg)
+        elif mtype == "netstate":
+            self._on_netstate(msg)
+        # "cptimeouts" IS confirmed live now ({"type":"cptimeouts","cp":0,
+        # "cp_sec":0,"null_sec":0,"null_pdown":0}, periodic, always zero
+        # so far) -- still not surfaced, since every field name is a
+        # cryptic abbreviation and every real sample has been all-zero,
+        # so there's no contrasting value to confirm what any of them
+        # actually mean. "netchk" isn't a separate message type at all as
+        # far as any real capture has shown -- it only ever appears as a
+        # "net-chk: ok (N ms)" LOG line (see _NET_CHK_LOG_RE in _on_log),
+        # unlike "pwr"/"wifirssi" which are confirmed to arrive BOTH as a
+        # "log" text line and as their own structured "type" message.
+        # A handful of other real, confirmed-live message types
+        # (state/modemmode/connector/tmpnetconnstate/pocsagstate/
+        # pocsagmsgqueue/dapnetbgstate/aprsbgstate/fwuinfo/fwustate) are
+        # deliberately not handled either -- device-internal state,
+        # disabled features (POCSAG/DAPNET/APRS background state were all
+        # -1 in every real sample), or one-shot boot-time noise, none
+        # with an established dashboard need yet.
+
+    def _on_resp(self, msg: dict) -> None:
+        """"resp" wraps MANY different query responses (rx/tx frequency,
+        homebrew/bmm settings, etc.), correlated by a per-request "id" that
+        is NOT stable across connections -- confirmed live, the same
+        cp_names/active_cp shape arrived under two different id values
+        (62345, then 7703) on two separate page loads. So this reacts to
+        the specific SHAPE of the response ("cp_names" present), not any
+        fixed id.
+        Confirmed live, arriving UNSOLICITED as part of a batch of ~11
+        "resp" messages the device pushes automatically right after the WS
+        opens -- this worker never sends a "get" for it and still receives
+        it, so no outbound message is needed on this app's side:
+          {"type":"resp","id":62345,"resp":{"reboot":0,"active_cp":0,
+           "timeoutchange_cp":0,"rxtimeout_sec":0,"rxtimeout_mode":0,
+           "active_cp_hostname":"openspot4","cp_names":["Brandmeister",
+           "TGIF","YSF","profile #4","profile #5","profile #6",
+           "profile #7","profile #8","profile #9","profile #10"],
+           "always_boot_p0":0},"code":200}
+        "active_cp" is a 0-indexed position into cp_names -- confirmed
+        against the device's OWN admin UI, which showed "Active config
+        profile: 1 (Brandmeister)" for this exact active_cp:0/
+        cp_names[0]=="Brandmeister" state (the UI displays the 1-indexed
+        position, +1 over the raw value)."""
+        resp = msg.get("resp")
+        if not isinstance(resp, dict) or "cp_names" not in resp:
+            return
+        names = resp.get("cp_names") or []
+        idx = resp.get("active_cp")
+        if not isinstance(idx, int) or not (0 <= idx < len(names)):
+            return
+        self._monitor.apply_external_update(self._ip, {
+            "active_config_profile_num": idx + 1,
+            "active_config_profile_name": names[idx],
+        })
+
+    def _on_calllogend(self, _msg: dict) -> None:
+        """Marks the end of the connect-time calllog HISTORY replay (see
+        _on_calllog's own docstring for the bug this fixes) -- everything
+        received after this point is a genuinely live event."""
+        self._replay_done = True
+
+    def _on_connectedto(self, msg: dict) -> None:
+        """Confirmed live: {"type":"connectedto","to":"YSF 32592",
+        "server":"americalink.radiotechnology.xyz","primary":1,
+        "read_only":0}. Tells us what reflector/room/master this device
+        is CURRENTLY CONNECTED TO, independent of whether a call is
+        active -- something openSPOT4 had no equivalent of on this
+        dashboard before. Deliberately kept separate from `talkgroup`
+        (set by _apply_call_start, call-scoped and can go briefly stale
+        after a call ends since _on_calllog's final branch doesn't touch
+        it) -- this is the persistent connector-level link, not a
+        specific call's destination, same distinction DMR's static
+        Brandmeister talkgroup link (app.py's bm_static_tgs) has versus
+        its own live talkgroup."""
+        to = msg.get("to")
+        if not to:
+            return
+        self._monitor.apply_external_update(self._ip, {
+            "connector_target": to,
+            "connector_server": msg.get("server"),
+        })
+
+    def _on_netstate(self, msg: dict) -> None:
+        """Confirmed live: {"type":"netstate","data":{"connected":1,
+        "ap_mode":0,"ssid":"Sanctuary24-5g","bssid":"18:e8:29:c4:4e:11",
+        "chnr":11,"sec":"wpa2","phy":"bgn","static_ip":0,
+        "ip":"192.168.156.242","mask":"255.255.255.0","gw":"...",
+        "ip6":[],"ip6_enabled":0,"static_dns":0,"dns1":"...","dns2":"...",
+        "regdom":"FCC"}}. Only "ssid" is surfaced for now -- gives the
+        bare wifi_rssi_dbm number actual context (which network it's
+        even measuring). The rest (IP/gateway/DNS/regdom/security) is
+        real but not surfaced -- no established dashboard need for it
+        beyond this."""
+        data = msg.get("data")
+        if not isinstance(data, dict):
+            return
+        ssid = data.get("ssid")
+        if not ssid:
+            return
+        self._monitor.apply_external_update(self._ip, {"wifi_ssid": ssid})
+
+    def _on_time(self, msg: dict) -> None:
+        """Confirmed live:
+          {"type":"time","now":1786790012,"up":2307,
+           "ntp_last_synced_at":1786787710,"ntp_synced_host":"pool.ntp.org",
+           "tzoffset":-14400}
+        "up" is the device's own uptime in seconds -- fills a real gap,
+        since openSPOT4 has no SSH and its uptime badge/drawer stat has
+        never had any data source before this. Formatted into the SAME
+        shape monitor.py's WPSD/ASL3 paths already store on `uptime`
+        (Linux `uptime -p`'s wording, minus its leading "up " -- see
+        config._LINUX_HOST_STATS_CMD / monitor.py's `output[1].replace
+        ("up ", "")`), so this reuses every existing `hs.uptime` consumer
+        (the card's own uptime badge, fmtUptime(), the drawer's fallback
+        header stats row) with no changes needed there. Only "now"/
+        "ntp_*"/"tzoffset" are ignored -- this app already has its own
+        server clock, and NTP sync health isn't worth surfacing yet
+        without a reported need."""
+        up = msg.get("up")
+        if not isinstance(up, (int, float)):
+            return
+        self._monitor.apply_external_update(self._ip, {"uptime": _format_uptime_pretty(up)})
 
     def _on_status(self, msg: dict) -> None:
         status = msg.get("status") or {}
@@ -316,18 +582,91 @@ class _OpenSpot4Worker:
         # monitor so the failure counter resets / status stays Online.
         self._monitor.apply_external_update(self._ip, updates)
 
+    def _on_pwr(self, msg: dict) -> None:
+        """Confirmed live as a genuine structured message, e.g.:
+          {"type":"pwr","detected":1,"charging":0,"charge_heat_err":0,
+           "fault":0,"low_curr":0,"curr_ma":1500,"percent":100,"mv":4149,
+           "cpu_temp":"32.2°C","remaining_min":0}
+        Strictly better than the "pwr: batt ..." log-line scrape
+        (_parse_battery_line) -- real booleans, no regex, and it exposes
+        fault/low_curr/charge_heat_err diagnostics the log line doesn't
+        have at all -- but kept as an ADDITIONAL source alongside the log
+        line rather than a replacement, since only one real sample of this
+        message has been captured so far and it's unconfirmed whether
+        every firmware build emits it. Both target the same battery_*
+        fields; if both fire for the same tick it's just a harmless
+        redundant write of identical values.
+        Note: "curr_ma" matches the log line's "usb <n>ma" (input current),
+        NOT its separate "chg <n>ma" (charge current) -- this message has
+        no equivalent of that second figure, so battery_charge_ma is left
+        untouched here rather than guessed from curr_ma.
+        remaining_min was 0 in the one real sample, on a fully charged
+        (100%), non-charging unit -- treated the same as the log line's
+        own "est. clause absent" case (None, not "0 minutes left"). NOT
+        yet confirmed what this looks like while genuinely discharging
+        with a real estimate -- re-verify against a low-battery capture
+        if one ever turns up.
+        """
+        if "percent" not in msg:
+            return
+        remaining = msg.get("remaining_min")
+        updates = {
+            "battery_pct": msg.get("percent"),
+            "battery_est_min": remaining if remaining else None,
+            "battery_mv": msg.get("mv"),
+            "battery_usb_ma": msg.get("curr_ma"),
+            "battery_charging": bool(msg.get("charging")),
+            "battery_cpu_temp_c": _parse_leading_float(msg.get("cpu_temp")),
+        }
+        if "detected" in msg:
+            updates["battery_detected"] = bool(msg.get("detected"))
+        if "fault" in msg:
+            updates["battery_fault"] = bool(msg.get("fault"))
+        if "low_curr" in msg:
+            updates["battery_low_curr"] = bool(msg.get("low_curr"))
+        self._monitor.apply_external_update(self._ip, updates)
+
+    def _on_wifirssi(self, msg: dict) -> None:
+        """Confirmed live, twice: {"type":"wifirssi","dbm":-69,"apclient":0}
+        and {"type":"wifirssi","dbm":-68,"apclient":0}. "dbm" is
+        unambiguous (WiFi signal strength). "apclient"'s exact meaning is
+        NOT confirmed -- both real samples had it 0, so there's no
+        contrasting value to infer from yet -- passed through raw rather
+        than interpreted as a bool/count with unproven semantics. Only
+        ever expected on a unit actually connected over WiFi; a
+        wired/Ethernet unit presumably never emits this at all, same
+        "absence means not applicable" convention as battery_* above."""
+        if "dbm" not in msg:
+            return
+        self._monitor.apply_external_update(self._ip, {
+            "wifi_rssi_dbm": msg.get("dbm"),
+            "wifi_ap_client": msg.get("apclient"),
+        })
+
     def _on_log(self, text: str) -> None:
-        """Only used to opportunistically learn the human mode name (DMR/
-        YSF/...) from whichever mode's own "<x>ct:" log line happens to
-        show up -- call lifecycle itself is driven by _on_calllog, not
-        this. Deliberately doesn't try to parse anything past the prefix
-        (dst/src/dur/ber/etc. all come from calllog instead, in a
-        consistent shape across modes, unlike these log lines which
-        differ per mode -- confirmed live, DMR's has a "[N]" channel
-        bracket and an explicit "call started" line, C4FM's has neither)."""
+        """Three independent things get opportunistically read off "log"
+        lines, none of which is the call-lifecycle signal (that's
+        _on_calllog): the human mode name (DMR/YSF/...) from whichever
+        mode's own "<x>ct:" log line happens to show up; on a
+        battery-powered unit, a "pwr: batt ..." line (see
+        _BATTERY_LOG_RE); and a periodic "net-chk: ok (N ms)" round-trip
+        check (see _NET_CHK_LOG_RE). Deliberately doesn't try to parse
+        anything past the mode prefix for the mode case (dst/src/dur/ber/
+        etc. all come from calllog instead, in a consistent shape across
+        modes, unlike these log lines which differ per mode -- confirmed
+        live, DMR's has a "[N]" channel bracket and an explicit "call
+        started" line, C4FM's has neither)."""
         m = _MODE_LOG_RE.match(text)
         if m:
             self._monitor.apply_external_update(self._ip, {"mode": _mode_for_prefix(m.group(1))})
+            return
+        battery = _parse_battery_line(text)
+        if battery:
+            self._monitor.apply_external_update(self._ip, battery)
+            return
+        net_check = _parse_net_check_line(text)
+        if net_check:
+            self._monitor.apply_external_update(self._ip, net_check)
 
     def _on_calllog(self, msg: dict) -> None:
         """The universal call-lifecycle signal, confirmed live across two
@@ -335,7 +674,23 @@ class _OpenSpot4Worker:
         a "calllog" entry with duration 0.0 is a call starting; the SAME
         "id" reappearing later with a real duration is that call ending.
         This is a structured JSON shape that's consistent across modes,
-        unlike the "log" text lines this replaced for call tracking."""
+        unlike the "log" text lines this replaced for call tracking.
+
+        A REAL, previously-shipped bug, caught from a fresh real capture:
+        right after the WS opens, the device replays several PAST calllog
+        entries (confirmed live -- src=="openSPOT4", the device's own
+        identity, not a caller; short durations; terminated by a
+        {"type":"calllogend"} marker) before switching to genuinely live
+        events. The original code had no way to tell these apart from a
+        real call just ending, so EVERY worker restart/reconnect would
+        spuriously re-log stale historical activity with a "just
+        happened" timestamp -- wrong Fleet Activity entries, last_heard
+        reset to the reconnect time instead of staying at whatever it
+        already was. Fixed by gating on self._replay_done (set True by
+        _on_calllogend) -- entries seen before that marker are recorded
+        into _finalized_call_ids (so a post-replay rebroadcast of the
+        same id, which calllog entries are already known to do, doesn't
+        slip through as new) but never applied to the dashboard."""
         call_id = msg.get("id")
         if not call_id:
             return
@@ -343,6 +698,11 @@ class _OpenSpot4Worker:
         dst = str(msg.get("dst") or "")
         duration = msg.get("duration")
         is_final = isinstance(duration, (int, float)) and duration > 0
+
+        if not self._replay_done:
+            if is_final:
+                self._finalized_call_ids.append(call_id)
+            return
 
         if not is_final:
             if self._active_call and self._active_call["id"] == call_id:
@@ -386,17 +746,33 @@ class _OpenSpot4Worker:
             # here directly instead, same QRZ/RadioID/APRS path _on_csd
             # uses for DMR.
             self._enrich_caller(src)
+        elif src in self._recent_csd:
+            # This exact DMR ID was already resolved by a csd that arrived
+            # BEFORE this call started (the confirmed real race -- see
+            # _recent_csd's own comment) -- apply it immediately instead
+            # of waiting for a possible later csd re-arrival.
+            callsign, name = self._recent_csd[src]
+            self._enrich_caller(callsign, name)
 
     def _on_csd(self, msg: dict) -> None:
-        active = self._active_call
-        if not active:
-            return  # a csd with no call we're tracking -- ignore defensively
-        if msg.get("id_type") != "dmr" or str(msg.get("id")) != active["src"]:
+        if msg.get("id_type") != "dmr":
             return
+        dmr_id = str(msg.get("id"))
         callsign = msg.get("callsign")
         if not callsign:
             return
-        self._enrich_caller(callsign, msg.get("name"))
+        name = msg.get("name")
+        # Cache UNCONDITIONALLY (not gated on an active call already being
+        # tracked) -- see _recent_csd's own comment for why: this message
+        # is known to sometimes arrive before the calllog "call started"
+        # event it belongs to, and a DMR ID -> callsign mapping is a
+        # stable fact worth remembering regardless of timing.
+        self._recent_csd[dmr_id] = (callsign, name)
+        if len(self._recent_csd) > 20:
+            self._recent_csd.pop(next(iter(self._recent_csd)))
+        active = self._active_call
+        if active and active["src"] == dmr_id:
+            self._enrich_caller(callsign, name)
 
     def _enrich_caller(self, call: str, device_name: str = None) -> None:
         """Shared caller-info enrichment for both DMR (via _on_csd, keyed
