@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.22 "Rhoads"</span>
+                <span class="release-version">v4.23 "Zevon"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>WPSD cards no longer show an empty, motionless VU meter during a call</span> — reported directly, with a real screenshot: a live call showing zero signal reflected at all. Root cause: MMDVM (WPSD's log source) reports RSSI/BER as an end-of-transmission summary statistic, not continuous live data during a call — the same gap the previous release fixed for openSPOT4, just not recognized as applying to WPSD too. There's no equivalent of openSPOT4's live jitter-buffer metric for WPSD (SSH-polled log-tail reading, nothing streams), so rather than animate a meter with nothing real behind it, WPSD cards now show the same static, last-known RSSI/BER whether a call is active or not — "currently transmitting" is already shown elsewhere on the card (the ACTIVE label and tx timer), so nothing is lost. openSPOT4 keeps its real, dejitter-driven VU meter from the last release unchanged, since that's the one case where genuinely continuous live data exists</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.22 "Rhoads"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed the active-call "VU meter" not reflecting real signal</span> — reported directly: it didn't look like it was tracking anything real. Confirmed why: openSPOT4's RSSI/BER fields stay completely empty for the entire duration of a real network-received DMR call (captured live), so the meter's fallback for that case — a hardcoded middle value, wobbling through a wide swing every tick regardless of whether anything had changed — had nothing real behind it whenever a call came in over the network, which is the common case for this device. Now prefers a genuinely live metric openSPOT4 already sends but this app was discarding (audio jitter-buffer depth, confirmed to update roughly once a second during a call), falling back to RSSI for hotspot types that only ever report that (WPSD). When no real reading exists at all, it shows an honest empty bar instead of guessing. The wobble itself shrank from a wide swing to a small, realistic jitter around the real value, which now holds steady between polls rather than continuously drifting</li>
