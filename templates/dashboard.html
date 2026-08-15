@@ -3420,12 +3420,18 @@ function batteryMeterRow(hs) {
     if (hs.battery_mv !== null && hs.battery_mv !== undefined) titleBits.push(`${(hs.battery_mv / 1000).toFixed(2)}V`);
     if (hs.battery_usb_ma !== null && hs.battery_usb_ma !== undefined) titleBits.push(`USB ${hs.battery_usb_ma}mA`);
     const title = titleBits.join(' · ');
-    return `<div class="meter-row-combined">
-        <div class="meter-half"${title ? ` title="${escapeHtml(title)}"` : ''}>
-            <span class="meter-label">🔋</span>
-            <span class="meter-track"><span class="meter-fill" style="width:${pct}%;background:${batteryColor(pct)}"></span></span>
-            <span class="meter-val">${pct}%${chgIcon}</span>
-        </div>
+    // Deliberately NOT wrapped in .meter-row-combined (grid-column:1/-1) --
+    // that class is meant for a row of meter-halves sharing the full card
+    // width (like the RSSI/BER pair). Battery is alone here, so a single
+    // flex:1 .meter-half inside a full-width row stretched to fill the
+    // entire card -- reported as looking wrong. A bare .meter-half is a
+    // normal grid item in .stats-grid (flex:1 only applies inside a flex
+    // container), so it now takes one column's width instead, matching
+    // an individual RSSI/BER bar rather than the full card.
+    return `<div class="meter-half"${title ? ` title="${escapeHtml(title)}"` : ''}>
+        <span class="meter-label">🔋</span>
+        <span class="meter-track"><span class="meter-fill" style="width:${pct}%;background:${batteryColor(pct)}"></span></span>
+        <span class="meter-val">${pct}%${chgIcon}</span>
     </div>`;
 }
 
