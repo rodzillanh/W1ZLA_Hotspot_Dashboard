@@ -3,7 +3,27 @@
   <Name>hotspot-dashboard</Name>
   <Repository>hotspot-dashboard:latest</Repository>
   <Registry/>
-  <Network>bridge</Network>
+  <!-- Network=host (changed from "bridge"), a deliberate tradeoff, not a
+       default: openSPOT4 hotspots can be reached by their mDNS ".local"
+       hostname (confirmed live: the device runs its own mDNS responder
+       and this app has no static-IP requirement for that field), but
+       mDNS depends on multicast UDP reaching the real LAN, which Docker's
+       default bridge network does not reliably pass through. Host mode
+       shares the Unraid box's own network stack directly instead of NAT,
+       so a ".local" name in the hotspot IP field resolves the same way
+       it would for any other program running directly on the host. Real
+       cost: this container no longer has its own isolated port space,
+       so whatever it binds (5000, 2237/udp) must not collide with
+       anything else already running on the host, and there's no
+       port-remapping safety net if it does. If that tradeoff isn't worth
+       it for a given install, "bridge" plus a DHCP reservation on the
+       openSPOT4 (a static IP, but managed by the router instead of this
+       app) is the equivalent fix with none of this cost. See the
+       WebUI/Edit label gotchas already documented in this project's
+       history with Unraid-specific template quirks before assuming this
+       Network value renders/behaves identically to bridge in every other
+       respect. -->
+  <Network>host</Network>
   <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
@@ -11,7 +31,7 @@
   <Project/>
   <Overview>Live status dashboard for a fleet of Pi-Star / WPSD ham radio hotspots, polled over SSH every few seconds for uptime, temperature, signal, and active-call info.</Overview>
   <Category>Network:Other</Category>
-  <WebUI>http://[IP]:[PORT:5000]/</WebUI>
+  <WebUI>http://[IP]:5000/</WebUI>
   <TemplateURL/>
   <Icon/>
   <ExtraParams/>
@@ -21,8 +41,14 @@
   <DonateText/>
   <DonateLink/>
   <Requires/>
-  <Config Name="WebUI Port" Target="5000" Default="5000" Mode="tcp" Description="Port for the dashboard web interface" Type="Port" Display="always" Required="true" Mask="false">5000</Config>
-  <Config Name="WSJT-X UDP Port" Target="2237" Default="2237" Mode="udp" Description="Only needed for the optional live WSJT-X QSO logging feature (Settings -> Integrations). Must match the UDP port set there, or WSJT-X's packets never reach the container." Type="Port" Display="always" Required="false" Mask="false">2237</Config>
+  <!-- No Port-type Config entries here anymore. A Port config's whole
+       purpose is editing a bridge-mode host<->container port MAPPING,
+       which doesn't exist under Network=host (the container's own ports
+       ARE the host's ports directly, always 5000/2237, not editable via
+       a mapping). The dashboard still listens on 5000, and the optional
+       WSJT-X UDP feature still expects 2237 to match its own Settings
+       toggle, both fixed values now, not configurable via this
+       template. -->
   <Config Name="App Data" Target="/app/data" Default="/mnt/user/appdata/hotspot-dashboard" Mode="rw" Description="Persistent storage for hotspots.json" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/hotspot-dashboard</Config>
   <Config Name="Poll Interval" Target="POLL_INTERVAL" Default="5" Mode="" Description="Seconds between fleet polling sweeps" Type="Variable" Display="always" Required="false" Mask="false">5</Config>
   <Config Name="SSH Timeout" Target="SSH_TIMEOUT" Default="5" Mode="" Description="SSH connection timeout in seconds" Type="Variable" Display="always" Required="false" Mask="false">5</Config>

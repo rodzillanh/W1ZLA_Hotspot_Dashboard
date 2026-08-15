@@ -2,13 +2,25 @@ services:
   hotspot-dashboard:
     build: .
     container_name: hotspot-dashboard
-    ports:
-      - "5000:5000"
-      # Required only for the optional live WSJT-X QSO logging feature
-      # (Settings -> Integrations) -- if you change that feature's UDP
-      # port away from 2237, update this line to match, or WSJT-X's
-      # packets will never reach the container at all.
-      - "2237:2237/udp"
+    # network_mode: host (changed from a "ports:" list under the default
+    # bridge network) -- a deliberate tradeoff, not a default. openSPOT4
+    # hotspots can be reached by their mDNS ".local" hostname, but mDNS
+    # needs multicast UDP to reach the real LAN, which Docker's bridge
+    # network doesn't reliably pass through -- host mode shares the
+    # machine's own network stack directly instead, so a ".local" name in
+    # the hotspot IP field resolves the same way it would for any other
+    # program running right on the host. Every port the app binds (5000,
+    # and 2237/udp for the optional WSJT-X QSO logging feature) is
+    # reachable automatically -- host mode has no concept of "publish a
+    # port," so there's no ports: list to keep in sync with that feature's
+    # Settings toggle anymore. Real cost: this container no longer has its
+    # own isolated port space -- whatever it binds must not collide with
+    # anything else already running on the host. If that tradeoff isn't
+    # worth it, reverting to the default bridge network + a "ports:" list
+    # (5000:5000, 2237:2237/udp) + a DHCP reservation on the openSPOT4 (a
+    # static IP, managed by the router instead of this app) is the
+    # equivalent fix with none of this cost.
+    network_mode: host
     volumes:
       # Unraid convention: bind-mount into appdata so it's visible/backed up
       # like any other app. Change the host side if you keep appdata elsewhere.

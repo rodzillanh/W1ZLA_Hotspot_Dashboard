@@ -201,11 +201,18 @@ when the underlying image changes.
 docker build -t hotspot-dashboard:latest .
 docker run -d \
   --name hotspot-dashboard \
-  -p 5000:5000 \
+  --network host \
   -v /mnt/user/appdata/hotspot-dashboard:/app/data \
   --restart unless-stopped \
   hotspot-dashboard:latest
 ```
+
+`--network host` (matching Options A/B) is what makes an openSPOT4's
+`.local` hostname resolvable from inside the container — see the
+openSPOT4 section further down for why. If you don't need that and would
+rather keep the container's own isolated network, swap it for
+`-p 5000:5000` (and `-p 2237:2237/udp` too, if you use the live WSJT-X
+QSO logging feature).
 
 Same caveat as Option A: updating later means removing and recreating the
 container, not just restarting it.
@@ -692,8 +699,30 @@ The device resolves DMR-ID-to-callsign itself and reports it directly;
 that callsign still gets the same QRZ/RadioID enrichment (name,
 location, photo) and favorites/APRS-alert treatment as any other card.
 Mode/RSSI/BER and the linked talkgroup show the same way a WPSD card
-does — there's no Linux host access, so temperature/CPU/uptime don't
-appear on an openSPOT4 card.
+does — there's no Linux host access, so board temperature/CPU don't
+appear the way they do for WPSD/ASL3 (the openSPOT4's own board
+temperature shows in its Battery section instead, on a battery-powered
+unit). Uptime, battery status, WiFi signal, network round-trip latency,
+the active config profile, and its own built-in APRS messaging all show
+on the card/drawer too — none of this is in openSPOT4's documented HTTP
+API, all of it comes over the same WebSocket feed.
+
+**The IP address field can be a hostname, not just a numeric IP.**
+openSPOT4 runs its own mDNS responder and answers to a `.local` name
+derived from its configured hostname (e.g. `openspot4.local`) — if that
+resolves for you (test with `ping openspot4.local` from the same
+network), you can put that hostname straight into the Settings IP field
+instead of a raw IP, so a DHCP-assigned address change no longer breaks
+the connection. Confirmed working from a bare Windows/macOS/Linux
+machine on the LAN. **Docker/Unraid needs one extra step for this to
+work**: mDNS depends on multicast traffic reaching the real network,
+which Docker's default bridge network doesn't reliably pass through —
+`docker-compose.yml`/`docker-update.sh`/the Unraid template all default
+to `--network host` for exactly this reason (see the tradeoff explained
+in their own comments). If you'd rather keep the container's isolated
+bridge network, a plain numeric IP (optionally with a DHCP reservation
+on your router, so it stops changing) works exactly as before with no
+extra step needed at all.
 
 **DMR and C4FM(YSF) verified so far.** Call start/end tracking has been
 confirmed against real calls on both DMR (Homebrew/BrandMeister-style
@@ -1558,14 +1587,15 @@ appear as pins — the QRZ subscription caveat above applies here too.
   whether packets are actually being received. Unlike a bulk ADIF import
   (which replaces the whole map), live-logged QSOs simply add to
   whatever's already there.
-  - **Docker/Unraid**: this needs a UDP port actually published from the
-    container, not just the app-level toggle — `docker-compose.yml` and
-    the Unraid template both publish `2237/udp` already. If you change
-    the port in Settings away from 2237, update the container's port
-    mapping to match (Unraid: Docker tab → Edit → add/adjust the "WSJT-X
-    UDP Port" field), or WSJT-X's packets will never reach the container
-    at all. Standalone Pi/systemd installs don't have this extra step —
-    whatever port you pick in Settings just works immediately.
+  - **Docker/Unraid**: `docker-compose.yml`/`docker-update.sh`/the Unraid
+    template all run the container on `--network host` (see the openSPOT4
+    section above for why), which means any port the app binds — 2237
+    included — is reachable automatically, same as a standalone Pi/systemd
+    install. If you've instead kept the container on Docker's default
+    bridge network, this needs a UDP port actually published, or WSJT-X's
+    packets never reach the container at all: publish `2237/udp` (or
+    whichever port you set here) explicitly, and keep it in sync if you
+    ever change the port in Settings.
 - **POTA spots** — a "POTA spots" checkbox in the map legend plots
   current Parks on the Air activator spots worldwide, color-coded
   separately from every hotspot/QSO color (shown in the Map key). Free,

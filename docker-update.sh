@@ -8,14 +8,27 @@
 # on 2026-07-06), so it's a drop-in replacement for the manual
 # GUI stop -> remove -> re-add cycle.
 #
-# -p 2237:2237/udp (added v3.45) is required for the optional live WSJT-X
-# QSO logging feature -- Docker's bridge network doesn't forward ANY port
-# into the container unless it's explicitly published, so without this,
-# WSJT-X's UDP packets sent to this box's IP never reach wsjtx.py's socket
-# at all, regardless of the "wsjtx_port" Settings toggle. If you ever
-# change that Settings field away from 2237, update this line (and the
-# matching Config in unraid-template.xml) to the same port, or the two
-# will drift and the feature will silently stop receiving anything.
+# --network host (changed from -p 5000:5000 -p 2237:2237/udp) -- a
+# deliberate tradeoff, not a default. openSPOT4 hotspots can be reached
+# by their mDNS ".local" hostname (confirmed live -- the device runs its
+# own mDNS responder, and this app has no static-IP requirement for that
+# field), but mDNS needs multicast UDP to reach the real LAN, which
+# Docker's default bridge network doesn't reliably pass through -- host
+# networking shares the box's own network stack directly instead, so a
+# ".local" name in the hotspot IP field resolves the same way it would
+# for any other program running right on the host. This also means the
+# WSJT-X UDP port (2237) and the dashboard's own port (5000) are reachable
+# automatically -- host mode has no concept of "publish a port," every
+# port the app binds is already exposed, so the old -p flags are gone
+# rather than kept-but-ignored. Real cost: this container no longer has
+# its own isolated port space -- whatever it binds must not collide with
+# anything else already running on the host. If that tradeoff isn't
+# worth it, reverting to bridge + these two -p flags + a DHCP reservation
+# on the openSPOT4 (a static IP, managed by the router instead of this
+# app) is the equivalent fix with none of this cost. If you ever change
+# the "wsjtx_port" Settings field away from 2237, this script has nothing
+# to update anymore (no port mapping to keep in sync) -- just make sure
+# nothing else on the host is already using whatever port you pick.
 #
 # Includes Unraid's net.unraid.docker.webui label so the container keeps
 # its "WebUI" shortcut in the Docker tab dropdown -- creating a container
@@ -63,8 +76,7 @@ echo "==> Starting new container..."
 docker run -d \
   --name="$CONTAINER_NAME" \
   --restart=unless-stopped \
-  -p 5000:5000 \
-  -p 2237:2237/udp \
+  --network host \
   -v /mnt/user/appdata/hotspot-dashboard:/app/data \
   -e TZ=America/New_York \
   -e POLL_INTERVAL=5 \
@@ -73,7 +85,7 @@ docker run -d \
   -e MAX_WORKERS=5 \
   -e QRZ_USERNAME="${QRZ_USERNAME:-}" \
   -e QRZ_PASSWORD="${QRZ_PASSWORD:-}" \
-  -l net.unraid.docker.webui='http://[IP]:[PORT:5000]/' \
+  -l net.unraid.docker.webui='http://[IP]:5000/' \
   -l net.unraid.docker.managed='dockerman' \
   "$IMAGE_NAME"
 
