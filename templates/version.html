@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.26 "Chilton"</span>
+                <span class="release-version">v4.27 "Buchanan"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>VU meter's color zones no longer shift position as the bar wobbles</span> — reported directly: the last release's gradient (scoped to position within whatever's currently lit) meant the color boundary itself moved every ~110ms tick as the natural wobble nudged the fill by a segment, reading as unrealistic/flickery. A real analog S-meter or VU meter has its colored bands painted onto the face at fixed positions — only the needle moves, the color at a given spot never changes. Reverted to a fixed scale position for that reason, but with much softer thresholds than the original pre-v4.25 version (which is what caused the very first report — any merely-strong-but-not-maxed reading already hit red). Red now needs the bar essentially fully lit to appear at all; amber needs roughly 80%+. Bar length is still what honestly communicates the real reading's strength</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.26 "Chilton"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>VU meter's multi-color gradient is back, without the "strong = red" confusion</span> — the previous release's fix (one flat color for the whole bar) was accurate but reported as losing the colorful, textured meter look, since this dashboard's real readings run consistently strong and the bar just stayed solid green all the time. Restored the green→amber→red taper, but scoped to position *within whatever's currently lit* rather than position on the full fixed scale — every reading, weak or strong, now gets the same proportional gradient toward its own tip (a bar needs to be at least a third or so full before any red shows at all). The gradient is purely decorative texture again, same as the classic look; actual signal strength is still told honestly by the bar's length, not by which colors appear in it</li>

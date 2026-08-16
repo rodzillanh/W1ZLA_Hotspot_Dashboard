@@ -3495,27 +3495,24 @@ function paintVu(ip) {
     const wobble = 0.92 + Math.abs(Math.sin(phase)) * 0.1 + (Math.random() - 0.5) * 0.06;
     const level = Math.max(0, Math.min(1, base * wobble));
     const lit = Math.round(level * segs.length);
-    // v4.26: a flat single color for the whole lit bar (v4.25's fix) was
-    // information-theoretically cleaner but reported as losing the
-    // multi-color texture entirely -- this user's real readings are
-    // consistently strong, so the bar was just solid green all the time,
-    // no gradient at all. Restored the gradient, but scoped it to
-    // POSITION WITHIN WHAT'S CURRENTLY LIT (i / lit), not position within
-    // the full fixed 20-segment scale (the ORIGINAL v4.21-and-earlier
-    // behavior, and the actual bug v4.25 fixed) -- a full-scale position
-    // meant only a STRONG signal could ever reach the red zone at all,
-    // confusingly implying "red = something's wrong" for what was
-    // actually a healthy, near-maxed reading. Scoping to the lit portion
-    // gives every reading -- weak or strong -- the same proportional
-    // green-to-red taper toward ITS OWN tip, so the gradient is purely
-    // decorative texture (like a classic meter's needle-approach shading)
-    // rather than an implied warning. The actual signal strength is still
-    // communicated honestly by the bar's LENGTH (how many segments lit at
-    // all), not by which colors appear within it.
+    // v4.27: v4.26's "position within what's currently lit" gradient
+    // meant the color BOUNDARY itself shifted every ~110ms tick as the
+    // wobble nudged `lit` up or down by a segment -- reported directly as
+    // looking unrealistic. A real analog S-meter/VU-meter has its colored
+    // bands painted onto the face at FIXED positions -- only the needle
+    // (how much is lit) moves; the color at a given physical spot never
+    // changes. Back to a fixed scale position (i / segs.length, this
+    // project's original pre-v4.25 approach) for that reason -- but with
+    // softer thresholds than the original 85%/65%, which is what caused
+    // the FIRST report ("seems to be in the red often"): those meant any
+    // merely-strong-but-not-maxed reading (70-85%) already hit red. Red
+    // now needs the bar essentially fully lit (the last of 20 segments)
+    // to appear at all; amber needs at least ~80% lit. Bar LENGTH is
+    // still what honestly communicates the real reading's strength.
     segs.forEach((seg, i) => {
         if (i >= lit) { seg.style.background = 'var(--panel-2)'; return; }
-        const withinLit = i / lit;
-        seg.style.background = withinLit > 0.85 ? 'var(--danger)' : withinLit > 0.65 ? 'var(--caution)' : 'var(--good)';
+        const segPct = i / segs.length;
+        seg.style.background = segPct > 0.92 ? 'var(--danger)' : segPct > 0.75 ? 'var(--caution)' : 'var(--good)';
     });
 }
 
