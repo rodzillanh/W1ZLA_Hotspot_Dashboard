@@ -162,14 +162,29 @@ class _AslAudioWorker:
             transport = client.get_transport()
             transport.request_port_forward("127.0.0.1", config.ASL_AUDIO_TUNNEL_PORT)
             try:
-                client.exec_command(
+                # Reading stdout (not just discarding exec_command()'s
+                # return value) matters here, not just for the diagnostic
+                # text: an unreferenced ChannelFile/Channel can be
+                # garbage-collected almost immediately, which risks
+                # tearing down the SSH channel -- and killing the remote
+                # `asterisk -rx "channel originate ..."` -- before it
+                # actually finishes triggering the spy call. .read()
+                # blocks until the remote command completes and the
+                # channel closes normally, same reason monitor.py's own
+                # _ssh_exec() always reads stdout rather than firing and
+                # walking away.
+                _, stdout, stderr = client.exec_command(
                     config.build_asl_audio_originate_cmd(self._node), timeout=config.SSH_TIMEOUT
                 )
+                originate_out = stdout.read().decode("utf-8", errors="ignore").strip()
+                originate_err = stderr.read().decode("utf-8", errors="ignore").strip()
                 chan = transport.accept(timeout=config.SSH_TIMEOUT)
                 if chan is None:
+                    detail = originate_out or originate_err or "(no output)"
                     raise TimeoutError(
                         "AudioSocket never connected back through the tunnel -- "
-                        "has provision-audio-meter.sh been run against this node?"
+                        f"channel originate said: {detail!r}. Has "
+                        "provision-audio-meter.sh been run against this node?"
                     )
                 chan.settimeout(config.ASL_AUDIO_STALE_SEC * 2)
                 try:
