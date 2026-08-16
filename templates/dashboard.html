@@ -3458,11 +3458,6 @@ const VU_STIFFNESS = 90;
 const VU_DAMPING = 9;
 const VU_PEAK_HOLD_SEC = 0.9;
 const VU_PEAK_FALL_RATE = 55;  // pct/sec
-// v4.32: how long to hold WPSD/D-Star's just-arrived end-of-transmission
-// reading before letting it fall to 0 -- long enough to actually read the
-// number across a couple of 3s poll cycles, see the tracking block's own
-// comment for why this reading (and only this one moment) is trustworthy.
-const VU_STALE_HOLD_MS = 8000;
 // ip -> { pct, value, velocity, peak, peakHoldT } for every WPSD/openSPOT4
 // hotspot currently on screen (ASL3 has no vu-<ip> element at all -- no VU
 // concept for that type, see the statsGrid comment). pct is the real
@@ -4316,48 +4311,23 @@ function renderCards(data) {
             : (lossPct !== null ? lossPct
             : berBarPct(hs.ber)));
 
-        let state = vuMeters[hs.ip];
-        if (!state) {
-            state = { pct: null, value: 0, velocity: 0, peak: 0, peakHoldT: 0, wasActive: false, holdUntil: 0 };
-            vuMeters[hs.ip] = state;
-        }
-
-        let pct;
-        if (hs.type === 'openspot4') {
-            // Genuinely live, per-second data either way (see
-            // dejitterBarPct's own comment) -- no staleness problem, show
-            // it directly and let it fall/rise on its own.
-            pct = livePct;
+        // v4.34: reverted v4.33's "show nothing during an active WPSD/
+        // D-Star call" -- reported directly as worse, not better ("made
+        // it worse"): a fully blank bar for the entire duration of every
+        // call read as broken, and in practice the vast majority of a
+        // call's length is spent showing the CORRECT reading anyway (only
+        // the first few seconds of a new call can show the previous
+        // call's carried-over value, since MMDVM only logs RSSI/BER/
+        // packet-loss as an end-of-transmission summary -- see this same
+        // block's v4.29/v4.31 history). Back to the simpler always-show
+        // -livePct approach; only the "fall to 0 once idle" behavior
+        // (v4.31, separately confirmed wanted) is kept.
+        const pct = hs.is_active ? livePct : (livePct === null ? null : 0);
+        if (vuMeters[hs.ip]) {
+            vuMeters[hs.ip].pct = pct;
         } else {
-            // v4.32: MMDVM only ever logs RSSI/BER/packet-loss as an
-            // END-OF-TRANSMISSION SUMMARY -- there is no live reading
-            // DURING a call at all. The instant a NEW call starts,
-            // whatever livePct currently holds is the PREVIOUS call's own
-            // final reading, not this one -- reported directly (a card
-            // showing "100%" just 13 seconds into a brand-new call, which
-            // cannot possibly be real data for that transmission). So:
-            // show nothing (honest empty bar) while a call is active.
-            // monitor.py's own end-of-transmission detection and metrics
-            // parsing come from the SAME log line (_apply_line_metrics
-            // runs before _is_end_of_transmission on every line, and a
-            // real captured example had both facts on one line -- "...end
-            // of voice transmission, ... BER: 0.0%") -- so the reading
-            // that arrives in the very poll where is_active flips to
-            // false IS guaranteed fresh for the call that just ended.
-            // Hold it briefly so it's actually readable, then let it fall
-            // to 0 (v4.31) rather than sitting solid forever.
-            if (hs.is_active) {
-                pct = null;
-            } else {
-                if (state.wasActive) {
-                    state.holdUntil = Date.now() + VU_STALE_HOLD_MS;
-                }
-                const holding = Date.now() < state.holdUntil;
-                pct = holding ? livePct : (livePct === null ? null : 0);
-            }
+            vuMeters[hs.ip] = { pct, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
         }
-        state.wasActive = hs.is_active;
-        state.pct = pct;
         paintVu(hs.ip, 0);
     });
 
