@@ -158,8 +158,12 @@
 
         /* --- VU meter: replaces the RSSI/BER line while a call is
            active, thin LED-bargraph style. --- */
-        .vu-meter { grid-column: 1 / -1; display: flex; gap: 2px; height: 3px; align-items: center; }
+        .vu-meter { position: relative; grid-column: 1 / -1; display: flex; gap: 2px; height: 3px; align-items: center; }
         .vu-seg { flex: 1; height: 100%; border-radius: 1px; background: var(--panel-2); transition: background .07s linear; }
+        /* Peak-hold marker (v4.28) -- climbs instantly with the needle,
+           holds briefly, then decays, same as a classic peak-reading
+           meter. Positioned in JS via inline left:calc(...). */
+        .vu-peak { position: absolute; top: -2px; bottom: -2px; width: 2px; border-radius: 1px; background: var(--text); opacity: .8; pointer-events: none; }
         .clocks { text-align: right; line-height: 1.4; }
         .clock-local { font-size: 13px; }
         .clock-utc   { font-size: 11px; color: var(--text-muted); }
@@ -3448,82 +3452,100 @@ function batteryMeterRow(hs) {
 }
 
 // --- VU meter (replaces the RSSI/BER line while a call is active) ---
-// v4.22 rework: the base level used to fall back to a hardcoded 0.5 when
-// no real reading was available, and wobbled through a wide swing (0.55x
-// to 1.10x the base, plus randomness) every 110ms regardless of whether
-// any new data had actually arrived -- reported as "doesn't seem to
-// reflect an actual signal." Confirmed why: openSPOT4's rssi_values_dbm/
-// ber_values stayed completely empty for the ENTIRE duration of a real
-// DMR call captured live (a network-received call apparently never
-// populates them at all), so hs.rssi just sat at "N/A" the whole time --
-// meaning the meter was animating around that fake fallback with nothing
-// real behind it whenever a call came in over the network, which is the
-// common case for this device. Fixed two ways: (1) prefer a real
-// dejitter-buffer reading (openSPOT4's own genuinely live audio-flow
-// metric, confirmed to update roughly once a second while a call is
-// active, unlike RSSI which is usually empty) over RSSI, falling back to
-// RSSI for hotspot types that only ever report that (WPSD); (2) if
-// NEITHER is available, show an honest empty bar instead of a fabricated
-// mid-level guess. The wobble itself also shrank from a wide swing to a
-// small one (~±10%), reading as realistic analog-meter jitter around a
-// real, currently-held level rather than motion implying a bigger change
-// than actually happened. The base level itself only changes when
-// renderCards() runs (every poll) and a genuinely new value has arrived --
-// it holds steady between polls rather than continuously drifting.
+// v4.28: spring-damped needle + peak-hold, mockup-approved before
+// building (see CLAUDE.md). Earlier versions animated a wobble (sine +
+// randomness) around the real base level every 110ms tick -- functional,
+// but felt artificial/jittery rather than like a real meter's needle
+// inertia. Now the needle is a damped spring pulling toward the real
+// target (state.pct, only ever changed once per poll in renderCards()),
+// stepped every animation frame via requestAnimationFrame instead of a
+// fixed 110ms interval, so the settle/overshoot reads as smooth physical
+// motion rather than a series of discrete jumps. A peak-hold marker
+// (classic meter behavior: climbs instantly, holds briefly, decays)
+// overlays the bar as a thin vertical line. Color zones are unchanged
+// from v4.27 (fixed position on the scale, not tied to the animated
+// value) -- see vuZoneColor().
 const VU_SEGMENTS = 20;
-let activeVu = {};  // ip -> { pct } for hotspots currently showing a VU meter -- pct is null if no real reading exists yet
+const VU_STIFFNESS = 90;
+const VU_DAMPING = 9;
+const VU_PEAK_HOLD_SEC = 0.9;
+const VU_PEAK_FALL_RATE = 55;  // pct/sec
+// ip -> { pct, value, velocity, peak, peakHoldT }. pct is the real target
+// (null if no real reading exists yet); the rest is spring/peak-hold
+// physics state, which persists across polls so the needle keeps moving
+// smoothly toward a NEW target instead of resetting -- only `pct` itself
+// gets overwritten each poll (see renderCards()'s tracking block).
+let activeVu = {};
 
 function vuMeterRow(ip) {
     const segs = Array.from({ length: VU_SEGMENTS }, () => '<span class="vu-seg"></span>').join('');
-    return `<div class="vu-meter" id="vu-${ip}">${segs}</div>`;
+    return `<div class="vu-meter" id="vu-${ip}">${segs}<span class="vu-peak" id="vu-peak-${ip}"></span></div>`;
 }
 
-function paintVu(ip) {
+// Fixed position on the scale, not the animated value -- unchanged from
+// v4.27 (see that version's own comment for why a moving/relative zone
+// looked unrealistic, and why the thresholds are this soft).
+function vuZoneColor(segPct) {
+    return segPct > 0.92 ? 'var(--danger)' : segPct > 0.75 ? 'var(--caution)' : 'var(--good)';
+}
+
+// dt in seconds; 0 is valid (used for an immediate re-paint right after
+// fresh DOM segments are created, with no physics stepping yet).
+function paintVu(ip, dt) {
     const el = document.getElementById('vu-' + ip);
-    if (!el || !activeVu[ip]) return;
+    const state = activeVu[ip];
+    if (!el || !state) return;
     const segs = el.querySelectorAll('.vu-seg');
-    const pct = activeVu[ip].pct;
-    if (pct === null) {
+    const peakEl = document.getElementById('vu-peak-' + ip);
+
+    if (state.pct === null) {
         // No real reading available yet (e.g. the very first instant of a
         // call, before the first status/log tick has arrived) -- an
         // honest empty bar, not a fabricated mid-level guess.
         segs.forEach(seg => { seg.style.background = 'var(--panel-2)'; });
+        if (peakEl) peakEl.style.opacity = '0';
         return;
     }
-    const base = Math.max(0, Math.min(1, pct / 100));
-    const phase = Date.now() / 260 + ip.length;  // per-ip offset so simultaneous calls don't sync up
-    const wobble = 0.92 + Math.abs(Math.sin(phase)) * 0.1 + (Math.random() - 0.5) * 0.06;
-    const level = Math.max(0, Math.min(1, base * wobble));
-    const lit = Math.round(level * segs.length);
-    // v4.27: v4.26's "position within what's currently lit" gradient
-    // meant the color BOUNDARY itself shifted every ~110ms tick as the
-    // wobble nudged `lit` up or down by a segment -- reported directly as
-    // looking unrealistic. A real analog S-meter/VU-meter has its colored
-    // bands painted onto the face at FIXED positions -- only the needle
-    // (how much is lit) moves; the color at a given physical spot never
-    // changes. Back to a fixed scale position (i / segs.length, this
-    // project's original pre-v4.25 approach) for that reason -- but with
-    // softer thresholds than the original 85%/65%, which is what caused
-    // the FIRST report ("seems to be in the red often"): those meant any
-    // merely-strong-but-not-maxed reading (70-85%) already hit red. Red
-    // now needs the bar essentially fully lit (the last of 20 segments)
-    // to appear at all; amber needs at least ~80% lit. Bar LENGTH is
-    // still what honestly communicates the real reading's strength.
+    if (peakEl) peakEl.style.opacity = '';
+
+    const force = (state.pct - state.value) * VU_STIFFNESS - state.velocity * VU_DAMPING;
+    state.velocity += force * dt;
+    state.value += state.velocity * dt;
+    if (state.value < 0) { state.value = 0; state.velocity *= -0.3; }
+    if (state.value > 100) { state.value = 100; state.velocity *= -0.3; }
+
+    if (state.value >= state.peak) {
+        state.peak = state.value;
+        state.peakHoldT = VU_PEAK_HOLD_SEC;
+    } else if (state.peakHoldT > 0) {
+        state.peakHoldT -= dt;
+    } else {
+        state.peak = Math.max(state.value, state.peak - VU_PEAK_FALL_RATE * dt);
+    }
+
+    const lit = Math.round((state.value / 100) * segs.length);
     segs.forEach((seg, i) => {
-        if (i >= lit) { seg.style.background = 'var(--panel-2)'; return; }
-        const segPct = i / segs.length;
-        seg.style.background = segPct > 0.92 ? 'var(--danger)' : segPct > 0.75 ? 'var(--caution)' : 'var(--good)';
+        seg.style.background = i < lit ? vuZoneColor(i / segs.length) : 'var(--panel-2)';
     });
+    if (peakEl) peakEl.style.left = `calc(${state.peak}% - 1px)`;
 }
 
-// Ticks faster than the 3s poll cycle, same "look up by id, update in
-// place" pattern as the tx-time/last-heard timer tick below -- innerHTML
-// gets fully replaced every poll, so anything animating between polls has
-// to be driven by a persistent loop querying the DOM by id, not a
-// per-render setInterval that would get torn down with the old markup.
-setInterval(() => {
-    Object.keys(activeVu).forEach(paintVu);
-}, 110);
+// requestAnimationFrame, not a fixed setInterval -- the spring physics
+// needs a real per-frame dt to integrate correctly (a fixed 110ms step
+// would make the same stiffness/damping values behave differently on a
+// slower/throttled tab). Same "persistent loop, look up by id" shape as
+// every other tick loop in this file -- innerHTML gets fully replaced
+// every poll, so anything animating between polls has to be driven by a
+// loop querying the DOM by id, not something torn down with the old
+// markup.
+let vuLastFrameT = null;
+function vuTick(t) {
+    const dt = vuLastFrameT === null ? 0 : Math.min((t - vuLastFrameT) / 1000, 0.05);
+    vuLastFrameT = t;
+    Object.keys(activeVu).forEach(ip => paintVu(ip, dt));
+    requestAnimationFrame(vuTick);
+}
+requestAnimationFrame(vuTick);
 
 // --- courtesy tone (off by default) ---
 let toneFiredCalls = {};  // ip -> last active_call already toned for
@@ -4207,22 +4229,28 @@ function renderCards(data) {
     // live -- see the statsGrid comment above) -- included anyway, since a
     // real-but-possibly-stale reading is still more honest than the
     // original fake fallback, and it's the most current data WPSD's own
-    // polling model can ever provide. Only ever set here, once per poll,
-    // so the level HOLDS STEADY between polls rather than drifting --
-    // paintVu()'s own wobble is a small, realistic jitter around this real
-    // value, not a substitute for it. Paints immediately rather than
-    // waiting for the next scheduled tick (up to 110ms away) -- the
-    // innerHTML assignment above just created brand-new, blank .vu-seg
-    // elements for every active card, and without this the browser could
-    // paint that blank frame before the tick loop ever gets to it, showing
-    // as a flicker synced to every 3s poll.
+    // polling model can ever provide. The TARGET (pct) is only ever
+    // overwritten here, once per poll -- the spring/peak-hold PHYSICS
+    // state (value/velocity/peak/peakHoldT) carries over untouched across
+    // polls for an already-tracked hotspot, so a new reading arriving
+    // mid-settle doesn't reset the needle's momentum, it just gives the
+    // spring a (possibly) new place to pull toward. Paints immediately
+    // (dt=0, no physics stepping, just a re-render of current state) with
+    // the fresh DOM segments the innerHTML assignment above just created --
+    // without this the browser could paint one blank frame before the
+    // next requestAnimationFrame tick, showing as a flicker synced to
+    // every 3s poll.
     data.forEach(hs => {
         if (hs.is_active) {
             const dejitterPct = hs.type === 'openspot4' ? dejitterBarPct(hs.dejitter_pkts) : null;
             const rssiPct = rssiBarPct(hs.rssi);
             const pct = dejitterPct !== null ? dejitterPct : (rssiPct !== null ? rssiPct : berBarPct(hs.ber));
-            activeVu[hs.ip] = { pct };
-            paintVu(hs.ip);
+            if (activeVu[hs.ip]) {
+                activeVu[hs.ip].pct = pct;
+            } else {
+                activeVu[hs.ip] = { pct, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
+            }
+            paintVu(hs.ip, 0);
         } else if (activeVu[hs.ip]) {
             delete activeVu[hs.ip];
         }

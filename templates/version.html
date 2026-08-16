@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.27 "Buchanan"</span>
+                <span class="release-version">v4.28 "Marriott"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>VU meter needle now has real spring physics and a peak-hold marker</span> — mocked up and approved before building. Replaces the wobble-based animation with a damped spring pulling toward the real reading (settling with a slight overshoot, like genuine needle inertia, instead of a sine wobble or discrete jumps), stepped every animation frame rather than a fixed interval. A thin peak-hold marker overlays the bar — climbs instantly to the highest recent level, holds briefly, then decays, same as a classic peak-reading meter. Color zones are unchanged from the last release (fixed position on the scale); only the motion driving the bar changed</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.27 "Buchanan"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>VU meter's color zones no longer shift position as the bar wobbles</span> — reported directly: the last release's gradient (scoped to position within whatever's currently lit) meant the color boundary itself moved every ~110ms tick as the natural wobble nudged the fill by a segment, reading as unrealistic/flickery. A real analog S-meter or VU meter has its colored bands painted onto the face at fixed positions — only the needle moves, the color at a given spot never changes. Reverted to a fixed scale position for that reason, but with much softer thresholds than the original pre-v4.25 version (which is what caused the very first report — any merely-strong-but-not-maxed reading already hit red). Red now needs the bar essentially fully lit to appear at all; amber needs roughly 80%+. Bar length is still what honestly communicates the real reading's strength</li>
