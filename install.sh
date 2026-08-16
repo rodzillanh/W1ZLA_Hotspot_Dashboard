@@ -203,6 +203,11 @@ SyslogIdentifier=${APP_NAME}
 # Environment
 Environment=CONFIG_DIR=${DATA_DIR}
 Environment=PORT=${PORT}
+# Same reasoning as the Dockerfile's ENV PYTHONUNBUFFERED=1 -- systemd
+# also captures stdout via a pipe (not a TTY), so plain print()
+# diagnostics can sit in Python's block-buffer instead of showing up in
+# `journalctl` right away without this.
+Environment=PYTHONUNBUFFERED=1
 
 # Hardening
 NoNewPrivileges=yes

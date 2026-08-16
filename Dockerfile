@@ -1,5 +1,16 @@
 FROM python:3.12-slim
 
+# Python's stdout is fully block-buffered (not line-buffered) whenever it
+# isn't a real terminal -- which is always true inside a container, since
+# `docker logs` reads it via a pipe. Without this, every plain print()
+# used for degrade-gracefully diagnostics across this app (aslstats.py,
+# asl_audio.py, etc.) can sit invisibly in that buffer for a long time
+# instead of showing up in `docker logs` right away -- confirmed live:
+# a real connection-failure print() in asl_audio.py produced zero output
+# across two separate 5/20-minute `docker logs` windows before this was
+# found and fixed.
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 # ffmpeg bridges RTSP camera feeds to MJPEG for the optional camera cards
