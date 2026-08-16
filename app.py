@@ -44,6 +44,7 @@ from psk_reporter import PskReporterClient
 from adif import parse_adif
 from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
+from asl_audio import AslAudioManager
 from wsjtx import WsjtxListener
 from hamalert import HamAlertListener
 from brandmeister_lastheard import BrandmeisterLastHeardListener
@@ -87,6 +88,11 @@ psk_reporter    = PskReporterClient()
 digipi_monitor  = DigipiMonitor()
 openspot_manager = OpenSpot4Manager(monitor)
 openspot_manager.reconcile(load_hotspots())  # eager start at boot, mirrors mqtt_pub's startup rebuild
+# Separate persistent-connection manager, same reconcile()/remove() shape
+# as openspot_manager -- see asl_audio.py's module docstring for why this
+# is its own subsystem rather than folded into monitor.py's poll loop.
+audio_manager = AslAudioManager()
+audio_manager.reconcile(load_hotspots())
 wsjtx_listener  = WsjtxListener(monitor)
 hamalert_listener = HamAlertListener()
 brandmeister_lh = BrandmeisterLastHeardListener()
@@ -272,6 +278,14 @@ def api_data():
         if hs.get("dvswitch_enabled"):
             entry["dvswitch_enabled"] = True
             entry["dvswitch_sparkline"] = storage_activity.dvswitch_sparkline(ip)
+        # Live audio-level VU meter (see asl_audio.py) -- static config
+        # passthrough, same reason type/lat/lon/card_url are here rather
+        # than part of the live-polled HotspotStatus. The level itself is
+        # NOT included here -- it changes far faster than this 3s poll,
+        # so the frontend fetches it separately via /api/audio_level on
+        # its own faster interval, only once it sees this flag.
+        if hs.get("audio_meter_enabled"):
+            entry["audio_meter_enabled"] = True
     ordered_ips = [h["ip"] for h in hotspots]
     # Return as an ARRAY so the browser preserves order — JS objects keyed by
     # IP strings get silently re-sorted by some engines (especially for
@@ -283,6 +297,16 @@ def api_data():
     # finishes), which would otherwise make a deleted card reappear.
     ordered = [snap[ip] for ip in ordered_ips if ip in snap]
     return jsonify(ordered)
+
+@app.route("/api/audio_level")
+def api_audio_level():
+    """Cheap in-memory read of every audio_meter_enabled ASL3 node's
+    current level (see asl_audio.py) -- no SSH, no network call per
+    request, just a lock-guarded dict read. Polled by the browser on its
+    own fast (~250ms) interval, decoupled from /api/data's 3s cycle, so
+    the VU meter actually tracks live audio instead of stepping between
+    infrequent samples the way a WPSD card's RSSI-driven meter does."""
+    return jsonify(audio_manager.snapshot())
 
 @app.route("/api/map_data")
 def api_map_data():
@@ -833,6 +857,14 @@ def setup():
             card_url = request.form.get("card_url", "").strip()
             if card_url and re.match(r"^https?://", card_url, re.IGNORECASE):
                 new_hotspot["card_url"] = card_url
+            # Live audio-level VU meter (see asl_audio.py) -- opt-in, same
+            # "absent means off" checkbox convention as dvswitch_enabled
+            # above. Needs the node to have already been provisioned via
+            # provision-audio-meter.sh; the toggle itself is harmless to
+            # flip on an unprovisioned node (the worker just retries with
+            # backoff, same degrade-gracefully contract as every other
+            # integration here).
+            new_hotspot["audio_meter_enabled"] = "audio_meter_enabled" in request.form
         elif node_type == "openspot4":
             new_hotspot["type"] = "openspot4"
             # "pass" (already set unconditionally above) is the primary
@@ -857,6 +889,7 @@ def setup():
         if mqtt_pub.enabled:
             mqtt_pub.set_hotspots(hotspots)
         openspot_manager.reconcile(hotspots)
+        audio_manager.reconcile(hotspots)
         return redirect("/setup")
     setup_hotspots = load_hotspots()
     setup_settings = load_settings()
@@ -953,6 +986,9 @@ def api_update_hotspot():
             hotspot["card_url"] = card_url
         else:
             hotspot.pop("card_url", None)
+        hotspot["audio_meter_enabled"] = bool(
+            data.get("audio_meter_enabled", hotspot.get("audio_meter_enabled", False))
+        )
     elif node_type == "openspot4":
         extra_pass = data.get("openspot4_extra_pass", "") or ""
         if extra_pass.strip():
@@ -966,6 +1002,7 @@ def api_update_hotspot():
     if mqtt_pub.enabled:
         mqtt_pub.set_hotspots(hotspots)
     openspot_manager.reconcile(hotspots)
+    audio_manager.reconcile(hotspots)
     return jsonify({"ok": True, "hotspot": hotspot})
 
 @app.route("/api/host_stats")
@@ -1762,6 +1799,7 @@ def delete_hotspot(ip):
     save_hotspots([h for h in load_hotspots() if h["ip"] != ip])
     monitor.remove(ip)
     openspot_manager.remove(ip)
+    audio_manager.remove(ip)
     return redirect("/setup")
 
 @app.route("/api/toggle_hotspot/<ip>", methods=["POST"])
@@ -1777,6 +1815,7 @@ def toggle_hotspot(ip):
     if mqtt_pub.enabled:
         mqtt_pub.set_hotspots(hotspots)
     openspot_manager.reconcile(hotspots)
+    audio_manager.reconcile(hotspots)
     # If just disabled, drop it from the live snapshot immediately rather
     # than waiting for the next poll tick's prune_stale to catch up.
     updated = next((h for h in hotspots if h["ip"] == ip), None)
@@ -1994,6 +2033,7 @@ def api_import_backup():
             card_url = str(h.get("card_url", "")).strip()
             if card_url and not re.match(r"^https?://", card_url, re.IGNORECASE):
                 h.pop("card_url", None)
+            h["audio_meter_enabled"] = bool(h.get("audio_meter_enabled", False))
             imported.append(h)
         if mode == "replace":
             hotspots = imported
@@ -2007,6 +2047,7 @@ def api_import_backup():
         if mqtt_pub.enabled:
             mqtt_pub.set_hotspots(hotspots)
         openspot_manager.reconcile(hotspots)
+        audio_manager.reconcile(hotspots)
 
     if isinstance(data.get("favorites"), list):
         imported = [
@@ -2126,6 +2167,7 @@ def main():
     threading.Thread(target=_aprs_alert_loop, daemon=True).start()
     threading.Thread(target=digipi_monitor.run_forever, daemon=True).start()
     threading.Thread(target=openspot_manager.run_forever, daemon=True).start()
+    threading.Thread(target=audio_manager.run_forever, daemon=True).start()
     # waitress, not Flask's own dev server -- see CLAUDE.md gotcha on why
     # this must stay a single process (no --workers-style forking): the
     # FleetMonitor/camera/APRS-inbox background threads started above are

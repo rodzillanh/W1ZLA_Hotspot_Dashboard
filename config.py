@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.31"
+APP_VERSION = "4.32"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -117,6 +117,7 @@ VERSION_CODENAMES = [
     "Young",            # v4.30 -- Malcolm Young, AC/DC's founding rhythm
                         # guitarist (1953-2017)
     "Denver",           # v4.31 -- John Denver (1943-1997)
+    "Cooke",            # v4.32 -- Sam Cooke, "the King of Soul" (1931-1964)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -466,6 +467,85 @@ def build_asl_ilink_cmd(local_node: str, ilink_code: int, remote_node: str) -> s
                            ASL_ILINK_LOCAL_MONITOR, ASL_ILINK_DISCONNECT_ALL):
         raise ValueError(f"invalid ilink code: {ilink_code!r}")
     return f'sudo asterisk -rx "rpt cmd {local_node} ilink {ilink_code} {remote_node}"'
+
+
+# --- ASL3 live audio-level VU meter (ChanSpy + AudioSocket over an SSH
+# reverse tunnel) -- see asl_audio.py's module docstring and CLAUDE.md for
+# the full live-diagnostic session this was built from (a real W1ZLA/node
+# 59929 SSH capture, 2026-08): Asterisk 22.9.0+asl3-3.9.3 on aarch64,
+# every module needed (chan_audiosocket.so/app_audiosocket.so/
+# app_chanspy.so, and separately the full ARI/Stasis stack) already
+# present on disk but unloaded. Chosen over Asterisk ARI's own
+# Snoop+externalMedia -- also confirmed available on this build --
+# specifically because AudioSocket is a single TCP connection, which can
+# ride an SSH REVERSE port forward on the SAME SSH connection this app
+# already holds open to every ASL3 node (paramiko's
+# request_port_forward): the node connects to its own
+# 127.0.0.1:ASL_AUDIO_TUNNEL_PORT, and SSH tunnels that back to this app.
+# No new inbound port on the dashboard host/firewall, and no new
+# credential -- the trigger is a plain `asterisk -rx "channel originate
+# ..."` over the exact same SSH login already stored in hotspots.json.
+# ARI's REST calls could tunnel the same way, but its actual audio
+# payload is RTP/UDP, which can't ride a TCP tunnel the same clean way --
+# it would still need a real open UDP port for the audio itself.
+# One context PER NODE (not one shared context with per-node extension
+# names) -- provision-audio-meter.sh writes each node's dialplan to its
+# own file (/etc/asterisk/dashboard-audiospy-<node>.conf), so re-running
+# it for one node is a clean whole-file overwrite with no merge/dedupe
+# logic needed, and provisioning a second local node on the same box
+# can't collide with the first's extensions.
+ASL_AUDIO_SPY_CONTEXT_FMT = "dashboard-audiospy-{node}"
+# Fixed extension names within that per-node context (fully static, no
+# runtime dialplan variables needed -- see that script):
+#   spy         -- ChanSpy(<rxchannel>,qB(dashboard-audiospy-<node>^audiosocket^1))
+#   audiosocket -- AudioSocket(<fixed-per-node-uuid>,127.0.0.1:<ASL_AUDIO_TUNNEL_PORT>)
+ASL_AUDIO_SPY_EXTEN        = "spy"
+ASL_AUDIO_AUDIOSOCKET_EXTEN = "audiosocket"
+# Bound on the REMOTE node's own loopback via paramiko's reverse port
+# forward -- scoped per SSH connection/remote host, so every node can
+# reuse the identical port number with zero collision risk (it's never
+# opened locally on the dashboard's own machine at all, unlike e.g.
+# WSJT-X's UDP 2237, which IS a real local port on this app's own host).
+ASL_AUDIO_TUNNEL_PORT = int(os.environ.get("ASL_AUDIO_TUNNEL_PORT", 8288))
+# Confirmed directly from Asterisk's own source (apps/app_audiosocket.c's
+# AST_MODULE_INFO `.requires` / `<depend>` declaration), not guessed --
+# a real, live provisioning attempt against W1ZLA/node 59929 failed to
+# load `chan_audiosocket.so` (a SEPARATE, unrelated channel driver, for
+# Asterisk *receiving* inbound AudioSocket connections as a call source
+# -- not needed here), which the source confirmed was never actually
+# required by the `AudioSocket()` dialplan APPLICATION this feature uses.
+# The app's own real dependency is `res_audiosocket.so` (a resource
+# module, confirmed present in the same live module listing) -- listed
+# explicitly here and loaded first, rather than assuming Asterisk's
+# module loader resolves `.requires` automatically in every build.
+ASL_AUDIO_MODULES = ("res_audiosocket.so", "app_audiosocket.so", "app_chanspy.so")
+ASL_AUDIO_RECONNECT_BACKOFF = int(os.environ.get("ASL_AUDIO_RECONNECT_BACKOFF", 10))
+# How long since the last audio frame before a worker is reported as
+# disconnected -- confirmed live that a node's rxchannel (SimpleUSB/etc.)
+# stays "Up" and streaming continuously even at idle, so a real gap this
+# long means the spy session itself died, not just "nobody's
+# transmitting right now."
+ASL_AUDIO_STALE_SEC = int(os.environ.get("ASL_AUDIO_STALE_SEC", 8))
+
+
+def build_asl_audio_originate_cmd(node: str) -> str:
+    """SSH command that fires this node's already-provisioned spy
+    extension (see provision-audio-meter.sh) -- originates a Local
+    channel into the fully-static, per-node dialplan entry that ChanSpy's
+    the node's own rxchannel onward to AudioSocket. `node` MUST be
+    pre-validated digits-only by the caller (same requirement as every
+    other ASL3 SSH command builder in this file) -- it's interpolated
+    into a shell string executed on the remote host. Needs `sudo` for the
+    same asterisk.ctl-permission reason every other `asterisk -rx`
+    command in this file does."""
+    if not node.isdigit():
+        raise ValueError(f"invalid ASL node number: {node!r}")
+    ctx = ASL_AUDIO_SPY_CONTEXT_FMT.format(node=node)
+    return (
+        f'sudo asterisk -rx "channel originate Local/{ASL_AUDIO_SPY_EXTEN}@{ctx} '
+        f'extension {ASL_AUDIO_SPY_EXTEN}@{ctx}"'
+    )
+
 
 # --- Log line parsing ---
 BER_PATTERN        = r"BER: (\d+\.?\d*)%"

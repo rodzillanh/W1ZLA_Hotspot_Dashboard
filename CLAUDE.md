@@ -4915,6 +4915,132 @@ config for per-integration credentials; put it in
     compact-card chip, and confirmed the hotspot drawer shows a visible
     duration line for every one of the 6 linked nodes in the sample.
 
+- **ASL3 live audio-level VU meter (`asl_audio.py`, v4.32) -- built from a
+  real, live multi-round SSH diagnostic session against W1ZLA/node 59929
+  (2026-08), not guessed from Asterisk docs alone.** ASL3 cards had no VU
+  meter at all before this (see the WPSD RSSI/BER meter gotcha above --
+  ASL3 has no MMDVM-layer telemetry to drive one with), and the user
+  explicitly wanted a REAL audio level, not a synthetic keyed-on/off
+  pulse -- ruling out the cheap option and requiring actual PCM off the
+  node.
+  - **Confirmed live before writing any code**: `sudo asterisk -rV` ->
+    `Asterisk 22.9.0+asl3-3.9.3-1.deb12`; `rpt.conf` has THREE node
+    stanzas on this one box (`Local/pseudo` for a hub-only node,
+    `SimpleUSB/59929` for the real RF-attached node, `USRP/
+    127.0.0.1:34001:32001` for the DVSwitch/Analog_Bridge bridge --
+    confirmed rxchannel really is per-node-stanza, not one global
+    setting); `module show like audiosocket`/`module show like res_ari`
+    both came back "0 modules loaded" -- but a full-disk `find` (past the
+    generic `/usr/lib/asterisk/modules/` path, which is WRONG on this
+    ARM64/aarch64 box -- the real path is
+    `/usr/lib/aarch64-linux-gnu/asterisk/modules/`) showed EVERY module
+    for BOTH candidate mechanisms already present as `.so` files, just
+    unloaded: `app_audiosocket.so`/`chan_audiosocket.so`/
+    `app_chanspy.so`/`res_audiosocket.so`, and the full ARI/Stasis stack
+    (`res_ari.so` + every `res_ari_*.so` sub-resource including
+    `res_ari_channels.so`/`res_ari_bridges.so`, `res_stasis.so` +
+    `res_stasis_snoop.so`, `res_http_websocket.so`). Nothing needed
+    installing -- only loading.
+  - **`sudo asterisk -rx "core show channels concise"` taken WHILE THE
+    NODE WAS ACTIVELY KEYED** is what actually settled the design: it
+    showed `SimpleUSB/59929` and `usrp/127.0.0.1:34001:32001` both
+    sitting in state "Up" with CallerID "Repeater Rx" continuously (not
+    just during a call) -- confirming a node's own rxchannel is a real,
+    persistent, always-attachable Asterisk channel object, exactly what
+    `ChanSpy()` needs a target name for, and that a VU meter fed from it
+    would show a continuous signal (low at idle, elevated when someone
+    transmits) rather than gaps. The same capture also cross-confirmed
+    unrelated ASL3 documentation elsewhere in this file, for free: node
+    600671 showed up as a real `ESTABLISHED` IAX2 link, node 622630
+    showed up mid-`Ringing` (i.e. Connecting) -- both exactly matching
+    what earlier `RPT_ALINKS`/connection-table sessions had already
+    recorded from this same node.
+  - **Chosen mechanism: `ChanSpy(<rxchannel>,qB(ctx^audiosocket^1))` +
+    `AudioSocket(uuid,host:port)` -- NOT Asterisk ARI's Snoop+
+    externalMedia, even though both were confirmed fully available.**
+    The deciding factor wasn't the dialplan-editing question (both were
+    real candidates going in) -- it was transport: AudioSocket is a
+    single TCP connection, which can ride an SSH **reverse port forward**
+    (`paramiko.Transport.request_port_forward`) on the SAME SSH
+    connection this app already holds open to every ASL3 node. The node
+    connects to its own `127.0.0.1:8288` (an arbitrary port, never opened
+    on the DASHBOARD's own host at all -- it's scoped per remote SSH
+    session, so every node can reuse the identical number with zero
+    collision risk), and SSH tunnels that back to this app. That means
+    **no new inbound port on the dashboard's firewall/Docker config, and
+    no new credential** -- the trigger is a plain `asterisk -rx "channel
+    originate ..."` over the exact same SSH login already stored in
+    `hotspots.json`. ARI's REST calls could tunnel the identical way, but
+    its actual audio payload is RTP/UDP, which can't ride a TCP tunnel
+    the same clean way -- it would still need a real open UDP port for
+    the audio itself. Confirmed the `ChanSpy`+`AudioSocket` combination
+    (`qB(context^exten^priority)` launches a second channel into a given
+    dialplan location carrying the spied audio) is a real, documented
+    pattern, not invented -- and confirmed AudioSocket's own wire framing
+    (1-byte kind + big-endian 2-byte length + payload; `KIND_AUDIO=0x10`
+    carries raw 16-bit/8kHz mono PCM) from Asterisk's own current docs
+    before writing `asl_audio.py`'s parser.
+  - **One context PER NODE, not one shared context with per-node
+    extension names** (`config.ASL_AUDIO_SPY_CONTEXT_FMT`,
+    `dashboard-audiospy-<node>`) -- `provision-audio-meter.sh` writes each
+    node's dialplan to its own file
+    (`/etc/asterisk/dashboard-audiospy-<node>.conf`), so re-running it for
+    one node is a clean whole-file overwrite with zero merge/dedupe logic
+    needed, and provisioning a second local node on the same box (a real
+    scenario, confirmed live -- this one box has three) can't collide
+    with the first's extensions. The dialplan content is fully static per
+    node (rxchannel, tunnel port, and a deterministic per-node UUID --
+    `00000000-0000-0000-0000-<node in hex>`, chosen only so re-running the
+    script produces byte-identical output, not because anything on this
+    app's side ever checks it) -- no runtime dialplan variables needed,
+    so triggering is just `channel originate Local/spy@<ctx> extension
+    spy@<ctx>` over SSH, no AMI `Originate` action or channel-variable
+    injection required.
+  - **This is a fully separate subsystem from `monitor.py`'s poll loop**
+    (`AslAudioManager`/`_AslAudioWorker`, mirroring `openspot.py`'s
+    `OpenSpot4Manager` diff-and-stop-old shape almost exactly) --
+    audio level changes far faster than the 5s SSH poll, so `HotspotStatus`/
+    `models.py` were deliberately NOT touched; the level lives only in the
+    manager's own lock-guarded per-worker state, read by a new, cheap,
+    pure-in-memory `GET /api/audio_level` route. `openspot.py`'s
+    "N independent persistent connections, one per configured device, no
+    viewer-based gating" shape was chosen over `camera_stream.py`'s
+    lazy-start-on-viewer pattern for the same reason it was chosen there:
+    there's no clean per-card "is anyone looking at this" signal when the
+    data is delivered over a polled JSON endpoint rather than a real HTTP
+    stream with countable viewers.
+  - **The browser polls `/api/audio_level` on its own separate ~250ms
+    interval** (`fetchAudioLevels()`), decoupled entirely from the main
+    3s `/api/data` cycle -- deliberately, since a 3s-driven level would
+    look exactly as stepped/laggy as the "MixMonitor + SSH poll" option
+    that was explicitly rejected earlier in this same conversation for
+    that reason. Reuses the EXACT existing spring-physics LED meter
+    (`vuMeterRow()`/`paintVu()`/`vuTick()`) with zero changes to that
+    code -- only the two ASL3 exclusions (`renderCards()`'s
+    `vuMeterBlock` and the `/api/data`-driven pct-tracking block) became
+    conditional on `audio_meter_enabled` instead of blanket-skipping
+    every ASL3 card.
+  - **Not yet live-tested against a real AudioSocket connection end to
+    end** (this dev sandbox has no reachable ASL3 node) -- the paramiko
+    `Transport.request_port_forward`/`accept`/`Channel.recv` calls were
+    confirmed to exist with the expected signatures against the installed
+    paramiko 5.0.0, and the AudioSocket frame parser was written directly
+    from Asterisk's own current documented wire format, but neither the
+    reverse-tunnel round trip nor a real `ChanSpy`+`AudioSocket` session
+    against a live app_rpt-managed channel has been observed firsthand.
+    If this doesn't work on the first real try, re-verify the SAME way
+    everything else in this section was verified -- a live SSH session
+    against the actual node, not further reasoning from docs. Two
+    specific unknowns worth checking first if it doesn't: whether this
+    node's `sshd_config` allows `AllowTcpForwarding` (default is usually
+    yes, but never explicitly confirmed here), and whether `ChanSpy`'s
+    audiohook mechanism actually attaches cleanly to an app_rpt-managed
+    channel the way it would a normal `Dial()`/`Bridge()` channel (a
+    genuine, disclosed unknown going in -- app_rpt does its own internal
+    software audio mixing, largely independent of Asterisk's core
+    `Bridge()` subsystem, and this was never separately verified beyond
+    "the channel object exists and shows Up in `core show channels`").
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

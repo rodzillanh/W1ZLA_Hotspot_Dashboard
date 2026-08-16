@@ -1380,7 +1380,8 @@
                         data-enabled="{{ hs.get('enabled', True) }}"
                         data-dvswitch-enabled="{{ hs.get('dvswitch_enabled', False) }}"
                         data-dvswitch-ports="{{ hs.get('dvswitch_ports', '') }}"
-                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.cardUrl, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.dvswitchEnabled, this.dataset.dvswitchPorts)">
+                        data-audio-meter-enabled="{{ hs.get('audio_meter_enabled', False) }}"
+                        onclick="editHotspot(this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.cardUrl, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.dvswitchEnabled, this.dataset.dvswitchPorts, this.dataset.audioMeterEnabled)">
                     Edit
                 </button>
                 <form action="/api/delete_hotspot/{{ hs.ip }}" method="POST" style="margin:0">
@@ -1460,6 +1461,13 @@
                 </label>
                 <input type="text" id="hs-card-url" placeholder="e.g. http://192.168.1.50/allscan">
             </div>
+            <div style="grid-column:1/-1;display:flex;align-items:center">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="hs-audio-meter-enabled">
+                    Live audio-level VU meter
+                    <span style="font-size:10px;color:var(--text-dim)">(real signal level from the node's own repeater audio, not RSSI/BER — needs provision-audio-meter.sh run against this node first; see README)</span>
+                </label>
+            </div>
         </div>
         <div class="form-grid" style="margin-bottom:10px;display:none" id="hs-openspot4-fields">
             <div style="grid-column:1/-1;font-size:12px;color:var(--text-dim);margin-bottom:8px">
@@ -1495,6 +1503,7 @@
                 <input type="checkbox" name="enabled" id="form-enabled" style="display:none">
                 <input type="checkbox" name="dvswitch_enabled" id="form-dvswitch-enabled" style="display:none">
                 <input type="hidden" name="dvswitch_ports" id="form-dvswitch-ports">
+                <input type="checkbox" name="audio_meter_enabled" id="form-audio-meter-enabled" style="display:none">
                 <button class="btn btn-primary" onclick="submitHotspot(event)">Save hotspot</button>
             </form>
             <button class="btn btn-danger btn-sm" onclick="clearHotspotForm()" style="margin-left:auto">Clear</button>
@@ -2279,9 +2288,10 @@ function submitHotspot(e) {
     document.getElementById('form-enabled').checked = document.getElementById('hs-enabled-toggle').classList.contains('on');
     document.getElementById('form-dvswitch-enabled').checked = document.getElementById('hs-dvswitch-enabled').checked;
     document.getElementById('form-dvswitch-ports').value = document.getElementById('hs-dvswitch-ports').value;
+    document.getElementById('form-audio-meter-enabled').checked = document.getElementById('hs-audio-meter-enabled').checked;
 }
 
-function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, cardUrl, openspot4ExtraPass, enabled, dvswitchEnabled, dvswitchPorts) {
+function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, cardUrl, openspot4ExtraPass, enabled, dvswitchEnabled, dvswitchPorts, audioMeterEnabled) {
     document.getElementById('hs-name').value    = name;
     document.getElementById('hs-ip').value      = ip;
     document.getElementById('hs-orig-ip').value = ip;
@@ -2297,6 +2307,7 @@ function editHotspot(name, ip, user, pass, lat, lon, bmid, type, aslNode, cardUr
     document.getElementById('hs-enabled-toggle').classList.toggle('on', enabled !== 'False');
     document.getElementById('hs-dvswitch-enabled').checked = dvswitchEnabled === 'True';
     document.getElementById('hs-dvswitch-ports').value = (dvswitchPorts && dvswitchPorts !== 'None') ? dvswitchPorts : '';
+    document.getElementById('hs-audio-meter-enabled').checked = audioMeterEnabled === 'True';
     onHotspotTypeChange();
     onDvswitchToggle();
     resetHsPasswordVisibility();
@@ -2310,6 +2321,7 @@ function clearHotspotForm() {
     document.getElementById('hs-type').value = 'wpsd';
     document.getElementById('hs-enabled-toggle').classList.add('on');
     document.getElementById('hs-dvswitch-enabled').checked = false;
+    document.getElementById('hs-audio-meter-enabled').checked = false;
     onHotspotTypeChange();
     onDvswitchToggle();
     resetHsPasswordVisibility();

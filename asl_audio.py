@@ -1,0 +1,237 @@
+"""Live audio-level metering for ASL3 (AllStarLink) hotspot cards.
+
+Real PCM off a node's own repeater audio, reduced to an RMS level for the
+dashboard's VU meter -- ASL3 has no MMDVM-style RSSI/BER telemetry at all
+(it's IAX2/Asterisk, not a radio modem), so unlike WPSD there was nothing
+to drive that meter with until now. See config.py's ASL_AUDIO_* constants
+and CLAUDE.md for the full research/diagnostic session this was built
+from (a real, live W1ZLA/node 59929 SSH capture, 2026-08) -- do not touch
+the mechanism below without re-verifying against a real node the same way.
+
+Mechanism: ChanSpy() attached to the node's own rxchannel -- the same
+persistent, always-"Up" channel `rpt xnode` already treats as the RF
+receiver (confirmed live, e.g. "SimpleUSB/59929 ... Repeater Rx") --
+whispering that audio into a second channel running AudioSocket(), a
+plain TCP client connection carrying raw 16-bit/8kHz mono PCM per
+Asterisk's own AudioSocket dialplan app. That TCP connection rides an SSH
+REVERSE port forward on the SAME SSH login this app already uses to poll
+the node (paramiko's request_port_forward) -- the node connects to its
+own 127.0.0.1:ASL_AUDIO_TUNNEL_PORT, and SSH tunnels it back here. No new
+inbound port on the dashboard host, no new credential beyond the SSH
+login already stored in hotspots.json. See config.py's own comment for
+why this was chosen over Asterisk ARI's Snoop+externalMedia (also
+confirmed available on the diagnosed build, but RTP/UDP-based, which
+can't ride the same tunnel).
+
+This is a fully separate subsystem from monitor.py's poll loop -- audio
+level changes far faster than the 5s SSH poll, so it's its own set of
+persistent per-node connections, same "N independent workers reconciled
+against hotspots.json" shape as openspot.py's OpenSpot4Manager (there's
+no clean per-card "someone is looking at this" signal the way
+camera_stream.py's real HTTP MJPEG viewers give it, since the meter is
+delivered over a polled JSON endpoint, not a stream) -- not something
+bolted onto FleetMonitor/HotspotStatus.
+
+Requires the node to have already been provisioned once via
+provision-audio-meter.sh (loads chan_audiosocket.so/app_audiosocket.so/
+app_chanspy.so and installs a small, per-node, fully-static dialplan
+include). A worker whose trigger command fails (not provisioned yet, or
+AllowTcpForwarding disabled in the node's sshd_config) just retries with
+backoff like every other degrade-gracefully integration in this project
+-- it never raises out of reconcile()/snapshot().
+"""
+import struct
+import threading
+import time
+
+import paramiko
+
+import config
+from storage import load_hotspots
+
+# AudioSocket wire framing (Asterisk's own AudioSocket dialplan-app
+# docs): a 1-byte "kind" + big-endian 2-byte length header, then that
+# many bytes of payload. KIND_AUDIO carries raw 16-bit/8kHz mono PCM
+# (signed, little-endian); KIND_HANGUP/KIND_ID/KIND_ERROR carry no audio
+# and are just observed/ignored here -- this worker only needs the
+# level, not call identity/lifecycle bookkeeping.
+_KIND_HANGUP = 0x00
+_KIND_ID     = 0x01
+_KIND_AUDIO  = 0x10
+_KIND_ERROR  = 0xFF
+
+
+def _recv_exact(chan, n: int) -> bytes:
+    buf = b""
+    while len(buf) < n:
+        chunk = chan.recv(n - len(buf))
+        if not chunk:
+            raise EOFError("AudioSocket connection closed mid-frame")
+        buf += chunk
+    return buf
+
+
+def _rms_level(payload: bytes) -> float:
+    """0.0-1.0 normalized RMS over a chunk of signed 16-bit LE PCM. A
+    plain struct-based loop, not a new dependency -- Python 3.12 dropped
+    stdlib audioop, but this is genuinely simple math (~5 lines), not a
+    reverse-engineered protocol worth a real dependency for (contrast
+    camera_stream.py's bambulabs_api, a real proprietary protocol)."""
+    n = len(payload) // 2
+    if n == 0:
+        return 0.0
+    samples = struct.unpack(f"<{n}h", payload[: n * 2])
+    mean_sq = sum(s * s for s in samples) / n
+    return min(1.0, (mean_sq ** 0.5) / 32768.0)
+
+
+class _AslAudioWorker:
+    """One persistent SSH connection + reverse port forward + AudioSocket
+    tap for one ASL3 hotspot. Reconnect-with-backoff shape mirrors
+    openspot.py's _OpenSpot4Worker -- a fresh SSH login, a fresh reverse
+    tunnel, and a fresh `channel originate` trigger every time the tap
+    needs (re)establishing, since none of it survives a dropped
+    connection."""
+
+    def __init__(self, hotspot: dict):
+        self._ip   = hotspot["ip"]
+        self._user = hotspot.get("user")
+        self._pass = hotspot.get("pass")
+        self._node = hotspot.get("asl_node", "")
+        self._stop_event = threading.Event()
+        self._lock = threading.Lock()
+        self._level = 0.0
+        self._connected = False
+        self._last_frame_at = 0.0
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+    def config_matches(self, hotspot: dict) -> bool:
+        return (hotspot.get("ip") == self._ip
+                and hotspot.get("user") == self._user
+                and hotspot.get("pass") == self._pass
+                and hotspot.get("asl_node", "") == self._node)
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            stale = (time.time() - self._last_frame_at) > config.ASL_AUDIO_STALE_SEC
+            connected = self._connected and not stale
+            return {"level": self._level if connected else 0.0, "connected": connected}
+
+    def _set_level(self, level: float) -> None:
+        with self._lock:
+            self._level = level
+            self._last_frame_at = time.time()
+            self._connected = True
+
+    def _set_disconnected(self) -> None:
+        with self._lock:
+            self._connected = False
+            self._level = 0.0
+
+    def _loop(self) -> None:
+        while not self._stop_event.is_set():
+            try:
+                self._run_once()
+            except Exception:
+                pass
+            self._set_disconnected()
+            if not self._stop_event.is_set():
+                self._stop_event.wait(config.ASL_AUDIO_RECONNECT_BACKOFF)
+
+    def _run_once(self) -> None:
+        if not self._node.isdigit():
+            raise ValueError(f"no valid ASL node number configured for {self._ip}")
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        try:
+            client.connect(self._ip, username=self._user, password=self._pass,
+                            timeout=config.SSH_TIMEOUT)
+            transport = client.get_transport()
+            transport.request_port_forward("127.0.0.1", config.ASL_AUDIO_TUNNEL_PORT)
+            try:
+                client.exec_command(
+                    config.build_asl_audio_originate_cmd(self._node), timeout=config.SSH_TIMEOUT
+                )
+                chan = transport.accept(timeout=config.SSH_TIMEOUT)
+                if chan is None:
+                    raise TimeoutError(
+                        "AudioSocket never connected back through the tunnel -- "
+                        "has provision-audio-meter.sh been run against this node?"
+                    )
+                chan.settimeout(config.ASL_AUDIO_STALE_SEC * 2)
+                try:
+                    self._read_audiosocket(chan)
+                finally:
+                    chan.close()
+            finally:
+                transport.cancel_port_forward("127.0.0.1", config.ASL_AUDIO_TUNNEL_PORT)
+        finally:
+            client.close()
+
+    def _read_audiosocket(self, chan) -> None:
+        while not self._stop_event.is_set():
+            header = _recv_exact(chan, 3)
+            kind = header[0]
+            length = (header[1] << 8) | header[2]
+            payload = _recv_exact(chan, length) if length else b""
+            if kind == _KIND_AUDIO:
+                self._set_level(_rms_level(payload))
+            elif kind in (_KIND_HANGUP, _KIND_ERROR):
+                return
+
+
+class AslAudioManager:
+    """Reconciles hotspots.json's audio_meter_enabled ASL3 entries against
+    live per-node worker threads. Same diff-and-stop-old shape as
+    openspot.py's OpenSpot4Manager -- see that class's own docstring for
+    why this "N independent persistent connections" shape fits better
+    here than camera_stream.py's viewer-count-gated lazy start."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._workers: dict[str, _AslAudioWorker] = {}
+
+    def reconcile(self, hotspots: list) -> None:
+        desired = {
+            h["ip"]: h for h in hotspots
+            if h.get("type") == "asl3" and h.get("audio_meter_enabled")
+               and h.get("enabled", True)
+        }
+        to_stop = []
+        with self._lock:
+            for ip, worker in list(self._workers.items()):
+                hs = desired.get(ip)
+                if hs is None or not worker.config_matches(hs):
+                    to_stop.append(self._workers.pop(ip))
+            for ip, hs in desired.items():
+                if ip not in self._workers:
+                    worker = _AslAudioWorker(hs)
+                    worker.start()
+                    self._workers[ip] = worker
+        for worker in to_stop:  # outside the lock -- mirrors OpenSpot4Manager/CameraStreamManager
+            worker.stop()
+
+    def remove(self, ip: str) -> None:
+        with self._lock:
+            worker = self._workers.pop(ip, None)
+        if worker is not None:
+            worker.stop()
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            return {ip: w.snapshot() for ip, w in self._workers.items()}
+
+    def run_forever(self) -> None:
+        """Periodic safety-net reconcile, same rationale as
+        OpenSpot4Manager.run_forever() -- every route that mutates
+        hotspots.json already calls reconcile() explicitly, so this
+        mostly no-ops in practice."""
+        while True:
+            self.reconcile(load_hotspots())
+            time.sleep(config.POLL_INTERVAL)

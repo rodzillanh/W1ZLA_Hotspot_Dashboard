@@ -678,6 +678,38 @@ everything else (Settings → Hotspots) — one position for the whole card,
 same as Fleet Activity/ASL Favorites, not one per node.
 
 <!-- wiki-group: Hotspot Types -->
+## ASL3 live audio-level VU meter
+
+An optional, real (not synthetic) VU meter for ASL3 hotspot cards. WPSD/
+openSPOT4 cards already have one driven by RSSI/BER/dejitter telemetry —
+ASL3 has none of that (it's IAX2/Asterisk, not a radio modem), so this
+taps the node's own repeater audio directly instead.
+
+**One-time setup per node**, run *on the node itself* over SSH:
+
+```
+sudo bash provision-audio-meter.sh <your-node-number>
+```
+
+This loads three Asterisk modules (already present on a stock ASL3 build,
+just not loaded by default) and installs a small, isolated dialplan file
+of its own — it never edits your existing `extensions.conf`/`modules.conf`
+content, only appends an `#include` line and a `load =>` line if they're
+not already there. Safe to re-run. Then, back in the dashboard, tick
+**"Live audio-level VU meter"** for that hotspot (Settings → Hotspots →
+edit the node, or the card's own gear-icon drawer).
+
+No SSH credentials or ports to configure beyond what's already there —
+the dashboard triggers a `ChanSpy`/`AudioSocket` dialplan call over the
+same SSH login already stored for that hotspot, and tunnels the audio
+back to itself over that same connection (an SSH reverse port forward),
+so nothing new needs opening on your network or firewall.
+
+The meter updates several times a second, not just once per poll cycle,
+so it visibly tracks real signal dynamics rather than stepping between
+infrequent samples.
+
+<!-- wiki-group: Hotspot Types -->
 ## openSPOT 4 (SharkRF) nodes
 
 A third node type alongside WPSD/Pi-Star and ASL3, added in v3.38 —

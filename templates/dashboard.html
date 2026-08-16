@@ -3544,6 +3544,39 @@ function vuTick(t) {
 }
 requestAnimationFrame(vuTick);
 
+// ASL3's live audio-level meter (see asl_audio.py) is fed by its OWN
+// fast poll, decoupled from the main 3s /api/data cycle -- that cadence
+// is fine for RSSI/BER (only ever updates at a call's end anyway), but
+// a real audio RMS level needs to update far more often than that to
+// read as live rather than stepped, the same "MixMonitor + SSH poll"
+// problem this feature deliberately avoided (see CLAUDE.md). paintVu()'s
+// existing spring physics smooths between even these more-frequent
+// samples the same way it already smooths WPSD's infrequent ones.
+// Reads lastApiData (set every 3s by refresh(), see its own comment)
+// rather than tracking a separate enabled-ip list -- skips the fetch
+// entirely when nothing on the page needs it.
+function fetchAudioLevels() {
+    const enabledIps = (lastApiData || [])
+        .filter(hs => hs.type === 'asl3' && hs.audio_meter_enabled)
+        .map(hs => hs.ip);
+    if (!enabledIps.length) return;
+    fetch('/api/audio_level')
+        .then(r => r.json())
+        .then(levels => {
+            enabledIps.forEach(ip => {
+                const entry = levels[ip];
+                const pct = entry ? entry.level * 100 : 0;
+                if (vuMeters[ip]) {
+                    vuMeters[ip].pct = pct;
+                } else {
+                    vuMeters[ip] = { pct, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
+                }
+            });
+        })
+        .catch(() => {});
+}
+setInterval(fetchAudioLevels, 250);
+
 // --- courtesy tone (off by default) ---
 let toneFiredCalls = {};  // ip -> last active_call already toned for
 
@@ -4045,8 +4078,11 @@ function renderCards(data) {
         // why the two node types behave differently once idle (openSPOT4's
         // needle genuinely falls toward a live idle reading; WPSD's holds
         // at the last real value, since it has no live idle reading at
-        // all to fall toward).
-        const vuMeterBlock = isAsl ? '' : vuMeterRow(hs.ip);
+        // all to fall toward). ASL3 only gets one when audio_meter_enabled
+        // (see asl_audio.py) -- a real signal level from the node's own
+        // repeater audio, fed by the separate fast /api/audio_level poll
+        // below, not this card's usual RSSI/BER-derived sources.
+        const vuMeterBlock = (isAsl && !hs.audio_meter_enabled) ? '' : vuMeterRow(hs.ip);
 
         const statsGrid = isAsl
             ? ''
@@ -4232,7 +4268,19 @@ function renderCards(data) {
     // synced to every 3s poll.
     data.forEach(hs => {
         if (hs.type === 'asl3') {
-            if (vuMeters[hs.ip]) delete vuMeters[hs.ip];
+            // ASL3 has no RSSI/BER/dejitter data at all to drive this
+            // block's usual pct tracking -- when audio_meter_enabled, the
+            // SEPARATE fast /api/audio_level poll (fetchAudioLevels())
+            // owns vuMeters[hs.ip].pct instead, so this just makes sure an
+            // entry exists for paintVu() to find (it no-ops on `!state`)
+            // without touching pct itself. Otherwise (no meter element
+            // rendered at all -- see vuMeterBlock above), same
+            // no-stale-state cleanup as before.
+            if (hs.audio_meter_enabled) {
+                if (!vuMeters[hs.ip]) vuMeters[hs.ip] = { pct: null, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
+            } else if (vuMeters[hs.ip]) {
+                delete vuMeters[hs.ip];
+            }
             return;
         }
         const dejitterPct = hs.type === 'openspot4' ? dejitterBarPct(hs.dejitter_pkts) : null;
@@ -7868,7 +7916,12 @@ function renderHotspotSettingsFields(hs, cfg) {
             <div class="hs-field-label-row"><label>DVSwitch ports</label><span class="hs-field-status" id="hsf-status-dvports">✓ Saved</span></div>
             <input type="text" id="hsf-dvports" onblur="saveHotspotField('dvswitch_ports', this.value)">
             <div class="hs-help">One or more Analog_Bridge ports, comma or newline separated.</div>
-        </div>`;
+        </div>
+        <div class="hs-toggle-row">
+            <span class="hs-toggle-label">Live audio-level VU meter</span>
+            <div class="hs-switch" id="hsf-audio-meter-enabled" onclick="hsToggleAudioMeter(this)"></div>
+        </div>
+        <div class="hs-help" style="margin-top:-6px;margin-bottom:8px">Real signal level from the node's own repeater audio, not RSSI/BER -- needs provision-audio-meter.sh run against this node first.</div>`;
     } else if (!isOpenSpot4) {
         fieldsHtml += `
         <div class="hs-field">
@@ -7905,6 +7958,7 @@ function renderHotspotSettingsFields(hs, cfg) {
         setVal('hsf-dvports', cfg.dvswitch_ports);
         document.getElementById('hsf-dvswitch-enabled').classList.toggle('on', !!cfg.dvswitch_enabled);
         document.getElementById('hsf-dvports-field').style.display = cfg.dvswitch_enabled ? '' : 'none';
+        document.getElementById('hsf-audio-meter-enabled').classList.toggle('on', !!cfg.audio_meter_enabled);
     } else if (isOpenSpot4) {
         setVal('hsf-os4extra', cfg.openspot4_extra_pass);
     } else {
@@ -7937,6 +7991,11 @@ function hsToggleDvswitch(el) {
 function hsToggleEnabled(el) {
     el.classList.toggle('on');
     saveHotspotField('enabled', el.classList.contains('on'));
+}
+
+function hsToggleAudioMeter(el) {
+    el.classList.toggle('on');
+    saveHotspotField('audio_meter_enabled', el.classList.contains('on'));
 }
 
 // Per-field instant save -- builds the full merged hotspot config (never
