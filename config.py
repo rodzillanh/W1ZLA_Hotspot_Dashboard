@@ -558,19 +558,39 @@ ASL_AUDIO_STALE_SEC = int(os.environ.get("ASL_AUDIO_STALE_SEC", 8))
 def build_asl_audio_originate_cmd(node: str) -> str:
     """SSH command that fires this node's already-provisioned spy
     extension (see provision-audio-meter.sh) -- originates a Local
-    channel into the fully-static, per-node dialplan entry that ChanSpy's
-    the node's own rxchannel onward to AudioSocket. `node` MUST be
-    pre-validated digits-only by the caller (same requirement as every
-    other ASL3 SSH command builder in this file) -- it's interpolated
-    into a shell string executed on the remote host. Needs `sudo` for the
-    same asterisk.ctl-permission reason every other `asterisk -rx`
-    command in this file does."""
+    channel whose two halves deliberately run DIFFERENT extensions, so
+    ChanSpy (on one half) and AudioSocket (on the other) end up bridged
+    together automatically, with no ChanSpy barge/whisper option
+    involved at all. This is the corrected form after a real, live-
+    verified mistake: an earlier version pointed the Local channel's own
+    embedded destination AND the origination's `extension` argument at
+    the SAME exten (both "spy"), which -- confirmed live via a safe
+    throwaway test dialplan -- makes BOTH halves run identical dialplan
+    (an earlier version of this feature also relied on a fabricated
+    ChanSpy `B(context^exten^priority)` option that doesn't exist at
+    all; see CLAUDE.md for the full story).
+
+    `Local/{SPY_EXTEN}@{ctx}` (the channel being originated) is what the
+    Local channel's OWN embedded destination points at -- its ";2" half
+    runs THIS extension automatically (ChanSpy). The `extension
+    {AUDIOSOCKET_EXTEN}@{ctx}` argument is a SEPARATE destination,
+    applied to the ";1" half (AudioSocket). Confirmed live (2026-08, a
+    throwaway `[testlocal]` dialplan with two dummy extensions) that
+    these two halves ARE automatically bridged to each other as an
+    inherent property of a Local channel pair -- audio written by
+    whatever runs on one half is what the other half reads.
+
+    `node` MUST be pre-validated digits-only by the caller (same
+    requirement as every other ASL3 SSH command builder in this file) --
+    it's interpolated into a shell string executed on the remote host.
+    Needs `sudo` for the same asterisk.ctl-permission reason every other
+    `asterisk -rx` command in this file does."""
     if not node.isdigit():
         raise ValueError(f"invalid ASL node number: {node!r}")
     ctx = ASL_AUDIO_SPY_CONTEXT_FMT.format(node=node)
     return (
         f'sudo asterisk -rx "channel originate Local/{ASL_AUDIO_SPY_EXTEN}@{ctx} '
-        f'extension {ASL_AUDIO_SPY_EXTEN}@{ctx}"'
+        f'extension {ASL_AUDIO_AUDIOSOCKET_EXTEN}@{ctx}"'
     )
 
 

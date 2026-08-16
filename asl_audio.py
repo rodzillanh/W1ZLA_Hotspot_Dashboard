@@ -170,6 +170,33 @@ class _AslAudioWorker:
                     time.sleep(config.ASL_AUDIO_FORWARD_RETRY_DELAY_SEC)
         raise last_exc
 
+    def _hangup_stale_spy_channels(self, client) -> None:
+        """Best-effort cleanup: hang up any of THIS node's own spy-context
+        Local channels still lingering when a connection attempt ends,
+        for ANY reason (error, timeout, stop). Confirmed necessary live,
+        not hypothetical -- a broken version of this feature (a
+        fabricated ChanSpy option that never worked, see CLAUDE.md) left
+        ~70 orphaned ChanSpy channels running forever on a real
+        production repeater, since nothing else was ever going to hang
+        them up. Scoped to this node's own context prefix only -- the
+        exact same targeted grep+hangup pattern used to manually clean
+        those up, never a blanket "channel request hangup all" (which
+        would drop real traffic on other links/calls). Swallows its own
+        failures -- this is cleanup, not the main flow, and must never
+        turn a connection teardown into a new exception."""
+        ctx = config.ASL_AUDIO_SPY_CONTEXT_FMT.format(node=self._node)
+        cmd = (
+            f'sudo asterisk -rx "core show channels concise" | '
+            f"grep '^Local/{config.ASL_AUDIO_SPY_EXTEN}@{ctx}' | "
+            f"cut -d'!' -f1 | "
+            f'while read -r ch; do sudo asterisk -rx "channel request hangup $ch"; done'
+        )
+        try:
+            _, stdout, _ = client.exec_command(cmd, timeout=config.SSH_TIMEOUT)
+            stdout.read()
+        except Exception:
+            pass
+
     def _run_once(self) -> None:
         if not self._node.isdigit():
             raise ValueError(f"no valid ASL node number configured for {self._ip}")
@@ -213,6 +240,7 @@ class _AslAudioWorker:
             finally:
                 transport.cancel_port_forward("127.0.0.1", config.ASL_AUDIO_TUNNEL_PORT)
         finally:
+            self._hangup_stale_spy_channels(client)
             client.close()
 
     def _read_audiosocket(self, chan) -> None:

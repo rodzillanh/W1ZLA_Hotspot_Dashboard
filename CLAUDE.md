@@ -5087,11 +5087,72 @@ config for per-integration credentials; put it in
        whole command doesn't exist, which is what made this look like a
        command-syntax bug rather than a missing-module one. Added to
        `config.ASL_AUDIO_MODULES` and `provision-audio-meter.sh`'s
-       `MODULES` array. **Still not confirmed working end-to-end as of
-       this fix** -- re-verify the same way once `res_clioriginate.so` is
-       actually loaded and re-provisioned, don't assume this was the
-       last bug in the chain just because it's the most plausible one
-       found so far.
+       `MODULES` array.
+    5. **The connection-layer bugs (#1-4) were all real, but fixing them
+       exposed the actual, final design mistake underneath: a fabricated
+       ChanSpy option that never existed.** With `res_clioriginate.so`
+       loaded, `channel originate` finally succeeded -- but
+       `transport.accept()` still timed out every time with no
+       AudioSocket connection ever arriving. `core show channels
+       concise` showed the real, serious cost of this: **over 70 stuck
+       `Local/spy@dashboard-audiospy-59929-*` channels**, accumulated
+       over several minutes of retries (durations up to 778 seconds),
+       every single one sitting in `ChanSpy` state and NEVER hanging up
+       on its own -- a real, live resource leak on a production
+       repeater, not a hypothetical. Root cause: this feature's dialplan
+       used `ChanSpy(<rxchannel>,qB(context^exten^priority))`, believing
+       `B(...)` would barge the spied audio into a second channel
+       running `AudioSocket()`. **That syntax was never real** --
+       fetched directly from Asterisk's own current ChanSpy docs page
+       and confirmed `B` is a BARE FLAG with no parenthesized argument
+       at all ("Instead of whispering on a single channel barge in on
+       both channels involved in the call"), unrelated to launching a
+       second channel into a dialplan location. The earlier "confirmed"
+       finding that `qB(ctx^ext^pri)` worked was trusted from an
+       AI-summarized secondhand search result, never checked against
+       Asterisk's own docs directly -- exactly the mistake this
+       project's own discipline exists to prevent, and it slipped
+       through once here.
+       **The corrected mechanism, verified live with a safe, throwaway
+       `[testlocal]` dialplan (two dummy extensions, 5-second self-
+       hangup, no real audio/ChanSpy/AudioSocket involved) before ever
+       touching the real config again**: a Local channel's two halves
+       (`;1`/`;2`) can run genuinely DIFFERENT extensions and are
+       inherently bridged to each other regardless -- confirmed by
+       originating `Local/legA@testlocal extension legB@testlocal` and
+       seeing, in `core show channels concise`'s own context/exten
+       fields, `;2` running `legA` (the Local channel's own embedded
+       destination) while `;1` ran `legB` (the origination's separate
+       `extension` argument). Applied to the real feature: the Local
+       channel's own name still embeds `spy` (so ChanSpy runs on `;2`),
+       but `config.build_asl_audio_originate_cmd()`'s `extension`
+       argument now points at `audiosocket` instead of also `spy` (so
+       AudioSocket runs on `;1`) -- the two halves' inherent bridge does
+       the rest, no `B()`/barge option needed at all. `ChanSpy(...)` in
+       `provision-audio-meter.sh`'s generated dialplan is now plain `q`
+       (quiet), nothing else.
+       **Lesson for next time a "confirmed" finding turns out wrong**:
+       an AI-summarized web search result is not the same tier of
+       evidence as the tool's own documentation page fetched directly,
+       even when the summary sounds concrete and cites a plausible-
+       looking example -- this project's own established discipline
+       (verify against the real source, not a paraphrase of it) applies
+       to researching a mechanism BEFORE writing code against it, not
+       just to testing the code afterward.
+    6. Cleanup of the ~70 leaked channels used a targeted, NOT a blanket
+       hangup -- `channel request hangup all` exists and would have been
+       faster, but hangs up EVERY channel on the box, including real
+       IAX2 links and any live QSO. Used instead:
+       `core show channels concise | grep '^Local/spy@dashboard-
+       audiospy-59929' | cut -d'!' -f1 | while read -r ch; do asterisk
+       -rx "channel request hangup $ch"; done` -- matches only the
+       leaked prefix, confirmed to leave `SimpleUSB/59929`, the IAX2
+       links, and the USRP bridge completely untouched.
+    **Still not confirmed working end-to-end as of this fix** --
+    re-verify live the same way once the corrected dialplan is
+    re-provisioned, and watch `core show channels concise` for the
+    dashboard-audiospy prefix during testing to catch any further
+    leak immediately rather than letting it accumulate again.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
