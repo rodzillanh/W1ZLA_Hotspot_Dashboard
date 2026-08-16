@@ -679,6 +679,7 @@ same as Fleet Activity/ASL Favorites, not one per node.
 
 <!-- wiki-group: Hotspot Types -->
 ## ASL3 live audio-level VU meter
+<!-- wiki-image: hotspot-card-asl3.png -->
 
 An optional, real (not synthetic) VU meter for ASL3 hotspot cards. WPSD/
 openSPOT4 cards already have one driven by RSSI/BER/dejitter telemetry —
@@ -691,7 +692,7 @@ taps the node's own repeater audio directly instead.
 sudo bash provision-audio-meter.sh <your-node-number>
 ```
 
-This loads three Asterisk modules (already present on a stock ASL3 build,
+This loads four Asterisk modules (already present on a stock ASL3 build,
 just not loaded by default) and installs a small, isolated dialplan file
 of its own — it never edits your existing `extensions.conf`/`modules.conf`
 content, only appends an `#include` line and a `load =>` line if they're
@@ -708,6 +709,15 @@ so nothing new needs opening on your network or firewall.
 The meter updates several times a second, not just once per poll cycle,
 so it visibly tracks real signal dynamics rather than stepping between
 infrequent samples.
+
+Confirmed working live against real hardware (see CLAUDE.md for the full
+diagnostic story) — as a one-time sanity check after provisioning a new
+node, this should show at most one matched pair while the meter is
+active, and none while idle:
+
+```
+sudo asterisk -rx "core show channels concise" | grep dashboard-audiospy
+```
 
 <!-- wiki-group: Hotspot Types -->
 ## openSPOT 4 (SharkRF) nodes

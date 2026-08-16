@@ -71,6 +71,16 @@ HOTSPOT_ASL3 = {
     "user": "root", "pass": "demo", "enabled": True, "asl_node": "59929",
     "lat": "43.2162", "lon": "-71.0132",
     "dvswitch_enabled": True, "dvswitch_ports": "31000,31001",
+    # The live audio-level VU meter card row (see asl_audio.py) is driven
+    # by a REAL background worker that SSHes to this fake TEST-NET-2 IP
+    # and fails forever in the background -- harmless (same
+    # degrade-gracefully contract every other integration here has), but
+    # it means /api/audio_level never has a real level for this demo IP.
+    # audio_manager.snapshot is monkeypatched below (screenshot-only,
+    # same "fake a live state for illustration" trick already used for
+    # the ASL Favorites "recently active" screenshot -- see CLAUDE.md)
+    # so the meter actually shows a lit, moving bar in the capture.
+    "audio_meter_enabled": True,
 }
 # A second DVSwitch-enabled ASL3 node -- purely so the redesigned DVSwitch
 # card's "Show:" picker (v3.99) has a real second option in its screenshot,
@@ -241,6 +251,15 @@ with app.monitor._lock:
     for hs in (wpsd_active, wpsd_idle, asl3, asl3_relay):
         app.monitor._data[hs.ip] = hs
 
+# Fake a live, mid-level reading for the audio meter's fast /api/audio_level
+# poll -- the real AslAudioManager.reconcile() (called eagerly by app.py at
+# import time, same as openspot_manager) DOES start a real worker for
+# HOTSPOT_ASL3's audio_meter_enabled=True, but it can only ever fail against
+# this fake TEST-NET-2 IP. Screenshot-only monkeypatch, never touches real
+# behavior -- same trick already used for the ASL Favorites "recently
+# active" state screenshot (see CLAUDE.md).
+app.audio_manager.snapshot = lambda: {HOTSPOT_ASL3["ip"]: {"level": 0.62, "connected": True}}
+
 # --- 4. Seed Fleet Activity / Top 5 Activity (storage_activity.py) --
 # log_activity() always timestamps "now", which is fine for a demo chart.
 # Durations are deliberately NOT proportional to call count -- W2ECR's one
@@ -307,7 +326,13 @@ CARD_SHOTS = [
 with sync_playwright() as p:
     browser = p.chromium.launch()
     page = browser.new_page(viewport={"width": 1600, "height": 1200})
-    page.goto(BASE_URL, wait_until="networkidle")
+    # "networkidle" no longer works for this page as of the audio meter
+    # feature (v4.32) -- fetchAudioLevels() polls /api/audio_level every
+    # ~250ms for as long as the page is open, so the page NEVER goes
+    # 500ms without a request, and "networkidle" waits forever. "load"
+    # plus the explicit wait_for_timeout below (already relied on to let
+    # the poll cycle + card JS populate) is what actually matters here.
+    page.goto(BASE_URL, wait_until="load")
     page.wait_for_timeout(2500)  # let the poll cycle + card JS populate
     # The Starlink train sub-section (inside satellites-card) does two
     # SEQUENTIAL live fetches (a CelesTrak page scrape, then a TLE fetch)
