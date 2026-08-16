@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.29 "Croce"</span>
+                <span class="release-version">v4.30 "Young"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>VU meter is now always visible, promoted to its own row, and shows a numeric readout</span> — mocked up (live-animated, cycling between idle/active states) and approved before building. Previously the meter only appeared during an active call, swapped for a plain RSSI/BER text row otherwise, and lived squeezed into the Mode/Freq/Temp/CPU stats grid. It's now a standalone row directly under the activity status (with a divider separating "what's happening right now" from static technical details below), rendered at all times so the needle visibly falls toward idle at the end of a call instead of the whole row disappearing — openSPOT4's needle settles toward a genuine live idle reading; WPSD's holds at its last real value, since MMDVM has no live idle reading to fall toward. A numeric percentage now sits at the end of the bar alongside the segments and peak marker</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.29 "Croce"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>VU meter now uses packet loss, a more meaningful real signal for network-relayed traffic</span> — a live MMDVM log capture (WPSD) confirmed RSSI is never logged at all for network-received transmissions (only genuine RF-received ones, which is why the meter often had nothing but BER to fall back on), and BER itself sat at a flat 0.0% for nearly every call in that session while packet loss ranged 0-66% for otherwise-ordinary calls. Packet loss is now parsed from the same log line (and openSPOT4's equivalent "loss" field, from the same calllog event ber/rssi already come from) and slotted into the fallback chain ahead of BER — real, previously-unparsed data, not a new metric invented for this</li>

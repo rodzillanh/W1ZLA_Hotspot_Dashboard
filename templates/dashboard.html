@@ -156,9 +156,18 @@
         }
         .hotspot-card { transition: opacity .35s ease, filter .35s ease; }
 
-        /* --- VU meter: replaces the RSSI/BER line while a call is
-           active, thin LED-bargraph style. --- */
-        .vu-meter { position: relative; grid-column: 1 / -1; display: flex; gap: 2px; height: 3px; align-items: center; }
+        /* --- VU meter (v4.30): a standalone row, always visible (no
+           longer swapped for a static RSSI/BER row when idle, and no
+           longer squeezed into the Mode/Freq/Temp/CPU stats-grid) -- its
+           own full-width row directly under the activity status, with a
+           thin divider separating "what's happening right now" (who's
+           active, connection quality) from the static technical details
+           below it. Mockup-approved before building -- see CLAUDE.md. --- */
+        .vu-meter-row {
+            display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--text-muted);
+            margin: 10px 0 14px; padding-top: 10px; border-top: 1px solid var(--card-border);
+        }
+        .vu-meter { position: relative; flex: 1; min-width: 0; display: flex; gap: 2px; height: 3px; align-items: center; }
         .vu-seg { flex: 1; height: 100%; border-radius: 1px; background: var(--panel-2); transition: background .07s linear; }
         /* Peak-hold marker (v4.28) -- climbs instantly with the needle,
            holds briefly, then decays, same as a classic peak-reading
@@ -3353,11 +3362,6 @@ function rssiBarPct(str) {
     const pct = ((parseFloat(m[1]) + 120) / 60) * 100;
     return Math.max(0, Math.min(100, pct));
 }
-function rssiColor(pct) {
-    if (pct >= 60) return 'var(--good)';
-    if (pct >= 30) return 'var(--caution)';
-    return 'var(--danger)';
-}
 // Illustrative scale only, same "real value, uncalibrated ceiling" caveat
 // as rssiBarPct's -120..-60 dBm range above -- openSPOT4 doesn't document
 // a max audio jitter-buffer depth anywhere. 30 packets is a reasonable
@@ -3378,14 +3382,6 @@ function berBarPct(str) {
     const pct = 100 - (parseFloat(m[1]) / 5) * 100;
     return Math.max(0, Math.min(100, pct));
 }
-function berColor(str) {
-    const m = /(\d+(?:\.\d+)?)/.exec(str || '');
-    if (!m) return 'var(--text-dim)';
-    const ber = parseFloat(m[1]);
-    if (ber < 1) return 'var(--good)';
-    if (ber <= 3) return 'var(--caution)';
-    return 'var(--danger)';
-}
 // Packet loss -- confirmed live from a real WPSD MMDVM log capture, only
 // present on NETWORK-received transmissions (never RF-received ones,
 // which also never carry an rssi field at all -- there's no local RF
@@ -3399,31 +3395,6 @@ function packetLossBarPct(str) {
     const pct = 100 - parseFloat(m[1]);
     return Math.max(0, Math.min(100, pct));
 }
-// Combined onto one line, half the width each -- was two full-width
-// stacked rows; halving them frees up a full grid row per card. Each
-// half degrades independently to plain text if its own value doesn't
-// parse (e.g. "N/A"), so a hotspot with only one of the two available
-// still gets a compact combined line rather than an empty gap.
-function rssiBerMeterRow(rssiStr, berStr) {
-    const rssiPct = rssiBarPct(rssiStr);
-    const berPct  = berBarPct(berStr);
-    const rssiHalf = rssiPct === null
-        ? `<div class="meter-half meter-half-plain">RSSI: <span class="stat-val">${rssiStr}</span></div>`
-        : `<div class="meter-half" title="Approximate -- MMDVM RSSI is calibrated per-device (varies ~10dB between individual units), not a universal dBm scale">
-            <span class="meter-label">RSSI</span>
-            <span class="meter-track"><span class="meter-fill" style="width:${rssiPct.toFixed(0)}%;background:${rssiColor(rssiPct)}"></span></span>
-            <span class="meter-val">${rssiStr}</span>
-          </div>`;
-    const berHalf = berPct === null
-        ? `<div class="meter-half meter-half-plain">BER: <span class="stat-val">${berStr}</span></div>`
-        : `<div class="meter-half">
-            <span class="meter-label">BER</span>
-            <span class="meter-track"><span class="meter-fill" style="width:${berPct.toFixed(0)}%;background:${berColor(berStr)}"></span></span>
-            <span class="meter-val">${berStr}</span>
-          </div>`;
-    return `<div class="meter-row-combined">${rssiHalf}${berHalf}</div>`;
-}
-
 // --- openSPOT4 battery (v4.14) -- only ever present on a battery-powered
 // unit; a mains-powered device never emits the "pwr: batt ..." log line
 // this is sourced from (see openspot.py), so battery_pct stays null/
@@ -3464,35 +3435,46 @@ function batteryMeterRow(hs) {
     </div>`;
 }
 
-// --- VU meter (replaces the RSSI/BER line while a call is active) ---
-// v4.28: spring-damped needle + peak-hold, mockup-approved before
-// building (see CLAUDE.md). Earlier versions animated a wobble (sine +
-// randomness) around the real base level every 110ms tick -- functional,
-// but felt artificial/jittery rather than like a real meter's needle
-// inertia. Now the needle is a damped spring pulling toward the real
-// target (state.pct, only ever changed once per poll in renderCards()),
-// stepped every animation frame via requestAnimationFrame instead of a
-// fixed 110ms interval, so the settle/overshoot reads as smooth physical
-// motion rather than a series of discrete jumps. A peak-hold marker
-// (classic meter behavior: climbs instantly, holds briefly, decays)
-// overlays the bar as a thin vertical line. Color zones are unchanged
-// from v4.27 (fixed position on the scale, not tied to the animated
-// value) -- see vuZoneColor().
+// --- VU meter ---
+// v4.30: promoted from "replaces the RSSI/BER line while a call is
+// active" to a standalone row that's ALWAYS visible, active or idle --
+// mockup-approved before building (see CLAUDE.md). Two real reasons:
+// (1) swapping to a completely different-looking static component the
+// instant a call ended was reported as "the meter disappeared," even
+// though that static row was rendering correctly; (2) the spring physics
+// added in v4.28 mean the needle now settles smoothly toward a NEW idle-
+// state target instead of just vanishing -- for openSPOT4 specifically
+// this is a genuinely live effect (dejitter_pkts really does drop to ~0
+// at idle, confirmed live), so the needle visibly falls right as a
+// transmission ends. WPSD has no equivalent live idle reading (RSSI/BER/
+// packet_loss only ever update at a call's END), so its needle just
+// holds at the last real value between calls instead of falling -- still
+// correct, just a different real behavior for a different data source.
+// Also added a numeric readout (vuReadout) -- the meter previously had
+// none at all, and dropping the old static row's RSSI/BER text entirely
+// would have been a real loss of information.
 const VU_SEGMENTS = 20;
 const VU_STIFFNESS = 90;
 const VU_DAMPING = 9;
 const VU_PEAK_HOLD_SEC = 0.9;
 const VU_PEAK_FALL_RATE = 55;  // pct/sec
-// ip -> { pct, value, velocity, peak, peakHoldT }. pct is the real target
-// (null if no real reading exists yet); the rest is spring/peak-hold
-// physics state, which persists across polls so the needle keeps moving
-// smoothly toward a NEW target instead of resetting -- only `pct` itself
-// gets overwritten each poll (see renderCards()'s tracking block).
-let activeVu = {};
+// ip -> { pct, value, velocity, peak, peakHoldT } for every WPSD/openSPOT4
+// hotspot currently on screen (ASL3 has no vu-<ip> element at all -- no VU
+// concept for that type, see the statsGrid comment). pct is the real
+// target (null if no real reading exists yet, e.g. a fresh install with
+// no calls logged yet this session); the rest is spring/peak-hold physics
+// state, which persists across polls so the needle keeps moving smoothly
+// toward a NEW target instead of resetting -- only `pct` itself gets
+// overwritten each poll (see renderCards()'s tracking block).
+let vuMeters = {};
 
 function vuMeterRow(ip) {
     const segs = Array.from({ length: VU_SEGMENTS }, () => '<span class="vu-seg"></span>').join('');
-    return `<div class="vu-meter" id="vu-${ip}">${segs}<span class="vu-peak" id="vu-peak-${ip}"></span></div>`;
+    return `<div class="vu-meter-row">
+        <span class="meter-label">SIG</span>
+        <div class="vu-meter" id="vu-${ip}">${segs}<span class="vu-peak" id="vu-peak-${ip}"></span></div>
+        <span class="meter-val" id="vu-readout-${ip}">—</span>
+    </div>`;
 }
 
 // Fixed position on the scale, not the animated value -- unchanged from
@@ -3506,17 +3488,18 @@ function vuZoneColor(segPct) {
 // fresh DOM segments are created, with no physics stepping yet).
 function paintVu(ip, dt) {
     const el = document.getElementById('vu-' + ip);
-    const state = activeVu[ip];
+    const state = vuMeters[ip];
     if (!el || !state) return;
     const segs = el.querySelectorAll('.vu-seg');
     const peakEl = document.getElementById('vu-peak-' + ip);
+    const readoutEl = document.getElementById('vu-readout-' + ip);
 
     if (state.pct === null) {
-        // No real reading available yet (e.g. the very first instant of a
-        // call, before the first status/log tick has arrived) -- an
-        // honest empty bar, not a fabricated mid-level guess.
+        // No real reading exists at all yet -- an honest empty bar, not a
+        // fabricated mid-level guess.
         segs.forEach(seg => { seg.style.background = 'var(--panel-2)'; });
         if (peakEl) peakEl.style.opacity = '0';
+        if (readoutEl) readoutEl.textContent = '—';
         return;
     }
     if (peakEl) peakEl.style.opacity = '';
@@ -3541,6 +3524,7 @@ function paintVu(ip, dt) {
         seg.style.background = i < lit ? vuZoneColor(i / segs.length) : 'var(--panel-2)';
     });
     if (peakEl) peakEl.style.left = `calc(${state.peak}% - 1px)`;
+    if (readoutEl) readoutEl.textContent = Math.round(state.value) + '%';
 }
 
 // requestAnimationFrame, not a fixed setInterval -- the spring physics
@@ -3555,7 +3539,7 @@ let vuLastFrameT = null;
 function vuTick(t) {
     const dt = vuLastFrameT === null ? 0 : Math.min((t - vuLastFrameT) / 1000, 0.05);
     vuLastFrameT = t;
-    Object.keys(activeVu).forEach(ip => paintVu(ip, dt));
+    Object.keys(vuMeters).forEach(ip => paintVu(ip, dt));
     requestAnimationFrame(vuTick);
 }
 requestAnimationFrame(vuTick);
@@ -4052,6 +4036,18 @@ function renderCards(data) {
             ? ''
             : (hs.talkgroup ? `<div class="card-tg">Linked: <span>${hs.talkgroup}</span></div>` : '');
 
+        // v4.30: promoted out of the technical stats-grid below into its
+        // own standalone row (mockup-approved before building, see
+        // CLAUDE.md) -- grouping "what's happening right now" (activity +
+        // connection quality) together, ahead of static technical details
+        // like Temp/CPU. Always rendered for non-ASL3 types now, not just
+        // while active -- see vuMeterRow()/paintVu()'s own comments for
+        // why the two node types behave differently once idle (openSPOT4's
+        // needle genuinely falls toward a live idle reading; WPSD's holds
+        // at the last real value, since it has no live idle reading at
+        // all to fall toward).
+        const vuMeterBlock = isAsl ? '' : vuMeterRow(hs.ip);
+
         const statsGrid = isAsl
             ? ''
             : isOpenSpot4
@@ -4061,10 +4057,6 @@ function renderCards(data) {
                 ? `<div class="stats-grid">
                      <div>Mode: <span class="stat-val">${hs.mode}</span></div>
                      ${hs.frequency && hs.frequency !== 'N/A' ? `<div>Freq: <span class="stat-val">${hs.frequency}${hs.duplex && hs.duplex !== 'N/A' ? ' (' + hs.duplex + ')' : ''}</span></div>` : ''}
-                     ${/* VU meter here is legitimate -- openSPOT4's dejitter_pkts is
-                        genuinely live, per-second telemetry while a call is active
-                        (see paintVu()'s own comment), unlike WPSD's RSSI/BER below. */
-                       hs.is_active ? vuMeterRow(hs.ip) : rssiBerMeterRow(hs.rssi, hs.ber)}
                      ${batteryMeterRow(hs)}
                      ${hs.bm_status_text
                          ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
@@ -4072,23 +4064,6 @@ function renderCards(data) {
                 : `<div class="stats-grid">
                      <div>Mode: <span class="stat-val">${hs.mode}</span></div>
                      ${hs.frequency && hs.frequency !== 'N/A' ? `<div>Freq: <span class="stat-val">${hs.frequency}${hs.duplex && hs.duplex !== 'N/A' ? ' (' + hs.duplex + ')' : ''}</span></div>` : ''}
-                     ${/* v4.24: brought vuMeterRow back for WPSD while active -- a
-                        reported regression, the meter LOOK disappearing (falling back
-                        to the plain two-bar RSSI/BER row) read as "the meter's gone,"
-                        even though that row itself was rendering correctly. MMDVM still
-                        only logs RSSI/BER as an end-of-transmission SUMMARY stat, not
-                        continuous live data (see dejitter_pkts' own comment for the
-                        equivalent openSPOT4 gap, which DOES have a live substitute --
-                        WPSD, SSH-polled log-tail reading, has none), so hs.rssi/hs.ber
-                        during an active call may be the PREVIOUS completed call's
-                        stale value, not truly current -- confirmed live: a BER value
-                        appeared 3 seconds into a brand-new call, too fast to be real
-                        for THAT transmission. Still meaningfully more honest than the
-                        original fake-swinging fallback: paintVu()'s own "hold steady +
-                        small wobble" treatment never invents a reading that doesn't
-                        exist anywhere, it just can't guarantee the reading is from the
-                        exact current instant -- the most WPSD's own data model allows. */
-                       hs.is_active ? vuMeterRow(hs.ip) : rssiBerMeterRow(hs.rssi, hs.ber)}
                      <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
                      <div>CPU:  <span class="stat-val">${hs.cpu}</span></div>
                      ${hs.color_code ? `<div>Color Code: <span class="stat-val">${hs.color_code}</span></div>` : ''}
@@ -4205,6 +4180,7 @@ function renderCards(data) {
                 ${photoBlock}
               </div>
               ${linkedLine}
+              ${vuMeterBlock}
               ${statsGrid}
               ${aslCardSplit}
               ${hs.bm_static_tgs && hs.bm_static_tgs.length
@@ -4232,52 +4208,46 @@ function renderCards(data) {
     const cardsOuter = document.getElementById('cards-outer');
     if (cardsOuter) cardsOuter.classList.toggle('spotlight', SPOTLIGHT_DIMMING_ENABLED && activeCount > 0);
 
-    // VU meter tracking -- ASL3 has no vu-<ip> element (no VU concept for
-    // that type at all), but WPSD and openSPOT4 both call vuMeterRow()
-    // while active. Fallback chain, most-live-first: openSPOT4's own
-    // dejitter-buffer depth (genuinely live, per-second, see its own
-    // comment) -> RSSI -> BER. RSSI/BER are real but may be a stale
-    // carry-over from the PREVIOUS completed call for WPSD specifically
-    // (MMDVM only logs them as an end-of-transmission summary, confirmed
-    // live -- see the statsGrid comment above) -- included anyway, since a
-    // real-but-possibly-stale reading is still more honest than the
-    // original fake fallback, and it's the most current data WPSD's own
-    // polling model can ever provide. The TARGET (pct) is only ever
-    // overwritten here, once per poll -- the spring/peak-hold PHYSICS
-    // state (value/velocity/peak/peakHoldT) carries over untouched across
-    // polls for an already-tracked hotspot, so a new reading arriving
-    // mid-settle doesn't reset the needle's momentum, it just gives the
-    // spring a (possibly) new place to pull toward. Paints immediately
-    // (dt=0, no physics stepping, just a re-render of current state) with
-    // the fresh DOM segments the innerHTML assignment above just created --
-    // without this the browser could paint one blank frame before the
-    // next requestAnimationFrame tick, showing as a flicker synced to
-    // every 3s poll.
+    // VU meter tracking (v4.30: ALWAYS tracked now, not just while active --
+    // see the meter's own comment for why). ASL3 has no vu-<ip> element at
+    // all (no VU concept for that type), so its entry (if any lingers from
+    // a type change) is cleaned up and skipped. Fallback chain, most-live-
+    // first: openSPOT4's own dejitter-buffer depth (genuinely live, per-
+    // second, see its own comment) -> RSSI -> packet loss -> BER. RSSI/BER/
+    // packet_loss are real but may be a stale carry-over from the PREVIOUS
+    // completed call for WPSD specifically (MMDVM only logs them as an
+    // end-of-transmission summary, confirmed live -- see the statsGrid
+    // comment above) -- included anyway, since a real-but-possibly-stale
+    // reading is still more honest than a fake fallback, and it's the most
+    // current data WPSD's own polling model can ever provide. The TARGET
+    // (pct) is only ever overwritten here, once per poll -- the spring/
+    // peak-hold PHYSICS state (value/velocity/peak/peakHoldT) carries over
+    // untouched across polls for an already-tracked hotspot, so a new
+    // reading arriving mid-settle doesn't reset the needle's momentum, it
+    // just gives the spring a (possibly) new place to pull toward. Paints
+    // immediately (dt=0, no physics stepping, just a re-render of current
+    // state) with the fresh DOM segments the innerHTML assignment above
+    // just created -- without this the browser could paint one blank frame
+    // before the next requestAnimationFrame tick, showing as a flicker
+    // synced to every 3s poll.
     data.forEach(hs => {
-        if (hs.is_active) {
-            // v4.29: added packet loss ahead of BER in the fallback chain --
-            // confirmed live (a real WPSD MMDVM capture) that RSSI is NEVER
-            // logged at all for network-received transmissions (only genuine
-            // RF-received ones), and BER stayed a flat 0.0% for nearly every
-            // call in that same session while packet loss ranged 0-66% --
-            // packet loss is the more meaningfully variable real signal for
-            // a hotspot that's mostly relaying network talkgroup traffic.
-            const dejitterPct = hs.type === 'openspot4' ? dejitterBarPct(hs.dejitter_pkts) : null;
-            const rssiPct = rssiBarPct(hs.rssi);
-            const lossPct = packetLossBarPct(hs.packet_loss);
-            const pct = dejitterPct !== null ? dejitterPct
-                : (rssiPct !== null ? rssiPct
-                : (lossPct !== null ? lossPct
-                : berBarPct(hs.ber)));
-            if (activeVu[hs.ip]) {
-                activeVu[hs.ip].pct = pct;
-            } else {
-                activeVu[hs.ip] = { pct, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
-            }
-            paintVu(hs.ip, 0);
-        } else if (activeVu[hs.ip]) {
-            delete activeVu[hs.ip];
+        if (hs.type === 'asl3') {
+            if (vuMeters[hs.ip]) delete vuMeters[hs.ip];
+            return;
         }
+        const dejitterPct = hs.type === 'openspot4' ? dejitterBarPct(hs.dejitter_pkts) : null;
+        const rssiPct = rssiBarPct(hs.rssi);
+        const lossPct = packetLossBarPct(hs.packet_loss);
+        const pct = dejitterPct !== null ? dejitterPct
+            : (rssiPct !== null ? rssiPct
+            : (lossPct !== null ? lossPct
+            : berBarPct(hs.ber)));
+        if (vuMeters[hs.ip]) {
+            vuMeters[hs.ip].pct = pct;
+        } else {
+            vuMeters[hs.ip] = { pct, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
+        }
+        paintVu(hs.ip, 0);
     });
 
     // Update browser-local timer state — only reset browserStart when the
