@@ -5020,26 +5020,24 @@ config for per-integration credentials; put it in
     `vuMeterBlock` and the `/api/data`-driven pct-tracking block) became
     conditional on `audio_meter_enabled` instead of blanket-skipping
     every ASL3 card.
-  - **Not yet live-tested against a real AudioSocket connection end to
-    end** (this dev sandbox has no reachable ASL3 node) -- the paramiko
-    `Transport.request_port_forward`/`accept`/`Channel.recv` calls were
-    confirmed to exist with the expected signatures against the installed
-    paramiko 5.0.0, and the AudioSocket frame parser was written directly
-    from Asterisk's own current documented wire format, but neither the
-    reverse-tunnel round trip nor a real `ChanSpy`+`AudioSocket` session
-    against a live app_rpt-managed channel has been observed firsthand.
-    If this doesn't work on the first real try, re-verify the SAME way
-    everything else in this section was verified -- a live SSH session
-    against the actual node, not further reasoning from docs. Two
-    specific unknowns worth checking first if it doesn't: whether this
-    node's `sshd_config` allows `AllowTcpForwarding` (default is usually
-    yes, but never explicitly confirmed here), and whether `ChanSpy`'s
-    audiohook mechanism actually attaches cleanly to an app_rpt-managed
-    channel the way it would a normal `Dial()`/`Bridge()` channel (a
-    genuine, disclosed unknown going in -- app_rpt does its own internal
-    software audio mixing, largely independent of Asterisk's core
-    `Bridge()` subsystem, and this was never separately verified beyond
-    "the channel object exists and shows Up in `core show channels`").
+  - **Confirmed fully working live end-to-end (2026-08, W1ZLA/node
+    59929)** -- this dev sandbox has no reachable ASL3 node, so the
+    initial build (paramiko `Transport.request_port_forward`/`accept`/
+    `Channel.recv`, the AudioSocket frame parser, `ChanSpy` attaching to
+    an app_rpt-managed channel) shipped genuinely unverified. It took a
+    real, multi-round debugging session against production hardware to
+    get there -- see the "Real first-deploy findings" entry immediately
+    below for the full blow-by-blow (six real, stacked bugs, not one),
+    but the short version: `ChanSpy` DOES attach cleanly to an
+    app_rpt-managed channel (`SimpleUSB/59929`, confirmed via `core show
+    channels concise` showing it continuously "Up"), and
+    `AllowTcpForwarding` was never the blocker either (confirmed via
+    sshd_config -- it defaults to allowed). Final live proof: a
+    throwaway Python TCP listener on the node's own `127.0.0.1:8288`
+    captured a real AudioSocket connection sending the exact expected
+    19-byte ID frame (`01` kind + `0010` length + the 16-byte UUID
+    `provision-audio-meter.sh` generates for that node), and a
+    post-connection channel check showed zero leaked channels.
   - **Real first-deploy findings (2026-08, live against W1ZLA/node
     59929), each fixed as soon as it surfaced -- three real bugs, not one,
     stacked on top of each other so each one had to be fixed before the
@@ -5148,11 +5146,16 @@ config for per-integration credentials; put it in
        -rx "channel request hangup $ch"; done` -- matches only the
        leaked prefix, confirmed to leave `SimpleUSB/59929`, the IAX2
        links, and the USRP bridge completely untouched.
-    **Still not confirmed working end-to-end as of this fix** --
-    re-verify live the same way once the corrected dialplan is
-    re-provisioned, and watch `core show channels concise` for the
-    dashboard-audiospy prefix during testing to catch any further
-    leak immediately rather than letting it accumulate again.
+    **Confirmed working end-to-end after this fix**, verified live via
+    the actual dashboard container (not just a manual `asterisk -rx`
+    test) -- the meter genuinely tracks live audio on a real card, and a
+    post-test `core show channels concise` check showed exactly one
+    healthy `spy`/`audiosocket` pair, no leak. If `res_clioriginate.so`/
+    the Local-channel-bridge mechanism above is ever touched again,
+    re-verify the same way: a live SSH session against a real node, and
+    watch `core show channels concise` for the `dashboard-audiospy`
+    prefix throughout testing so a regression can't accumulate
+    unnoticed the way it did during this session.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
