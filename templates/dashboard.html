@@ -3386,6 +3386,19 @@ function berColor(str) {
     if (ber <= 3) return 'var(--caution)';
     return 'var(--danger)';
 }
+// Packet loss -- confirmed live from a real WPSD MMDVM log capture, only
+// present on NETWORK-received transmissions (never RF-received ones,
+// which also never carry an rssi field at all -- there's no local RF
+// signal for a network-relayed call). Unlike BER's typical sub-5% range
+// (needing the /5 amplification berBarPct above uses), a real capture
+// showed packet loss spanning a genuine 0-66% range for otherwise-normal
+// calls, so this uses a direct 0-100 scale, no amplification needed.
+function packetLossBarPct(str) {
+    const m = /(\d+(?:\.\d+)?)/.exec(str || '');
+    if (!m) return null;
+    const pct = 100 - parseFloat(m[1]);
+    return Math.max(0, Math.min(100, pct));
+}
 // Combined onto one line, half the width each -- was two full-width
 // stacked rows; halving them frees up a full grid row per card. Each
 // half degrades independently to plain text if its own value doesn't
@@ -4242,9 +4255,20 @@ function renderCards(data) {
     // every 3s poll.
     data.forEach(hs => {
         if (hs.is_active) {
+            // v4.29: added packet loss ahead of BER in the fallback chain --
+            // confirmed live (a real WPSD MMDVM capture) that RSSI is NEVER
+            // logged at all for network-received transmissions (only genuine
+            // RF-received ones), and BER stayed a flat 0.0% for nearly every
+            // call in that same session while packet loss ranged 0-66% --
+            // packet loss is the more meaningfully variable real signal for
+            // a hotspot that's mostly relaying network talkgroup traffic.
             const dejitterPct = hs.type === 'openspot4' ? dejitterBarPct(hs.dejitter_pkts) : null;
             const rssiPct = rssiBarPct(hs.rssi);
-            const pct = dejitterPct !== null ? dejitterPct : (rssiPct !== null ? rssiPct : berBarPct(hs.ber));
+            const lossPct = packetLossBarPct(hs.packet_loss);
+            const pct = dejitterPct !== null ? dejitterPct
+                : (rssiPct !== null ? rssiPct
+                : (lossPct !== null ? lossPct
+                : berBarPct(hs.ber)));
             if (activeVu[hs.ip]) {
                 activeVu[hs.ip].pct = pct;
             } else {

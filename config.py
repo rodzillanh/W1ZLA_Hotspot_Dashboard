@@ -10,7 +10,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.28"
+APP_VERSION = "4.29"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -113,6 +113,7 @@ VERSION_CODENAMES = [
     "Buchanan",         # v4.27 -- Roy Buchanan, guitarist (1939-1988)
     "Marriott",         # v4.28 -- Steve Marriott, Small Faces/Humble Pie
                         # (1947-1991)
+    "Croce",            # v4.29 -- Jim Croce (1943-1973)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -469,6 +470,15 @@ BER_PATTERN        = r"BER: (\d+\.?\d*)%"
 # Capture just the first (minimum) value; DMR reports a single value.
 RSSI_PATTERN       = r"RSSI: (-?\d+)"
 MODE_PATTERN       = r"DMR|D-Star|YSF|P25|NXDN"
+# Confirmed live, real WPSD MMDVM log capture -- e.g. "...to TG 91, 1.1
+# seconds, 66% packet loss, BER: 0.0%". Only ever seen on NETWORK-received
+# transmissions (not RF-received ones) -- and network transmissions never
+# carry an RSSI field at all (there's no local RF signal to measure for a
+# call relayed over the internet), so for a hotspot that's mostly relaying
+# network talkgroup traffic, this is the more meaningfully variable
+# quality signal: real captured BER stayed a flat 0.0% for nearly every
+# call in the same session while packet loss ranged 0%-66%.
+PACKET_LOSS_PATTERN = r"(\d+(?:\.\d+)?)% packet loss"
 COLOR_CODE_PATTERN = r"Colo(?:u)?r Code:\s*(\d+)"   # matches "Color Code: 15" and "Colour Code: 15"
 SLOT_PATTERN       = r"DMR Slot (\d+)"               # matches "DMR Slot 2"
 

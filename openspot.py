@@ -842,11 +842,17 @@ class _OpenSpot4Worker:
 
         ber = msg.get("ber")
         rssi = msg.get("rssi")
+        loss = msg.get("loss")
         updates = {"is_active": False, "tx_start": None, "last_heard": time.time()}
         if isinstance(ber, (int, float)) and ber >= 0:
             updates["ber"] = f"{ber}%"
         if isinstance(rssi, (int, float)):
             updates["rssi"] = f"{rssi} dBm"
+        # -1 is the same "not applicable" sentinel confirmed live for ber
+        # above (real samples: {"ber":-1,"loss":-1,...} at call-start vs.
+        # {"ber":0.0,"loss":0.0,...} at call-end).
+        if isinstance(loss, (int, float)) and loss >= 0:
+            updates["packet_loss"] = f"{loss}%"
         self._monitor.apply_external_update(self._ip, updates)
         self._monitor.log_activity(self._ip)
         if self._active_call and self._active_call["id"] == call_id:

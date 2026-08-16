@@ -1396,9 +1396,11 @@ class FleetMonitor:
         ber  = re.search(config.BER_PATTERN,  line)
         rssi = re.search(config.RSSI_PATTERN, line)
         mode = re.search(config.MODE_PATTERN, line)
+        loss = re.search(config.PACKET_LOSS_PATTERN, line)
         if ber:  updates["ber"]  = ber.group(1)  + "%"
         if rssi: updates["rssi"] = rssi.group(1) + " dBm"
         if mode: updates["mode"] = mode.group(0)
+        if loss: updates["packet_loss"] = loss.group(1) + "%"
 
     @staticmethod
     def _is_end_of_transmission(line: str) -> bool:

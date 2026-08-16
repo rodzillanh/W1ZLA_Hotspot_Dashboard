@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.28 "Marriott"</span>
+                <span class="release-version">v4.29 "Croce"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>VU meter now uses packet loss, a more meaningful real signal for network-relayed traffic</span> — a live MMDVM log capture (WPSD) confirmed RSSI is never logged at all for network-received transmissions (only genuine RF-received ones, which is why the meter often had nothing but BER to fall back on), and BER itself sat at a flat 0.0% for nearly every call in that session while packet loss ranged 0-66% for otherwise-ordinary calls. Packet loss is now parsed from the same log line (and openSPOT4's equivalent "loss" field, from the same calllog event ber/rssi already come from) and slotted into the fallback chain ahead of BER — real, previously-unparsed data, not a new metric invented for this</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.28 "Marriott"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>VU meter needle now has real spring physics and a peak-hold marker</span> — mocked up and approved before building. Replaces the wobble-based animation with a damped spring pulling toward the real reading (settling with a slight overshoot, like genuine needle inertia, instead of a sine wobble or discrete jumps), stepped every animation frame rather than a fixed interval. A thin peak-hold marker overlays the bar — climbs instantly to the highest recent level, holds briefly, then decays, same as a classic peak-reading meter. Color zones are unchanged from the last release (fixed position on the scale); only the motion driving the bar changed</li>

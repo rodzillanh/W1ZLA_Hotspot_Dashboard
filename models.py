@@ -50,6 +50,12 @@ class HotspotStatus:
     history: List[dict] = field(default_factory=list)
     ber: str = "N/A"
     rssi: str = "N/A"
+    # WPSD: from the same MMDVM log line as ber/rssi (config.PACKET_LOSS_
+    # PATTERN), confirmed only present on NETWORK-received transmissions
+    # (never RF-received ones, which also never carry rssi at all -- see
+    # CLAUDE.md for the full story). openSPOT4: from the same "calllog"
+    # end-of-call event ber/rssi already come from (its own "loss" field).
+    packet_loss: str = "N/A"
     mode: str = "N/A"
     # WPSD reads this from /etc/mmdvmhost (a slow check -- see
     # config.HOTSPOT_INFO_CHECK_CMD). ASL3 reads it from /etc/sa818.conf
