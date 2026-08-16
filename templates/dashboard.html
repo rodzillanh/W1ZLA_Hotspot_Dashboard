@@ -4023,19 +4023,23 @@ function renderCards(data) {
                 : `<div class="stats-grid">
                      <div>Mode: <span class="stat-val">${hs.mode}</span></div>
                      ${hs.frequency && hs.frequency !== 'N/A' ? `<div>Freq: <span class="stat-val">${hs.frequency}${hs.duplex && hs.duplex !== 'N/A' ? ' (' + hs.duplex + ')' : ''}</span></div>` : ''}
-                     ${/* Deliberately NOT vuMeterRow even while active -- a real,
-                        reported regression confirmed live: MMDVM logs RSSI/BER as an
-                        end-of-transmission SUMMARY stat, not continuous live data, the
-                        same gap openSPOT4 has (see dejitter_pkts) but with no
-                        equivalent live substitute available for WPSD (SSH-polled log
-                        tail, nothing streams). hs.rssi during an active call is
-                        either stale (leftover from the PREVIOUS completed call) or,
-                        with no prior call yet, genuinely "N/A" -- the old VU meter's
-                        fake fallback was masking this exact gap for WPSD too. "is
-                        transmitting" is already shown via the ACTIVE label/tx timer
-                        elsewhere on the card, so there's nothing lost by just always
-                        showing the last known real RSSI/BER here, active or not. */
-                       rssiBerMeterRow(hs.rssi, hs.ber)}
+                     ${/* v4.24: brought vuMeterRow back for WPSD while active -- a
+                        reported regression, the meter LOOK disappearing (falling back
+                        to the plain two-bar RSSI/BER row) read as "the meter's gone,"
+                        even though that row itself was rendering correctly. MMDVM still
+                        only logs RSSI/BER as an end-of-transmission SUMMARY stat, not
+                        continuous live data (see dejitter_pkts' own comment for the
+                        equivalent openSPOT4 gap, which DOES have a live substitute --
+                        WPSD, SSH-polled log-tail reading, has none), so hs.rssi/hs.ber
+                        during an active call may be the PREVIOUS completed call's
+                        stale value, not truly current -- confirmed live: a BER value
+                        appeared 3 seconds into a brand-new call, too fast to be real
+                        for THAT transmission. Still meaningfully more honest than the
+                        original fake-swinging fallback: paintVu()'s own "hold steady +
+                        small wobble" treatment never invents a reading that doesn't
+                        exist anywhere, it just can't guarantee the reading is from the
+                        exact current instant -- the most WPSD's own data model allows. */
+                       hs.is_active ? vuMeterRow(hs.ip) : rssiBerMeterRow(hs.rssi, hs.ber)}
                      <div>Temp: <span class="stat-val">${hs.temperature}</span></div>
                      <div>CPU:  <span class="stat-val">${hs.cpu}</span></div>
                      ${hs.color_code ? `<div>Color Code: <span class="stat-val">${hs.color_code}</span></div>` : ''}
@@ -4179,24 +4183,31 @@ function renderCards(data) {
     const cardsOuter = document.getElementById('cards-outer');
     if (cardsOuter) cardsOuter.classList.toggle('spotlight', SPOTLIGHT_DIMMING_ENABLED && activeCount > 0);
 
-    // VU meter tracking -- openSPOT4 ONLY (the only type whose card markup
-    // ever calls vuMeterRow() -- WPSD/ASL3 don't have a vu-<ip> element to
-    // paint at all, see the statsGrid comment above for why WPSD lost this).
-    // Anchors to dejitter-buffer depth, openSPOT4's genuinely live
-    // per-second audio-flow metric, falling back to RSSI only for the rare
-    // case neither has arrived yet. Only ever set here, once per poll, so
-    // the level HOLDS STEADY between polls rather than drifting --
+    // VU meter tracking -- ASL3 has no vu-<ip> element (no VU concept for
+    // that type at all), but WPSD and openSPOT4 both call vuMeterRow()
+    // while active. Fallback chain, most-live-first: openSPOT4's own
+    // dejitter-buffer depth (genuinely live, per-second, see its own
+    // comment) -> RSSI -> BER. RSSI/BER are real but may be a stale
+    // carry-over from the PREVIOUS completed call for WPSD specifically
+    // (MMDVM only logs them as an end-of-transmission summary, confirmed
+    // live -- see the statsGrid comment above) -- included anyway, since a
+    // real-but-possibly-stale reading is still more honest than the
+    // original fake fallback, and it's the most current data WPSD's own
+    // polling model can ever provide. Only ever set here, once per poll,
+    // so the level HOLDS STEADY between polls rather than drifting --
     // paintVu()'s own wobble is a small, realistic jitter around this real
     // value, not a substitute for it. Paints immediately rather than
     // waiting for the next scheduled tick (up to 110ms away) -- the
     // innerHTML assignment above just created brand-new, blank .vu-seg
-    // elements for every active openSPOT4 card, and without this the
-    // browser could paint that blank frame before the tick loop ever gets
-    // to it, showing as a flicker synced to every 3s poll.
+    // elements for every active card, and without this the browser could
+    // paint that blank frame before the tick loop ever gets to it, showing
+    // as a flicker synced to every 3s poll.
     data.forEach(hs => {
-        if (hs.is_active && hs.type === 'openspot4') {
-            const dejitterPct = dejitterBarPct(hs.dejitter_pkts);
-            activeVu[hs.ip] = { pct: dejitterPct !== null ? dejitterPct : rssiBarPct(hs.rssi) };
+        if (hs.is_active) {
+            const dejitterPct = hs.type === 'openspot4' ? dejitterBarPct(hs.dejitter_pkts) : null;
+            const rssiPct = rssiBarPct(hs.rssi);
+            const pct = dejitterPct !== null ? dejitterPct : (rssiPct !== null ? rssiPct : berBarPct(hs.ber));
+            activeVu[hs.ip] = { pct };
             paintVu(hs.ip);
         } else if (activeVu[hs.ip]) {
             delete activeVu[hs.ip];
