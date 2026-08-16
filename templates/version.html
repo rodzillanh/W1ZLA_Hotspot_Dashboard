@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.32 "Cooke"</span>
+                <span class="release-version">v4.33 "King"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>WPSD/D-Star VU meter no longer shows a stale reading as if it were live during an active call</span> — reported directly with a screenshot: a card showed a solid "100%" bar just 13 seconds into a brand-new call, which cannot possibly be real data for that transmission. Root cause: MMDVM only ever logs RSSI/BER/packet-loss as an END-OF-TRANSMISSION SUMMARY, never during a call — so the instant a new call starts, whatever the meter shows is actually the PREVIOUS call's final reading, not the one in progress. The meter now shows nothing (an honest empty bar) for the full duration of an active WPSD/D-Star call, since no live reading exists to show. The moment a call ENDS, the reading that arrives in that same poll is genuinely fresh (monitor.py's end-of-transmission detection and its RSSI/BER/loss parsing come from the same log line) — that reading is now held briefly so it's actually readable, then falls to 0 per the previous release. openSPOT4 is unaffected — its dejitter reading is genuinely live either way</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.32 "Cooke"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>ASL3 (AllStarLink) hotspot cards can now show a real, live audio-level VU meter</span> — previously only WPSD/openSPOT4 cards had one at all (ASL3 has no MMDVM-style RSSI/BER telemetry to drive it with). A new opt-in per-hotspot toggle ("Live audio-level VU meter," in Settings → Hotspots or a card's own gear-icon drawer) taps the node's own repeater audio for real — not a synthetic keyed on/off pulse — via a ChanSpy + AudioSocket dialplan extension, tunneled back to the dashboard over the same SSH connection it already uses to poll the node (no new port to open, no new credential). Needs a one-time provisioning step per node — run <code>provision-audio-meter.sh</code> against it first — see the README and CLAUDE.md for the full setup and the real diagnostic session this was built from</li>
