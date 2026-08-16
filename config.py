@@ -590,12 +590,28 @@ def build_asl_audio_originate_cmd(node: str) -> str:
     requirement as every other ASL3 SSH command builder in this file) --
     it's interpolated into a shell string executed on the remote host.
     Needs `sudo` for the same asterisk.ctl-permission reason every other
-    `asterisk -rx` command in this file does."""
+    `asterisk -rx` command in this file does.
+
+    The trailing `/n` on the Local channel resource is load-bearing, not
+    decorative -- confirmed live (2026-08) that without it, the tap
+    works correctly for several seconds and then Asterisk silently
+    hangs up the AudioSocket leg (`app_audiosocket.c`'s own log:
+    "Failed to receive frame from channel ... connected to AudioSocket
+    server", which Asterisk's source confirms means `ast_read()`
+    returned NULL -- the channel itself was hung up, not a timeout or a
+    network problem). This is classic Asterisk "Local channel
+    optimization": once Asterisk decides it can simplify a Local channel
+    pair's topology, it collapses it and discards the pair -- exactly
+    the delayed, hangs-up-after-a-few-seconds symptom observed. `/n`
+    (confirmed against Asterisk's own current docs on Local Channel
+    Optimization, syntax `Local/exten@context/n`) disables that
+    collapsing so the pair -- and therefore the ChanSpy<->AudioSocket
+    bridge this feature depends on -- stays intact indefinitely."""
     if not node.isdigit():
         raise ValueError(f"invalid ASL node number: {node!r}")
     ctx = ASL_AUDIO_SPY_CONTEXT_FMT.format(node=node)
     return (
-        f'sudo asterisk -rx "channel originate Local/{ASL_AUDIO_SPY_EXTEN}@{ctx} '
+        f'sudo asterisk -rx "channel originate Local/{ASL_AUDIO_SPY_EXTEN}@{ctx}/n '
         f'extension {ASL_AUDIO_AUDIOSOCKET_EXTEN}@{ctx}"'
     )
 

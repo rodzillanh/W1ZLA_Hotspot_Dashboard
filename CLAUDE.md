@@ -5146,16 +5146,55 @@ config for per-integration credentials; put it in
        -rx "channel request hangup $ch"; done` -- matches only the
        leaked prefix, confirmed to leave `SimpleUSB/59929`, the IAX2
        links, and the USRP bridge completely untouched.
-    **Confirmed working end-to-end after this fix**, verified live via
-    the actual dashboard container (not just a manual `asterisk -rx`
-    test) -- the meter genuinely tracks live audio on a real card, and a
-    post-test `core show channels concise` check showed exactly one
-    healthy `spy`/`audiosocket` pair, no leak. If `res_clioriginate.so`/
-    the Local-channel-bridge mechanism above is ever touched again,
-    re-verify the same way: a live SSH session against a real node, and
-    watch `core show channels concise` for the `dashboard-audiospy`
-    prefix throughout testing so a regression can't accumulate
-    unnoticed the way it did during this session.
+    **Initially reported as "confirmed working end-to-end" after this
+    fix -- correction: that was true for a single point-in-time check,
+    not for SUSTAINED operation.** The mechanism genuinely worked (a
+    real byte-for-byte AudioSocket capture proved that), and a
+    channel-leak check immediately afterward was clean -- but neither of
+    those checks ran long enough to catch that the connection was only
+    stable for a few seconds at a time before silently dying and
+    reconnecting. Lesson: "it worked once, right now" is not the same
+    claim as "it stays working" -- for anything with a reconnect loop,
+    the real test is watching it for several consecutive cycles, not one.
+    7. **The actual sustained-connection killer, found only once the
+       redeploy for the dBFS fix (finding above) put the feature back
+       under real reconnect load**: `/api/audio_level` kept flipping
+       back to `connected: false` every few seconds, `docker logs`
+       showed a tight repeating cycle of `EOFError: AudioSocket
+       connection closed mid-frame` / `SSHException: TCP forwarding
+       request denied` (the latter now understood as a KNOCK-ON of the
+       former -- a connection that dies after only a few seconds tears
+       down and immediately retries, landing right back in the
+       OS-level port-release race finding #3 already documented, just
+       far more often since the connection never lives long enough to
+       avoid it). A live `sudo asterisk -rvvv` capture on the node during
+       an active reconnect cycle (redirected to a file with `timeout 30
+       ... > file 2>&1` rather than watched interactively, so it could be
+       pasted back whole) showed the real cause directly:
+       `app_audiosocket.c:183 audiosocket_run: Failed to receive frame
+       from channel ... connected to AudioSocket server` -- confirmed
+       from Asterisk's own source that this specific message means
+       `ast_read()` returned NULL (the channel was hung up), NOT a
+       timeout (a separate, differently-worded message exists for that
+       case). Something was hanging up the AudioSocket leg out from
+       under a healthy, actively-spying session after several seconds.
+       **Root cause: Local channel optimization** -- a real, documented
+       Asterisk behavior (confirmed against Asterisk's own current docs,
+       "Local Channel Optimization") where Asterisk automatically
+       collapses a Local channel pair once it decides it can simplify
+       the topology, discarding the pair entirely -- exactly the
+       "works fine, then unexpectedly dies after a few seconds" symptom
+       observed. Fixed with the documented `/n` suffix on the Local
+       channel's own resource string (`Local/spy@<ctx>/n`, confirmed
+       exact syntax/placement against Asterisk's docs -- `/n` goes
+       immediately after `exten@context`, before any other trailing
+       origination arguments), which disables that collapsing.
+       **Not yet re-confirmed for SUSTAINED stability as of this fix**
+       -- given the "confirmed working" claim above turned out to only
+       hold for a brief window, don't trust this one on a single check
+       either. Watch `/api/audio_level` and `docker logs` continuously
+       for several minutes (not one point-in-time check) before
+       believing this is actually solved.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
