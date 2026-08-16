@@ -40,6 +40,7 @@ AllowTcpForwarding disabled in the node's sshd_config) just retries with
 backoff like every other degrade-gracefully integration in this project
 -- it never raises out of reconcile()/snapshot().
 """
+import math
 import struct
 import threading
 import time
@@ -71,18 +72,35 @@ def _recv_exact(chan, n: int) -> bytes:
     return buf
 
 
-def _rms_level(payload: bytes) -> float:
-    """0.0-1.0 normalized RMS over a chunk of signed 16-bit LE PCM. A
-    plain struct-based loop, not a new dependency -- Python 3.12 dropped
-    stdlib audioop, but this is genuinely simple math (~5 lines), not a
-    reverse-engineered protocol worth a real dependency for (contrast
-    camera_stream.py's bambulabs_api, a real proprietary protocol)."""
+def _rms_dbfs(payload: bytes) -> float:
+    """RMS level in dBFS (0 = digital full-scale, negative below that)
+    over a chunk of signed 16-bit LE PCM. A plain struct-based loop, not
+    a new dependency -- Python 3.12 dropped stdlib audioop, but this is
+    genuinely simple math (~5 lines), not a reverse-engineered protocol
+    worth a real dependency for (contrast camera_stream.py's
+    bambulabs_api, a real proprietary protocol).
+
+    Deliberately dBFS, not a raw linear 0.0-1.0 fraction of full-scale --
+    an earlier version returned `rms / 32768.0` directly, which reads as
+    "quiet" for almost all real speech (normal speech RMS typically sits
+    tens of dB below full-scale, so a linear fraction against literal
+    digital full-scale needs near-clipping-hot audio to show anything on
+    a 0-100% bar at all -- reported directly: "it seems to take quite a
+    bit of signal to light up the meter"). A logarithmic (dB) value is
+    what every real VU-style meter actually uses, for the same reason
+    the RSSI meter maps a dBm RANGE rather than treating -60dBm as
+    "60% of the way to 0". The actual bar-percentage mapping happens
+    client-side (dashboard.html's audioLevelBarPct()), same "send the
+    real unit, format for display in JS" split as rssiBarPct()."""
     n = len(payload) // 2
     if n == 0:
-        return 0.0
+        return config.ASL_AUDIO_SILENCE_DBFS
     samples = struct.unpack(f"<{n}h", payload[: n * 2])
     mean_sq = sum(s * s for s in samples) / n
-    return min(1.0, (mean_sq ** 0.5) / 32768.0)
+    if mean_sq <= 0:
+        return config.ASL_AUDIO_SILENCE_DBFS
+    rms = mean_sq ** 0.5
+    return max(config.ASL_AUDIO_SILENCE_DBFS, 20.0 * math.log10(rms / 32768.0))
 
 
 class _AslAudioWorker:
@@ -100,8 +118,8 @@ class _AslAudioWorker:
         self._node = hotspot.get("asl_node", "")
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
-        self._level = 0.0
         self._connected = False
+        self._level_dbfs = config.ASL_AUDIO_SILENCE_DBFS
         self._last_frame_at = 0.0
         self._thread = threading.Thread(target=self._loop, daemon=True)
 
@@ -121,18 +139,19 @@ class _AslAudioWorker:
         with self._lock:
             stale = (time.time() - self._last_frame_at) > config.ASL_AUDIO_STALE_SEC
             connected = self._connected and not stale
-            return {"level": self._level if connected else 0.0, "connected": connected}
+            level = self._level_dbfs if connected else config.ASL_AUDIO_SILENCE_DBFS
+            return {"level_dbfs": level, "connected": connected}
 
-    def _set_level(self, level: float) -> None:
+    def _set_level(self, level_dbfs: float) -> None:
         with self._lock:
-            self._level = level
+            self._level_dbfs = level_dbfs
             self._last_frame_at = time.time()
             self._connected = True
 
     def _set_disconnected(self) -> None:
         with self._lock:
             self._connected = False
-            self._level = 0.0
+            self._level_dbfs = config.ASL_AUDIO_SILENCE_DBFS
 
     def _loop(self) -> None:
         while not self._stop_event.is_set():
@@ -250,7 +269,7 @@ class _AslAudioWorker:
             length = (header[1] << 8) | header[2]
             payload = _recv_exact(chan, length) if length else b""
             if kind == _KIND_AUDIO:
-                self._set_level(_rms_level(payload))
+                self._set_level(_rms_dbfs(payload))
             elif kind in (_KIND_HANGUP, _KIND_ERROR):
                 return
 

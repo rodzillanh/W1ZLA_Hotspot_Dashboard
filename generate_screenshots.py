@@ -258,7 +258,7 @@ with app.monitor._lock:
 # this fake TEST-NET-2 IP. Screenshot-only monkeypatch, never touches real
 # behavior -- same trick already used for the ASL Favorites "recently
 # active" state screenshot (see CLAUDE.md).
-app.audio_manager.snapshot = lambda: {HOTSPOT_ASL3["ip"]: {"level": 0.62, "connected": True}}
+app.audio_manager.snapshot = lambda: {HOTSPOT_ASL3["ip"]: {"level_dbfs": -26.0, "connected": True}}
 
 # --- 4. Seed Fleet Activity / Top 5 Activity (storage_activity.py) --
 # log_activity() always timestamps "now", which is fine for a demo chart.

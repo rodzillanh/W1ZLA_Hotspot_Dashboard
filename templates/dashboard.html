@@ -3544,17 +3544,37 @@ function vuTick(t) {
 }
 requestAnimationFrame(vuTick);
 
-// ASL3's live audio-level meter (see asl_audio.py) is fed by its OWN
-// fast poll, decoupled from the main 3s /api/data cycle -- that cadence
-// is fine for RSSI/BER (only ever updates at a call's end anyway), but
-// a real audio RMS level needs to update far more often than that to
-// read as live rather than stepped, the same "MixMonitor + SSH poll"
-// problem this feature deliberately avoided (see CLAUDE.md). paintVu()'s
-// existing spring physics smooths between even these more-frequent
-// samples the same way it already smooths WPSD's infrequent ones.
-// Reads lastApiData (set every 3s by refresh(), see its own comment)
-// rather than tracking a separate enabled-ip list -- skips the fetch
-// entirely when nothing on the page needs it.
+// ASL3's live audio-level meter (see asl_audio.py) sends real dBFS (0 =
+// digital full-scale, negative below it), not a pre-computed percentage
+// -- same "send the real unit, format for display in JS" split as
+// rssiBarPct() above. A first (wrong) version sent a raw linear
+// fraction of full-scale directly as the percentage, which read as
+// "quiet" for almost all real speech -- normal speech RMS sits tens of
+// dB below full-scale, so it barely lit the bar at all (reported
+// directly: "it seems to take quite a bit of signal to light up the
+// meter"). This range is a first illustrative guess, same "no universal
+// calibration standard, explicitly approximate" caveat as rssiBarPct's
+// own -120..-60 dBm window -- if real audio still reads too hot/too
+// quiet against this node's actual mic gain, narrow/widen these two
+// numbers rather than assuming the dBFS math itself is wrong.
+const ASL_AUDIO_SILENCE_DBFS = -50;  // bar reads 0% at/below this
+const ASL_AUDIO_HOT_DBFS = -12;      // bar reads 100% at/above this
+function audioLevelBarPct(dbfs) {
+    if (dbfs === null || dbfs === undefined) return null;
+    const pct = ((dbfs - ASL_AUDIO_SILENCE_DBFS) / (ASL_AUDIO_HOT_DBFS - ASL_AUDIO_SILENCE_DBFS)) * 100;
+    return Math.max(0, Math.min(100, pct));
+}
+
+// Fed by its OWN fast poll, decoupled from the main 3s /api/data cycle
+// -- that cadence is fine for RSSI/BER (only ever updates at a call's
+// end anyway), but a real audio level needs to update far more often
+// than that to read as live rather than stepped, the same "MixMonitor +
+// SSH poll" problem this feature deliberately avoided (see CLAUDE.md).
+// paintVu()'s existing spring physics smooths between even these
+// more-frequent samples the same way it already smooths WPSD's
+// infrequent ones. Reads lastApiData (set every 3s by refresh(), see
+// its own comment) rather than tracking a separate enabled-ip list --
+// skips the fetch entirely when nothing on the page needs it.
 function fetchAudioLevels() {
     const enabledIps = (lastApiData || [])
         .filter(hs => hs.type === 'asl3' && hs.audio_meter_enabled)
@@ -3565,7 +3585,7 @@ function fetchAudioLevels() {
         .then(levels => {
             enabledIps.forEach(ip => {
                 const entry = levels[ip];
-                const pct = entry ? entry.level * 100 : 0;
+                const pct = entry ? audioLevelBarPct(entry.level_dbfs) : 0;
                 if (vuMeters[ip]) {
                     vuMeters[ip].pct = pct;
                 } else {

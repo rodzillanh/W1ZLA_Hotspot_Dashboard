@@ -553,6 +553,12 @@ ASL_AUDIO_FORWARD_RETRY_DELAY_SEC = float(os.environ.get("ASL_AUDIO_FORWARD_RETR
 # long means the spy session itself died, not just "nobody's
 # transmitting right now."
 ASL_AUDIO_STALE_SEC = int(os.environ.get("ASL_AUDIO_STALE_SEC", 8))
+# Floor value for the dBFS level computation (asl_audio.py's _rms_dbfs())
+# -- true digital silence is -inf dBFS, which isn't a usable number for
+# the frontend's bar-percentage math. -96 dBFS is the theoretical noise
+# floor of 16-bit PCM (6.02 dB/bit * 16), a generous, real reference
+# point rather than an arbitrary round number.
+ASL_AUDIO_SILENCE_DBFS = float(os.environ.get("ASL_AUDIO_SILENCE_DBFS", -96.0))
 
 
 def build_asl_audio_originate_cmd(node: str) -> str:
