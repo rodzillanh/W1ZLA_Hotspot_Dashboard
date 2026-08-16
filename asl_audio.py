@@ -166,9 +166,27 @@ class _AslAudioWorker:
                 # worker thread" contract -- this just makes the failure
                 # visible instead of invisible.
                 print(f"asl_audio: {self._ip} (node {self._node}): {type(e).__name__}: {e}")
+            # A short-lived-but-real connection (audio was actually
+            # flowing before something dropped it) gets a much shorter
+            # retry delay than a connection that never established at
+            # all -- confirmed live (2026-08) that ChanSpy on an
+            # app_rpt-managed channel reliably drops after ~7-10s for a
+            # reason not fully root-caused (ruled out: Local channel
+            # optimization, fixed separately with /n but didn't solve
+            # this). Since the tap genuinely works while connected, a
+            # fast reconnect keeps the meter's visible gap small instead
+            # of sitting disconnected for the full backoff -- but a
+            # connection that NEVER establishes (bad credentials, node
+            # unreachable, not provisioned) still gets the longer delay,
+            # so a genuinely broken node doesn't get hammered with rapid
+            # retries indefinitely.
+            with self._lock:
+                had_connection = self._connected
             self._set_disconnected()
             if not self._stop_event.is_set():
-                self._stop_event.wait(config.ASL_AUDIO_RECONNECT_BACKOFF)
+                backoff = (config.ASL_AUDIO_RECONNECT_BACKOFF_AFTER_DROP if had_connection
+                           else config.ASL_AUDIO_RECONNECT_BACKOFF)
+                self._stop_event.wait(backoff)
 
     def _request_port_forward_with_retry(self, transport) -> None:
         """A reconnect that follows closely on the PREVIOUS attempt's

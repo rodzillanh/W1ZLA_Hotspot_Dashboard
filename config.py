@@ -532,6 +532,13 @@ ASL_AUDIO_TUNNEL_PORT = int(os.environ.get("ASL_AUDIO_TUNNEL_PORT", 8288))
 # never wrong.
 ASL_AUDIO_MODULES = ("res_audiosocket.so", "app_audiosocket.so", "app_chanspy.so", "res_clioriginate.so")
 ASL_AUDIO_RECONNECT_BACKOFF = int(os.environ.get("ASL_AUDIO_RECONNECT_BACKOFF", 10))
+# Much shorter retry delay used specifically after a connection that DID
+# establish and stream real audio before dropping -- see
+# _AslAudioWorker._loop()'s own comment for why this needs to be
+# distinct from ASL_AUDIO_RECONNECT_BACKOFF above (a connection that
+# never establishes at all still gets the longer delay, so a genuinely
+# unreachable/misconfigured node doesn't get hammered).
+ASL_AUDIO_RECONNECT_BACKOFF_AFTER_DROP = float(os.environ.get("ASL_AUDIO_RECONNECT_BACKOFF_AFTER_DROP", 1.5))
 # Reusing the exact same fixed remote port on every reconnect (see
 # ASL_AUDIO_TUNNEL_PORT's own comment for why it's fixed rather than
 # dynamic) means a reconnect that follows closely on a previous

@@ -5189,12 +5189,61 @@ config for per-integration credentials; put it in
        exact syntax/placement against Asterisk's docs -- `/n` goes
        immediately after `exten@context`, before any other trailing
        origination arguments), which disables that collapsing.
+    8. **`/n` was real and correctly applied, but WASN'T the actual
+       fix -- a second live `sudo asterisk -rvvv` capture (redirected to
+       a file, not watched interactively) after deploying it showed the
+       EXACT SAME failure, just in a different-looking order.** This
+       time `ChanSpy` on the `;2` half ended FIRST ("`Done Spying on
+       channel SimpleUSB/59929`"), and only then, under a second later,
+       did `AudioSocket` on `;1` fail -- the reverse of finding #7's
+       capture, which conclusively rules out Local channel optimization
+       as the cause (that would look like an abrupt simultaneous
+       collapse of both halves, not one app cleanly finishing before the
+       other notices). Read Asterisk's own `app_chanspy.c` source
+       directly (not another web-search summary) for the spy loop's
+       exact exit conditions: it only exits on `ast_waitfor`/`ast_read`
+       failure or a hangup check **on the spying channel itself**
+       (`;2`) -- confirmed there is NO explicit "has the target gone
+       away" check in the loop at all. So something is hanging up `;2`
+       (our own half of the Local channel pair) directly, consistently
+       around 7-10 seconds in, for a reason that traces into app_rpt's
+       own internals (not generic Asterisk/ChanSpy/Local-channel
+       behavior) -- genuinely NOT root-caused as of this writing.
+       Searched for known app_rpt+ChanSpy interaction issues and a
+       periodic app_rpt housekeeping/cleanup timer near this interval;
+       found nothing definitive. Pinning this down for real would mean
+       reading app_rpt's own (large) C source directly, with no
+       guarantee of finding it -- could be deliberate app_rpt
+       housekeeping, could be something specific to this SimpleUSB
+       hardware/driver, or something else entirely.
+       **Given the choice between open-ended further research and a
+       pragmatic workaround, the user chose the workaround** (asked
+       directly via AskUserQuestion, not assumed): since the tap
+       genuinely works correctly while connected (proven twice now,
+       including a byte-for-byte AudioSocket capture), `_AslAudioWorker._loop()`
+       now uses a MUCH shorter reconnect delay
+       (`ASL_AUDIO_RECONNECT_BACKOFF_AFTER_DROP`, 1.5s) specifically
+       when a connection had actually established and streamed real
+       audio before dying, versus the original longer
+       `ASL_AUDIO_RECONNECT_BACKOFF` (10s) for a connection that never
+       established at all (so a genuinely unreachable/misconfigured
+       node doesn't get hammered with rapid retries forever). This
+       doesn't fix the underlying ~7-10s drop -- it just keeps the
+       meter's visible gap small by reconnecting quickly, accepting
+       periodic brief blackouts as a working tradeoff for a cosmetic,
+       non-safety-critical feature. If someone ever wants to actually
+       root-cause the ~7-10s drop, start by reading app_rpt's own
+       source for anything touching channel/audiohook lifecycle on a
+       roughly 10-second cadence, or try attaching a live debugger/more
+       verbose Asterisk debug levels (`core set debug`) during an active
+       drop -- neither was attempted here.
        **Not yet re-confirmed for SUSTAINED stability as of this fix**
-       -- given the "confirmed working" claim above turned out to only
-       hold for a brief window, don't trust this one on a single check
-       either. Watch `/api/audio_level` and `docker logs` continuously
-       for several minutes (not one point-in-time check) before
-       believing this is actually solved.
+       -- given TWO earlier "confirmed working" claims in this same
+       entry both turned out to only hold for a brief window, don't
+       trust this one on a single check either. Watch `/api/audio_level`
+       and `docker logs` continuously for several minutes (not one
+       point-in-time check) before believing the gaps are actually as
+       brief/tolerable as intended.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
