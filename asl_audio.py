@@ -138,8 +138,15 @@ class _AslAudioWorker:
         while not self._stop_event.is_set():
             try:
                 self._run_once()
-            except Exception:
-                pass
+            except Exception as e:
+                # Never silently swallow -- a bare `except: pass` here
+                # made a real failure completely undiagnosable from
+                # `docker logs` (see CLAUDE.md's aslstats.py rate-limit
+                # gotcha for the same lesson learned once already in this
+                # project). Still keeps the "never raises out of a
+                # worker thread" contract -- this just makes the failure
+                # visible instead of invisible.
+                print(f"asl_audio: {self._ip} (node {self._node}): {type(e).__name__}: {e}")
             self._set_disconnected()
             if not self._stop_event.is_set():
                 self._stop_event.wait(config.ASL_AUDIO_RECONNECT_BACKOFF)
