@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.30 "Young"</span>
+                <span class="release-version">v4.31 "Denver"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>VU meter now falls to 0 once a call ends, instead of holding the last reading indefinitely</span> — reported directly with two real screenshots (a WPSD card showing "100%" solid well after its last call, another showing a full bright bar on a card that was simply "Listening…", no recent call at all). This was the previous release's documented "WPSD holds at its last real value" behavior working as designed (MMDVM only logs RSSI/BER/packet-loss as an end-of-transmission summary, there's no live idle reading to fall toward) — but a solid bar at the last reading looked like a live signal when nothing was actually happening. openSPOT4 already fell toward idle naturally (its dejitter reading is genuinely live, per-second data); WPSD/D-Star now gets the same treatment explicitly — the meter's target drops to 0 the moment a hotspot isn't actively transmitting, and the existing spring physics/peak-hold carries it down smoothly rather than snapping. A hotspot with no reading at all yet (a fresh install, zero calls logged this session) still shows the honest empty bar, not a fabricated 0%</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.30 "Young"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>VU meter is now always visible, promoted to its own row, and shows a numeric readout</span> — mocked up (live-animated, cycling between idle/active states) and approved before building. Previously the meter only appeared during an active call, swapped for a plain RSSI/BER text row otherwise, and lived squeezed into the Mode/Freq/Temp/CPU stats grid. It's now a standalone row directly under the activity status (with a divider separating "what's happening right now" from static technical details below), rendered at all times so the needle visibly falls toward idle at the end of a call instead of the whole row disappearing — openSPOT4's needle settles toward a genuine live idle reading; WPSD's holds at its last real value, since MMDVM has no live idle reading to fall toward. A numeric percentage now sits at the end of the bar alongside the segments and peak marker</li>

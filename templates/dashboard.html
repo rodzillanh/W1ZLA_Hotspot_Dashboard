@@ -4238,10 +4238,22 @@ function renderCards(data) {
         const dejitterPct = hs.type === 'openspot4' ? dejitterBarPct(hs.dejitter_pkts) : null;
         const rssiPct = rssiBarPct(hs.rssi);
         const lossPct = packetLossBarPct(hs.packet_loss);
-        const pct = dejitterPct !== null ? dejitterPct
+        const livePct = dejitterPct !== null ? dejitterPct
             : (rssiPct !== null ? rssiPct
             : (lossPct !== null ? lossPct
             : berBarPct(hs.ber)));
+        // v4.31: fall to 0 once the call ends, rather than holding the
+        // last reading indefinitely -- reported directly (two real
+        // screenshots) that a solid/bright bar sitting at the last call's
+        // value looked like a live signal when nothing was actually
+        // happening. openSPOT4 already did this naturally (dejitter_pkts
+        // is genuinely live, per-second data that falls on its own at
+        // idle); WPSD/D-Star had no equivalent live idle reading to fall
+        // toward, so this makes that explicit instead. Only overrides a
+        // REAL reading (livePct !== null) -- a hotspot with no reading at
+        // all yet (fresh install, zero calls logged this session) still
+        // gets the honest empty bar below, not a fabricated "0%".
+        const pct = hs.is_active ? livePct : (livePct === null ? null : 0);
         if (vuMeters[hs.ip]) {
             vuMeters[hs.ip].pct = pct;
         } else {
