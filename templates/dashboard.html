@@ -3385,14 +3385,24 @@ function berBarPct(str) {
 // Packet loss -- confirmed live from a real WPSD MMDVM log capture, only
 // present on NETWORK-received transmissions (never RF-received ones,
 // which also never carry an rssi field at all -- there's no local RF
-// signal for a network-relayed call). Unlike BER's typical sub-5% range
-// (needing the /5 amplification berBarPct above uses), a real capture
-// showed packet loss spanning a genuine 0-66% range for otherwise-normal
-// calls, so this uses a direct 0-100 scale, no amplification needed.
+// signal for a network-relayed call). v4.29 originally used a direct
+// 0-100 scale (no amplification) since ONE real capture showed packet
+// loss spanning a genuine 0-66% range across different calls -- but
+// reported directly (v4.35): in ordinary day-to-day use the meter still
+// read as "stuck at 100%, no real fluctuation," because most real calls
+// for a healthy network path cluster much lower, in the 0-10% range, not
+// spread evenly up to 66%. A direct 1:1 scale barely moves the bar for
+// that common range. Amplified the same way berBarPct's /5 curve already
+// amplifies BER -- 25%+ loss now empties the bar instead of needing
+// ~100% -- so the small, real variation that actually shows up call to
+// call is visible instead of flattened out near the top. A genuinely
+// perfect 0%-loss call still reads a full 100% -- that's honest, not a
+// display bug; there's no fluctuation to show when the network path
+// really is clean for that whole transmission.
 function packetLossBarPct(str) {
     const m = /(\d+(?:\.\d+)?)/.exec(str || '');
     if (!m) return null;
-    const pct = 100 - parseFloat(m[1]);
+    const pct = 100 - parseFloat(m[1]) * 4;
     return Math.max(0, Math.min(100, pct));
 }
 // --- openSPOT4 battery (v4.14) -- only ever present on a battery-powered

@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.34 "Weiland"</span>
+                <span class="release-version">v4.35 "Farndon"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>WPSD/D-Star VU meter is more sensitive to real packet loss, instead of reading near-100% almost all the time</span> — reported directly: the meter "isn't very active... usually at 100%, no real fluctuation with signal strength." Root cause: for a network-relayed call (the majority of traffic — WPSD only logs RSSI for genuine RF-received calls), the bar is driven by packet loss, and the old scale mapped it directly (5% loss → 95%, 10% loss → 90%). A real healthy connection's ordinary day-to-day loss mostly clusters in a low single-digit range, not spread evenly up to the 66% one earlier capture happened to show — so a direct scale barely moved the bar for the loss levels that actually occur most often. Loss is now amplified 4x (25%+ loss empties the bar, matching the same amplification BER's own curve already used) so the real, smaller variation between calls actually shows up instead of flattening out near the top. A genuinely perfect 0%-loss call still reads a full 100% — that's an honest reading of a clean network path, not a display bug</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.34 "Weiland"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>WPSD/D-Star VU meter shows a value again during an active call</span> — the previous release's fix (a fully blank bar for the whole duration of a call, to avoid showing the previous call's carried-over reading as if it were live) was reported directly as worse than the problem it fixed: an empty bar for an entire call read as broken. Reverted back to always showing the current reading while a call is active — in practice this is correct for nearly all of a call's length (only the first few seconds of a brand-new call can still show the previous call's value, since MMDVM only logs RSSI/BER/packet-loss at end-of-transmission, no per-second telemetry exists to do better). The one piece kept from the previous two releases: the meter still falls to 0 once a call ends rather than holding that last reading forever</li>
