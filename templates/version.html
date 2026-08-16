@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.35 "Farndon"</span>
+                <span class="release-version">v4.36 "Preston"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Big Ass Clock: Square is now the default face for Analog, and 12-hour is now the default for Digital</span> — requested directly. Only affects an install that's never touched these toggles before (a per-browser localStorage preference, not settings.json) — an explicit prior choice of the round face, or of 24-hour format, is still respected either way, same "flip the default without clobbering someone's own choice" pattern already used elsewhere in this app</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.35 "Farndon"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>WPSD/D-Star VU meter is more sensitive to real packet loss, instead of reading near-100% almost all the time</span> — reported directly: the meter "isn't very active... usually at 100%, no real fluctuation with signal strength." Root cause: for a network-relayed call (the majority of traffic — WPSD only logs RSSI for genuine RF-received calls), the bar is driven by packet loss, and the old scale mapped it directly (5% loss → 95%, 10% loss → 90%). A real healthy connection's ordinary day-to-day loss mostly clusters in a low single-digit range, not spread evenly up to the 66% one earlier capture happened to show — so a direct scale barely moved the bar for the loss levels that actually occur most often. Loss is now amplified 4x (25%+ loss empties the bar, matching the same amplification BER's own curve already used) so the real, smaller variation between calls actually shows up instead of flattening out near the top. A genuinely perfect 0%-loss call still reads a full 100% — that's an honest reading of a clean network path, not a display bug</li>

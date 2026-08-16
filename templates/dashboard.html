@@ -5736,13 +5736,18 @@ const CLOCK_SHOW_DATE_KEY = 'w1zla_clock_show_date';
 let clockStyle = localStorage.getItem(CLOCK_STYLE_KEY) || 'digital';
 let clockDualEnabled = localStorage.getItem(CLOCK_DUAL_KEY) === '1';
 let clockDualTz = localStorage.getItem(CLOCK_DUAL_TZ_KEY) || 'UTC';
-let clockUse12Hour = localStorage.getItem(CLOCK_12HR_KEY) === '1';  // 24hr default, matches ham radio/aviation convention
+// v4.36: 12-hour is now the default for Digital, and Square is now the
+// default face for Analog -- reported directly. Only affects an install
+// that's never touched these toggles (localStorage unset) -- an explicit
+// prior choice (a literal stored '0' for 12hr, or a literal stored
+// 'round' for the face) is still respected either way, same "flip the
+// default without clobbering someone's own choice" pattern used
+// elsewhere in this file (map style/grey-line default).
+let clockUse12Hour = localStorage.getItem(CLOCK_12HR_KEY) !== '0';
 // Analog-only extras (mockup-approved, see CLAUDE.md): a square
 // "instrument panel" face as an alternative to the round dial, and a
-// watch-style date window. Both default off -- the existing round face
-// with no date is unchanged behavior for every install upgrading into
-// this.
-let clockFaceShape = localStorage.getItem(CLOCK_FACE_SHAPE_KEY) || 'round';
+// watch-style date window. Show-date still defaults off.
+let clockFaceShape = localStorage.getItem(CLOCK_FACE_SHAPE_KEY) || 'square';
 let clockShowDate = localStorage.getItem(CLOCK_SHOW_DATE_KEY) === '1';
 let clockTixState = {};  // per-digit-position cached dot layout, keyed by "position:value:dotCount"
 
