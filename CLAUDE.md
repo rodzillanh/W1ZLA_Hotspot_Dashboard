@@ -5040,6 +5040,58 @@ config for per-integration credentials; put it in
     software audio mixing, largely independent of Asterisk's core
     `Bridge()` subsystem, and this was never separately verified beyond
     "the channel object exists and shows Up in `core show channels`").
+  - **Real first-deploy findings (2026-08, live against W1ZLA/node
+    59929), each fixed as soon as it surfaced -- three real bugs, not one,
+    stacked on top of each other so each one had to be fixed before the
+    next became visible:**
+    1. `_AslAudioWorker._loop()`'s exception handler was a bare `except
+       Exception: pass` -- a real connection failure produced ZERO output
+       in `docker logs`, exactly the undiagnosable-by-design mistake this
+       project already learned once with `aslstats.py`'s own rate-limit
+       debugging (see that gotcha above). Fixed by `print()`-ing the
+       exception, same "never raises, but never silent either" contract.
+    2. Even after adding that `print()`, `docker logs` stayed EMPTY across
+       two separate windows (5 and 20 minutes) despite the worker retrying
+       every 10s. Root cause: Python's stdout is fully block-buffered
+       (not line-buffered) whenever it isn't a real terminal -- always
+       true for a containerized/systemd process, since both capture
+       stdout via a pipe. This affects EVERY plain `print()` diagnostic
+       across this whole app, not just this feature. Fixed by adding
+       `PYTHONUNBUFFERED=1` to both the `Dockerfile` (`ENV`) and
+       `install.sh`'s generated systemd unit (`Environment=`).
+    3. With logging actually visible, the real failure showed up:
+       `client.exec_command(...)`'s returned stdout/stderr were discarded
+       entirely (never assigned to a variable) -- an unreferenced
+       paramiko `ChannelFile`/`Channel` can be garbage-collected almost
+       immediately, which risks tearing down the SSH channel (and the
+       remote `asterisk -rx "channel originate ..."` process riding on
+       it) before it actually finished. Every OTHER SSH command in this
+       codebase (`monitor.py`'s `_ssh_exec`) always reads `stdout` for
+       exactly this reason -- this one didn't. Fixed by reading both
+       streams and folding the real Asterisk CLI response text into the
+       "AudioSocket never connected back" error message.
+    4. **The actual, final root cause, only visible once #3 surfaced real
+       output**: `channel originate` reported `"No such command"` for the
+       exact command string this app builds -- which reads exactly like a
+       syntax mistake, but isn't one (the syntax matches Asterisk's own
+       documented `channel originate <tech/data> extension <exten>@
+       <context>` form exactly). `channel originate` is NOT part of
+       Asterisk core -- it's provided by a separate module,
+       `res_clioriginate.so`, confirmed from Asterisk's own docs (the
+       "provided by res_clioriginate.so" note on the CLI command page).
+       It was never in `ASL_AUDIO_MODULES` at all -- a genuinely missed
+       fourth dependency alongside `res_audiosocket.so`/
+       `app_audiosocket.so`/`app_chanspy.so`. Missing it doesn't fail
+       loudly the way a missing app module does (no module-load error at
+       provisioning time) -- it just makes the CLI act as though the
+       whole command doesn't exist, which is what made this look like a
+       command-syntax bug rather than a missing-module one. Added to
+       `config.ASL_AUDIO_MODULES` and `provision-audio-meter.sh`'s
+       `MODULES` array. **Still not confirmed working end-to-end as of
+       this fix** -- re-verify the same way once `res_clioriginate.so` is
+       actually loaded and re-provisioned, don't assume this was the
+       last bug in the chain just because it's the most plausible one
+       found so far.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

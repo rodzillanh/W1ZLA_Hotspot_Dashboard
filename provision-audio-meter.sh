@@ -64,7 +64,12 @@ AUDIOSOCKET_EXTEN="audiosocket"
 # needed by the AudioSocket() dialplan app) was in an earlier version of
 # this list and failed to load on a real node for exactly that reason;
 # removed rather than debugged further since it was never actually used.
-MODULES=(res_audiosocket.so app_audiosocket.so app_chanspy.so)
+# res_clioriginate.so is what actually provides the `channel originate`
+# CLI command this script's trigger relies on -- missing it doesn't fail
+# loudly (no module-load error), it just makes the CLI report "No such
+# command 'channel originate ...'", which reads like a syntax mistake
+# rather than a missing module. Confirmed live the hard way (2026-08).
+MODULES=(res_audiosocket.so app_audiosocket.so app_chanspy.so res_clioriginate.so)
 DIALPLAN_FILE="/etc/asterisk/dashboard-audiospy-${NODE}.conf"
 EXTENSIONS_CONF="/etc/asterisk/extensions.conf"
 MODULES_CONF="/etc/asterisk/modules.conf"

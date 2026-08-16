@@ -518,7 +518,19 @@ ASL_AUDIO_TUNNEL_PORT = int(os.environ.get("ASL_AUDIO_TUNNEL_PORT", 8288))
 # module, confirmed present in the same live module listing) -- listed
 # explicitly here and loaded first, rather than assuming Asterisk's
 # module loader resolves `.requires` automatically in every build.
-ASL_AUDIO_MODULES = ("res_audiosocket.so", "app_audiosocket.so", "app_chanspy.so")
+#
+# res_clioriginate.so is a SEPARATE, easy-to-miss fourth dependency --
+# the `channel originate` CLI command used to trigger the spy call isn't
+# part of Asterisk core at all, it's provided by this module. Missing it
+# doesn't fail loudly the way a missing app_audiosocket.so etc. would (no
+# module-load error) -- it just makes the CLI report "No such command
+# 'channel originate ...'" as if the whole command didn't exist, which
+# reads exactly like a syntax mistake in the command string rather than
+# a missing module. Confirmed live (2026-08) against W1ZLA/node 59929:
+# the exact same command string this app builds, run manually, hit this
+# error until res_clioriginate.so was loaded -- the syntax itself was
+# never wrong.
+ASL_AUDIO_MODULES = ("res_audiosocket.so", "app_audiosocket.so", "app_chanspy.so", "res_clioriginate.so")
 ASL_AUDIO_RECONNECT_BACKOFF = int(os.environ.get("ASL_AUDIO_RECONNECT_BACKOFF", 10))
 # How long since the last audio frame before a worker is reported as
 # disconnected -- confirmed live that a node's rxchannel (SimpleUSB/etc.)
