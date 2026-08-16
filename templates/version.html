@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.25 "Shannon"</span>
+                <span class="release-version">v4.26 "Chilton"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>VU meter's multi-color gradient is back, without the "strong = red" confusion</span> — the previous release's fix (one flat color for the whole bar) was accurate but reported as losing the colorful, textured meter look, since this dashboard's real readings run consistently strong and the bar just stayed solid green all the time. Restored the green→amber→red taper, but scoped to position *within whatever's currently lit* rather than position on the full fixed scale — every reading, weak or strong, now gets the same proportional gradient toward its own tip (a bar needs to be at least a third or so full before any red shows at all). The gradient is purely decorative texture again, same as the classic look; actual signal strength is still told honestly by the bar's length, not by which colors appear in it</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.25 "Shannon"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed the VU meter's color making a strong signal look bad</span> — reported directly, with a real screenshot: a nearly-full, healthy-looking bar still showed red at its tip. Root cause: color was based on a lit segment's *position* in the bar (the top ~15% always red, next ~20% always amber, mimicking a classic analog meter's fixed redline zone) rather than the actual reading's quality — meaning a strong signal that filled most of the bar showed just as much red as a weak one, the opposite of what red means everywhere else on this dashboard (RSSI/BER/battery bars all use "low value = red, high value = green"). Now the whole lit bar takes one color driven by the real reading, using the same thresholds as the RSSI bar elsewhere</li>
