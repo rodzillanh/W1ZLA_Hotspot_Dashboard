@@ -151,6 +151,25 @@ class _AslAudioWorker:
             if not self._stop_event.is_set():
                 self._stop_event.wait(config.ASL_AUDIO_RECONNECT_BACKOFF)
 
+    def _request_port_forward_with_retry(self, transport) -> None:
+        """A reconnect that follows closely on the PREVIOUS attempt's
+        listener teardown can lose a real, confirmed OS-level race -- the
+        just-closed port isn't always immediately rebindable (confirmed
+        live with the stock `ssh -R` client, not just paramiko -- see
+        config.ASL_AUDIO_FORWARD_RETRY_* comment). Retry a few times with
+        a short pause before giving up, rather than treating one denial
+        as a hard failure needing a full external reconnect+backoff."""
+        last_exc = None
+        for attempt in range(config.ASL_AUDIO_FORWARD_RETRY_ATTEMPTS):
+            try:
+                transport.request_port_forward("127.0.0.1", config.ASL_AUDIO_TUNNEL_PORT)
+                return
+            except paramiko.SSHException as e:
+                last_exc = e
+                if attempt < config.ASL_AUDIO_FORWARD_RETRY_ATTEMPTS - 1:
+                    time.sleep(config.ASL_AUDIO_FORWARD_RETRY_DELAY_SEC)
+        raise last_exc
+
     def _run_once(self) -> None:
         if not self._node.isdigit():
             raise ValueError(f"no valid ASL node number configured for {self._ip}")
@@ -160,7 +179,7 @@ class _AslAudioWorker:
             client.connect(self._ip, username=self._user, password=self._pass,
                             timeout=config.SSH_TIMEOUT)
             transport = client.get_transport()
-            transport.request_port_forward("127.0.0.1", config.ASL_AUDIO_TUNNEL_PORT)
+            self._request_port_forward_with_retry(transport)
             try:
                 # Reading stdout (not just discarding exec_command()'s
                 # return value) matters here, not just for the diagnostic

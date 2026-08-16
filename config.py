@@ -532,6 +532,21 @@ ASL_AUDIO_TUNNEL_PORT = int(os.environ.get("ASL_AUDIO_TUNNEL_PORT", 8288))
 # never wrong.
 ASL_AUDIO_MODULES = ("res_audiosocket.so", "app_audiosocket.so", "app_chanspy.so", "res_clioriginate.so")
 ASL_AUDIO_RECONNECT_BACKOFF = int(os.environ.get("ASL_AUDIO_RECONNECT_BACKOFF", 10))
+# Reusing the exact same fixed remote port on every reconnect (see
+# ASL_AUDIO_TUNNEL_PORT's own comment for why it's fixed rather than
+# dynamic) means a reconnect that follows closely on a previous
+# listener's teardown can lose a real, confirmed OS-level race -- the
+# just-closed port isn't always immediately rebindable. Confirmed live
+# (2026-08) with the STOCK `ssh -R` client, not just this app's own code:
+# an immediate second `ssh -R 127.0.0.1:8288:...` attempt right after the
+# first one's session ended failed with "remote port forwarding failed"
+# every time, while a fresh attempt after a short pause succeeded --
+# proving this is a genuine sshd/OS timing behavior, not a paramiko or
+# app-side bug. Retrying the forward request itself a few times within
+# one connection attempt (not a full external reconnect) rides through
+# that window cheaply.
+ASL_AUDIO_FORWARD_RETRY_ATTEMPTS = int(os.environ.get("ASL_AUDIO_FORWARD_RETRY_ATTEMPTS", 5))
+ASL_AUDIO_FORWARD_RETRY_DELAY_SEC = float(os.environ.get("ASL_AUDIO_FORWARD_RETRY_DELAY_SEC", 2.0))
 # How long since the last audio frame before a worker is reported as
 # disconnected -- confirmed live that a node's rxchannel (SimpleUSB/etc.)
 # stays "Up" and streaming continuously even at idle, so a real gap this
