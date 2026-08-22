@@ -179,6 +179,12 @@ import models  # noqa: E402
 import storage_activity  # noqa: E402
 import waitress  # noqa: E402
 
+# monitor._data is keyed by each hotspot's stable id, not ip (two hotspots
+# can share an ip -- see storage.load_hotspots()'s id backfill). The dicts
+# above were written to hotspots.json before that backfill ever ran, so
+# re-read the now-backfilled file to learn each demo hotspot's real id.
+_ip_to_id = {h["ip"]: h["id"] for h in app.load_hotspots()}
+
 # --- 3. Seed live status directly into monitor._data, bypassing SSH entirely.
 now = time.time()
 
@@ -249,7 +255,8 @@ asl3_relay = models.HotspotStatus(
 
 with app.monitor._lock:
     for hs in (wpsd_active, wpsd_idle, asl3, asl3_relay):
-        app.monitor._data[hs.ip] = hs
+        hs.id = _ip_to_id[hs.ip]
+        app.monitor._data[hs.id] = hs
 
 # Fake a live, mid-level reading for the audio meter's fast /api/audio_level
 # poll -- the real AslAudioManager.reconcile() (called eagerly by app.py at
@@ -257,8 +264,9 @@ with app.monitor._lock:
 # HOTSPOT_ASL3's audio_meter_enabled=True, but it can only ever fail against
 # this fake TEST-NET-2 IP. Screenshot-only monkeypatch, never touches real
 # behavior -- same trick already used for the ASL Favorites "recently
-# active" state screenshot (see CLAUDE.md).
-app.audio_manager.snapshot = lambda: {HOTSPOT_ASL3["ip"]: {"level_dbfs": -26.0, "connected": True}}
+# active" state screenshot (see CLAUDE.md). Keyed by id, not ip, matching
+# AslAudioManager.snapshot()'s real shape.
+app.audio_manager.snapshot = lambda: {_ip_to_id[HOTSPOT_ASL3["ip"]]: {"level_dbfs": -26.0, "connected": True}}
 
 # --- 4. Seed Fleet Activity / Top 5 Activity (storage_activity.py) --
 # log_activity() always timestamps "now", which is fine for a demo chart.
@@ -276,6 +284,7 @@ for call, mode, tg, duration in [
     storage_activity.log_activity(
         HOTSPOT_WPSD_ACTIVE["ip"], HOTSPOT_WPSD_ACTIVE["name"], mode,
         target=call, target_type="callsign", via=tg, duration=duration,
+        hotspot_id=_ip_to_id[HOTSPOT_WPSD_ACTIVE["ip"]],
     )
 # DVSwitch card's own footer sparkline reads the same activity_log table,
 # filtered to mode="DVSwitch" -- see storage_activity.dvswitch_sparkline().
@@ -287,6 +296,7 @@ for call, duration in (("W1ZLA", 14), ("KC1ABC", 9), ("W1ZLA", 11), ("N1LCP", 6)
     storage_activity.log_activity(
         HOTSPOT_ASL3["ip"], HOTSPOT_ASL3["name"], "DVSwitch",
         target=call, target_type="callsign", duration=duration,
+        hotspot_id=_ip_to_id[HOTSPOT_ASL3["ip"]],
     )
 
 # --- 5. Start the real app the same way main() does (waitress, not the

@@ -341,6 +341,11 @@ BIOS = {
         "blurb": "Progressive rock band Yes's founding bassist and only member to appear on every one of their studio albums, known for an unusually melodic, treble-heavy bass tone.",
         "wiki": "Chris_Squire",
     },
+    "Baker": {
+        "name": "Ginger Baker",
+        "blurb": "Cream's volatile, jazz-schooled drummer, whose polyrhythmic style and dueling solos with Jack Bruce helped define the power-trio format.",
+        "wiki": "Ginger_Baker",
+    },
 }
 
 

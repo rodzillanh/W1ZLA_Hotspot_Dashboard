@@ -9,6 +9,13 @@ class HotspotStatus:
 
     name: str
     ip: str
+    # Stable per-hotspot identity, independent of ip -- lets two hotspot
+    # entries share one ip (e.g. two ASL3 radios/node numbers behind the
+    # same SSH login) without colliding. See storage.load_hotspots()'s
+    # backfill and CLAUDE.md's "hotspot id" gotcha for the full story.
+    # Defaults to "" only for dataclass field-ordering purposes -- every
+    # real entry always has a real id by the time _ensure_entry() creates it.
+    id: str = ""
     status: str = "Connecting..."
     offline_since: Optional[float] = None  # epoch when status first became "Offline"; None if online/unknown
     # epoch of the last SUCCESSFUL poll (wpsd/asl3 only -- set alongside the

@@ -260,9 +260,9 @@ def api_version():
 def api_data():
     snap      = monitor.snapshot()
     hotspots  = load_hotspots()
-    by_ip     = {h["ip"]: h for h in hotspots}
-    for ip, entry in snap.items():
-        hs = by_ip.get(ip, {})
+    by_id     = {h["id"]: h for h in hotspots}
+    for hotspot_id, entry in snap.items():
+        hs = by_id.get(hotspot_id, {})
         entry["lat"]      = hs.get("lat")
         entry["lon"]      = hs.get("lon")
         entry["type"]     = hs.get("type", "wpsd")
@@ -275,9 +275,10 @@ def api_data():
         # hotspots.json (static config, same reason type/lat/lon do); the
         # sparkline is the one piece not already on the live snapshot, since
         # it's a activity_log query rather than in-memory poll state.
+        # Keyed by hotspot_id (not ip) -- see storage_activity.py.
         if hs.get("dvswitch_enabled"):
             entry["dvswitch_enabled"] = True
-            entry["dvswitch_sparkline"] = storage_activity.dvswitch_sparkline(ip)
+            entry["dvswitch_sparkline"] = storage_activity.dvswitch_sparkline(hotspot_id)
         # Live audio-level VU meter (see asl_audio.py) -- static config
         # passthrough, same reason type/lat/lon/card_url are here rather
         # than part of the live-polled HotspotStatus. The level itself is
@@ -286,16 +287,16 @@ def api_data():
         # its own faster interval, only once it sees this flag.
         if hs.get("audio_meter_enabled"):
             entry["audio_meter_enabled"] = True
-    ordered_ips = [h["ip"] for h in hotspots]
+    ordered_ids = [h["id"] for h in hotspots]
     # Return as an ARRAY so the browser preserves order — JS objects keyed by
-    # IP strings get silently re-sorted by some engines (especially for
+    # id strings get silently re-sorted by some engines (especially for
     # keys that look numeric), so a dict is not reliable here.
-    # Only ever return entries for IPs currently in load_hotspots() -- never
+    # Only ever return entries for ids currently in load_hotspots() -- never
     # fall back to "whatever is in the snapshot," since an in-flight poll
     # thread can resurrect a just-deleted hotspot's entry in monitor._data
     # (check_one -> _ensure_entry recreates it before the SSH call
     # finishes), which would otherwise make a deleted card reappear.
-    ordered = [snap[ip] for ip in ordered_ips if ip in snap]
+    ordered = [snap[key] for key in ordered_ids if key in snap]
     return jsonify(ordered)
 
 @app.route("/api/audio_level")
@@ -805,7 +806,15 @@ def setup():
         if not name or not ip:
             return redirect("/setup")
         hotspots    = load_hotspots()
+        # Identity is the hotspot's own generated id, not ip (two hotspots
+        # CAN share one ip -- two ASL3 radios/node numbers behind one SSH
+        # login is a real, confirmed setup). Blank on add-new (no hidden
+        # field value yet); the existing hotspot's id on edit. This is why
+        # editing IP no longer needs the old orig_ip "match on the pre-edit
+        # value" dance -- ip is just an ordinary field now.
+        hotspot_id  = request.form.get("id", "").strip() or f"hs-{uuid.uuid4().hex[:10]}"
         new_hotspot = {
+            "id":   hotspot_id,
             "name": name,
             "ip":   ip,
             "user": request.form.get("user"),
@@ -876,14 +885,7 @@ def setup():
             extra_pass = request.form.get("openspot4_extra_pass", "")
             if extra_pass.strip():
                 new_hotspot["openspot4_extra_pass"] = extra_pass
-        # Match on the hotspot's ip *before* this edit, not the (possibly
-        # just-changed) submitted ip -- matching on the new ip meant editing
-        # a hotspot's IP address never removed the old entry (nothing had
-        # that new ip yet to match), leaving a stale duplicate behind under
-        # the old IP and making the change look like it hadn't saved.
-        orig_ip  = request.form.get("orig_ip", "").strip()
-        match_ip = orig_ip or new_hotspot["ip"]
-        hotspots = [h for h in hotspots if h["ip"] != match_ip]
+        hotspots = [h for h in hotspots if h.get("id") != hotspot_id]
         hotspots.append(new_hotspot)
         save_hotspots(hotspots)
         if mqtt_pub.enabled:
@@ -903,8 +905,8 @@ def setup():
                            overflow_sentinels=_overflow_sentinels(setup_settings, setup_hotspots, setup_cameras),
                            app_version=config.APP_VERSION, app_codename=config.APP_CODENAME)
 
-@app.route("/api/hotspot_config/<ip>")
-def api_hotspot_config(ip):
+@app.route("/api/hotspot_config/<hotspot_id>")
+def api_hotspot_config(hotspot_id):
     """Raw stored hotspot config (including SSH/admin credentials) for the
     card drawer's Settings block -- /api/data deliberately excludes
     credentials from the live-polled snapshot (a 3s poll every open
@@ -912,7 +914,7 @@ def api_hotspot_config(ip):
     passwords), so the drawer fetches this separately, once, right when
     it opens, the same way setup.html's edit form already gets these
     values server-rendered into the page."""
-    hotspot = next((h for h in load_hotspots() if h["ip"] == ip), None)
+    hotspot = next((h for h in load_hotspots() if h.get("id") == hotspot_id), None)
     if hotspot is None:
         return jsonify({"error": "not found"}), 404
     return jsonify(hotspot)
@@ -934,12 +936,18 @@ def api_update_hotspot():
     if not name or not ip:
         return jsonify({"ok": False, "message": "Name and IP are required"}), 400
 
-    hotspots = load_hotspots()
-    orig_ip  = (data.get("orig_ip") or "").strip()
-    match_ip = orig_ip or ip
-    existing = next((h for h in hotspots if h["ip"] == match_ip), None)
-    hotspot  = dict(existing) if existing else {}
+    hotspots   = load_hotspots()
+    # Identity is the hotspot's id, not ip -- this route only ever edits an
+    # EXISTING hotspot (the drawer's Settings block), so id always arrives
+    # in the payload (currentHotspotConfig.id, client-side). A missing id
+    # shouldn't happen in practice, but falls back to a fresh one (creates
+    # a new entry) rather than a 400 -- same degrade-gracefully posture as
+    # the rest of this route.
+    hotspot_id = (data.get("id") or "").strip() or f"hs-{uuid.uuid4().hex[:10]}"
+    existing   = next((h for h in hotspots if h.get("id") == hotspot_id), None)
+    hotspot    = dict(existing) if existing else {}
 
+    hotspot["id"]   = hotspot_id
     hotspot["name"] = name
     hotspot["ip"]   = ip
     hotspot["user"] = data.get("user", hotspot.get("user"))
@@ -996,7 +1004,7 @@ def api_update_hotspot():
         else:
             hotspot.pop("openspot4_extra_pass", None)
 
-    hotspots = [h for h in hotspots if h["ip"] != match_ip]
+    hotspots = [h for h in hotspots if h.get("id") != hotspot_id]
     hotspots.append(hotspot)
     save_hotspots(hotspots)
     if mqtt_pub.enabled:
@@ -1070,7 +1078,7 @@ def api_activity():
     hotspots = load_hotspots()
     snap     = monitor.snapshot()
     hotspots_online = sum(
-        1 for h in hotspots if snap.get(h["ip"], {}).get("status") != "Offline"
+        1 for h in hotspots if snap.get(h["id"], {}).get("status") != "Offline"
     )
     return jsonify({
         "buckets":                 result["buckets"],
@@ -1540,14 +1548,15 @@ def api_asl_connect():
     DTMF-simulated `rpt fun <node> *3<remotenode>` form, which requires
     replicating app_rpt's digit-collection state machine and proved
     unreliable in practice."""
-    data   = request.json or {}
-    ip     = data.get("ip", "").strip()
-    node   = data.get("node", "").strip()
-    action = data.get("action", "").strip()
+    data       = request.json or {}
+    hotspot_id = data.get("id", "").strip()
+    node       = data.get("node", "").strip()
+    action     = data.get("action", "").strip()
 
-    hotspot = next((h for h in load_hotspots() if h["ip"] == ip), None)
+    hotspot = next((h for h in load_hotspots() if h.get("id") == hotspot_id), None)
     if hotspot is None or hotspot.get("type") != "asl3":
         return jsonify({"success": False, "message": "Not an ASL3 hotspot"}), 400
+    ip = hotspot["ip"]
     local_node = hotspot.get("asl_node", "")
     if not local_node.isdigit():
         return jsonify({"success": False, "message": "Invalid node number"}), 400
@@ -1596,11 +1605,11 @@ def api_brandmeister_talkgroup():
     third-party WPSD-Dashboard project this was inspired by ships its own
     TGIF Manager as non-functional, "does not work until TGIF's API is
     made available")."""
-    data   = request.json or {}
-    ip     = data.get("ip", "").strip()
-    action = data.get("action", "").strip()
+    data       = request.json or {}
+    hotspot_id = data.get("id", "").strip()
+    action     = data.get("action", "").strip()
 
-    hotspot = next((h for h in load_hotspots() if h["ip"] == ip), None)
+    hotspot = next((h for h in load_hotspots() if h.get("id") == hotspot_id), None)
     if hotspot is None:
         return jsonify({"success": False, "message": "Unknown hotspot"}), 400
     bm_id = (hotspot.get("brandmeister_id") or "").strip()
@@ -1634,7 +1643,7 @@ def api_brandmeister_talkgroup():
         # cached list.
         info = bm_write_client.lookup(bm_id)
         if info is not None:
-            monitor.apply_bm_static_tgs(ip, info["static_talkgroups"])
+            monitor.apply_bm_static_tgs(hotspot_id, info["static_talkgroups"])
     return jsonify({"success": ok, "message": message})
 
 
@@ -1783,33 +1792,35 @@ def test_brandmeister():
 
 @app.route("/api/reorder_hotspots", methods=["POST"])
 def reorder_hotspots():
-    """Accept an ordered list of IPs and persist that order."""
-    ordered_ips = request.json or []
+    """Accept an ordered list of hotspot ids and persist that order."""
+    ordered_ids = request.json or []
     hotspots    = load_hotspots()
-    by_ip       = {h["ip"]: h for h in hotspots}
-    reordered   = [by_ip[ip] for ip in ordered_ips if ip in by_ip]
+    by_id       = {h["id"]: h for h in hotspots}
+    reordered   = [by_id[key] for key in ordered_ids if key in by_id]
     # Append any hotspots not mentioned in the payload (safety net)
-    mentioned = set(ordered_ips)
-    reordered += [h for h in hotspots if h["ip"] not in mentioned]
+    mentioned = set(ordered_ids)
+    reordered += [h for h in hotspots if h["id"] not in mentioned]
     save_hotspots(reordered)
     return jsonify({"ok": True})
 
-@app.route("/api/delete_hotspot/<ip>", methods=["POST"])
-def delete_hotspot(ip):
-    save_hotspots([h for h in load_hotspots() if h["ip"] != ip])
-    monitor.remove(ip)
-    openspot_manager.remove(ip)
-    audio_manager.remove(ip)
+@app.route("/api/delete_hotspot/<hotspot_id>", methods=["POST"])
+def delete_hotspot(hotspot_id):
+    save_hotspots([h for h in load_hotspots() if h.get("id") != hotspot_id])
+    monitor.remove(hotspot_id)
+    openspot_manager.remove(hotspot_id)
+    audio_manager.remove(hotspot_id)
     return redirect("/setup")
 
-@app.route("/api/toggle_hotspot/<ip>", methods=["POST"])
-def toggle_hotspot(ip):
+@app.route("/api/toggle_hotspot/<hotspot_id>", methods=["POST"])
+def toggle_hotspot(hotspot_id):
     """Quick on/off from the Settings hotspot list -- config/credentials
     stay in hotspots.json either way, only the enabled flag flips. Same
-    mutate-save-reconcile shape as /setup's POST handler."""
+    mutate-save-reconcile shape as /setup's POST handler. Matched by id
+    (not ip) so toggling one of two same-ip hotspots (e.g. two ASL3
+    radios on one box) doesn't flip the other one too."""
     hotspots = load_hotspots()
     for h in hotspots:
-        if h["ip"] == ip:
+        if h.get("id") == hotspot_id:
             h["enabled"] = not h.get("enabled", True)
     save_hotspots(hotspots)
     if mqtt_pub.enabled:
@@ -1818,9 +1829,9 @@ def toggle_hotspot(ip):
     audio_manager.reconcile(hotspots)
     # If just disabled, drop it from the live snapshot immediately rather
     # than waiting for the next poll tick's prune_stale to catch up.
-    updated = next((h for h in hotspots if h["ip"] == ip), None)
+    updated = next((h for h in hotspots if h.get("id") == hotspot_id), None)
     if updated is not None and not updated.get("enabled", True):
-        monitor.remove(ip)
+        monitor.remove(hotspot_id)
     return redirect("/setup")
 
 
@@ -2036,12 +2047,32 @@ def api_import_backup():
             h["audio_meter_enabled"] = bool(h.get("audio_meter_enabled", False))
             imported.append(h)
         if mode == "replace":
+            # A replace-mode import still needs every hotspot to have an id
+            # -- load_hotspots() would backfill it on the NEXT load, but
+            # this list is used immediately below (mqtt_pub.set_hotspots,
+            # openspot_manager.reconcile, audio_manager.reconcile all read
+            # hotspot["id"]), so backfill inline instead of waiting.
+            existing_by_ip = {h["ip"]: h for h in load_hotspots()}
+            for h in imported:
+                if not h.get("id"):
+                    h["id"] = (existing_by_ip.get(h["ip"], {}).get("id")
+                               or f"hs-{uuid.uuid4().hex[:10]}")
             hotspots = imported
         else:
-            by_ip = {h["ip"]: h for h in load_hotspots()}
+            # Merge by id -- ip is no longer a unique identity (two
+            # hotspots can share one, e.g. two ASL3 radios on one box).
+            # An imported entry with its own id merges onto the matching
+            # existing entry; one without an id (an older, pre-migration
+            # backup file) falls back to matching by ip so a restore from
+            # an old export still updates in place rather than duplicating.
+            current = load_hotspots()
+            by_id   = {h["id"]: h for h in current}
+            by_ip   = {h["ip"]: h["id"] for h in current}
             for h in imported:
-                by_ip[h["ip"]] = h
-            hotspots = list(by_ip.values())
+                key = h.get("id") or by_ip.get(h["ip"]) or f"hs-{uuid.uuid4().hex[:10]}"
+                h["id"] = key
+                by_id[key] = h
+            hotspots = list(by_id.values())
         save_hotspots(hotspots)
         result["hotspots"] = len(hotspots)
         if mqtt_pub.enabled:

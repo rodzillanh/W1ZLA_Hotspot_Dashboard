@@ -56,12 +56,21 @@ def _get_conn() -> sqlite3.Connection:
         conn.execute("ALTER TABLE activity_log ADD COLUMN via TEXT")
     if "duration" not in cols:
         conn.execute("ALTER TABLE activity_log ADD COLUMN duration REAL")
+    if "hotspot_id" not in cols:
+        # Nullable, same self-healing-not-retroactive precedent as
+        # duration above -- old rows just have NULL here. hotspot_ip
+        # stopped being a unique identity once two hotspots could share
+        # one ip (two ASL3 radios behind one SSH login); hotspot_id
+        # (storage.load_hotspots()'s generated id) is the real identity
+        # now, used by dvswitch_sparkline()'s per-hotspot filter below.
+        conn.execute("ALTER TABLE activity_log ADD COLUMN hotspot_id TEXT")
     return conn
 
 
 def log_activity(hotspot_ip: str, hotspot_name: str, mode: str | None,
                   target: str | None = None, target_type: str | None = None,
-                  via: str | None = None, duration: float | None = None) -> None:
+                  via: str | None = None, duration: float | None = None,
+                  hotspot_id: str | None = None) -> None:
     """Insert one row for a just-completed transmission and prune anything
     older than RETENTION_SECONDS. Prune happens inline here rather than a
     separate thread -- inserts are infrequent (once per completed
@@ -83,9 +92,9 @@ def log_activity(hotspot_ip: str, hotspot_name: str, mode: str | None,
         conn = _get_conn()
         try:
             conn.execute(
-                "INSERT INTO activity_log (ts, hotspot_ip, hotspot_name, mode, target, target_type, via, duration) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (now, hotspot_ip, hotspot_name, mode, target, target_type, via, duration),
+                "INSERT INTO activity_log (ts, hotspot_ip, hotspot_name, mode, target, target_type, via, duration, hotspot_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (now, hotspot_ip, hotspot_name, mode, target, target_type, via, duration, hotspot_id),
             )
             conn.execute("DELETE FROM activity_log WHERE ts < ?", (now - RETENTION_SECONDS,))
             conn.commit()
@@ -148,13 +157,17 @@ def top_targets(hours: int = 24, limit: int = 5, rank_by: str = "count") -> list
     ]
 
 
-def dvswitch_sparkline(hotspot_ip: str, minutes: int = 180, buckets: int = 14) -> list:
+def dvswitch_sparkline(hotspot_id: str, minutes: int = 180, buckets: int = 14) -> list:
     """Compact recent-activity bucket counts for one ASL3 hotspot's
     DVSwitch traffic -- backs the DVSwitch card's footer sparkline, a
     small glanceable trend rather than the detailed Fleet Activity chart.
     Reuses the exact same activity_log rows _check_dvswitch_tx() already
-    writes with mode="DVSwitch" -- no new data source, no new column,
-    just a shorter/differently-bucketed read of what's already there."""
+    writes with mode="DVSwitch" -- no new data source, just a shorter/
+    differently-bucketed read of what's already there. Filters on
+    hotspot_id (not hotspot_ip) since two hotspots can share one ip --
+    rows logged before hotspot_id existed have it as NULL and simply
+    never match here (a one-time, cosmetic gap in old history, not a
+    crash)."""
     now      = time.time()
     interval = max(1, (minutes * 60) // buckets)
     start    = now - buckets * interval
@@ -162,8 +175,8 @@ def dvswitch_sparkline(hotspot_ip: str, minutes: int = 180, buckets: int = 14) -
         conn = _get_conn()
         try:
             rows = conn.execute(
-                "SELECT ts FROM activity_log WHERE hotspot_ip = ? AND mode = 'DVSwitch' AND ts >= ?",
-                (hotspot_ip, start),
+                "SELECT ts FROM activity_log WHERE hotspot_id = ? AND mode = 'DVSwitch' AND ts >= ?",
+                (hotspot_id, start),
             ).fetchall()
         finally:
             conn.close()

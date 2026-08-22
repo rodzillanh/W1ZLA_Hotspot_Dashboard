@@ -64,7 +64,7 @@ class FleetMonitor:
 
     def snapshot(self) -> dict:
         with self._lock:
-            return {ip: asdict(status) for ip, status in self._data.items()}
+            return {key: asdict(status) for key, status in self._data.items()}
 
     def fleet_events(self) -> list:
         """Recent online/offline transitions, newest first, for the
@@ -88,22 +88,22 @@ class FleetMonitor:
         with self._lock:
             self._aprs = client
 
-    def remove(self, ip: str) -> None:
+    def remove(self, hotspot_id: str) -> None:
         with self._lock:
-            self._data.pop(ip, None)
-            self._failures.pop(ip, None)
+            self._data.pop(hotspot_id, None)
+            self._failures.pop(hotspot_id, None)
 
-    def prune_stale(self, current_ips: set) -> None:
-        """Drop any monitor entries for IPs no longer in the hotspot
-        config. Called at the top of each poll cycle as a safety net --
-        an in-flight check_one/check_one_slow worker thread for a
+    def prune_stale(self, current_ids: set) -> None:
+        """Drop any monitor entries for hotspot ids no longer in the
+        hotspot config. Called at the top of each poll cycle as a safety
+        net -- an in-flight check_one/check_one_slow worker thread for a
         just-deleted hotspot can call _ensure_entry() and recreate its
         entry in self._data right after remove() ran for it."""
         with self._lock:
-            stale = [ip for ip in self._data if ip not in current_ips]
-            for ip in stale:
-                self._data.pop(ip, None)
-                self._failures.pop(ip, None)
+            stale = [key for key in self._data if key not in current_ids]
+            for key in stale:
+                self._data.pop(key, None)
+                self._failures.pop(key, None)
 
     def map_data(self) -> dict:
         """Location data for the live map: your own hotspots (if lat/lon is
@@ -116,6 +116,7 @@ class FleetMonitor:
                 nodes.append({
                     "name": hs["name"],
                     "ip":   hs["ip"],
+                    "id":   hs["id"],
                     "lat":  lat,
                     "lon":  lon,
                 })
@@ -141,6 +142,7 @@ class FleetMonitor:
                         "is_active": True,
                         "node":      status.name,
                         "node_ip":   status.ip,
+                        "node_id":   status.id,
                     })
                 # History entries (already carry QRZ/RadioID/APRS data from
                 # when they were active)
@@ -159,6 +161,7 @@ class FleetMonitor:
                             "is_active": False,
                             "node":      status.name,
                             "node_ip":   status.ip,
+                            "node_id":   status.id,
                         })
         return {"nodes": nodes, "callers": callers}
 
@@ -170,7 +173,7 @@ class FleetMonitor:
                 # prune_stale's keep-set, so it's neither checked nor shown
                 # on the dashboard until re-enabled.
                 hotspots = [h for h in load_hotspots() if h.get("enabled", True)]
-                self.prune_stale({h["ip"] for h in hotspots})
+                self.prune_stale({h["id"] for h in hotspots})
                 list(executor.map(self.check_one, hotspots))
                 time.sleep(config.POLL_INTERVAL)
 
@@ -182,12 +185,12 @@ class FleetMonitor:
         with concurrent.futures.ThreadPoolExecutor(max_workers=config.MAX_WORKERS) as executor:
             while True:
                 hotspots = [h for h in load_hotspots() if h.get("enabled", True)]
-                self.prune_stale({h["ip"] for h in hotspots})
+                self.prune_stale({h["id"] for h in hotspots})
                 list(executor.map(self.check_one_slow, hotspots))
                 time.sleep(config.VERSION_CHECK_INTERVAL)
 
     def check_one_slow(self, hotspot: dict) -> None:
-        ip = hotspot["ip"]
+        key = hotspot["id"]
         self._ensure_entry(hotspot)
 
         bm_id = hotspot.get("brandmeister_id")
@@ -195,9 +198,9 @@ class FleetMonitor:
             bm_info = self._brandmeister.lookup(bm_id)
             if bm_info is not None:
                 with self._lock:
-                    if ip in self._data:
-                        self._data[ip].bm_status_text = bm_info["status_text"]
-                        self._data[ip].bm_static_tgs   = bm_info["static_talkgroups"]
+                    if key in self._data:
+                        self._data[key].bm_status_text = bm_info["status_text"]
+                        self._data[key].bm_static_tgs   = bm_info["static_talkgroups"]
 
         node_type = hotspot.get("type", "wpsd")
 
@@ -233,8 +236,8 @@ class FleetMonitor:
                         webcode_version = local or None
                         webcode_date    = date or None
                 with self._lock:
-                    if ip in self._data:
-                        status = self._data[ip]
+                    if key in self._data:
+                        status = self._data[key]
                         status.dashboard_version         = webcode_version
                         status.dashboard_version_date    = webcode_date
                         status.dashboard_update_available = any_update
@@ -282,8 +285,8 @@ class FleetMonitor:
 
             if updates:
                 with self._lock:
-                    if ip in self._data:
-                        status = self._data[ip]
+                    if key in self._data:
+                        status = self._data[key]
                         for field_name, value in updates.items():
                             setattr(status, field_name, value)
         except Exception:
@@ -302,16 +305,16 @@ class FleetMonitor:
         since this only runs once per config.VERSION_CHECK_INTERVAL (30
         min default) and a single missed cycle shouldn't flash a
         known-good frequency back to N/A for that long."""
-        ip = hotspot["ip"]
+        key = hotspot["id"]
         try:
             output = self._ssh_exec(hotspot, config.SA818_CONF_CMD, config.SSH_TIMEOUT).strip()
         except Exception:
             return
 
         with self._lock:
-            if ip not in self._data:
+            if key not in self._data:
                 return
-            status = self._data[ip]
+            status = self._data[key]
 
             if not output:
                 # SSH succeeded but the file isn't there -- a real, distinct
@@ -417,47 +420,47 @@ class FleetMonitor:
             self._check_one_wpsd(hotspot)
 
     def _check_one_wpsd(self, hotspot: dict) -> None:
-        ip = hotspot["ip"]
+        key = hotspot["id"]
         try:
             output = self._ssh_exec(hotspot, config.SSH_STATUS_CMD, config.SSH_TIMEOUT).splitlines()
-            updates = self._parse_output(ip, output)
+            updates = self._parse_output(key, output)
             with self._lock:
-                status = self._data[ip]
+                status = self._data[key]
                 for field_name, value in updates.items():
                     setattr(status, field_name, value)
-                self._failures[ip] = 0
+                self._failures[key] = 0
                 if status.offline_since is not None:
-                    self._record_fleet_event(ip, status.name, "online")
+                    self._record_fleet_event(status.ip, status.name, "online")
                 status.offline_since = None
                 status.last_poll_at = time.time()
         except Exception:
-            self._record_failure(ip)
+            self._record_failure(key)
 
     def _check_one_asl3(self, hotspot: dict) -> None:
-        ip       = hotspot["ip"]
+        key      = hotspot["id"]
         node     = hotspot.get("asl_node", "")
         dvswitch = hotspot.get("dvswitch_enabled", False)
         dvswitch_ports = self._dvswitch_port_list(hotspot)
         try:
             cmd = config.build_asl_status_cmd(node, dvswitch_enabled=dvswitch, dvswitch_ports=dvswitch_ports)
             output = self._ssh_exec(hotspot, cmd, config.SSH_TIMEOUT).splitlines()
-            updates = self._parse_asl_output(ip, node, output)
+            updates = self._parse_asl_output(key, node, output)
             with self._lock:
-                status = self._data[ip]
+                status = self._data[key]
                 for field_name, value in updates.items():
                     setattr(status, field_name, value)
-                self._failures[ip] = 0
+                self._failures[key] = 0
                 if status.offline_since is not None:
-                    self._record_fleet_event(ip, status.name, "online")
+                    self._record_fleet_event(status.ip, status.name, "online")
                 status.offline_since = None
                 status.last_poll_at = time.time()
             if dvswitch:
                 sections = self._split_dvswitch_sections(output)
-                self._check_dvswitch_tx(ip, sections)
+                self._check_dvswitch_tx(key, sections)
                 live, dmr_linked, dstar_status = self._parse_dvswitch_mmdvm_live(sections)
                 bridges = self._parse_dvswitch_bridges(sections, dvswitch_ports)
                 with self._lock:
-                    status = self._data[ip]
+                    status = self._data[key]
                     status.dvswitch_bridges = bridges
                     status.dvswitch_vocoder = self._parse_dvswitch_vocoder(sections, bridges)
                     status.dvswitch_live = live
@@ -481,7 +484,7 @@ class FleetMonitor:
                     if dstar_status is not None:
                         status.dvswitch_dstar_status = dstar_status
         except Exception:
-            self._record_failure(ip)
+            self._record_failure(key)
 
     @staticmethod
     def _dvswitch_port_list(hotspot: dict) -> list[str]:
@@ -522,8 +525,10 @@ class FleetMonitor:
                 sections[current_key].append(line)
         return sections
 
-    def _check_dvswitch_tx(self, ip: str, sections: dict[str, list[str]]) -> None:
-        """Scans the DVSwitch (Analog_Bridge) log tail for the confirmed-real
+    def _check_dvswitch_tx(self, key: str, sections: dict[str, list[str]]) -> None:
+        """`key` is the hotspot's stable id (self._data/self._dvswitch_last_tx
+        key), not a literal IP -- see storage.load_hotspots()'s id backfill.
+        Scans the DVSwitch (Analog_Bridge) log tail for the confirmed-real
         "Begin TX: ..." line -- confirmed live against a real device (not
         just an old GitHub issue quote), including a real call= field this
         app initially treated as unconfirmed. There's no confirmed
@@ -541,10 +546,11 @@ class FleetMonitor:
         if last_tx_line is None:
             return
         with self._lock:
-            if self._dvswitch_last_tx.get(ip) == last_tx_line:
+            if self._dvswitch_last_tx.get(key) == last_tx_line:
                 return
-            self._dvswitch_last_tx[ip] = last_tx_line
-            name = self._data[ip].name
+            self._dvswitch_last_tx[key] = last_tx_line
+            status_for_log = self._data[key]
+            ip, name = status_for_log.ip, status_for_log.name
 
         call_match = re.search(config.DVSWITCH_TX_CALL_PATTERN, last_tx_line)
         src_match  = re.search(config.DVSWITCH_TX_SRC_PATTERN,  last_tx_line)
@@ -563,11 +569,11 @@ class FleetMonitor:
                 "seen_at": time.time(),
             }
             with self._lock:
-                status = self._data[ip]
+                status = self._data[key]
                 heard = [heard_entry] + [h for h in status.dvswitch_heard if h["call"] != call]
                 status.dvswitch_heard = heard[:config.MAX_HISTORY]
 
-        storage_activity.log_activity(ip, name, "DVSwitch")
+        storage_activity.log_activity(ip, name, "DVSwitch", hotspot_id=key)
 
     @staticmethod
     def _parse_dvswitch_bridges(sections: dict[str, list[str]], ports: list[str]) -> list[dict]:
@@ -747,43 +753,43 @@ class FleetMonitor:
         WPSD/ASL3 run every cycle (_apply_last_heard_ttl is pure
         state-based logic, not triggered by a log line), since without
         it a last-heard caller would never clear on an openspot4 card."""
-        ip = hotspot["ip"]
+        key = hotspot["id"]
         updates: dict = {}
-        self._apply_last_heard_ttl(ip, updates)
+        self._apply_last_heard_ttl(key, updates)
         if updates:
             with self._lock:
-                status = self._data[ip]
+                status = self._data[key]
                 for field_name, value in updates.items():
                     setattr(status, field_name, value)
 
-    def apply_external_update(self, ip: str, updates: dict) -> None:
+    def apply_external_update(self, hotspot_id: str, updates: dict) -> None:
         """Push-based integrations (currently just openspot.py) merge a
         batch of field updates under the shared lock. Receiving ANY
         message over a persistent connection is itself proof of liveness
         -- the WS analogue of a successful SSH poll -- so this also
         resets the failure counter and clears offline_since. Drops the
-        update (rather than KeyError-ing) if ip isn't in self._data yet --
-        a possible race between the openspot worker thread starting and
-        check_one()'s first _ensure_entry() tick at app startup; the next
-        5s poll tick creates the entry and the next WS message lands
-        fine."""
+        update (rather than KeyError-ing) if hotspot_id isn't in
+        self._data yet -- a possible race between the openspot worker
+        thread starting and check_one()'s first _ensure_entry() tick at
+        app startup; the next 5s poll tick creates the entry and the next
+        WS message lands fine."""
         with self._lock:
-            if ip not in self._data:
+            if hotspot_id not in self._data:
                 return
-            status = self._data[ip]
+            status = self._data[hotspot_id]
             for field_name, value in updates.items():
                 setattr(status, field_name, value)
-            self._failures[ip] = 0
+            self._failures[hotspot_id] = 0
             status.status = "Online"
             if status.offline_since is not None:
-                self._record_fleet_event(ip, status.name, "online")
+                self._record_fleet_event(status.ip, status.name, "online")
             status.offline_since = None
 
-    def mark_external_offline(self, ip: str) -> None:
+    def mark_external_offline(self, hotspot_id: str) -> None:
         """Called by openspot.py when a reconnect attempt fails -- same
         FAILURE_THRESHOLD-gated Offline transition as _record_failure(),
         just driven by connection state instead of a per-poll exception."""
-        self._record_failure(ip)
+        self._record_failure(hotspot_id)
 
     def lookup_caller_info(self, call: str) -> dict:
         """Public wrapper around _lookup_caller for push-based
@@ -793,18 +799,18 @@ class FleetMonitor:
     def apply_favorite_match(self, call: str) -> "tuple[bool, str | None]":
         return self._apply_favorite_match(call)
 
-    def apply_bm_static_tgs(self, ip: str, static_tgs: list) -> None:
+    def apply_bm_static_tgs(self, hotspot_id: str, static_tgs: list) -> None:
         """Called by app.py right after a successful Brandmeister
         link/unlink so the hotspot card drawer reflects the change on the
         very next /api/data poll (3s), instead of waiting for the next
         run_slow_checks_forever() cycle (30 min) to re-fetch it. Same
         "poke _data directly" shape as apply_external_update() above."""
         with self._lock:
-            if ip in self._data:
-                self._data[ip].bm_static_tgs = static_tgs
+            if hotspot_id in self._data:
+                self._data[hotspot_id].bm_static_tgs = static_tgs
 
-    def log_activity(self, ip: str) -> None:
-        self._log_activity(ip)
+    def log_activity(self, hotspot_id: str) -> None:
+        self._log_activity(hotspot_id)
 
     def _ssh_exec(self, hotspot: dict, cmd: str, timeout: int) -> str:
         """Connect, run one command, return its decoded stdout. Raises on
@@ -837,35 +843,36 @@ class FleetMonitor:
         self._fleet_events.append(event)
         storage_notifications.log_notification("fleet", event["at"], event, self._fleet_events.maxlen)
 
-    def _record_failure(self, ip: str) -> None:
+    def _record_failure(self, hotspot_id: str) -> None:
         with self._lock:
-            self._failures[ip] = self._failures.get(ip, 0) + 1
-            # ip may not be in self._data yet -- previously safe to assume
-            # since this was only ever called after _ensure_entry() ran
-            # earlier in the same check_one() invocation, but
+            self._failures[hotspot_id] = self._failures.get(hotspot_id, 0) + 1
+            # hotspot_id may not be in self._data yet -- previously safe to
+            # assume since this was only ever called after _ensure_entry()
+            # ran earlier in the same check_one() invocation, but
             # mark_external_offline() (openspot.py) can call in from a
             # separate thread before that first tick lands.
-            if ip in self._data and self._failures[ip] >= config.FAILURE_THRESHOLD:
-                status = self._data[ip]
+            if hotspot_id in self._data and self._failures[hotspot_id] >= config.FAILURE_THRESHOLD:
+                status = self._data[hotspot_id]
                 status.status = "Offline"
                 if status.offline_since is None:
                     status.offline_since = time.time()
-                    self._record_fleet_event(ip, status.name, "offline")
+                    self._record_fleet_event(status.ip, status.name, "offline")
 
     def _ensure_entry(self, hotspot: dict) -> None:
-        ip = hotspot["ip"]
+        key = hotspot["id"]
         with self._lock:
-            if ip not in self._data:
-                self._data[ip] = HotspotStatus(name=hotspot["name"], ip=ip)
-                self._failures[ip] = 0
+            if key not in self._data:
+                self._data[key] = HotspotStatus(name=hotspot["name"], ip=hotspot["ip"], id=key)
+                self._failures[key] = 0
             else:
-                # Keep the name in sync with hotspots.json -- a rename in
-                # Settings doesn't change the ip, so without this the live
-                # HotspotStatus (created once, above) would keep showing
-                # the old name until the app restarts.
-                self._data[ip].name = hotspot["name"]
+                # Keep the name/ip in sync with hotspots.json -- a rename in
+                # Settings, or an ip edit, doesn't change the hotspot's id,
+                # so without this the live HotspotStatus (created once,
+                # above) would keep showing the old values until restart.
+                self._data[key].name = hotspot["name"]
+                self._data[key].ip   = hotspot["ip"]
 
-    def _log_activity(self, ip: str) -> None:
+    def _log_activity(self, key: str) -> None:
         """Record one completed transmission for the Fleet activity metrics
         card -- opt-in (see settings.show_fleet_activity), so skip the write
         entirely when nobody will ever query it.
@@ -898,16 +905,16 @@ class FleetMonitor:
         if not load_settings().get("show_fleet_activity", False):
             return
         with self._lock:
-            status = self._data.get(ip)
+            status = self._data.get(key)
             if status is None:
                 return
-            name, mode = status.name, status.mode
+            ip, name, mode = status.ip, status.name, status.mode
             target = status.active_call or None
             target_type = "callsign" if target else None
             via = status.talkgroup or None
             tx_start = status.tx_start
         duration = (time.time() - tx_start) if tx_start else None
-        storage_activity.log_activity(ip, name, mode, target, target_type, via, duration)
+        storage_activity.log_activity(ip, name, mode, target, target_type, via, duration, hotspot_id=key)
 
     def _lookup_caller(self, call: str) -> dict:
         """Compose caller info from QRZ, RadioID.net (name/location fallback),
@@ -963,7 +970,7 @@ class FleetMonitor:
         fav_entry = next((f for f in load_favorites() if f["call"].upper() == call), None)
         return call in favs, (fav_entry["label"] if fav_entry else None)
 
-    def _apply_last_heard_ttl(self, ip: str, updates: dict) -> None:
+    def _apply_last_heard_ttl(self, key: str, updates: dict) -> None:
         """If a previous call is sitting in "last heard" state and has aged
         past LAST_HEARD_TTL, wipe caller info so the card returns to true
         idle. Pure state-based logic (no log parsing involved), shared by
@@ -971,7 +978,7 @@ class FleetMonitor:
         if config.LAST_HEARD_TTL <= 0:
             return
         with self._lock:
-            lh = self._data[ip].last_heard
+            lh = self._data[key].last_heard
         if lh is not None and (time.time() - lh) > config.LAST_HEARD_TTL:
             updates.update({
                 "active_call":     None,
@@ -991,6 +998,10 @@ class FleetMonitor:
     # --- log parsing ---
 
     def _parse_output(self, ip: str, output: list[str]) -> dict:
+        # NOTE: despite the name (kept for a smaller diff against the many
+        # self._data[ip] reads below), `ip` here is actually the hotspot's
+        # stable `id` -- both call sites (_check_one_wpsd) pass `key`
+        # (hotspot["id"]), never a literal IP. See storage.load_hotspots().
         if len(output) < 2:
             return {}
 
@@ -1161,7 +1172,12 @@ class FleetMonitor:
         return updates
 
     def _parse_asl_output(self, ip: str, node: str, output: list[str]) -> dict:
-        """Parse an ASL3 (AllStarLink) hotspot's SSH output: the same
+        """NOTE: despite the name (kept for a smaller diff against the many
+        self._data[ip] reads below), `ip` here is actually the hotspot's
+        stable `id` -- the one call site (_check_one_asl3) passes `key`
+        (hotspot["id"]), never a literal IP. See storage.load_hotspots().
+
+        Parse an ASL3 (AllStarLink) hotspot's SSH output: the same
         generic Linux temp/uptime/CPU one-liners as WPSD, plus `rpt xnode`'s
         dialplan-variable dump -- RPT_ALINKS gives real per-linked-node
         keyed state (confirmed against a real node; see

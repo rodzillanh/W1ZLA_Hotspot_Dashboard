@@ -25,8 +25,12 @@ STATE_PREFIX        = "hotspot_dashboard"
 AVAILABILITY_TOPIC  = f"{STATE_PREFIX}/status"
 
 
-def _node_id(ip: str) -> str:
-    return "hotspot_" + re.sub(r"[^A-Za-z0-9_]", "_", ip)
+def _node_id(hotspot_id: str) -> str:
+    # hotspot_id (storage.load_hotspots()'s generated "hs-<hex>") is already
+    # a safe HA entity-id string -- the sanitize is defensive, not load-
+    # bearing, now that this is keyed by id instead of ip (two hotspots can
+    # share an ip, e.g. two ASL3 radios on one box, but never an id).
+    return "hotspot_" + re.sub(r"[^A-Za-z0-9_]", "_", hotspot_id)
 
 
 def _extract_float(s: Optional[str]):
@@ -180,8 +184,8 @@ class MqttPublisher:
     def _publish_discovery(self, hotspot: dict) -> None:
         if not self.enabled:
             return
-        ip, name = hotspot["ip"], hotspot["name"]
-        node        = _node_id(ip)
+        name = hotspot["name"]
+        node = _node_id(hotspot["id"])
         state_topic = f"{STATE_PREFIX}/{node}/state"
         device = {
             "identifiers":  [node],
@@ -209,7 +213,7 @@ class MqttPublisher:
         """hotspot_status is one entry from monitor.snapshot() (already a dict)."""
         if not self.enabled:
             return
-        node = _node_id(hotspot_status["ip"])
+        node = _node_id(hotspot_status["id"])
         payload = {
             "online":          hotspot_status.get("status") == "Online",
             "is_active":       bool(hotspot_status.get("is_active")),

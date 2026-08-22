@@ -113,6 +113,11 @@ class _AslAudioWorker:
 
     def __init__(self, hotspot: dict):
         self._ip   = hotspot["ip"]
+        # Stable per-hotspot identity, independent of ip -- lets two ASL3
+        # entries (e.g. two radios/node numbers on one box) each get their
+        # own worker instead of colliding in AslAudioManager._workers. See
+        # storage.load_hotspots()'s id backfill.
+        self._id   = hotspot["id"]
         self._user = hotspot.get("user")
         self._pass = hotspot.get("pass")
         self._node = hotspot.get("asl_node", "")
@@ -130,7 +135,8 @@ class _AslAudioWorker:
         self._stop_event.set()
 
     def config_matches(self, hotspot: dict) -> bool:
-        return (hotspot.get("ip") == self._ip
+        return (hotspot.get("id") == self._id
+                and hotspot.get("ip") == self._ip
                 and hotspot.get("user") == self._user
                 and hotspot.get("pass") == self._pass
                 and hotspot.get("asl_node", "") == self._node)
@@ -304,34 +310,37 @@ class AslAudioManager:
         self._workers: dict[str, _AslAudioWorker] = {}
 
     def reconcile(self, hotspots: list) -> None:
+        # Keyed by the hotspot's stable id, not ip -- two audio-meter-
+        # enabled ASL3 entries CAN share one ip (two radios/node numbers
+        # behind the same SSH login is a real, confirmed setup).
         desired = {
-            h["ip"]: h for h in hotspots
+            h["id"]: h for h in hotspots
             if h.get("type") == "asl3" and h.get("audio_meter_enabled")
                and h.get("enabled", True)
         }
         to_stop = []
         with self._lock:
-            for ip, worker in list(self._workers.items()):
-                hs = desired.get(ip)
+            for key, worker in list(self._workers.items()):
+                hs = desired.get(key)
                 if hs is None or not worker.config_matches(hs):
-                    to_stop.append(self._workers.pop(ip))
-            for ip, hs in desired.items():
-                if ip not in self._workers:
+                    to_stop.append(self._workers.pop(key))
+            for key, hs in desired.items():
+                if key not in self._workers:
                     worker = _AslAudioWorker(hs)
                     worker.start()
-                    self._workers[ip] = worker
+                    self._workers[key] = worker
         for worker in to_stop:  # outside the lock -- mirrors OpenSpot4Manager/CameraStreamManager
             worker.stop()
 
-    def remove(self, ip: str) -> None:
+    def remove(self, hotspot_id: str) -> None:
         with self._lock:
-            worker = self._workers.pop(ip, None)
+            worker = self._workers.pop(hotspot_id, None)
         if worker is not None:
             worker.stop()
 
     def snapshot(self) -> dict:
         with self._lock:
-            return {ip: w.snapshot() for ip, w in self._workers.items()}
+            return {key: w.snapshot() for key, w in self._workers.items()}
 
     def run_forever(self) -> None:
         """Periodic safety-net reconcile, same rationale as

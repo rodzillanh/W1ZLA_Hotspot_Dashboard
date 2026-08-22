@@ -344,6 +344,13 @@ class _OpenSpot4Worker:
 
     def __init__(self, hotspot: dict, monitor):
         self._ip = hotspot["ip"]
+        # Stable per-hotspot identity, independent of ip -- passed to every
+        # monitor.apply_external_update()/mark_external_offline()/
+        # log_activity() call below instead of self._ip, so two openSPOT4
+        # entries sharing one ip (same "N independent connections" shape
+        # asl_audio.py's AslAudioManager needed fixing for) don't collide
+        # in monitor._data. See storage.load_hotspots()'s id backfill.
+        self._id = hotspot["id"]
         self._passwords = _collect_passwords(hotspot)
         self._monitor = monitor
         self._stop_event = threading.Event()
@@ -404,7 +411,8 @@ class _OpenSpot4Worker:
         self._stop_event.set()
 
     def config_matches(self, hotspot: dict) -> bool:
-        return (hotspot.get("ip") == self._ip
+        return (hotspot.get("id") == self._id
+                and hotspot.get("ip") == self._ip
                 and _collect_passwords(hotspot) == self._passwords)
 
     def _loop(self) -> None:
@@ -412,7 +420,7 @@ class _OpenSpot4Worker:
             try:
                 self._run_once()
             except Exception:
-                self._monitor.mark_external_offline(self._ip)
+                self._monitor.mark_external_offline(self._id)
             if not self._stop_event.is_set():
                 self._stop_event.wait(config.OPENSPOT4_RECONNECT_BACKOFF)
 
@@ -526,7 +534,7 @@ class _OpenSpot4Worker:
         idx = resp.get("active_cp")
         if not isinstance(idx, int) or not (0 <= idx < len(names)):
             return
-        self._monitor.apply_external_update(self._ip, {
+        self._monitor.apply_external_update(self._id, {
             "active_config_profile_num": idx + 1,
             "active_config_profile_name": names[idx],
         })
@@ -553,7 +561,7 @@ class _OpenSpot4Worker:
         to = msg.get("to")
         if not to:
             return
-        self._monitor.apply_external_update(self._ip, {
+        self._monitor.apply_external_update(self._id, {
             "connector_target": to,
             "connector_server": msg.get("server"),
         })
@@ -575,7 +583,7 @@ class _OpenSpot4Worker:
         ssid = data.get("ssid")
         if not ssid:
             return
-        self._monitor.apply_external_update(self._ip, {"wifi_ssid": ssid})
+        self._monitor.apply_external_update(self._id, {"wifi_ssid": ssid})
 
     def _on_aprsbgstate(self, msg: dict) -> None:
         """openSPOT4's OWN built-in APRS-IS connection state (the "APRS
@@ -592,10 +600,10 @@ class _OpenSpot4Worker:
         label = _APRS_BGSTATE_LABELS.get(msg.get("state"))
         if label is None:
             return
-        self._monitor.apply_external_update(self._ip, {"aprs_conn_state": label})
+        self._monitor.apply_external_update(self._id, {"aprs_conn_state": label})
 
     def _record_aprs_update(self) -> None:
-        self._monitor.apply_external_update(self._ip, {"aprs_messages": list(self._aprs_messages)})
+        self._monitor.apply_external_update(self._id, {"aprs_messages": list(self._aprs_messages)})
 
     def _on_aprsmsg(self, msg: dict) -> None:
         """Confirmed live -- an inbound APRS message (a reply from WXBOT,
@@ -679,7 +687,7 @@ class _OpenSpot4Worker:
         up = msg.get("up")
         if not isinstance(up, (int, float)):
             return
-        self._monitor.apply_external_update(self._ip, {"uptime": _format_uptime_pretty(up)})
+        self._monitor.apply_external_update(self._id, {"uptime": _format_uptime_pretty(up)})
 
     def _on_status(self, msg: dict) -> None:
         status = msg.get("status") or {}
@@ -705,7 +713,7 @@ class _OpenSpot4Worker:
             updates["dejitter_pkts"] = max(dejitter_vals)
         # Even an empty heartbeat is proof of life -- always touch the
         # monitor so the failure counter resets / status stays Online.
-        self._monitor.apply_external_update(self._ip, updates)
+        self._monitor.apply_external_update(self._id, updates)
 
     def _on_pwr(self, msg: dict) -> None:
         """Confirmed live as a genuine structured message, e.g.:
@@ -749,7 +757,7 @@ class _OpenSpot4Worker:
             updates["battery_fault"] = bool(msg.get("fault"))
         if "low_curr" in msg:
             updates["battery_low_curr"] = bool(msg.get("low_curr"))
-        self._monitor.apply_external_update(self._ip, updates)
+        self._monitor.apply_external_update(self._id, updates)
 
     def _on_wifirssi(self, msg: dict) -> None:
         """Confirmed live, twice: {"type":"wifirssi","dbm":-69,"apclient":0}
@@ -763,7 +771,7 @@ class _OpenSpot4Worker:
         "absence means not applicable" convention as battery_* above."""
         if "dbm" not in msg:
             return
-        self._monitor.apply_external_update(self._ip, {
+        self._monitor.apply_external_update(self._id, {
             "wifi_rssi_dbm": msg.get("dbm"),
             "wifi_ap_client": msg.get("apclient"),
         })
@@ -783,15 +791,15 @@ class _OpenSpot4Worker:
         started" line, C4FM's has neither)."""
         m = _MODE_LOG_RE.match(text)
         if m:
-            self._monitor.apply_external_update(self._ip, {"mode": _mode_for_prefix(m.group(1))})
+            self._monitor.apply_external_update(self._id, {"mode": _mode_for_prefix(m.group(1))})
             return
         battery = _parse_battery_line(text)
         if battery:
-            self._monitor.apply_external_update(self._ip, battery)
+            self._monitor.apply_external_update(self._id, battery)
             return
         net_check = _parse_net_check_line(text)
         if net_check:
-            self._monitor.apply_external_update(self._ip, net_check)
+            self._monitor.apply_external_update(self._id, net_check)
 
     def _on_calllog(self, msg: dict) -> None:
         """The universal call-lifecycle signal, confirmed live across two
@@ -853,14 +861,14 @@ class _OpenSpot4Worker:
         # {"ber":0.0,"loss":0.0,...} at call-end).
         if isinstance(loss, (int, float)) and loss >= 0:
             updates["packet_loss"] = f"{loss}%"
-        self._monitor.apply_external_update(self._ip, updates)
-        self._monitor.log_activity(self._ip)
+        self._monitor.apply_external_update(self._id, updates)
+        self._monitor.log_activity(self._id)
         if self._active_call and self._active_call["id"] == call_id:
             self._active_call = None
 
     def _apply_call_start(self, src: str, dst: str) -> None:
         is_fav, fav_label = self._monitor.apply_favorite_match(src)
-        self._monitor.apply_external_update(self._ip, {
+        self._monitor.apply_external_update(self._id, {
             "is_active": True,
             "active_call": src,  # DMR ID placeholder (csd resolves it) or already a real callsign
             "talkgroup": _clean_dst(dst),
@@ -938,7 +946,7 @@ class _OpenSpot4Worker:
                 "lat": caller_info["lat"], "lon": caller_info["lon"], "source": caller_info["source"],
             })
             updates["history"] = history[:config.MAX_HISTORY]
-        self._monitor.apply_external_update(self._ip, updates)
+        self._monitor.apply_external_update(self._id, updates)
 
 
 class OpenSpot4Manager:
@@ -961,27 +969,30 @@ class OpenSpot4Manager:
         # but is excluded here, so its worker gets torn down like any
         # other removed device -- same "keep config, stop polling" pattern
         # FleetMonitor's own run_forever()/run_slow_checks_forever() use.
+        # Keyed by the hotspot's stable id, not ip -- two openSPOT4 entries
+        # CAN share one ip (see asl_audio.py's AslAudioManager for the same
+        # fix, motivated by two ASL3 radios behind one SSH login).
         desired = {
-            h["ip"]: h for h in hotspots
+            h["id"]: h for h in hotspots
             if h.get("type") == "openspot4" and h.get("enabled", True)
         }
         to_stop = []
         with self._lock:
-            for ip, worker in list(self._workers.items()):
-                hs = desired.get(ip)
+            for key, worker in list(self._workers.items()):
+                hs = desired.get(key)
                 if hs is None or not worker.config_matches(hs):
-                    to_stop.append(self._workers.pop(ip))
-            for ip, hs in desired.items():
-                if ip not in self._workers:
+                    to_stop.append(self._workers.pop(key))
+            for key, hs in desired.items():
+                if key not in self._workers:
                     worker = _OpenSpot4Worker(hs, self._monitor)
                     worker.start()
-                    self._workers[ip] = worker
+                    self._workers[key] = worker
         for worker in to_stop:  # outside the lock -- mirrors CameraStreamManager
             worker.stop()
 
-    def remove(self, ip: str) -> None:
+    def remove(self, hotspot_id: str) -> None:
         with self._lock:
-            worker = self._workers.pop(ip, None)
+            worker = self._workers.pop(hotspot_id, None)
         if worker is not None:
             worker.stop()
 

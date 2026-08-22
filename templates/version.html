@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.36 "Preston"</span>
+                <span class="release-version">v4.37 "Baker"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Hotspots can now share an IP address — e.g. two AllStarLink radios/node numbers on the same box, each reachable over one SSH login</span> — prompted directly by a real setup with exactly that. Every hotspot now gets its own stable id, independent of ip; ip goes back to meaning only "where to connect," never "which hotspot this is." Fixes several real bugs this previously caused for two same-ip hotspots: deleting one deleted both, toggling one flipped both, and only one of the two would ever actually poll/show live status, since both collapsed onto a single internal entry. Also fixed for MQTT/Home Assistant discovery, APRS favorite-alert notifications, and the DVSwitch live audio meter, which had the same collision</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.36 "Preston"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Big Ass Clock: Square is now the default face for Analog, and 12-hour is now the default for Digital</span> — requested directly. Only affects an install that's never touched these toggles before (a per-browser localStorage preference, not settings.json) — an explicit prior choice of the round face, or of 24-hour format, is still respected either way, same "flip the default without clobbering someone's own choice" pattern already used elsewhere in this app</li>

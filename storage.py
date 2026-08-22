@@ -3,6 +3,7 @@ import contextlib
 import json
 import os
 import threading
+import uuid
 
 import config
 
@@ -20,13 +21,31 @@ _file_lock = threading.RLock()
 # --- hotspots ---
 
 def load_hotspots() -> list:
+    """Return the hotspot list, backfilling a stable `id` for any entry
+    that predates this field -- same self-healing-on-load pattern as
+    load_asl_favorites()'s pinned/pinned_at backfill below. `id` (not
+    `ip`) is every hotspot's real identity key everywhere in the app now
+    -- `ip` is purely a connection target, so two entries CAN legitimately
+    share one (e.g. two ASL3 radios/node numbers behind the same SSH
+    login). Self-healing: any write path that doesn't know about `id`
+    (an old backup import, hand-edited JSON) just omits it, and it gets
+    backfilled the same way the next time this loads."""
     if not os.path.exists(config.CONFIG_FILE):
         return []
     try:
         with _file_lock, open(config.CONFIG_FILE, "r") as f:
-            return json.load(f)
+            hotspots = json.load(f)
     except (json.JSONDecodeError, OSError):
         return []
+
+    migrated = False
+    for h in hotspots:
+        if not h.get("id"):
+            h["id"] = f"hs-{uuid.uuid4().hex[:10]}"
+            migrated = True
+    if migrated:
+        save_hotspots(hotspots)
+    return hotspots
 
 
 def save_hotspots(hotspots: list) -> None:

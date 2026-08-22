@@ -65,7 +65,11 @@ class AprsMessenger:
         stays active), and respects the configured cooldown per hotspot."""
         if not self.enabled:
             return
-        key         = hotspot_status.get("ip")
+        # Keyed by the hotspot's stable id, not ip -- two hotspots CAN share
+        # one ip (two ASL3 radios behind one SSH login), and without this
+        # their favorite-active cooldown/dedupe state would cross-suppress
+        # each other's real alerts.
+        key         = hotspot_status.get("id")
         is_alertable = bool(hotspot_status.get("is_active") and hotspot_status.get("is_favorite"))
         with self._lock:
             was_active = key in self._active_keys

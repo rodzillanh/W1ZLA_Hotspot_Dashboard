@@ -5245,6 +5245,142 @@ config for per-integration credentials; put it in
        point-in-time check) before believing the gaps are actually as
        brief/tolerable as intended.
 
+- **Every hotspot now has its own generated `id`, independent of `ip` --
+  `ip` stopped being an identity key anywhere in this app and went back to
+  meaning exactly one thing: the SSH/HTTP connection target.** Prompted by
+  a real user setup: one AllStarLink box with TWO separate radios/node
+  numbers, both reachable over the same SSH login -- something the app
+  had no way to represent, since `hotspots.json` entries were matched/
+  keyed by `ip` almost everywhere (`monitor.py`'s live-status dict, most
+  `/api/*` routes, dashboard/setup JS, MQTT/HA discovery, the APRS
+  favorite-alert cooldown, the DVSwitch live-audio tunnel manager, the
+  Fleet Activity/DVSwitch-sparkline database). Two hotspot entries
+  sharing one `ip` used to collapse onto a single dict entry in every one
+  of those places -- confirmed live before fixing anything: deleting one
+  of two same-ip hotspots deleted BOTH, toggling one flipped BOTH, and
+  only one of the two radios' live status/audio meter/MQTT device/APRS
+  alert would ever actually work, whichever happened to win the
+  collision.
+  - **New identity field**: every hotspot dict gets `"id":
+    "hs-<uuid4 hex[:10]>"`, mirroring how `cameras.json` already gives
+    cameras their own generated `id` (`app.py`'s `/api/cameras` POST
+    handler, `camera_id or f"cam-{uuid.uuid4().hex[:10]}"`) -- the
+    template this migration followed rather than inventing a new
+    pattern. `storage.load_hotspots()` backfills it for any entry
+    missing one (same self-healing-on-load pattern as
+    `load_asl_favorites()`'s `pinned`/`pinned_at` backfill) and saves
+    immediately if anything changed. `models.HotspotStatus` gained
+    `id: str = ""` alongside its existing `ip` field.
+  - **This directly supersedes the `orig_ip`/`hs-orig-ip` mechanism**
+    documented earlier in this file (the "editing a hotspot's IP address
+    is a rename of its identity key" gotcha) -- once identity is `id`
+    (which never changes), editing the `ip` field is just an ordinary
+    field edit, no special pre-edit-value tracking needed at all. That
+    whole mechanism (`orig_ip` hidden form field, `match_ip` upsert
+    logic in `/setup`'s and `/api/update_hotspot`'s POST handlers) was
+    removed outright, replaced by a plain `id`-based upsert -- not kept
+    alongside as a second identity concept.
+  - **`monitor.py`'s `self._data`/`self._failures`/
+    `self._dvswitch_last_tx` are now keyed by hotspot id, not ip.** Every
+    internal method that used to do `ip = hotspot["ip"]` then index
+    `self._data[ip]` now captures `key = hotspot["id"]` for the dict key
+    while still reading `hotspot["ip"]` separately wherever the real
+    connection target or a display value is actually needed (`_ssh_exec`
+    already took the whole hotspot dict, so it needed no change at all).
+    The two big log-parsing functions (`_parse_output`/`_parse_asl_output`)
+    were deliberately left with their internal parameter still NAMED
+    `ip` (now holding the id value, documented with an explicit comment
+    at each `def`) rather than renaming dozens of internal
+    `self._data[ip]` references throughout -- a pragmatic, disclosed
+    trade-off to keep the diff smaller in the two highest-risk functions,
+    not an oversight. Every OTHER internal method (`_ensure_entry`,
+    `_record_failure`, `_check_dvswitch_tx`, `_apply_last_heard_ttl`,
+    `_log_activity`, etc.) got a real rename to `key`/`hotspot_id` since
+    each only had a handful of call sites. Public hooks called from
+    OUTSIDE monitor.py (`apply_external_update`, `mark_external_offline`,
+    `apply_bm_static_tgs`, `log_activity`) all changed their param from
+    `ip` to a hotspot id -- `openspot.py`'s `_OpenSpot4Worker` gained its
+    own `self._id` alongside `self._ip` for this, and `app.py`'s
+    `/api/brandmeister_talkgroup` passes the resolved hotspot's `id`
+    instead of the request's `ip` field.
+  - **`AslAudioManager` (`asl_audio.py`) and `OpenSpot4Manager`
+    (`openspot.py`) both had the identical bug**: `reconcile()`'s
+    `desired = {h["ip"]: h for h in hotspots if ...}` meant two
+    audio-meter-enabled ASL3 hotspots (or, in principle, two openSPOT4
+    devices) sharing an ip would collapse to one worker, silently
+    starving the other radio's live audio tap. Both managers' `_workers`
+    dict, `reconcile()`, and `remove()` moved to keying by id;
+    `_AslAudioWorker`/`_OpenSpot4Worker` each gained their own `self._id`
+    checked in `config_matches()` alongside the existing ip/credential
+    checks. `/api/audio_level`'s response is now keyed by hotspot id, not
+    ip -- `dashboard.html`'s `fetchAudioLevels()`/`vuMeters` moved to
+    match.
+  - **`mqtt_publisher.py`'s `_node_id()` and `aprs_messaging.py`'s
+    favorite-alert cooldown/dedupe state both moved from keying by `ip`
+    to keying by `id`** -- otherwise two same-ip hotspots would publish
+    to the IDENTICAL Home Assistant MQTT device (one overwriting the
+    other's discovery config/state every publish cycle) and share one
+    APRS alert cooldown timer, cross-suppressing each other's real
+    favorite-active alerts. Verified live: two synthetic same-ip
+    hotspots produced two distinct HA device identities and two
+    independent APRS alerts, neither one silently swallowed by the
+    other's "already alerted" state.
+  - **`storage_activity.py` gained a nullable `hotspot_id` column**
+    (same guarded-ALTER-TABLE pattern already used for `target`/
+    `target_type`/`via`/`duration` -- `_get_conn()` checks `PRAGMA
+    table_info` and adds it if missing, safe to run on every connection
+    open) specifically for `dvswitch_sparkline()`'s per-hotspot filter,
+    which used to query `WHERE hotspot_ip = ?` -- two same-ip DVSwitch
+    hotspots would have shared/contaminated each other's sparkline data.
+    `query_activity()`'s own per-hotspot chart series was NOT touched --
+    it already groups by `hotspot_name`, not `ip`, so it was never
+    actually affected by the duplicate-ip case. Old rows just have
+    `hotspot_id = NULL` (a one-time, cosmetic gap in old sparkline
+    history, not a crash), same "self-healing, not retroactively fixed"
+    precedent as the `duration` column before it.
+  - **`generate_screenshots.py` (the dev-only screenshot tool) needed a
+    fix too** -- it used to seed `app.monitor._data[hs.ip] = hs`
+    directly, which silently broke once `_data` became id-keyed (its
+    fake hotspots would never resolve on `/api/data`, since
+    `hotspots.json`'s entries get a *different* freshly-generated id
+    each run than whatever the seeded `HotspotStatus` objects would
+    default to). Fixed by re-reading `app.load_hotspots()` right after
+    `import app` (which triggers the id backfill) to build an
+    `ip -> id` lookup, then setting `.id` on each fake `HotspotStatus`
+    and both `storage_activity.log_activity()` calls before seeding.
+  - **Verified end-to-end with a real Playwright browser against the
+    real running app** (not just Python-level route tests) -- two ASL3
+    hotspot dicts sharing one ip, seeded with independent
+    `HotspotStatus` objects (different `asl_node`/`active_call` each),
+    confirmed: `/api/data` returns two distinct entries; two separate
+    `#card-<id>` DOM elements exist; clicking each card's own gear icon
+    opens a drawer showing ONLY that card's own node number (no
+    cross-contamination between the two radios' drawers); the DVSwitch
+    card's "Show:" picker and the ASL Favorites "Control from" select
+    both list both hotspot ids as separate options. A mocked-SSH
+    `test_client()` pass separately confirmed `/api/toggle_hotspot/<id>`
+    and `/api/delete_hotspot/<id>` each only ever affect the ONE matching
+    id (the exact "deletes/toggles both" bug this migration fixes), and
+    that `/api/asl_connect` resolves the request's `id` to build an SSH
+    command against THAT hotspot's own `asl_node` -- confirmed by
+    inspecting the actual built command string, not just a success
+    response.
+  - **`dashboard.html`'s `data-ip` attribute on hotspot drag-list rows
+    (both here and in `setup.html`'s Cards-tab drag list) deliberately
+    KEPT its literal name** even though it now holds a hotspot's `id`,
+    not an `ip` -- consistent with the existing convention cameras
+    already established there (`__camera__<cam.id>`, never a literal
+    ip). Renaming the attribute itself would have meant touching
+    `sentinelDataIp()`/`isSentinel()`/`saveCardOrder()`'s DOM queries for
+    no functional gain. Several JS variables that previously held an ip
+    WERE renamed for clarity where they're not part of that
+    shared-attribute convention (`aslSelectedHotspotIp` ->
+    `aslSelectedHotspotId`, `dvsSelectedHotspotIp` ->
+    `dvsSelectedHotspotId`, `currentDrawerIp` -> `currentDrawerId`,
+    `aslDiscallIp` -> `aslDiscallId`) -- if another ip-holding variable
+    is ever found still using the old naming, rename it the same way
+    rather than leaving a variable named `...Ip` holding an id.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

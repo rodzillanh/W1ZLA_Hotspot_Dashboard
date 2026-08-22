@@ -3078,14 +3078,15 @@
 const POLL_MS = 3000;
 let leafletMap = null;
 let mapInitialized = false;
-// Browser-local timer state — keyed by ip
+// Browser-local timer state — keyed by hotspot id (not ip; two hotspots
+// can share an ip, e.g. two ASL3 radios on one box)
 // { type: 'tx'|'lh', browserStart: Date.now() when the event was first seen }
 // We store browser-local timestamps so timers run independently of the
 // server clock and the 3-second render cycle.
 let timerState = {};
-let prevTxStart      = {};  // ip -> last seen tx_start from server
-let prevLastHeard    = {};  // ip -> last seen last_heard from server
-let prevOfflineSince = {};  // ip -> last seen offline_since from server
+let prevTxStart      = {};  // hotspot id -> last seen tx_start from server
+let prevLastHeard    = {};  // hotspot id -> last seen last_heard from server
+let prevOfflineSince = {};  // hotspot id -> last seen offline_since from server
 
 
 // --- weather ---
@@ -3605,20 +3606,22 @@ function audioLevelBarPct(dbfs) {
 // its own comment) rather than tracking a separate enabled-ip list --
 // skips the fetch entirely when nothing on the page needs it.
 function fetchAudioLevels() {
-    const enabledIps = (lastApiData || [])
+    // /api/audio_level (asl_audio.py's AslAudioManager.snapshot()) is keyed
+    // by hotspot id, not ip -- two ASL3 entries can share an ip.
+    const enabledIds = (lastApiData || [])
         .filter(hs => hs.type === 'asl3' && hs.audio_meter_enabled)
-        .map(hs => hs.ip);
-    if (!enabledIps.length) return;
+        .map(hs => hs.id);
+    if (!enabledIds.length) return;
     fetch('/api/audio_level')
         .then(r => r.json())
         .then(levels => {
-            enabledIps.forEach(ip => {
-                const entry = levels[ip];
+            enabledIds.forEach(key => {
+                const entry = levels[key];
                 const pct = entry ? audioLevelBarPct(entry.level_dbfs) : 0;
-                if (vuMeters[ip]) {
-                    vuMeters[ip].pct = pct;
+                if (vuMeters[key]) {
+                    vuMeters[key].pct = pct;
                 } else {
-                    vuMeters[ip] = { pct, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
+                    vuMeters[key] = { pct, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
                 }
             });
         })
@@ -3656,14 +3659,14 @@ function playCourtesyTone() {
 
 function maybeCourtesyTone(hs) {
     if (!COURTESY_TONE_ENABLED || !hs.is_active || !hs.active_call) return;
-    if (toneFiredCalls[hs.ip] === hs.active_call) return;  // already fired for this call
-    toneFiredCalls[hs.ip] = hs.active_call;
+    if (toneFiredCalls[hs.id] === hs.active_call) return;  // already fired for this call
+    toneFiredCalls[hs.id] = hs.active_call;
     playCourtesyTone();
 }
 
 function clearStaleTones(data) {
     data.forEach(hs => {
-        if (!hs.is_active && toneFiredCalls[hs.ip]) delete toneFiredCalls[hs.ip];
+        if (!hs.is_active && toneFiredCalls[hs.id]) delete toneFiredCalls[hs.id];
     });
 }
 
@@ -3745,27 +3748,27 @@ function closeModal(e) {
 
 // --- browser notifications for favorites ---
 let notifPermission = ('Notification' in window) ? Notification.permission : 'unsupported';
-let notifiedCalls   = {};  // ip -> last notified callsign, avoids repeat alerts
+let notifiedCalls   = {};  // hotspot id -> last notified callsign, avoids repeat alerts
 
 
 function maybeNotify(hs) {
     if (!hs.is_favorite || !hs.is_active || !hs.active_call) return;
     if (Notification.permission !== 'granted') return;
-    if (notifiedCalls[hs.ip] === hs.active_call) return;  // already fired for this call
-    notifiedCalls[hs.ip] = hs.active_call;
+    if (notifiedCalls[hs.id] === hs.active_call) return;  // already fired for this call
+    notifiedCalls[hs.id] = hs.active_call;
     const label    = hs.favorite_label ? ` · ${hs.favorite_label}` : '';
     const location = hs.caller_location ? ` · ${hs.caller_location}` : '';
     new Notification(`⭐ ${hs.active_call} is on the air${label}`, {
         body: `${hs.name}${location}${hs.talkgroup ? ' · ' + hs.talkgroup : ''}`,
         icon: hs.caller_image || undefined,
-        tag:  `fav-${hs.ip}`,  // replaces any prior notif for the same node
+        tag:  `fav-${hs.id}`,  // replaces any prior notif for the same node
     });
 }
 
 function clearStaleNotifs(data) {
     // Reset tracking when a call ends so the next call fires a fresh notif
     data.forEach(hs => {
-        if (!hs.is_active && notifiedCalls[hs.ip]) delete notifiedCalls[hs.ip];
+        if (!hs.is_active && notifiedCalls[hs.id]) delete notifiedCalls[hs.id];
     });
 }
 
@@ -4030,7 +4033,7 @@ function renderCards(data) {
                   title="Update available: ${outdatedList} — WebCode installed: ${hs.dashboard_version || '?'} (${hs.dashboard_version_date || 'unknown date'}) — click to open the update page">⬆ update</a>`
             : '';
         const mapPin = (hs.lat !== undefined && hs.lat !== null)
-            ? `<a class="map-jump-btn" onclick="event.preventDefault(); event.stopPropagation(); jumpToNodeOnMap('${hs.ip}')" href="#">📍 map</a>`
+            ? `<a class="map-jump-btn" onclick="event.preventDefault(); event.stopPropagation(); jumpToNodeOnMap('${hs.id}')" href="#">📍 map</a>`
             : '';
         const uptimeBadge = (hs.uptime && hs.uptime !== 'Unknown')
             ? `<span class="card-uptime" title="Uptime: ${hs.uptime}">⏱ ${fmtUptime(hs.uptime)}</span>`
@@ -4076,7 +4079,7 @@ function renderCards(data) {
                 ? 'No response — WebSocket connection failed'
                 : 'No response — SSH connection failed';
             infoBlock = `<div class="offline-label">⚠ ${offlineReason}</div>
-               <div class="offline-sub">Offline for <span class="offline-duration" id="off-${hs.ip}">${fmtOfflineDuration(hs.offline_since)}</span> · last known data below, may be stale</div>`;
+               <div class="offline-sub">Offline for <span class="offline-duration" id="off-${hs.id}">${fmtOfflineDuration(hs.offline_since)}</span> · last known data below, may be stale</div>`;
         } else if (hs.is_active) {
             infoBlock = `<div class="active-label" ${activeColor}>📡 ACTIVE:
                  <a class="active-call-link" href="https://www.qrz.com/db/${hs.active_call}"
@@ -4085,7 +4088,7 @@ function renderCards(data) {
                ${(hs.caller_name || hs.caller_location)
                    ? `<div class="caller-info">${[hs.caller_name, hs.caller_location].filter(Boolean).join(' — ')}</div>`
                    : ''}
-               <div class="tx-time" id="tx-${hs.ip}">${fmtTx(hs.tx_start)}</div>`;
+               <div class="tx-time" id="tx-${hs.id}">${fmtTx(hs.tx_start)}</div>`;
         } else if (isLastHeard) {
             infoBlock = `<div class="listening">Last heard:
                  <a class="recent-call" href="https://www.qrz.com/db/${hs.active_call}"
@@ -4094,7 +4097,7 @@ function renderCards(data) {
                ${(hs.caller_name || hs.caller_location)
                    ? `<div class="caller-info">${[hs.caller_name, hs.caller_location].filter(Boolean).join(' — ')}</div>`
                    : ''}
-               <div class="tx-time" id="lh-${hs.ip}">${fmtAgo(hs.last_heard)}</div>`;
+               <div class="tx-time" id="lh-${hs.id}">${fmtAgo(hs.last_heard)}</div>`;
         } else {
             infoBlock = `<div class="listening">Listening...</div>`;
         }
@@ -4131,7 +4134,7 @@ function renderCards(data) {
         // (see asl_audio.py) -- a real signal level from the node's own
         // repeater audio, fed by the separate fast /api/audio_level poll
         // below, not this card's usual RSSI/BER-derived sources.
-        const vuMeterBlock = (isAsl && !hs.audio_meter_enabled) ? '' : vuMeterRow(hs.ip);
+        const vuMeterBlock = (isAsl && !hs.audio_meter_enabled) ? '' : vuMeterRow(hs.id);
 
         const statsGrid = isAsl
             ? ''
@@ -4250,10 +4253,10 @@ function renderCards(data) {
         const cardNameHref = hs.card_url ? escapeHtml(hs.card_url) : `http://${hs.ip}`;
 
         return `
-        <div class="hotspot-card ${cardClass}" id="card-${hs.ip}" style="order:${cardOrder}">
+        <div class="hotspot-card ${cardClass}" id="card-${hs.id}" style="order:${cardOrder}">
           <div class="card-header">
             <a class="card-name" href="${cardNameHref}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${hs.name}${chipHtml}</a>
-            <div class="card-header-right">${updateBadge}${mapPin}${uptimeBadge}<button class="card-gear-btn" title="Card details &amp; settings" onclick="openHotspotDrawer('${hs.ip}')">⚙</button></div>
+            <div class="card-header-right">${updateBadge}${mapPin}${uptimeBadge}<button class="card-gear-btn" title="Card details &amp; settings" onclick="openHotspotDrawer('${hs.id}')">⚙</button></div>
           </div>
           ${identityLine}
           <div class="card-inner">
@@ -4320,15 +4323,16 @@ function renderCards(data) {
             // ASL3 has no RSSI/BER/dejitter data at all to drive this
             // block's usual pct tracking -- when audio_meter_enabled, the
             // SEPARATE fast /api/audio_level poll (fetchAudioLevels())
-            // owns vuMeters[hs.ip].pct instead, so this just makes sure an
+            // owns vuMeters[hs.id].pct instead, so this just makes sure an
             // entry exists for paintVu() to find (it no-ops on `!state`)
             // without touching pct itself. Otherwise (no meter element
             // rendered at all -- see vuMeterBlock above), same
-            // no-stale-state cleanup as before.
+            // no-stale-state cleanup as before. Keyed by hs.id, not hs.ip
+            // -- two hotspots can share an ip (two ASL3 radios on one box).
             if (hs.audio_meter_enabled) {
-                if (!vuMeters[hs.ip]) vuMeters[hs.ip] = { pct: null, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
-            } else if (vuMeters[hs.ip]) {
-                delete vuMeters[hs.ip];
+                if (!vuMeters[hs.id]) vuMeters[hs.id] = { pct: null, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
+            } else if (vuMeters[hs.id]) {
+                delete vuMeters[hs.id];
             }
             return;
         }
@@ -4352,19 +4356,23 @@ function renderCards(data) {
         // -livePct approach; only the "fall to 0 once idle" behavior
         // (v4.31, separately confirmed wanted) is kept.
         const pct = hs.is_active ? livePct : (livePct === null ? null : 0);
-        if (vuMeters[hs.ip]) {
-            vuMeters[hs.ip].pct = pct;
+        if (vuMeters[hs.id]) {
+            vuMeters[hs.id].pct = pct;
         } else {
-            vuMeters[hs.ip] = { pct, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
+            vuMeters[hs.id] = { pct, value: 0, velocity: 0, peak: 0, peakHoldT: 0 };
         }
-        paintVu(hs.ip, 0);
+        paintVu(hs.id, 0);
     });
 
     // Update browser-local timer state — only reset browserStart when the
     // server reports a genuinely new event (tx_start or last_heard changed).
     // This keeps each card's timer running smoothly across render cycles.
     data.forEach(hs => {
-        const ip = hs.ip;
+        // Despite the name (kept for a smaller diff below), this is the
+        // hotspot's stable id, not a literal IP -- matches the id-based
+        // DOM element ids (off-/tx-/lh-) rendered above. Two hotspots can
+        // share an ip (two ASL3 radios on one box), never an id.
+        const ip = hs.id;
         if (hs.status === 'Offline' && hs.offline_since) {
             // Offline takes priority over active/last-heard -- same
             // reasoning as cardClass/infoBlock above, that data is stale.
@@ -4441,14 +4449,14 @@ function renderCards(data) {
 // touched on later polls, mirroring renderAslFavorites()'s own
 // preserve-the-selection-across-rebuilds handling of its select.
 let lastSentinelOrders = {};
-let dvsSelectedHotspotIp = null;
+let dvsSelectedHotspotId = null;
 
 function renderDvswitchCards(data) {
     const container = document.getElementById('dvswitch-cards');
     const dvsHotspots = data.filter(hs => hs.dvswitch_enabled);
     if (!dvsHotspots.length) {
         container.innerHTML = '';
-        dvsSelectedHotspotIp = null;
+        dvsSelectedHotspotId = null;
         return;
     }
 
@@ -4475,16 +4483,16 @@ function renderDvswitchCards(data) {
     // it's still valid, since this rebuilds on every poll -- same
     // pattern renderAslFavorites() already uses for its own select.
     const select = document.getElementById('dvswitch-node-select');
-    const prevSelection = select.value || dvsSelectedHotspotIp;
+    const prevSelection = select.value || dvsSelectedHotspotId;
     select.innerHTML = dvsHotspots.map(hs =>
-        `<option value="${escapeHtml(hs.ip)}">${escapeHtml(hs.name)}</option>`
+        `<option value="${escapeHtml(hs.id)}">${escapeHtml(hs.name)}</option>`
     ).join('');
-    if (dvsHotspots.some(hs => hs.ip === prevSelection)) {
+    if (dvsHotspots.some(hs => hs.id === prevSelection)) {
         select.value = prevSelection;
     }
-    dvsSelectedHotspotIp = select.value || null;
+    dvsSelectedHotspotId = select.value || null;
 
-    const hs = dvsHotspots.find(h => h.ip === dvsSelectedHotspotIp) || dvsHotspots[0];
+    const hs = dvsHotspots.find(h => h.id === dvsSelectedHotspotId) || dvsHotspots[0];
     renderDvswitchBody(hs);
 }
 
@@ -4614,7 +4622,7 @@ function renderDvswitchBody(hs) {
         : '';
 
     const sparkline = hs.dvswitch_sparkline || [];
-    const sparkSvg = sparkline.length ? sparklineSvg(sparkline, hs.ip) : '';
+    const sparkSvg = sparkline.length ? sparklineSvg(sparkline, hs.id) : '';
 
     body.innerHTML = `
         ${liveRowHtml}
@@ -6657,7 +6665,7 @@ function renderMapKey(nodes, hotspotColors) {
         <div class="map-key-title">Map key</div>
         ${lastMapNodes.map(node => `
             <div class="map-key-row">
-                <span class="map-key-swatch square" style="background:${lastHotspotColors[node.ip]}"></span>
+                <span class="map-key-swatch square" style="background:${lastHotspotColors[node.id]}"></span>
                 <b>${node.name}</b>
             </div>`).join('')}
         <div class="map-key-row">
@@ -7535,18 +7543,18 @@ function fmtDistance(km) {
     return `${Math.round(km)} km`;
 }
 
-function jumpToNodeOnMap(ip) {
+function jumpToNodeOnMap(hotspotId) {
     goToTab('map');
-    const node = nodeMarkers.find(n => n.ip === ip);
+    const node = nodeMarkers.find(n => n.id === hotspotId);
     if (node) {
         leafletMap.setView(node.marker.getLatLng(), Math.max(leafletMap.getZoom(), 9));
         node.marker.openPopup();
     }
 }
 
-function showHotspotCard(ip) {
+function showHotspotCard(hotspotId) {
     goToTab('dashboard');
-    const card = document.getElementById('card-' + ip);
+    const card = document.getElementById('card-' + hotspotId);
     if (!card) return;
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     card.classList.add('map-highlight');
@@ -7559,13 +7567,13 @@ function showHotspotCard(ip) {
 // Reads lastApiData (the most recent /api/data response, already kept
 // around for ASL Favorites lookups) rather than a separate fetch -- the
 // card that was clicked already has this data in hand.
-let currentDrawerIp = null;      // hotspot this drawer is currently showing -- matches /api/update_hotspot's orig_ip
-let currentHotspotConfig = null; // raw config fetched from /api/hotspot_config/<ip>, updated in place as fields save
+let currentDrawerId = null;      // id of the hotspot this drawer is currently showing
+let currentHotspotConfig = null; // raw config fetched from /api/hotspot_config/<id>, updated in place as fields save
 
-function openHotspotDrawer(ip) {
-    const hs = (lastApiData || []).find(h => h.ip === ip);
+function openHotspotDrawer(hotspotId) {
+    const hs = (lastApiData || []).find(h => h.id === hotspotId);
     if (!hs) return;
-    currentDrawerIp = ip;
+    currentDrawerId = hotspotId;
     currentHotspotConfig = null;
     const isAsl = hs.type === 'asl3';
     const isOpenSpot4 = hs.type === 'openspot4';
@@ -7589,7 +7597,7 @@ function openHotspotDrawer(ip) {
     if (isOpenSpot4 && hs.active_config_profile_name) {
         identityBits.unshift(`Profile ${hs.active_config_profile_num} (${hs.active_config_profile_name})`);
     }
-    const subLine = [ip, ...identityBits].join(' · ');
+    const subLine = [hs.ip, ...identityBits].join(' · ');
 
     let talkersHtml = '';
     if (!isAsl && !isOpenSpot4) {
@@ -7612,7 +7620,7 @@ function openHotspotDrawer(ip) {
         <div class="hs-drawer-section" style="margin-top:10px">
             <div class="hs-drawer-section-title" style="justify-content:space-between">
                 <span>Linked nodes <span class="count">(${nodes.length})</span></span>
-                <button class="open-asl-ctrl-link" onclick="openAslDrawer('${escapeHtml(hs.ip)}')">🎛️ Open in ASL Control →</button>
+                <button class="open-asl-ctrl-link" onclick="openAslDrawer('${escapeHtml(hs.id)}')">🎛️ Open in ASL Control →</button>
             </div>
             <div class="hs-link-quickconnect">
                 <input type="text" id="hs-quickconnect-node" placeholder="Node # to connect…">
@@ -7851,10 +7859,10 @@ function openHotspotDrawer(ip) {
     document.getElementById('hs-drawer').classList.add('open');
     document.getElementById('hs-drawer-backdrop').classList.add('open');
 
-    fetch('/api/hotspot_config/' + encodeURIComponent(ip))
+    fetch('/api/hotspot_config/' + encodeURIComponent(hotspotId))
         .then(r => r.json())
         .then(cfg => {
-            if (currentDrawerIp !== ip || cfg.error) return; // drawer moved on / closed before this resolved
+            if (currentDrawerId !== hotspotId || cfg.error) return; // drawer moved on / closed before this resolved
             currentHotspotConfig = cfg;
             renderHotspotSettingsFields(hs, cfg);
         })
@@ -8061,9 +8069,13 @@ function hsToggleAudioMeter(el) {
 // that changed, same instant-no-submit-step feel as the Quick Settings
 // drawer's toggles.
 function saveHotspotField(field, value) {
-    if (!currentHotspotConfig || !currentDrawerIp) return;
+    if (!currentHotspotConfig || !currentDrawerId) return;
     currentHotspotConfig[field] = value;
-    const payload = Object.assign({}, currentHotspotConfig, { orig_ip: currentDrawerIp });
+    // Identity is the hotspot's id (never changes), not ip -- editing the
+    // ip field is now just an ordinary field edit, no special "identity
+    // key changed, close the drawer" handling needed the way the old
+    // orig_ip mechanism required.
+    const payload = Object.assign({}, currentHotspotConfig, { id: currentDrawerId });
     fetch('/api/update_hotspot', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -8072,14 +8084,6 @@ function saveHotspotField(field, value) {
         .then(r => r.json())
         .then(data => {
             flashFieldStatus(field, !!data.ok, data.message);
-            if (data.ok && field === 'ip' && value !== currentDrawerIp) {
-                // The hotspot's identity key just changed -- the drawer's
-                // remaining field ids/currentDrawerIp are now stale, so
-                // close it and let the next poll's fresh card carry the
-                // new IP, rather than trying to live-patch every reference.
-                currentDrawerIp = value;
-                setTimeout(() => { closeHotspotDrawer(); refresh(); }, 500);
-            }
         })
         .catch(() => flashFieldStatus(field, false, 'Network error'));
 }
@@ -8128,7 +8132,7 @@ function runHotspotTest(btn, resultId, route, bodyFn) {
 // (this is a direct per-node action, not a favorites-style exclusive
 // select).
 function hotspotQuickConnect() {
-    if (!currentDrawerIp) return;
+    if (!currentDrawerId) return;
     const input = document.getElementById('hs-quickconnect-node');
     const result = document.getElementById('hs-quickconnect-result');
     const node = input.value.trim();
@@ -8138,7 +8142,7 @@ function hotspotQuickConnect() {
     fetch('/api/asl_connect', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ip: currentDrawerIp, node, action: 'connect'})
+        body: JSON.stringify({id: currentDrawerId, node, action: 'connect'})
     })
         .then(r => r.json())
         .then(data => {
@@ -8149,7 +8153,7 @@ function hotspotQuickConnect() {
 }
 
 function hotspotLinkAction(btn) {
-    if (!currentDrawerIp) return;
+    if (!currentDrawerId) return;
     const node = btn.dataset.node;
     const linked = btn.dataset.linked !== 'false';
     const action = linked ? 'disconnect' : 'connect';
@@ -8158,7 +8162,7 @@ function hotspotLinkAction(btn) {
     fetch('/api/asl_connect', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ip: currentDrawerIp, node, action})
+        body: JSON.stringify({id: currentDrawerId, node, action})
     })
         .then(r => r.json())
         .then(data => {
@@ -8174,11 +8178,11 @@ function hotspotLinkAction(btn) {
 
 // --- Brandmeister talkgroup link/unlink (hotspot card drawer) ---
 function bmDrawerHotspot() {
-    return (lastApiData || []).find(h => h.ip === currentDrawerIp);
+    return (lastApiData || []).find(h => h.id === currentDrawerId);
 }
 
 function linkTalkgroup() {
-    if (!currentDrawerIp) return;
+    if (!currentDrawerId) return;
     const input  = document.getElementById('tg-link-input');
     const slotEl = document.getElementById('tg-link-slot');
     const result = document.getElementById('tg-link-result');
@@ -8203,13 +8207,13 @@ function linkTalkgroup() {
     fetch('/api/brandmeister_talkgroup', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ip: currentDrawerIp, action: 'link', tg, slot})
+        body: JSON.stringify({id: currentDrawerId, action: 'link', tg, slot})
     })
         .then(r => r.json())
         .then(data => {
             if (data.success && hs) {
                 hs.bm_static_tgs = (hs.bm_static_tgs || []).concat([{talkgroup: tg, slot}]);
-                openHotspotDrawer(currentDrawerIp);
+                openHotspotDrawer(currentDrawerId);
             } else {
                 btn.disabled = false;
                 btn.textContent = 'Link';
@@ -8232,7 +8236,7 @@ function quickLinkTalkgroup(chipBtn) {
 }
 
 function unlinkTalkgroup(btn) {
-    if (!currentDrawerIp) return;
+    if (!currentDrawerId) return;
     const tg   = btn.dataset.tg;
     const slot = btn.dataset.slot;
     btn.disabled = true;
@@ -8240,14 +8244,14 @@ function unlinkTalkgroup(btn) {
     fetch('/api/brandmeister_talkgroup', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ip: currentDrawerIp, action: 'unlink', tg, slot})
+        body: JSON.stringify({id: currentDrawerId, action: 'unlink', tg, slot})
     })
         .then(r => r.json())
         .then(data => {
             const hs = bmDrawerHotspot();
             if (data.success && hs) {
                 hs.bm_static_tgs = (hs.bm_static_tgs || []).filter(t => !(String(t.talkgroup) === tg && String(t.slot || '') === slot));
-                openHotspotDrawer(currentDrawerIp);
+                openHotspotDrawer(currentDrawerId);
             } else {
                 btn.disabled = false;
                 btn.textContent = 'Unlink';
@@ -8671,14 +8675,17 @@ function refreshMap() {
             // caller pin heard through it, so "which hotspot" reads at a
             // glance instead of the old fixed "active=green/recent=blue"
             // scheme that couldn't distinguish one hotspot from another.
+            // Keyed by each hotspot's stable id, not ip -- two hotspots can
+            // share an ip (two ASL3 radios on one box), and coloring them
+            // by ip would collapse both onto the identical color.
             const hotspotColors = {};
             nodes.forEach((node, i) => {
-                hotspotColors[node.ip] = HOTSPOT_COLOR_PALETTE[i % HOTSPOT_COLOR_PALETTE.length];
+                hotspotColors[node.id] = HOTSPOT_COLOR_PALETTE[i % HOTSPOT_COLOR_PALETTE.length];
             });
 
             const nodeByName = {};
             nodes.forEach(node => {
-                const color = hotspotColors[node.ip];
+                const color = hotspotColors[node.id];
                 const icon = L.divIcon({
                     className: '',
                     html: `<div style="width:14px;height:14px;background:${color};border:2px solid #fff;box-shadow:0 0 4px rgba(0,0,0,.4)"></div>`,
@@ -8688,13 +8695,13 @@ function refreshMap() {
                 const marker = L.marker([node.lat, node.lon], {icon, zIndexOffset: 1000})
                     .bindPopup(`<b>${node.name}</b><br><small>${node.ip}</small>`)
                     .addTo(leafletMap);
-                nodeMarkers.push({ ip: node.ip, marker });
+                nodeMarkers.push({ ip: node.ip, id: node.id, marker });
                 nodeByName[node.name] = node;
             });
             renderMapKey(nodes, hotspotColors);
 
             callers.forEach(entry => {
-                const color = hotspotColors[entry.node_ip] || '#95a5a6';
+                const color = hotspotColors[entry.node_id] || '#95a5a6';
                 const activeClass = entry.is_active ? 'caller-pin-active' : 'caller-pin-recent';
                 // Only a caller whose position actually came from a live
                 // APRS beacon (entry.source === 'aprs') gets a shaped
@@ -8720,7 +8727,7 @@ function refreshMap() {
                 });
                 const sourceNote = entry.source === 'aprs'
                     ? `<br><small>📍 live APRS position${symKey ? ' (' + APRS_SYMBOL_NAME[symKey] + ')' : ''}</small>` : '';
-                const popup = `<b>${entry.call}</b>${entry.name ? `<br>${entry.name}` : ''}${entry.location ? `<br>${entry.location}` : ''}<br><small>via ${entry.node}</small>${sourceNote}<br><a href="#" onclick="event.preventDefault(); showHotspotCard('${entry.node_ip}')">Go to card →</a>`;
+                const popup = `<b>${entry.call}</b>${entry.name ? `<br>${entry.name}` : ''}${entry.location ? `<br>${entry.location}` : ''}<br><small>via ${entry.node}</small>${sourceNote}<br><a href="#" onclick="event.preventDefault(); showHotspotCard('${entry.node_id}')">Go to card →</a>`;
                 const marker = L.marker([entry.lat, entry.lon], {icon}).bindPopup(popup);
                 callerCluster.addLayer(marker);
 
@@ -9063,7 +9070,7 @@ function renderFleetActivity(data) {
 // --- ASL favorites & control ---
 let aslFavorites          = [];    // [{node, label, pinned, pinned_at}, ...] from /api/asl_favorites
 let lastApiData           = null;  // most recent /api/data response, reused for status lookup
-let aslSelectedHotspotIp   = null; // which ASL3 hotspot the "Control from" select is on
+let aslSelectedHotspotId   = null; // which ASL3 hotspot the "Control from" select is on
 let aslSelectedFavoriteNode = null; // ASL Control sidebar: which favorite row is selected -- drives Quick connect's context (see renderAslDrawer())
 // Max favorites shown as tiles on the compact card at once -- kept in
 // sync manually with config.ASL_FAV_CARD_CAP server-side.
@@ -9132,14 +9139,14 @@ function renderAslFavorites() {
 
     // Populate the hotspot selector, preserving the current selection if
     // it's still valid, since this rebuilds on every poll.
-    const prevSelection = select.value || aslSelectedHotspotIp;
+    const prevSelection = select.value || aslSelectedHotspotId;
     select.innerHTML = aslHotspots.map(hs =>
-        `<option value="${hs.ip}">${escapeHtml(hs.name)} (${escapeHtml(hs.asl_node || '?')})</option>`
+        `<option value="${hs.id}">${escapeHtml(hs.name)} (${escapeHtml(hs.asl_node || '?')})</option>`
     ).join('');
-    if (aslHotspots.some(hs => hs.ip === prevSelection)) {
+    if (aslHotspots.some(hs => hs.id === prevSelection)) {
         select.value = prevSelection;
     }
-    aslSelectedHotspotIp = select.value || null;
+    aslSelectedHotspotId = select.value || null;
 
     if (aslHotspots.length === 0) {
         miniEl.innerHTML = '';
@@ -9148,7 +9155,7 @@ function renderAslFavorites() {
         return;
     }
 
-    const controlHotspot = aslHotspots.find(hs => hs.ip === aslSelectedHotspotIp) || aslHotspots[0];
+    const controlHotspot = aslHotspots.find(hs => hs.id === aslSelectedHotspotId) || aslHotspots[0];
     // Live status comes from the already-polled asl_linked_nodes on whichever
     // hotspot is selected -- no separate status API needed.
     const linkedByNode = {};
@@ -9322,11 +9329,11 @@ function dynamicFavTileHtml(extraLink, extraFav) {
 // against whichever hotspot is currently controlling.
 function tileToggleConnect(node) {
     const aslHotspots = (lastApiData || []).filter(hs => hs.type === 'asl3');
-    const controlHotspot = aslHotspots.find(hs => hs.ip === aslSelectedHotspotIp) || aslHotspots[0];
+    const controlHotspot = aslHotspots.find(hs => hs.id === aslSelectedHotspotId) || aslHotspots[0];
     if (!controlHotspot) return;
     const linkedByNode = {};
     (controlHotspot.asl_linked_nodes || []).forEach(link => { linkedByNode[link.node] = link; });
-    aslConnect(controlHotspot.ip, node, linkedByNode[node] ? 'disconnect' : 'connect', 'asl-fav-status');
+    aslConnect(controlHotspot.id, node, linkedByNode[node] ? 'disconnect' : 'connect', 'asl-fav-status');
 }
 
 function quickConnectFromCard() {
@@ -9340,9 +9347,9 @@ function quickConnectFromCard() {
         return;
     }
     const aslHotspots = (lastApiData || []).filter(hs => hs.type === 'asl3');
-    const controlHotspot = aslHotspots.find(hs => hs.ip === aslSelectedHotspotIp) || aslHotspots[0];
+    const controlHotspot = aslHotspots.find(hs => hs.id === aslSelectedHotspotId) || aslHotspots[0];
     if (!controlHotspot) return;
-    aslConnect(controlHotspot.ip, node, 'connect', 'asl-fav-status');
+    aslConnect(controlHotspot.id, node, 'connect', 'asl-fav-status');
     input.value = '';
 }
 
@@ -9432,7 +9439,7 @@ function selectAslFavorite(node) {
 // toggled from the drawer only) is now ONE shared setting read directly
 // here, not a per-surface checkbox -- see that variable's own comment for
 // why v4.0 dropped the old per-caller keepCbId param entirely.
-function aslConnect(ip, node, action, statusElId) {
+function aslConnect(hotspotId, node, action, statusElId) {
     const status = document.getElementById(statusElId || 'asl-fav-status');
 
     // Default behavior: connecting to a favorite first disconnects any
@@ -9440,7 +9447,7 @@ function aslConnect(ip, node, action, statusElId) {
     // hotspot, so you don't end up stacking links by accident.
     // Multi-connect skips this and just connects, same as before.
     if (action === 'connect' && !aslMultiConnect) {
-        const hs = (lastApiData || []).find(h => h.ip === ip);
+        const hs = (lastApiData || []).find(h => h.id === hotspotId);
         const linkedByNode = {};
         ((hs && hs.asl_linked_nodes) || []).forEach(link => { linkedByNode[link.node] = link; });
         const others = aslFavorites
@@ -9452,12 +9459,12 @@ function aslConnect(ip, node, action, statusElId) {
             Promise.all(others.map(n => fetch('/api/asl_connect', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ ip, node: n, action: 'disconnect' })
-            }))).then(() => aslSendConnect(ip, node, action, status));
+                body: JSON.stringify({ id: hotspotId, node: n, action: 'disconnect' })
+            }))).then(() => aslSendConnect(hotspotId, node, action, status));
             return;
         }
     }
-    aslSendConnect(ip, node, action, status);
+    aslSendConnect(hotspotId, node, action, status);
 }
 
 const ASL_ACTION_PROGRESS_TEXT = {
@@ -9465,12 +9472,12 @@ const ASL_ACTION_PROGRESS_TEXT = {
     disconnect: 'Disconnecting...', disconnect_all: 'Disconnecting all...',
 };
 
-function aslSendConnect(ip, node, action, status) {
+function aslSendConnect(hotspotId, node, action, status) {
     status.textContent = ASL_ACTION_PROGRESS_TEXT[action] || 'Working...';
     fetch('/api/asl_connect', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ ip, node, action })
+        body: JSON.stringify({ id: hotspotId, node, action })
     })
         .then(r => r.json())
         .then(data => {
@@ -9490,13 +9497,13 @@ function aslSendConnect(ip, node, action, status) {
 // shows) and a "connect to any node #" quick-connect that doesn't
 // require saving a favorite first. The favorites list/add/remove and
 // aslConnect()/aslSendConnect() are all reused as-is, not duplicated.
-// `ip`, if given, pre-selects that hotspot in "Control from" -- e.g. so
-// jumping here from a specific node's own drawer lands on that node, not
-// whatever was last selected. `focusFavorites` scrolls the Favorites/pin
-// section into view once rendered, for the card's "★ Manage favorites"
-// shortcut.
-function openAslDrawer(ip, focusFavorites) {
-    if (ip) aslSelectedHotspotIp = ip;
+// `hotspotId`, if given, pre-selects that hotspot in "Control from" -- e.g.
+// so jumping here from a specific node's own drawer lands on that node,
+// not whatever was last selected. `focusFavorites` scrolls the Favorites/
+// pin section into view once rendered, for the card's "★ Manage
+// favorites" shortcut.
+function openAslDrawer(hotspotId, focusFavorites) {
+    if (hotspotId) aslSelectedHotspotId = hotspotId;
     closeAllDrawers();
     document.getElementById('asl-drawer').classList.add('open');
     document.getElementById('hs-drawer-backdrop').classList.add('open');
@@ -9589,8 +9596,8 @@ function renderAslDrawer() {
         return;
     }
 
-    const controlHotspot = aslHotspots.find(hs => hs.ip === aslSelectedHotspotIp) || aslHotspots[0];
-    aslSelectedHotspotIp = controlHotspot.ip;
+    const controlHotspot = aslHotspots.find(hs => hs.id === aslSelectedHotspotId) || aslHotspots[0];
+    aslSelectedHotspotId = controlHotspot.id;
     const linkedByNode = {};
     (controlHotspot.asl_linked_nodes || []).forEach(link => { linkedByNode[link.node] = link; });
 
@@ -9719,10 +9726,10 @@ function renderAslDrawer() {
     // nodes (ilink 8 vs. Monitor's ilink 2 -- see config.py's own
     // comment for the AllScan-verified distinction).
     const qcButtonsHtml = selectedFav && selectedLink
-        ? `<button class="asl-ctrl-qc-btn disconnect" onclick="aslDrawerQuickConnect('${controlHotspot.ip}', 'disconnect')">Disconnect</button>`
-        : `<button class="asl-ctrl-qc-btn connect" onclick="aslDrawerQuickConnect('${controlHotspot.ip}', 'connect')">Connect</button>
-           <button class="asl-ctrl-qc-btn monitor" onclick="aslDrawerQuickConnect('${controlHotspot.ip}', 'monitor')">Monitor</button>
-           <button class="asl-ctrl-qc-btn localmonitor" onclick="aslDrawerQuickConnect('${controlHotspot.ip}', 'localmonitor')" title="Receive-only, doesn't relay to your other linked nodes">Local Mon</button>`;
+        ? `<button class="asl-ctrl-qc-btn disconnect" onclick="aslDrawerQuickConnect('${controlHotspot.id}', 'disconnect')">Disconnect</button>`
+        : `<button class="asl-ctrl-qc-btn connect" onclick="aslDrawerQuickConnect('${controlHotspot.id}', 'connect')">Connect</button>
+           <button class="asl-ctrl-qc-btn monitor" onclick="aslDrawerQuickConnect('${controlHotspot.id}', 'monitor')">Monitor</button>
+           <button class="asl-ctrl-qc-btn localmonitor" onclick="aslDrawerQuickConnect('${controlHotspot.id}', 'localmonitor')" title="Receive-only, doesn't relay to your other linked nodes">Local Mon</button>`;
 
     drawer.innerHTML = `
         <div class="hs-drawer-header">
@@ -9730,8 +9737,8 @@ function renderAslDrawer() {
                 <div class="hs-drawer-title">📡 ASL Control</div>
                 <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
             </div>
-            <select class="asl-ctrl-source-select" onchange="aslSelectedHotspotIp = this.value; renderAslDrawer();">
-                ${aslHotspots.map(hs => `<option value="${hs.ip}" ${hs.ip === controlHotspot.ip ? 'selected' : ''}>${escapeHtml(hs.name)} (${escapeHtml(hs.asl_node || '?')})</option>`).join('')}
+            <select class="asl-ctrl-source-select" onchange="aslSelectedHotspotId = this.value; renderAslDrawer();">
+                ${aslHotspots.map(hs => `<option value="${hs.id}" ${hs.id === controlHotspot.id ? 'selected' : ''}>${escapeHtml(hs.name)} (${escapeHtml(hs.asl_node || '?')})</option>`).join('')}
             </select>
         </div>
         <div class="hs-drawer-body">
@@ -9764,7 +9771,7 @@ function renderAslDrawer() {
             </div>
             <div id="asl-drawer-import-preview"></div>
             <div class="asl-ctrl-discall-zone">
-                <button class="asl-ctrl-discall-btn" data-ip="${escapeHtml(controlHotspot.ip)}" data-name="${escapeHtml(controlHotspot.name)}" data-node="${escapeHtml(controlHotspot.asl_node || '?')}" onclick="confirmAslDisconnectAll(this.dataset.ip, this.dataset.name, this.dataset.node)">⛔ Disconnect all links on this node</button>
+                <button class="asl-ctrl-discall-btn" data-hotspot-id="${escapeHtml(controlHotspot.id)}" data-name="${escapeHtml(controlHotspot.name)}" data-node="${escapeHtml(controlHotspot.asl_node || '?')}" onclick="confirmAslDisconnectAll(this.dataset.hotspotId, this.dataset.name, this.dataset.node)">⛔ Disconnect all links on this node</button>
                 <div class="asl-ctrl-discall-note">Disconnects EVERY link on ${escapeHtml(controlHotspot.asl_node || 'this node')} — not just your favorites. Includes any permanent/backbone connections.</div>
             </div>
             <a class="asl-ctrl-allscan-btn" href="http://${controlHotspot.ip}/allscan" target="_blank" rel="noopener" style="margin:14px 0 0">🔗 Open AllScan Control Panel</a>
@@ -9818,7 +9825,7 @@ function fetchAslFavoriteStats() {
 // adding one, reusing aslConnect() verbatim (Multi-connect applies here
 // too, same shared aslMultiConnect setting every caller reads -- same
 // digits-only guard as addAslFavorite()'s node field).
-function aslDrawerQuickConnect(ip, action) {
+function aslDrawerQuickConnect(hotspotId, action) {
     const input = document.getElementById('asl-drawer-qc-node');
     let node = input.value.trim();
     // Defensive fallback (v4.10) -- a real, reported case: clicking a
@@ -9842,7 +9849,7 @@ function aslDrawerQuickConnect(ip, action) {
         setTimeout(() => status.textContent = '', 2500);
         return;
     }
-    aslConnect(ip, node, action, 'asl-drawer-status');
+    aslConnect(hotspotId, node, action, 'asl-drawer-status');
     input.value = '';
 }
 
@@ -9853,10 +9860,10 @@ function aslDrawerQuickConnect(ip, action) {
 // Deliberately gated behind a confirm dialog naming the actual node,
 // not just the muted button styling alone -- the one drawer action with
 // blast radius bigger than "one link you already know about".
-let aslDiscallIp = null;
+let aslDiscallId = null;
 
-function confirmAslDisconnectAll(ip, name, nodeNum) {
-    aslDiscallIp = ip;
+function confirmAslDisconnectAll(hotspotId, name, nodeNum) {
+    aslDiscallId = hotspotId;
     document.getElementById('asl-discall-confirm-box').innerHTML = `
         <h3>⛔ Disconnect all links?</h3>
         <p>This disconnects <b>every</b> link currently on node <b>${escapeHtml(nodeNum)}</b> ("${escapeHtml(name)}") — not just your saved favorites. Any permanent or backbone connections will be dropped too.</p>
@@ -9868,15 +9875,15 @@ function confirmAslDisconnectAll(ip, name, nodeNum) {
 }
 
 function cancelAslDisconnectAll() {
-    aslDiscallIp = null;
+    aslDiscallId = null;
     document.getElementById('asl-discall-confirm-backdrop').classList.remove('open');
 }
 
 function doAslDisconnectAll() {
-    const ip = aslDiscallIp;
+    const hotspotId = aslDiscallId;
     cancelAslDisconnectAll();
-    if (!ip) return;
-    aslSendConnect(ip, '0', 'disconnect_all', document.getElementById('asl-drawer-status'));
+    if (!hotspotId) return;
+    aslSendConnect(hotspotId, '0', 'disconnect_all', document.getElementById('asl-drawer-status'));
 }
 
 // --- favorites.ini import -- AllScan's own favorites file format,
