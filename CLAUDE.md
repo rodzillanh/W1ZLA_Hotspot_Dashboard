@@ -5543,6 +5543,39 @@ config for per-integration credentials; put it in
     hotspot back to the normal red offline card -- the setting round-
     trips through the real save path, not just the initial render.
 
+- **A real, reported bug: editing ANY hotspot's settings silently moved
+  its card to the end of the dashboard.** Root cause: `/setup`'s POST
+  handler and `/api/update_hotspot` both upserted with a
+  filter-out-then-append pattern (`hotspots = [h for h in hotspots if
+  h.get("id") != hotspot_id]; hotspots.append(new_hotspot)`) -- correct
+  for adding a genuinely new hotspot, but for an EDIT this always dropped
+  the entry from wherever it was in the list and re-added it at the very
+  end, and `/api/data`'s own card ordering reads directly off
+  `hotspots.json`'s list order. This predates the hotspot-id migration
+  earlier in this file (the old version did the identical
+  filter-then-append, just keyed by `ip`) -- it just took someone
+  actually noticing a card jump to the end after an edit to surface it.
+  Especially bad for `/api/update_hotspot` specifically, since the
+  hotspot card drawer's Settings block auto-saves on every single field's
+  blur/toggle (see that route's own docstring) -- editing anything
+  through the drawer would reorder the card practically every time.
+  Fixed by finding the hotspot's EXISTING index first
+  (`next((i for i, h in enumerate(hotspots) if h.get("id") ==
+  hotspot_id), None)`) and replacing it in place there
+  (`hotspots[existing_idx] = new_hotspot`) when one exists, falling back
+  to `.append()` only for a genuinely new hotspot (no existing index) --
+  same fix applied to both routes. `/api/import_backup`'s merge mode was
+  already correct and needed no change -- it builds a `dict` keyed by
+  id from the on-disk list and just updates values in place
+  (`by_id[key] = h`), and plain dict key updates never move a key's
+  position in insertion order, unlike a list filter+append. Verified
+  live with `test_client()`: three hotspots, edited the MIDDLE one
+  through both `/setup` POST and `/api/update_hotspot`, confirmed its
+  position in the saved list stayed put both times (not just that the
+  edit itself worked), and confirmed adding a genuinely NEW hotspot
+  afterward still correctly appends at the end rather than, say, always
+  inserting at the front.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

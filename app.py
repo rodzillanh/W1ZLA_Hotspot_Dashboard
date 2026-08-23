@@ -908,8 +908,17 @@ def setup():
             extra_pass = request.form.get("openspot4_extra_pass", "")
             if extra_pass.strip():
                 new_hotspot["openspot4_extra_pass"] = extra_pass
-        hotspots = [h for h in hotspots if h.get("id") != hotspot_id]
-        hotspots.append(new_hotspot)
+        # Replace in place at its EXISTING index when editing -- a plain
+        # filter-out-then-append (the previous approach) always moved the
+        # edited hotspot to the end of the list, which /api/data's own
+        # ordering reads straight from, so editing any hotspot's settings
+        # silently reordered it to last on the dashboard every time. Only
+        # a genuinely NEW hotspot (no existing index) goes at the end.
+        existing_idx = next((i for i, h in enumerate(hotspots) if h.get("id") == hotspot_id), None)
+        if existing_idx is not None:
+            hotspots[existing_idx] = new_hotspot
+        else:
+            hotspots.append(new_hotspot)
         save_hotspots(hotspots)
         if mqtt_pub.enabled:
             mqtt_pub.set_hotspots(hotspots)
@@ -1036,8 +1045,16 @@ def api_update_hotspot():
         else:
             hotspot.pop("openspot4_extra_pass", None)
 
-    hotspots = [h for h in hotspots if h.get("id") != hotspot_id]
-    hotspots.append(hotspot)
+    # Replace in place at its EXISTING index -- this route only ever edits
+    # an existing hotspot (see the docstring above), and every field
+    # auto-saves on its own blur/toggle, so a filter-out-then-append here
+    # would move the card to the end of the dashboard on nearly every
+    # single edit. Same fix as /setup's POST handler above.
+    existing_idx = next((i for i, h in enumerate(hotspots) if h.get("id") == hotspot_id), None)
+    if existing_idx is not None:
+        hotspots[existing_idx] = hotspot
+    else:
+        hotspots.append(hotspot)
     save_hotspots(hotspots)
     if mqtt_pub.enabled:
         mqtt_pub.set_hotspots(hotspots)

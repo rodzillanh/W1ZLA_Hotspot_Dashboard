@@ -361,6 +361,11 @@ BIOS = {
         "blurb": "A powerhouse drummer who passed through Rainbow, Whitesnake, and Black Sabbath, known for thunderous fills and a famously huge drum kit.",
         "wiki": "Cozy_Powell",
     },
+    "Gatton": {
+        "name": "Danny Gatton",
+        "blurb": "A virtuoso guitarist nicknamed \"The Humbler\" for his genre-spanning technique, revered by other players despite never breaking through to mainstream fame.",
+        "wiki": "Danny_Gatton",
+    },
 }
 
 
