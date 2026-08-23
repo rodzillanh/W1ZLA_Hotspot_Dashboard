@@ -266,6 +266,10 @@ def api_data():
         entry["lat"]      = hs.get("lat")
         entry["lon"]      = hs.get("lon")
         entry["type"]     = hs.get("type", "wpsd")
+        # Static config passthrough, same reason lat/lon/type are here --
+        # renderCards() uses this to show the neutral "away" card instead
+        # of the red offline one when a portable hotspot can't be reached.
+        entry["portable"] = bool(hs.get("portable", False))
         # Card title's link override -- static config, same reason type/
         # lat/lon are passed through here rather than being part of the
         # live-polled HotspotStatus. None when unset -- renderCards()'s
@@ -823,6 +827,12 @@ def setup():
             # means unchecked, not "field not submitted", so this correctly
             # defaults to disabled if the checkbox was unticked.
             "enabled": "enabled" in request.form,
+            # Generic across every hotspot type (not just openSPOT4) -- a
+            # portable hotspot going offline gets the neutral "away" card
+            # treatment instead of the red offline/error one, since not
+            # being reachable is expected for something you take mobile,
+            # not a problem. Same checkbox convention as "enabled" above.
+            "portable": "portable" in request.form,
         }
         lat = request.form.get("lat", "").strip()
         lon = request.form.get("lon", "").strip()
@@ -968,6 +978,7 @@ def api_update_hotspot():
     # Same "absent means unchecked" convention as /setup's form handler,
     # just expressed as an explicit JSON bool instead of form-field presence.
     hotspot["enabled"] = bool(data.get("enabled", hotspot.get("enabled", True)))
+    hotspot["portable"] = bool(data.get("portable", hotspot.get("portable", False)))
 
     lat, lon = data.get("lat"), data.get("lon")
     if lat not in (None, "") and lon not in (None, ""):
@@ -2071,6 +2082,8 @@ def api_import_backup():
             if sa818_conf_path and not re.match(config.SA818_CONF_PATH_PATTERN, sa818_conf_path):
                 h.pop("sa818_conf_path", None)
             h["audio_meter_enabled"] = bool(h.get("audio_meter_enabled", False))
+            # Generic across every hotspot type -- see /setup's own comment.
+            h["portable"] = bool(h.get("portable", False))
             imported.append(h)
         if mode == "replace":
             # A replace-mode import still needs every hotspot to have an id

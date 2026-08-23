@@ -1380,10 +1380,11 @@
                         data-sa818-conf-path="{{ hs.get('sa818_conf_path', '') }}"
                         data-openspot4-extra-pass="{{ hs.get('openspot4_extra_pass', '') }}"
                         data-enabled="{{ hs.get('enabled', True) }}"
+                        data-portable="{{ hs.get('portable', False) }}"
                         data-dvswitch-enabled="{{ hs.get('dvswitch_enabled', False) }}"
                         data-dvswitch-ports="{{ hs.get('dvswitch_ports', '') }}"
                         data-audio-meter-enabled="{{ hs.get('audio_meter_enabled', False) }}"
-                        onclick="editHotspot(this.dataset.id, this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.cardUrl, this.dataset.sa818ConfPath, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.dvswitchEnabled, this.dataset.dvswitchPorts, this.dataset.audioMeterEnabled)">
+                        onclick="editHotspot(this.dataset.id, this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.cardUrl, this.dataset.sa818ConfPath, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.portable, this.dataset.dvswitchEnabled, this.dataset.dvswitchPorts, this.dataset.audioMeterEnabled)">
                     Edit
                 </button>
                 <form action="/api/delete_hotspot/{{ hs.id }}" method="POST" style="margin:0">
@@ -1419,6 +1420,12 @@
                 <span style="font-size:10px;color:var(--text-dim)">(disable to keep this hotspot's saved settings without polling it or showing it on the dashboard)</span>
             </span>
             <div class="toggle on" id="hs-enabled-toggle" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="toggle-row" style="border-bottom:none;padding:0 0 10px">
+            <span class="toggle-label">Portable hotspot
+                <span style="font-size:10px;color:var(--text-dim)">(won't always be reachable -- a go-box or anything you take mobile. Shows a neutral "away" card instead of a red offline error when it can't be reached. Works for any hotspot type)</span>
+            </span>
+            <div class="toggle" id="hs-portable-toggle" onclick="this.classList.toggle('on')"></div>
         </div>
         <div class="form-grid" style="margin-bottom:10px">
             <div><label id="hs-pass-label">SSH password</label>
@@ -1510,6 +1517,7 @@
                 <input type="hidden" name="sa818_conf_path" id="form-sa818-conf-path">
                 <input type="hidden" name="openspot4_extra_pass" id="form-openspot4-extra-pass">
                 <input type="checkbox" name="enabled" id="form-enabled" style="display:none">
+                <input type="checkbox" name="portable" id="form-portable" style="display:none">
                 <input type="checkbox" name="dvswitch_enabled" id="form-dvswitch-enabled" style="display:none">
                 <input type="hidden" name="dvswitch_ports" id="form-dvswitch-ports">
                 <input type="checkbox" name="audio_meter_enabled" id="form-audio-meter-enabled" style="display:none">
@@ -2296,12 +2304,13 @@ function submitHotspot(e) {
     document.getElementById('form-sa818-conf-path').value = document.getElementById('hs-sa818-conf-path').value;
     document.getElementById('form-openspot4-extra-pass').value = document.getElementById('hs-openspot4-extra-pass').value;
     document.getElementById('form-enabled').checked = document.getElementById('hs-enabled-toggle').classList.contains('on');
+    document.getElementById('form-portable').checked = document.getElementById('hs-portable-toggle').classList.contains('on');
     document.getElementById('form-dvswitch-enabled').checked = document.getElementById('hs-dvswitch-enabled').checked;
     document.getElementById('form-dvswitch-ports').value = document.getElementById('hs-dvswitch-ports').value;
     document.getElementById('form-audio-meter-enabled').checked = document.getElementById('hs-audio-meter-enabled').checked;
 }
 
-function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, cardUrl, sa818ConfPath, openspot4ExtraPass, enabled, dvswitchEnabled, dvswitchPorts, audioMeterEnabled) {
+function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, cardUrl, sa818ConfPath, openspot4ExtraPass, enabled, portable, dvswitchEnabled, dvswitchPorts, audioMeterEnabled) {
     document.getElementById('hs-id').value      = id;
     document.getElementById('hs-name').value    = name;
     document.getElementById('hs-ip').value      = ip;
@@ -2316,6 +2325,7 @@ function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, ca
     document.getElementById('hs-sa818-conf-path').value = (sa818ConfPath && sa818ConfPath !== 'None') ? sa818ConfPath : '';
     document.getElementById('hs-openspot4-extra-pass').value = (openspot4ExtraPass && openspot4ExtraPass !== 'None') ? openspot4ExtraPass : '';
     document.getElementById('hs-enabled-toggle').classList.toggle('on', enabled !== 'False');
+    document.getElementById('hs-portable-toggle').classList.toggle('on', portable === 'True');
     document.getElementById('hs-dvswitch-enabled').checked = dvswitchEnabled === 'True';
     document.getElementById('hs-dvswitch-ports').value = (dvswitchPorts && dvswitchPorts !== 'None') ? dvswitchPorts : '';
     document.getElementById('hs-audio-meter-enabled').checked = audioMeterEnabled === 'True';
@@ -2331,6 +2341,7 @@ function clearHotspotForm() {
     ['hs-id','hs-name','hs-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-card-url','hs-sa818-conf-path','hs-openspot4-extra-pass','hs-dvswitch-ports'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('hs-type').value = 'wpsd';
     document.getElementById('hs-enabled-toggle').classList.add('on');
+    document.getElementById('hs-portable-toggle').classList.remove('on');
     document.getElementById('hs-dvswitch-enabled').checked = false;
     document.getElementById('hs-audio-meter-enabled').checked = false;
     onHotspotTypeChange();

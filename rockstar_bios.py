@@ -356,6 +356,11 @@ BIOS = {
         "blurb": "An Irish blues-rock guitarist known for relentless touring and a battered, road-worn Fender Stratocaster that became as much his trademark as his playing.",
         "wiki": "Rory_Gallagher",
     },
+    "Powell": {
+        "name": "Cozy Powell",
+        "blurb": "A powerhouse drummer who passed through Rainbow, Whitesnake, and Black Sabbath, known for thunderous fills and a famously huge drum kit.",
+        "wiki": "Cozy_Powell",
+    },
 }
 
 

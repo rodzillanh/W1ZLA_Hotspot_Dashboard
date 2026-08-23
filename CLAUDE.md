@@ -5458,6 +5458,91 @@ config for per-integration credentials; put it in
     against that port, saved to a new `--conf` path, and that same path
     then entered into this new field.
 
+- **A generic `portable` flag (v4.40) gives any hotspot a neutral "away"
+  card instead of the red offline/error one, mockup-first (a published
+  HTML mockup iterated twice before any real code changed, same workflow
+  as every other UI feature in this app).** Motivated directly: an
+  openSPOT4 that's a go-box, not always plugged in at home, was showing
+  the same alarm-style "⚠ No response... OFFLINE" treatment as an actual
+  broken stationary repeater every time it wasn't currently reachable --
+  misleading, since nothing is actually wrong with a portable device
+  that's just not home right now.
+  - **Scoped as a per-hotspot boolean (`portable`), not a check on
+    `hs.type === 'openspot4'`** -- the user explicitly asked for this
+    after seeing the mockup, anticipating a future WPSD/ASL3 go-box
+    wanting the same treatment. Same "absent means off" checkbox
+    convention as `enabled`/`dvswitch_enabled` elsewhere in this file,
+    defaults to `False` so every existing hotspot is completely
+    unaffected. Threaded through all the same places `enabled` already
+    is: `/setup` POST, `/api/update_hotspot`, `/api/import_backup`, and
+    `/api/data`'s static-config passthrough (same reasoning as
+    `card_url`/`type`/`lat`/`lon` being there instead of on the live-
+    polled `HotspotStatus` -- it's config, not something monitor.py's
+    poll loop computes).
+  - **The mockup went through two rounds, not one, and the SECOND round
+    is what actually shipped.** Round 1 offered a straight choice:
+    "Variant A" (dimmed, same full card) vs. "Variant B" (collapsed to a
+    compact single row). The user liked Variant B's instinct (drop the
+    stale battery/WiFi numbers, since they're meaningless once a device
+    has been unplugged) but rejected the collapsed SIZE -- every other
+    card on this dashboard has a fixed footprint, and shrinking one
+    would visually disrupt the grid. What shipped is a deliberate
+    hybrid: Variant A's fixed card size/position, combined with Variant
+    B's "drop the stale stats, show a last-seen line instead" content
+    decision -- neither mockup round alone was the final answer.
+  - **`isAway` (`renderCards()`, `dashboard.html`) is `isOffline &&
+    !!hs.portable`, checked BEFORE the existing `isOffline` branch** in
+    every place that branches on card state (`cardClass`, `chipHtml`,
+    `infoBlock`) -- same "more specific state wins" precedence the
+    existing offline-before-active/favorite check already established
+    elsewhere in this function. `isAway` implies `isOffline`, so nothing
+    needed touching the `photoBlock`/`isLastHeard` gates that already key
+    off `isOffline` alone.
+  - **The away card reuses the EXACT same `off-<id>` element id and
+    `'off'` timer type** the existing offline-duration ticker already
+    drives (`timerState`/the tick loop further down `renderCards()`) --
+    just wrapped in different wording/CSS class (`away-duration` instead
+    of `offline-duration`). No changes needed to the ticking logic
+    itself, since both states are driven by the identical
+    `hs.offline_since` value; only the label/color differ.
+  - **No new CSS token was introduced for "away."** The whole point of
+    this state is "not an alert" -- it deliberately reuses only the
+    app's existing NEUTRAL tokens (`--panel-2`, `--border`, `--text-dim`/
+    `--text-muted`), never `--danger` or any other accent, and drops the
+    colored top rail entirely by simply not adding a
+    `.hotspot-card.away::before` override -- the base `.hotspot-card::before`
+    rule (a plain `var(--border)` line) applies automatically once
+    `.offline`'s own override doesn't match.
+  - **The stats-grid/linked-line/VU-meter/recent-row/BM-static-TGs blocs
+    are suppressed entirely for an away card** (`${isAway ? '' :
+    statsGrid}` etc. in the card template), not just dimmed the way the
+    existing `.offline` state's CSS dims them -- this is what actually
+    delivers the approved mockup's "no stale battery/WiFi numbers" call;
+    those blocks are still COMPUTED unconditionally (same as every other
+    hotspot type's unused blocks already are elsewhere in this
+    function), just not emitted into the returned template string, to
+    keep the diff to the return statement rather than threading `isAway`
+    into each block's own computation.
+  - **The Settings toggle lives in the shared, non-type-gated section of
+    the hotspot form** (`setup.html`'s add/edit form, right after
+    "Enabled"; the hotspot card drawer's Settings block, right after its
+    own `Enabled` toggle) -- deliberately NOT inside the ASL3 or
+    openSPOT4-specific field blocks, since the whole point is that it
+    applies to any type. Defaults to off or new hotspots (`class="toggle"`,
+    no `on`, unlike "Enabled" which defaults on) -- most hotspots are
+    stationary, so the common case shouldn't require an extra click to
+    turn something off.
+  - **Verified live with Playwright**, not just read through: two
+    offline hotspots (one `portable: true`, one `portable: false`)
+    confirmed to render `.away` vs. `.offline` respectively, confirmed
+    the away card's actual text ("💤 Not connected" / "AWAY" / "Portable
+    — last seen 3h 40m ago", no "No response"/alarm wording) and that it
+    genuinely has no `.stats-grid` element in the DOM at all (not just
+    hidden via CSS), and confirmed flipping `portable` off via
+    `/api/update_hotspot` and reloading correctly reverts that same
+    hotspot back to the normal red offline card -- the setting round-
+    trips through the real save path, not just the initial render.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

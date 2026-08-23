@@ -518,6 +518,45 @@
         .hotspot-card.offline .recent-row {
             color: var(--text-dim);
         }
+        /* "Away" state (v4.40, mockup-approved) -- a hotspot marked
+           `portable` in Settings going offline is expected, not a
+           problem, so it gets this deliberately neutral treatment
+           instead of .offline's red one: no danger color anywhere,
+           quieter opacity, and no colored top rail (falls through to
+           .hotspot-card::before's own plain var(--border) line, since
+           there's no .hotspot-card.away::before override here). */
+        .hotspot-card.away {
+            background: var(--panel-2);
+            border-color: var(--border);
+            opacity: .75;
+        }
+        .away-chip {
+            display: inline-block;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 10px;
+            font-weight: 600;
+            padding: 1px 7px;
+            border-radius: 10px;
+            margin-left: 7px;
+            vertical-align: middle;
+            letter-spacing: .3px;
+        }
+        .away-label {
+            font-size: 15px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        .away-sub {
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+        .away-duration {
+            font-variant-numeric: tabular-nums;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
         .card-inner {
             display: flex;
             gap: 16px;
@@ -4009,17 +4048,26 @@ function renderCards(data) {
         const isOpenSpot4  = hs.type === 'openspot4';
         const isFav      = hs.is_favorite && hs.is_active;
         const isOffline  = hs.status === 'Offline';
-        // Offline takes precedence over active/favorite tinting -- if the
-        // hotspot isn't reachable, whatever is_active/is_favorite still say
-        // is stale data from before it dropped, not current state.
-        const cardClass = isOffline ? 'offline' : (hs.is_active ? (isFav ? 'favorite' : 'active') : '');
+        // A portable hotspot (Settings -> Hotspots, any type) going
+        // offline is expected -- it's not always plugged in -- so it gets
+        // the neutral "away" treatment instead of the red offline/error
+        // one below. Not being reachable isn't a problem for something
+        // you take mobile the way it is for a stationary repeater.
+        const isAway = isOffline && !!hs.portable;
+        // Offline/away take precedence over active/favorite tinting -- if
+        // the hotspot isn't reachable, whatever is_active/is_favorite
+        // still say is stale data from before it dropped, not current
+        // state.
+        const cardClass = isAway ? 'away' : (isOffline ? 'offline' : (hs.is_active ? (isFav ? 'favorite' : 'active') : ''));
 
-        const chipHtml = isOffline
-            ? `<span class="offline-chip">⚠ OFFLINE</span>`
-            : hs.is_active
-                ? (isFav ? `<span class="friend-chip">⭐ FRIEND</span>`
-                         : `<span class="live-chip">LIVE</span>`)
-                : '';  // no chip for last-heard or idle
+        const chipHtml = isAway
+            ? `<span class="away-chip">💤 AWAY</span>`
+            : isOffline
+                ? `<span class="offline-chip">⚠ OFFLINE</span>`
+                : hs.is_active
+                    ? (isFav ? `<span class="friend-chip">⭐ FRIEND</span>`
+                             : `<span class="live-chip">LIVE</span>`)
+                    : '';  // no chip for last-heard or idle
 
         const activeColor = isFav ? 'style="color:var(--fav-color)"' : '';
         const friendLabel = isFav && hs.favorite_label
@@ -4074,7 +4122,14 @@ function renderCards(data) {
             : '';
 
         let infoBlock;
-        if (isOffline) {
+        if (isAway) {
+            // Reuses the same off-<id> element id/timer type ('off') the
+            // offline ticker already drives -- see the tick loop further
+            // down -- just styled/worded differently, since it's the same
+            // underlying offline_since value either way.
+            infoBlock = `<div class="away-label">💤 Not connected</div>
+               <div class="away-sub">Portable — last seen <span class="away-duration" id="off-${hs.id}">${fmtOfflineDuration(hs.offline_since)}</span> ago</div>`;
+        } else if (isOffline) {
             const offlineReason = isOpenSpot4
                 ? 'No response — WebSocket connection failed'
                 : 'No response — SSH connection failed';
@@ -4267,14 +4322,14 @@ function renderCards(data) {
                 </div>
                 ${photoBlock}
               </div>
-              ${linkedLine}
-              ${vuMeterBlock}
-              ${statsGrid}
-              ${aslCardSplit}
-              ${hs.bm_static_tgs && hs.bm_static_tgs.length
+              ${isAway ? '' : linkedLine}
+              ${isAway ? '' : vuMeterBlock}
+              ${isAway ? '' : statsGrid}
+              ${isAway ? '' : aslCardSplit}
+              ${!isAway && hs.bm_static_tgs && hs.bm_static_tgs.length
                   ? `<div class="card-tg">BM static: <span>${hs.bm_static_tgs.map(t => t.talkgroup + (t.slot ? ` (TS${t.slot})` : '')).join(', ')}</span></div>`
                   : ''}
-              ${recentBlock}
+              ${isAway ? '' : recentBlock}
             </div>
           </div>
         </div>`;
@@ -8006,6 +8061,12 @@ function renderHotspotSettingsFields(hs, cfg) {
         <div class="hs-toggle-row">
             <span class="hs-toggle-label">Enabled</span>
             <div class="hs-switch" id="hsf-enabled" onclick="hsToggleEnabled(this)"></div>
+        </div>
+        <div class="hs-toggle-row">
+            <span class="hs-toggle-label">Portable hotspot
+                <div class="hs-help" style="margin:2px 0 0">Won't always be reachable (a go-box or anything you take mobile) -- shows a neutral "away" card instead of a red offline error when it can't be reached.</div>
+            </span>
+            <div class="hs-switch" id="hsf-portable" onclick="hsTogglePortable(this)"></div>
         </div>`;
 
     el.innerHTML = healthHtml + fieldsHtml;
@@ -8034,6 +8095,7 @@ function renderHotspotSettingsFields(hs, cfg) {
         setVal('hsf-bmid', cfg.brandmeister_id);
     }
     document.getElementById('hsf-enabled').classList.toggle('on', cfg.enabled !== false);
+    document.getElementById('hsf-portable').classList.toggle('on', !!cfg.portable);
 }
 
 function setVal(id, value) {
@@ -8060,6 +8122,11 @@ function hsToggleDvswitch(el) {
 function hsToggleEnabled(el) {
     el.classList.toggle('on');
     saveHotspotField('enabled', el.classList.contains('on'));
+}
+
+function hsTogglePortable(el) {
+    el.classList.toggle('on');
+    saveHotspotField('portable', el.classList.contains('on'));
 }
 
 function hsToggleAudioMeter(el) {
