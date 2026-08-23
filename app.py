@@ -866,6 +866,19 @@ def setup():
             card_url = request.form.get("card_url", "").strip()
             if card_url and re.match(r"^https?://", card_url, re.IGNORECASE):
                 new_hotspot["card_url"] = card_url
+            # Optional override for WHICH sa818-menu-saved config file this
+            # hotspot's frequency/tone reading comes from -- see
+            # config.build_sa818_conf_cmd()'s docstring for why (two
+            # physical SA818 modules on one box, one SSH login, would
+            # otherwise both read the same default /etc/sa818.conf and
+            # report identical frequencies for two different radios).
+            # Blank means the default path. Re-validated the same
+            # shell-interpolated-over-SSH way as asl_node/dvswitch_ports
+            # above; an invalid value is silently dropped rather than
+            # saved, same posture as card_url's scheme check.
+            sa818_conf_path = request.form.get("sa818_conf_path", "").strip()
+            if sa818_conf_path and re.match(config.SA818_CONF_PATH_PATTERN, sa818_conf_path):
+                new_hotspot["sa818_conf_path"] = sa818_conf_path
             # Live audio-level VU meter (see asl_audio.py) -- opt-in, same
             # "absent means off" checkbox convention as dvswitch_enabled
             # above. Needs the node to have already been provisioned via
@@ -994,6 +1007,14 @@ def api_update_hotspot():
             hotspot["card_url"] = card_url
         else:
             hotspot.pop("card_url", None)
+        # Which sa818-menu-saved config file this hotspot's frequency
+        # reading comes from -- see config.build_sa818_conf_cmd()'s
+        # docstring. Same re-validation as /setup's form handler.
+        sa818_conf_path = (data.get("sa818_conf_path") or "").strip()
+        if sa818_conf_path and re.match(config.SA818_CONF_PATH_PATTERN, sa818_conf_path):
+            hotspot["sa818_conf_path"] = sa818_conf_path
+        else:
+            hotspot.pop("sa818_conf_path", None)
         hotspot["audio_meter_enabled"] = bool(
             data.get("audio_meter_enabled", hotspot.get("audio_meter_enabled", False))
         )
@@ -2044,6 +2065,11 @@ def api_import_backup():
             card_url = str(h.get("card_url", "")).strip()
             if card_url and not re.match(r"^https?://", card_url, re.IGNORECASE):
                 h.pop("card_url", None)
+            # Same re-validation for the sa818-menu config path override --
+            # shell-interpolated over SSH (config.build_sa818_conf_cmd).
+            sa818_conf_path = str(h.get("sa818_conf_path", "")).strip()
+            if sa818_conf_path and not re.match(config.SA818_CONF_PATH_PATTERN, sa818_conf_path):
+                h.pop("sa818_conf_path", None)
             h["audio_meter_enabled"] = bool(h.get("audio_meter_enabled", False))
             imported.append(h)
         if mode == "replace":

@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.38 "Helm"</span>
+                <span class="release-version">v4.39 "Gallagher"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL3 hotspots can now point at their own SA818 config file, for boxes with more than one physical radio module</span> — reported directly against a real two-radio setup: both radios showed the identical frequency. Confirmed live over SSH that the box genuinely has two separate serial ports (two SA818 modules) but only one saved config file, since every hotspot always read the same fixed <code>/etc/sa818.conf</code> regardless of which radio it was. A new optional "SA818 config file" field (Settings → Hotspots, or the card's own gear-icon drawer) lets a hotspot point at its own file instead — created on the device via <code>sa818-menu --conf &lt;path&gt;</code> against that radio's own port. Blank still means the existing default, so single-radio installs are unaffected</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.38 "Helm"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>ASL Control's "Control from" selection no longer silently reverts to a different hotspot after a moment</span> — reported directly against a real two-radio setup. The compact ASL Favorites card and the ASL Control drawer each have their own "Control from" dropdown, but share one underlying selection — the compact card's dropdown was treating its own (possibly untouched, defaulted-to-the-first-hotspot) value as authoritative on every background refresh, overwriting whatever was just picked in the drawer. Only ever showed up with two or more ASL3 hotspots configured, since with just one there was nothing to disagree about</li>

@@ -1377,12 +1377,13 @@
                         data-bmid="{{ hs.brandmeister_id }}" data-type="{{ hs.get('type', 'wpsd') }}"
                         data-asl-node="{{ hs.get('asl_node', '') }}"
                         data-card-url="{{ hs.get('card_url', '') }}"
+                        data-sa818-conf-path="{{ hs.get('sa818_conf_path', '') }}"
                         data-openspot4-extra-pass="{{ hs.get('openspot4_extra_pass', '') }}"
                         data-enabled="{{ hs.get('enabled', True) }}"
                         data-dvswitch-enabled="{{ hs.get('dvswitch_enabled', False) }}"
                         data-dvswitch-ports="{{ hs.get('dvswitch_ports', '') }}"
                         data-audio-meter-enabled="{{ hs.get('audio_meter_enabled', False) }}"
-                        onclick="editHotspot(this.dataset.id, this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.cardUrl, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.dvswitchEnabled, this.dataset.dvswitchPorts, this.dataset.audioMeterEnabled)">
+                        onclick="editHotspot(this.dataset.id, this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.cardUrl, this.dataset.sa818ConfPath, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.dvswitchEnabled, this.dataset.dvswitchPorts, this.dataset.audioMeterEnabled)">
                     Edit
                 </button>
                 <form action="/api/delete_hotspot/{{ hs.id }}" method="POST" style="margin:0">
@@ -1462,6 +1463,12 @@
                 </label>
                 <input type="text" id="hs-card-url" placeholder="e.g. http://192.168.1.50/allscan">
             </div>
+            <div style="grid-column:1/-1">
+                <label>SA818 config file
+                    <span style="font-size:10px;color:var(--text-dim)">(optional — which sa818-menu-saved file this hotspot's frequency/tone reading comes from. Only needed if this box has MORE THAN ONE physical SA818 radio module sharing one SSH login — each radio needs its own file, saved via `sa818-menu --conf &lt;path&gt;` on the device. Blank defaults to /etc/sa818.conf)</span>
+                </label>
+                <input type="text" id="hs-sa818-conf-path" placeholder="e.g. /etc/sa818.conf">
+            </div>
             <div style="grid-column:1/-1;display:flex;align-items:center">
                 <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
                     <input type="checkbox" id="hs-audio-meter-enabled">
@@ -1500,6 +1507,7 @@
                 <input type="hidden" name="type" id="form-type">
                 <input type="hidden" name="asl_node" id="form-aslnode">
                 <input type="hidden" name="card_url" id="form-card-url">
+                <input type="hidden" name="sa818_conf_path" id="form-sa818-conf-path">
                 <input type="hidden" name="openspot4_extra_pass" id="form-openspot4-extra-pass">
                 <input type="checkbox" name="enabled" id="form-enabled" style="display:none">
                 <input type="checkbox" name="dvswitch_enabled" id="form-dvswitch-enabled" style="display:none">
@@ -2285,6 +2293,7 @@ function submitHotspot(e) {
     document.getElementById('form-type').value    = document.getElementById('hs-type').value;
     document.getElementById('form-aslnode').value = document.getElementById('hs-aslnode').value;
     document.getElementById('form-card-url').value = document.getElementById('hs-card-url').value;
+    document.getElementById('form-sa818-conf-path').value = document.getElementById('hs-sa818-conf-path').value;
     document.getElementById('form-openspot4-extra-pass').value = document.getElementById('hs-openspot4-extra-pass').value;
     document.getElementById('form-enabled').checked = document.getElementById('hs-enabled-toggle').classList.contains('on');
     document.getElementById('form-dvswitch-enabled').checked = document.getElementById('hs-dvswitch-enabled').checked;
@@ -2292,7 +2301,7 @@ function submitHotspot(e) {
     document.getElementById('form-audio-meter-enabled').checked = document.getElementById('hs-audio-meter-enabled').checked;
 }
 
-function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, cardUrl, openspot4ExtraPass, enabled, dvswitchEnabled, dvswitchPorts, audioMeterEnabled) {
+function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, cardUrl, sa818ConfPath, openspot4ExtraPass, enabled, dvswitchEnabled, dvswitchPorts, audioMeterEnabled) {
     document.getElementById('hs-id').value      = id;
     document.getElementById('hs-name').value    = name;
     document.getElementById('hs-ip').value      = ip;
@@ -2304,6 +2313,7 @@ function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, ca
     document.getElementById('hs-type').value    = (type    && type    !== 'None') ? type    : 'wpsd';
     document.getElementById('hs-aslnode').value = (aslNode && aslNode !== 'None') ? aslNode : '';
     document.getElementById('hs-card-url').value = (cardUrl && cardUrl !== 'None') ? cardUrl : '';
+    document.getElementById('hs-sa818-conf-path').value = (sa818ConfPath && sa818ConfPath !== 'None') ? sa818ConfPath : '';
     document.getElementById('hs-openspot4-extra-pass').value = (openspot4ExtraPass && openspot4ExtraPass !== 'None') ? openspot4ExtraPass : '';
     document.getElementById('hs-enabled-toggle').classList.toggle('on', enabled !== 'False');
     document.getElementById('hs-dvswitch-enabled').checked = dvswitchEnabled === 'True';
@@ -2318,7 +2328,7 @@ function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, ca
 }
 
 function clearHotspotForm() {
-    ['hs-id','hs-name','hs-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-card-url','hs-openspot4-extra-pass','hs-dvswitch-ports'].forEach(id => document.getElementById(id).value = '');
+    ['hs-id','hs-name','hs-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-card-url','hs-sa818-conf-path','hs-openspot4-extra-pass','hs-dvswitch-ports'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('hs-type').value = 'wpsd';
     document.getElementById('hs-enabled-toggle').classList.add('on');
     document.getElementById('hs-dvswitch-enabled').checked = false;

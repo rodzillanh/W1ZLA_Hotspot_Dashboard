@@ -5417,6 +5417,46 @@ config for per-integration credentials; put it in
     each surface's `onchange` the explicit write and keep every passive
     render function read-only against the shared variable, or the same
     class of bug will resurface.
+  - **Another real, reported follow-up: two ASL3 radios on one box also
+    reported the IDENTICAL frequency/tone**, even though they're two
+    physically different SA818 modules. Root cause confirmed live over
+    SSH, not guessed: `config.SA818_CONF_CMD` (now
+    `build_sa818_conf_cmd()`) was a single fixed command, `sudo cat
+    /etc/sa818.conf` -- every ASL3 hotspot ran the literal same command
+    regardless of `asl_node`, so two hotspot entries sharing one SSH
+    login necessarily read the same file. Confirmed the user's actual
+    box really does have two physical modules (`ls -la /dev/ttyUSB0
+    /dev/ttyUSB1`, both present) but only one `/etc/sa818.conf`
+    (`sudo find /etc -iname "*sa818*"`), and that `sa818-menu` itself
+    already supports this (`sa818-menu --help` documents `--conf
+    <config-file>`, default `/etc/sa818.conf` -- a real, existing escape
+    hatch, not something added for this). `/etc/sa818.conf`'s own
+    `CURRENT_PORT` field (confirmed via a live `sudo cat`) was blank on
+    the real device, meaning the file can't be used to auto-detect which
+    physical port it reflects -- there's no way to make this automatic;
+    the user has to actually run `sa818-menu --conf <path>` against the
+    SECOND radio's port to create a genuinely separate saved file for it.
+    Fixed by adding a new optional per-hotspot field, `sa818_conf_path`
+    (Settings -> Hotspots' ASL3 fields, and the hotspot card drawer's own
+    Settings block) -- blank means the existing default
+    (`config.DEFAULT_SA818_CONF_PATH`, `/etc/sa818.conf`), so every
+    existing single-radio install is completely unaffected. Re-validated
+    at all three write paths (`/setup` POST, `/api/update_hotspot`,
+    `/api/import_backup`) against `config.SA818_CONF_PATH_PATTERN`
+    (`^/etc/[A-Za-z0-9_.\-]+\.conf$`) the same way `asl_node`/
+    `dvswitch_ports`/`card_url` already are, since it's shell-interpolated
+    over SSH and `/setup` has no auth -- an invalid value is silently
+    dropped/falls back to the default rather than ever reaching the SSH
+    command, confirmed with a live hostile-input test (`; rm -rf /`,
+    path traversal, a bare `$(...)` substitution) before trusting it.
+    Verified end-to-end with mocked SSH: two same-ip ASL3 hotspots, one
+    left at the default and one given `sa818_conf_path:
+    "/etc/sa818-radio2.conf"`, produced two genuinely different `sudo
+    cat ...` commands. The actual device-side fix (creating the second
+    radio's own saved config file) is on the user, not something this
+    app can do for them -- `sa818-menu` needs to be re-run interactively
+    against that port, saved to a new `--conf` path, and that same path
+    then entered into this new field.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

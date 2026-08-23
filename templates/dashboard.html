@@ -7971,6 +7971,11 @@ function renderHotspotSettingsFields(hs, cfg) {
             <input type="text" id="hsf-cardurl" placeholder="defaults to http://<node ip>" onblur="saveHotspotField('card_url', this.value)">
             <div class="hs-help">Where clicking this card's title goes -- leave blank for the node's own IP, or point it at AllScan (http://&lt;ip&gt;/allscan) or anything else.</div>
         </div>
+        <div class="hs-field">
+            <div class="hs-field-label-row"><label>SA818 config file</label><span class="hs-field-status" id="hsf-status-sa818confpath">✓ Saved</span></div>
+            <input type="text" id="hsf-sa818confpath" placeholder="defaults to /etc/sa818.conf" onblur="saveHotspotField('sa818_conf_path', this.value)">
+            <div class="hs-help">Only needed if this box has more than one physical SA818 radio module -- point each hotspot at its own sa818-menu-saved file (<code>sa818-menu --conf &lt;path&gt;</code> on the device), or they'll all report the same frequency.</div>
+        </div>
         <div class="hs-toggle-row">
             <span class="hs-toggle-label">DVSwitch bridge (Analog_Bridge)</span>
             <div class="hs-switch" id="hsf-dvswitch-enabled" onclick="hsToggleDvswitch(this)"></div>
@@ -8018,6 +8023,7 @@ function renderHotspotSettingsFields(hs, cfg) {
     if (isAsl) {
         setVal('hsf-aslnode', cfg.asl_node);
         setVal('hsf-cardurl', cfg.card_url);
+        setVal('hsf-sa818confpath', cfg.sa818_conf_path);
         setVal('hsf-dvports', cfg.dvswitch_ports);
         document.getElementById('hsf-dvswitch-enabled').classList.toggle('on', !!cfg.dvswitch_enabled);
         document.getElementById('hsf-dvports-field').style.display = cfg.dvswitch_enabled ? '' : 'none';
@@ -8093,6 +8099,7 @@ function flashFieldStatus(field, ok, message) {
         : field === 'dvswitch_ports' ? 'dvports'
         : field === 'asl_node' ? 'aslnode'
         : field === 'card_url' ? 'cardurl'
+        : field === 'sa818_conf_path' ? 'sa818confpath'
         : field;
     const span = document.getElementById('hsf-status-' + key);
     if (!span) return;

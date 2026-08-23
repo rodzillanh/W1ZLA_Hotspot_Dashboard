@@ -1,5 +1,6 @@
 """Central place for all the constants that used to be scattered/hardcoded."""
 import os
+import re
 
 # --- Version codename ---
 # Each release gets a codename, one deceased rock & roll musician per
@@ -10,7 +11,7 @@ import os
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.38"
+APP_VERSION = "4.39"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -131,6 +132,8 @@ VERSION_CODENAMES = [
                         # style (1939-2019)
     "Helm",             # v4.38 -- Levon Helm, The Band's drummer and
                         # a lead vocalist (1940-2012)
+    "Gallagher",        # v4.39 -- Rory Gallagher, Irish blues-rock
+                        # guitarist (1948-1995)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -386,20 +389,48 @@ def build_asl_status_cmd(
 
 # SA818 (the RF module many simplex ASL3 hotspots use -- e.g. a SHARI-
 # style Pi build) -- its last-programmed RX/TX frequency lives in
-# /etc/sa818.conf, written by the sa818-menu tool. The module itself
-# can't be read back over the air, so this file is only ever a record of
-# what THIS host last wrote -- if the radio was ever reprogrammed from a
-# different Pi, this won't reflect the hardware (same caveat sa818-menu
-# itself documents). Confirmed live against two real nodes: one with a
-# genuine frequency programmed (446.1000 UHF simplex, node 600672) and
-# one where sa818-menu had only ever written its 000.0000 placeholder
-# skeleton (node 59929) -- see monitor.py's _check_asl3_sa818 for how the
-# two are told apart. Read on the same slow (30 min) cadence as WPSD's
-# own frequency check -- static config that only changes when someone
-# re-runs sa818-menu, not every 5s poll. Needs sudo for the same reason
-# `rpt xnode` does (root-owned file) -- assumes passwordless sudo, same
-# assumption every other ASL3 SSH command here already makes.
-SA818_CONF_CMD = "sudo cat /etc/sa818.conf 2>/dev/null"
+# /etc/sa818.conf by default, written by the sa818-menu tool. The module
+# itself can't be read back over the air, so this file is only ever a
+# record of what THIS host last wrote -- if the radio was ever
+# reprogrammed from a different Pi, this won't reflect the hardware (same
+# caveat sa818-menu itself documents). Confirmed live against two real
+# nodes: one with a genuine frequency programmed (446.1000 UHF simplex,
+# node 600672) and one where sa818-menu had only ever written its
+# 000.0000 placeholder skeleton (node 59929) -- see monitor.py's
+# _check_asl3_sa818 for how the two are told apart. Read on the same slow
+# (30 min) cadence as WPSD's own frequency check -- static config that
+# only changes when someone re-runs sa818-menu, not every 5s poll. Needs
+# sudo for the same reason `rpt xnode` does (root-owned file) -- assumes
+# passwordless sudo, same assumption every other ASL3 SSH command here
+# already makes.
+#
+# DEFAULT_SA818_CONF_PATH is a per-hotspot OVERRIDE default, not a
+# universal one -- a real, reported setup has TWO physical SA818 modules
+# on one box (two separate serial ports, confirmed live via `ls /dev/
+# ttyUSB*`) behind two ASL3 hotspot entries sharing one SSH login. Both
+# would otherwise `cat` the identical /etc/sa818.conf and report the
+# identical frequency for two genuinely different radios. sa818-menu
+# itself supports this (`sa818-menu --conf <path>`, confirmed live via
+# its own --help output -- default /etc/sa818.conf when --conf is
+# omitted), so a hotspot can be pointed at its own separate saved-config
+# file, one per radio. build_sa818_conf_cmd() re-validates the path the
+# same way config.build_asl_status_cmd() etc. already do for other
+# free-text ASL3 fields -- it's shell-interpolated over SSH, and /setup
+# has no auth, so a hostile path string is exactly as real a risk here as
+# for asl_node/dvswitch_ports/card_url elsewhere in this file.
+DEFAULT_SA818_CONF_PATH = "/etc/sa818.conf"
+# Absolute path under /etc, plain filename characters only (no shell
+# metacharacters -- this becomes part of an interpolated `sudo cat
+# <path>` command). Deliberately conservative rather than trying to
+# allow every theoretically-valid Unix filename.
+SA818_CONF_PATH_PATTERN = r"^/etc/[A-Za-z0-9_.\-]+\.conf$"
+
+
+def build_sa818_conf_cmd(conf_path: str | None = None) -> str:
+    path = (conf_path or "").strip() or DEFAULT_SA818_CONF_PATH
+    if not re.match(SA818_CONF_PATH_PATTERN, path):
+        path = DEFAULT_SA818_CONF_PATH
+    return f"sudo cat {path} 2>/dev/null"
 
 
 # DigiPi (KM6LYW's Raspberry Pi ham radio data hotspot) -- Direwolf isn't a

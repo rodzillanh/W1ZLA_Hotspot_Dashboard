@@ -293,8 +293,13 @@ class FleetMonitor:
             pass  # best-effort, same as the update check above
 
     def _check_asl3_sa818(self, hotspot: dict) -> None:
-        """SA818 RF module config (/etc/sa818.conf) for ASL3 hotspots that
-        use one -- see config.SA818_CONF_CMD. Populates the SAME
+        """SA818 RF module config (/etc/sa818.conf by default, or this
+        hotspot's own `sa818_conf_path` override -- see
+        config.build_sa818_conf_cmd()'s docstring for why a per-hotspot
+        override exists: two physical SA818 modules on one box, sharing
+        one SSH login across two ASL3 hotspot entries, would otherwise
+        both read the identical file and report the identical frequency
+        for two genuinely different radios). Populates the SAME
         frequency/duplex fields WPSD's own slow check populates from
         /etc/mmdvmhost, plus sa818_status explaining why they might still
         be "N/A" (see models.py's own comment on that field). Best-effort
@@ -306,8 +311,9 @@ class FleetMonitor:
         min default) and a single missed cycle shouldn't flash a
         known-good frequency back to N/A for that long."""
         key = hotspot["id"]
+        cmd = config.build_sa818_conf_cmd(hotspot.get("sa818_conf_path"))
         try:
-            output = self._ssh_exec(hotspot, config.SA818_CONF_CMD, config.SSH_TIMEOUT).strip()
+            output = self._ssh_exec(hotspot, cmd, config.SSH_TIMEOUT).strip()
         except Exception:
             return
 

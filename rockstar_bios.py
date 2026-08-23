@@ -351,6 +351,11 @@ BIOS = {
         "blurb": "The Band's drummer and one of its lead vocalists, the only American member of a group otherwise built around Bob Dylan's former Canadian backing musicians.",
         "wiki": "Levon_Helm",
     },
+    "Gallagher": {
+        "name": "Rory Gallagher",
+        "blurb": "An Irish blues-rock guitarist known for relentless touring and a battered, road-worn Fender Stratocaster that became as much his trademark as his playing.",
+        "wiki": "Rory_Gallagher",
+    },
 }
 
 
