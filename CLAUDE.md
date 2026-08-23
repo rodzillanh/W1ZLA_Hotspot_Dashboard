@@ -5380,6 +5380,43 @@ config for per-integration credentials; put it in
     `aslDiscallIp` -> `aslDiscallId`) -- if another ip-holding variable
     is ever found still using the old naming, rename it the same way
     rather than leaving a variable named `...Ip` holding an id.
+  - **A real, reported follow-up bug once the user actually tested two
+    ASL3 hotspots live**: selecting a hotspot in the ASL Control drawer's
+    own "Control from" select would silently revert to a DIFFERENT
+    hotspot within moments -- not caused by the id migration itself, but
+    a PRE-EXISTING latent bug the migration didn't introduce and couldn't
+    have surfaced before it (with only one ASL3 hotspot ever configured,
+    both selects always agreed by construction). Root cause: the compact
+    ASL Favorites card and the ASL Control drawer each have their OWN,
+    separate "Control from" `<select>` element, but share ONE global
+    variable (`aslSelectedHotspotId`) for which hotspot is being
+    controlled. `renderAslFavorites()` (the compact card) used to treat
+    ITS OWN select's current `.value` as authoritative on EVERY call --
+    including the passive poll-driven re-renders `refresh()` fires every
+    `POLL_MS` regardless of which surface the user is actually using --
+    and reassigned that value straight into the shared variable. If the
+    user only ever touched the DRAWER's select (never the compact card's,
+    which stays wherever it defaulted to, e.g. the first hotspot), the
+    very next poll tick's `renderAslFavorites()` call would read its own
+    stale/default select value and clobber whatever the user had just
+    picked in the drawer -- reproduced live with a synthetic two-hotspot
+    setup (nodes 600670/600672, matching the exact numbers reported) and
+    confirmed the shared variable really did revert within one simulated
+    poll tick. Fixed by making the compact card's select match the
+    drawer's ALREADY-correct pattern: its `onchange` now sets
+    `aslSelectedHotspotId` explicitly before re-rendering
+    (`onchange="aslSelectedHotspotId = this.value; renderAslFavorites()"`,
+    same shape as the drawer's own select), and `renderAslFavorites()`
+    itself now only ever READS the shared variable to sync its own
+    select's displayed value (falling back to the first hotspot only
+    when the shared value isn't set or no longer matches a real
+    hotspot), never writes to it during a passive re-render -- the same
+    find-or-fallback-only pattern `renderAslDrawer()`'s own select
+    already used correctly. If a similar "two independent UI surfaces
+    sharing one piece of state" pattern is ever added elsewhere, give
+    each surface's `onchange` the explicit write and keep every passive
+    render function read-only against the shared variable, or the same
+    class of bug will resurface.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

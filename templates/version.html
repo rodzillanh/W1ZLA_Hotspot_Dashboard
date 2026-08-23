@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.37 "Baker"</span>
+                <span class="release-version">v4.38 "Helm"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL Control's "Control from" selection no longer silently reverts to a different hotspot after a moment</span> — reported directly against a real two-radio setup. The compact ASL Favorites card and the ASL Control drawer each have their own "Control from" dropdown, but share one underlying selection — the compact card's dropdown was treating its own (possibly untouched, defaulted-to-the-first-hotspot) value as authoritative on every background refresh, overwriting whatever was just picked in the drawer. Only ever showed up with two or more ASL3 hotspots configured, since with just one there was nothing to disagree about</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.37 "Baker"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Hotspots can now share an IP address — e.g. two AllStarLink radios/node numbers on the same box, each reachable over one SSH login</span> — prompted directly by a real setup with exactly that. Every hotspot now gets its own stable id, independent of ip; ip goes back to meaning only "where to connect," never "which hotspot this is." Fixes several real bugs this previously caused for two same-ip hotspots: deleting one deleted both, toggling one flipped both, and only one of the two would ever actually poll/show live status, since both collapsed onto a single internal entry. Also fixed for MQTT/Home Assistant discovery, APRS favorite-alert notifications, and the DVSwitch live audio meter, which had the same collision</li>

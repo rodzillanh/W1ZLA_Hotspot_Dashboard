@@ -2504,7 +2504,7 @@
                 </div>
                 <div class="asl-fav-source">
                     <label for="asl-fav-hotspot-select">From:</label>
-                    <select id="asl-fav-hotspot-select" onchange="renderAslFavorites()"></select>
+                    <select id="asl-fav-hotspot-select" onchange="aslSelectedHotspotId = this.value; renderAslFavorites();"></select>
                 </div>
             </div>
             <div class="top-row">
@@ -9137,16 +9137,29 @@ function renderAslFavorites() {
 
     const aslHotspots = (lastApiData || []).filter(hs => hs.type === 'asl3');
 
-    // Populate the hotspot selector, preserving the current selection if
-    // it's still valid, since this rebuilds on every poll.
-    const prevSelection = select.value || aslSelectedHotspotId;
+    // aslSelectedHotspotId is shared with the ASL Control drawer's OWN,
+    // completely separate "Control from" select -- this card's select
+    // must only ever WRITE that shared variable when the USER changes
+    // THIS select (its onchange sets it explicitly before calling this
+    // function again), never on a passive poll-driven re-render. A real,
+    // reported bug without this distinction: with two ASL3 hotspots
+    // configured, picking one in the drawer would get silently reverted
+    // within one poll cycle back to whichever hotspot this card's own
+    // (untouched, defaulted-to-the-first-option) select happened to show
+    // -- this function used to read `select.value` as authoritative on
+    // EVERY call and reassign it into the shared variable, clobbering a
+    // selection made on the other surface. Now it only ever READS the
+    // shared variable to sync this select's displayed value, falling
+    // back to the first hotspot only if the shared value isn't set/valid
+    // (e.g. that hotspot was just deleted) -- same pattern
+    // renderAslDrawer() already used correctly.
     select.innerHTML = aslHotspots.map(hs =>
         `<option value="${hs.id}">${escapeHtml(hs.name)} (${escapeHtml(hs.asl_node || '?')})</option>`
     ).join('');
-    if (aslHotspots.some(hs => hs.id === prevSelection)) {
-        select.value = prevSelection;
+    if (!aslHotspots.some(hs => hs.id === aslSelectedHotspotId)) {
+        aslSelectedHotspotId = aslHotspots.length ? aslHotspots[0].id : null;
     }
-    aslSelectedHotspotId = select.value || null;
+    select.value = aslSelectedHotspotId || '';
 
     if (aslHotspots.length === 0) {
         miniEl.innerHTML = '';

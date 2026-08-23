@@ -346,6 +346,11 @@ BIOS = {
         "blurb": "Cream's volatile, jazz-schooled drummer, whose polyrhythmic style and dueling solos with Jack Bruce helped define the power-trio format.",
         "wiki": "Ginger_Baker",
     },
+    "Helm": {
+        "name": "Levon Helm",
+        "blurb": "The Band's drummer and one of its lead vocalists, the only American member of a group otherwise built around Bob Dylan's former Canadian backing musicians.",
+        "wiki": "Levon_Helm",
+    },
 }
 
 
