@@ -6786,9 +6786,16 @@ function initMap() {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 18
     });
-    darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
+    // Esri "Dark Gray Canvas" base -- keyless (same provider as satLayer
+    // below), replacing CARTO's dark_all, which started returning
+    // "API KEY REQUIRED" placeholder tiles once CARTO retired anonymous
+    // raster basemap access. Native tiles stop at z16 globally, so
+    // maxNativeZoom lets Leaflet upscale them for z17-19 rather than
+    // showing blank tiles. This "Base" layer is near-label-free (place/
+    // water labels live in a separate Reference overlay we don't load).
+    darkLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles © Esri',
+        maxNativeZoom: 16,
         maxZoom: 19
     });
     satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -8401,9 +8408,10 @@ function ensureQsoDrawerSkeleton() {
             <div style="font-size:13px;color:var(--text)" id="qso-d-loc"></div>
         </div>`;
     qsoMiniMap = L.map('qso-mini-map', { zoomControl: false }).setView([0, 0], 2);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd', maxZoom: 19,
+    // Keyless Esri "Dark Gray Canvas" base -- see the darkLayer comment in
+    // initMap() for why this replaced CARTO's dark_all.
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles © Esri', maxNativeZoom: 16, maxZoom: 19,
     }).addTo(qsoMiniMap);
 }
 

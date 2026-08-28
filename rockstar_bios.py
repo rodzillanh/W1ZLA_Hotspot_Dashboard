@@ -366,6 +366,11 @@ BIOS = {
         "blurb": "A virtuoso guitarist nicknamed \"The Humbler\" for his genre-spanning technique, revered by other players despite never breaking through to mainstream fame.",
         "wiki": "Danny_Gatton",
     },
+    "Domino": {
+        "name": "Fats Domino",
+        "blurb": "A New Orleans pianist and singer whose rolling boogie-woogie style helped invent rock and roll, with hits like \"Blueberry Hill\" and \"Ain't That a Shame.\"",
+        "wiki": "Fats_Domino",
+    },
 }
 
 

@@ -379,6 +379,33 @@ config for per-integration credentials; put it in
   gate — it used to run forever in the background even after navigating
   away from the map tab.
 
+- **The dark map style uses Esri's keyless "Dark Gray Canvas" raster
+  base (`server.arcgisonline.com/ArcGIS/rest/services/Canvas/
+  World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`), NOT CARTO
+  (`basemaps.cartocdn.com/dark_all`) — swapped in v4.42 after CARTO
+  retired free anonymous access to their raster basemaps and the old URL
+  started serving "API KEY REQUIRED" placeholder tiles (confirmed live
+  against a real deploy, and matches the same complaint on the Home
+  Assistant forum).** Two spots use it: `initMap()`'s `darkLayer`
+  ([dashboard.html]) and the QSO detail drawer's mini-map (its own inline
+  `L.tileLayer`). Chosen keyless (same provider as the existing satellite
+  layer) over a free CARTO API key specifically to avoid adding a new
+  credential + Settings field, per this project's usual instinct.
+  Tradeoffs, disclosed to the user before the swap: (1) native tiles stop
+  at **z16** globally — `maxNativeZoom: 16` lets Leaflet upscale for
+  z17-19 rather than showing blank tiles, so pins still work at any zoom,
+  just blurrier past 16; (2) it's a near-label-free "Base" layer (place/
+  water labels live in a separate `...Reference` overlay we deliberately
+  don't load), which is also what sidesteps the **"Gulf of America"**
+  concern — Esri's Feb 2025 renaming went into their newer *vector*
+  US-region styles, not this legacy raster service, and this Base layer
+  shows essentially no ocean labels anyway. If a future ask wants
+  CARTO's exact near-black look / full z19 sharpness back, that means the
+  free CARTO key route (`?key=...` on the same `dark_all` URL, 5M tiles/
+  month free tier) — a real option, just deliberately not taken here.
+  The light (`osmLayer`) and satellite (`satLayer`) styles were never
+  CARTO and are unchanged.
+
 - **Docker: restarting an existing container does NOT pick up a newly
   built image at the same tag.** Containers are bound to the specific
   image ID they were created from. Any change here requires

@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.41 "Gatton"</span>
+                <span class="release-version">v4.42 "Domino"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed the Live map showing "API KEY REQUIRED" instead of a dark map</span> — CARTO retired free anonymous access to their basemap tiles, so the dark map style (and the QSO detail drawer's mini-map) started serving placeholder tiles. Both now use Esri's keyless "Dark Gray Canvas" basemap instead — no API key, same provider as the existing satellite layer. It's a near-label-free dark backdrop; the map is sharp through zoom 16 and upscales past that</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.41 "Gatton"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Editing a hotspot no longer moves its card to the end of the dashboard</span> — reported directly. Saving any change (through Settings, or the card's own gear-icon drawer, which auto-saves on every field) was silently dropping the hotspot from wherever it sat in the list and re-adding it at the very end, since the dashboard's card order reads straight off that list order. Editing now updates the hotspot in place instead, so it stays exactly where you had it — adding a genuinely new hotspot still goes at the end, same as always</li>
