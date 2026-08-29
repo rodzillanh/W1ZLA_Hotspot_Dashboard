@@ -371,6 +371,11 @@ BIOS = {
         "blurb": "A New Orleans pianist and singer whose rolling boogie-woogie style helped invent rock and roll, with hits like \"Blueberry Hill\" and \"Ain't That a Shame.\"",
         "wiki": "Fats_Domino",
     },
+    "Fogerty": {
+        "name": "Tom Fogerty",
+        "blurb": "Rhythm guitarist and co-founder of Creedence Clearwater Revival, whose tight chord work anchored the band's run of swamp-rock hits before he left in 1971.",
+        "wiki": "Tom_Fogerty",
+    },
 }
 
 

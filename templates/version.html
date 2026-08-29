@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.42 "Domino"</span>
+                <span class="release-version">v4.43 "Fogerty"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed the weather forecast popup not opening while the Live map tab was active</span> — the panel was opening the whole time, just painting underneath the map. Its stacking order was far below Leaflet's own map layers and controls, so it stayed hidden behind them. Raised it to sit above the map, matching every other pop-over in the dashboard</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.42 "Domino"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed the Live map showing "API KEY REQUIRED" instead of a dark map</span> — CARTO retired free anonymous access to their basemap tiles, so the dark map style (and the QSO detail drawer's mini-map) started serving placeholder tiles. Both now use Esri's keyless "Dark Gray Canvas" basemap instead — no API key, same provider as the existing satellite layer. It's a near-label-free dark backdrop; the map is sharp through zoom 16 and upscales past that</li>

@@ -1777,7 +1777,10 @@
             position: fixed;
             inset: 0;
             background: rgba(0,0,0,0);
-            z-index: 150;
+            /* Above Leaflet's own panes/controls (which reach z-index 1000)
+               so the forecast panel isn't buried under the map on the Live
+               map tab -- matches the .hs-drawer-backdrop tier below. */
+            z-index: 1000;
             transition: background .25s;
         }
         .wx-panel-backdrop.open {
@@ -1798,7 +1801,7 @@
             border: 1px solid var(--card-border);
             border-radius: 12px;
             box-shadow: 0 8px 32px rgba(0,0,0,.4);
-            z-index: 151;
+            z-index: 1001;
             transition: transform .25s cubic-bezier(.4,0,.2,1), opacity .25s;
             padding: 16px;
         }
