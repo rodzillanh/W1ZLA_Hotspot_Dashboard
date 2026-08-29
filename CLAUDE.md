@@ -4081,6 +4081,22 @@ config for per-integration credentials; put it in
   the dashboard JS no longer reads a per-hotspot position for this card
   at all, only the one `DVSWITCH_POSITION` constant seeded from
   `settings.dvswitch_position`.
+  **v4.44 added the `show_dvswitch` toggle after all** (Settings ->
+  Cards, "Dashboard cards" subgroup) -- the v3.99 "nothing else to gate
+  on, so no show_* toggle" reasoning held until a user wanted to hide
+  the card while keeping `dvswitch_enabled` on (it also feeds the Fleet
+  Activity mode bar, so unchecking that per-hotspot box isn't a
+  card-only off switch). The card now shows when `show_dvswitch` (new
+  `DEFAULT_SETTINGS` key, **default `True`** so existing installs with a
+  DVSwitch hotspot are unaffected) AND `any(hs.dvswitch_enabled)`. Wired
+  the same three-places-in-sync way as `dvswitch_position` itself:
+  `_overflow_sentinels()`'s DVSwitch `if`, `dashboard.html`'s
+  `SHOW_DVSWITCH` const (gates both the `computeCardOrders()` sentinel
+  push and `renderDvswitchCards()`'s hotspot filter), and `setup.html`'s
+  Cards-tab drag-list `dvswitch_pos` guard + the `#dvswitch-card-toggle`
+  switch in `saveCards()`'s POST body. `/api/settings` persists it with
+  a plain `if "show_dvswitch" in data: settings["show_dvswitch"] =
+  bool(...)` block next to `show_cameras`.
 
 - **ASL Favorites card + ASL Control entry point (v4.0) — a four-round
   mockup-approved redesign, built together since they share state

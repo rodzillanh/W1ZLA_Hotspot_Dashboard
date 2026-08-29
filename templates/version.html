@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.43 "Fogerty"</span>
+                <span class="release-version">v4.44 "Kramer"</span>
                 <span class="release-date">August 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Added a "Show DVSwitch card" toggle</span> — Settings → Cards. The DVSwitch card only ever appeared based on whether an ASL3 hotspot had "This node also runs DVSwitch" enabled, with no way to hide the card while keeping that on (it also feeds the Fleet Activity mode bar). The new toggle lets you turn just the card off. Defaults on, so nothing changes for existing installs</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.43 "Fogerty"</span>
+                <span class="release-date">August 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fixed the weather forecast popup not opening while the Live map tab was active</span> — the panel was opening the whole time, just painting underneath the map. Its stacking order was far below Leaflet's own map layers and controls, so it stayed hidden behind them. Raised it to sit above the map, matching every other pop-over in the dashboard</li>

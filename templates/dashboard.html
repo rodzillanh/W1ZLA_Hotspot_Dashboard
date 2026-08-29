@@ -3267,9 +3267,11 @@ const QSO_STATS_POSITION = {{ settings.get('qso_stats_position', 0) }};
 const QSO_STATS_POLL_MS = 20000;  // same cadence as Recent Contacts/the map -- same qsos.json source
 const SHOW_TOP_ACTIVITY = {{ 'true' if settings.get('show_top_activity', False) else 'false' }};
 const TOP_ACTIVITY_POSITION = {{ settings.get('top_activity_position', 0) }};
-// No matching SHOW_DVSWITCH -- enablement is derived per-poll from
-// data.some(hs => hs.dvswitch_enabled), not a settings.json toggle (see
-// _overflow_sentinels()'s DVSwitch comment in app.py).
+// DVSwitch card shows when SHOW_DVSWITCH is on AND at least one hotspot
+// has dvswitch_enabled (derived per-poll from data.some(...)). Default
+// true, so an install that already had a DVSwitch hotspot is unaffected
+// (see _overflow_sentinels()'s DVSwitch comment in app.py).
+const SHOW_DVSWITCH = {{ 'true' if settings.get('show_dvswitch', True) else 'false' }};
 const DVSWITCH_POSITION = {{ settings.get('dvswitch_position', 0) }};
 // let, not const -- Quick Settings (openSettingsDrawer) can flip these
 // live from the dashboard without a page reload, unlike every other
@@ -3999,7 +4001,7 @@ function renderCards(data) {
     // sentinel per hotspot -- enabled if ANY hotspot has dvswitch_enabled
     // set, sourced from the SAME `data` array already in hand, not a
     // separate async fetch.
-    if (data.some(hs => hs.dvswitch_enabled)) {
+    if (SHOW_DVSWITCH && data.some(hs => hs.dvswitch_enabled)) {
         sentinels.push({ key: 'dvswitch', pos: Math.max(0, DVSWITCH_POSITION) });
     }
     const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);
@@ -4511,7 +4513,7 @@ let dvsSelectedHotspotId = null;
 
 function renderDvswitchCards(data) {
     const container = document.getElementById('dvswitch-cards');
-    const dvsHotspots = data.filter(hs => hs.dvswitch_enabled);
+    const dvsHotspots = SHOW_DVSWITCH ? data.filter(hs => hs.dvswitch_enabled) : [];
     if (!dvsHotspots.length) {
         container.innerHTML = '';
         dvsSelectedHotspotId = null;

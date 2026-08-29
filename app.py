@@ -413,6 +413,8 @@ def api_settings_post():
         settings["update_check_branch"] = data["update_check_branch"].strip()
     if "show_cameras" in data:
         settings["show_cameras"] = bool(data["show_cameras"])
+    if "show_dvswitch" in data:
+        settings["show_dvswitch"] = bool(data["show_dvswitch"])
     if "aprs_inbox_enabled" in data:
         settings["aprs_inbox_enabled"] = bool(data["aprs_inbox_enabled"])
     if "aprs_inbox_position" in data:
@@ -778,12 +780,12 @@ def _overflow_sentinels(settings: dict, hotspots: list, cameras: list) -> list:
     # DVSwitch card (v3.99) -- ONE consolidated card covering every
     # DVSwitch-enabled ASL3 hotspot via its own "Show:" node picker, not
     # one card per hotspot (that was the original v3.66 shape -- see
-    # CLAUDE.md for why it was collapsed). Enablement is still derived
-    # from hotspots.json (any hs.dvswitch_enabled) rather than a show_*
-    # settings gate, since there's nothing else to gate on -- but there's
-    # now exactly one position to track, so it lives in settings.json
+    # CLAUDE.md for why it was collapsed). Shown when ANY hotspot has
+    # dvswitch_enabled AND the "Show DVSwitch card" toggle is on
+    # (show_dvswitch, default True so existing installs with a DVSwitch
+    # hotspot are unaffected). The single position lives in settings.json
     # like every other single-instance card above, not per-hotspot.
-    if any(hs.get("dvswitch_enabled") for hs in hotspots):
+    if settings.get("show_dvswitch", True) and any(hs.get("dvswitch_enabled") for hs in hotspots):
         pos = settings.get("dvswitch_position", 0)
         if pos >= hotspot_count:
             items.append({

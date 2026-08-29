@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.43"
+APP_VERSION = "4.44"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -142,6 +142,8 @@ VERSION_CODENAMES = [
                         # (1928-2017)
     "Fogerty",          # v4.43 -- Tom Fogerty, rhythm guitarist of
                         # Creedence Clearwater Revival (1941-1990)
+    "Kramer",           # v4.44 -- Wayne Kramer, guitarist of the MC5
+                        # (1948-2024)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1065,12 +1067,14 @@ DEFAULT_SETTINGS = {
     # YSF research that ruled that out as a clean REST-pollable option.
     "show_top_activity": False,
     "top_activity_position": 0,
-    # DVSwitch card position (v3.99) -- one consolidated card covering
-    # every DVSwitch-enabled ASL3 hotspot via its own "Show:" node picker,
-    # not one card per hotspot. Unlike every other *_position setting
-    # here there's no matching "show_*" toggle -- enablement is derived
-    # from hotspots.json (any hotspot with dvswitch_enabled set), the
-    # same way show_cameras' absence is handled for cameras.
+    # DVSwitch card (v3.99) -- one consolidated card covering every
+    # DVSwitch-enabled ASL3 hotspot via its own "Show:" node picker, not
+    # one card per hotspot. Shown when ANY hotspot has dvswitch_enabled
+    # AND show_dvswitch is on. Defaults True (v4.44) so existing installs
+    # that already have a DVSwitch hotspot keep seeing the card without
+    # touching Settings -- the toggle just lets you hide it while leaving
+    # dvswitch_enabled (and its Fleet Activity segment) on.
+    "show_dvswitch": True,
     "dvswitch_position": 0,
     # Live WSJT-X QSO logging -- off by default. Listens for WSJT-X's own
     # UDP telemetry protocol (the same feed GridTracker/JTAlert use) and

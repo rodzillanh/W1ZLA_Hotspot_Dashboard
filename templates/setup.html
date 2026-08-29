@@ -715,6 +715,15 @@
                 <div class="toggle {{ 'on' if settings.get('show_top_activity', False) else '' }}"
                      id="top-activity-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show DVSwitch card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (only appears if an ASL3 hotspot also has "This node also runs DVSwitch" on -- turn this off to hide the card while keeping that enabled)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_dvswitch', True) else '' }}"
+                     id="dvswitch-card-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
 
             <div class="toggle-subhead">Notifications card sources</div>
             <div class="toggle-row">
@@ -822,11 +831,10 @@
             {% set recent_contacts_pos = settings.get('recent_contacts_position', 0) if settings.get('show_recent_contacts', False) else -1 %}
             {% set qso_stats_pos = settings.get('qso_stats_position', 0) if settings.get('show_qso_stats', False) else -1 %}
             {% set top_activity_pos = settings.get('top_activity_position', 0) if settings.get('show_top_activity', False) else -1 %}
-            {# DVSwitch (v3.99) -- one consolidated card, enabled if ANY
-               hotspot has dvswitch_enabled set (no matching show_* toggle,
-               same as show_cameras below but hotspot-derived instead of a
-               settings.json flag). #}
-            {% set dvswitch_pos = settings.get('dvswitch_position', 0) if (hotspots | selectattr('dvswitch_enabled') | list | length > 0) else -1 %}
+            {# DVSwitch (v3.99) -- one consolidated card, shown when the
+               "Show DVSwitch card" toggle (show_dvswitch, default on) is
+               on AND any hotspot has dvswitch_enabled set. #}
+            {% set dvswitch_pos = settings.get('dvswitch_position', 0) if (settings.get('show_dvswitch', True) and hotspots | selectattr('dvswitch_enabled') | list | length > 0) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots %}
                 {% if loop.index0 == fleet_pos %}
@@ -1969,6 +1977,7 @@ function saveCards() {
             fleet_alerts_enabled: document.getElementById('fleet-alerts-toggle').classList.contains('on'),
             solar_alerts_enabled: document.getElementById('solar-alerts-toggle').classList.contains('on'),
             show_top_activity: document.getElementById('top-activity-toggle').classList.contains('on'),
+            show_dvswitch: document.getElementById('dvswitch-card-toggle').classList.contains('on'),
             brandmeister_alerts_enabled: document.getElementById('brandmeister-alerts-toggle').classList.contains('on'),
         })
     }).then(() => {

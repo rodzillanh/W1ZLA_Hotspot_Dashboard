@@ -376,6 +376,11 @@ BIOS = {
         "blurb": "Rhythm guitarist and co-founder of Creedence Clearwater Revival, whose tight chord work anchored the band's run of swamp-rock hits before he left in 1971.",
         "wiki": "Tom_Fogerty",
     },
+    "Kramer": {
+        "name": "Wayne Kramer",
+        "blurb": "Guitarist of Detroit's MC5, whose ferocious, politically charged proto-punk on \"Kick Out the Jams\" made him a lasting influence on punk and hard rock.",
+        "wiki": "Wayne_Kramer_(guitarist)",
+    },
 }
 
 
