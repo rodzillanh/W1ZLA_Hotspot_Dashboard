@@ -441,7 +441,10 @@ logbook is enabled for the QRZ API". The paid XML subscription is **not**
 required. Enter the key in Settings → Integrations → "QRZ Logbook sync",
 then turn the sync on under Settings → Cards → Notifications card sources
 → "QRZ logbook confirmations in Notifications" (that one switch gates the
-whole feature — sync, the badge, and the notifications).
+whole feature — sync, the badge, and the notifications). A **Sync now**
+button next to the key runs a sync immediately and reports what it pulled
+(added / matched / newly confirmed), so you don't have to wait for the
+next background cycle.
 
 - **Deduped** against QSOs already logged by WSJT-X or an ADIF import — a
   contact in both places is matched on callsign + band + mode + time and
