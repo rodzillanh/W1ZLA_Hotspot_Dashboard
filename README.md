@@ -428,6 +428,37 @@ default; toggle it off in Settings → Integrations if you'd rather see a
 bare callsign than an unverified fallback name.
 
 <!-- wiki-group: Integrations -->
+## QRZ Logbook sync
+
+Optional, **read-only** — pulls the contacts already in your
+[QRZ Logbook](https://logbook.qrz.com) into the Recent Contacts card and,
+when a contact gets confirmed, posts a "confirmed contact" event to the
+Notifications card and shows a green **✓ QRZ** badge on that row.
+
+This uses a **QRZ Logbook API key**, a different credential from the
+QRZ.com login above — find it under QRZ Logbook → Settings → "This
+logbook is enabled for the QRZ API". The paid XML subscription is **not**
+required. Enter the key in Settings → Integrations → "QRZ Logbook sync",
+then turn the sync on under Settings → Cards → Notifications card sources
+→ "QRZ logbook confirmations in Notifications" (that one switch gates the
+whole feature — sync, the badge, and the notifications).
+
+- **Deduped** against QSOs already logged by WSJT-X or an ADIF import — a
+  contact in both places is matched on callsign + band + mode + time and
+  shown once, with the logbook's details filling any blank fields, rather
+  than added a second time.
+- **Confirmations are a state change on an existing QSO**, so the sync
+  periodically re-checks your still-unconfirmed contacts (up to a year
+  old) and flags the moment one flips to confirmed — exactly one
+  notification per confirmation, never a repeat, and never one for a
+  contact that was already confirmed the first time it synced.
+- **One-way.** It only reads your logbook; it never uploads this
+  dashboard's WSJT-X / imported QSOs to QRZ.
+- New QSOs are pulled about every 30 minutes, confirmations re-checked a
+  few times a day — a logbook confirmation depends on the other operator
+  logging the contact too, so it's never instant regardless.
+
+<!-- wiki-group: Integrations -->
 ## APRS.fi live position
 
 Optional — requires a free API key from
@@ -1111,7 +1142,7 @@ a proper APRS message.
 <!-- wiki-group: Integrations -->
 ## Notifications card
 
-Optional dashboard card (Settings → Cards) that merges up to five
+Optional dashboard card (Settings → Cards) that merges up to six
 independent message/alert sources into one scrollable, time-sorted list —
 appears as soon as *any* is enabled, and each remains its own separate
 on/off toggle underneath. Position it anywhere in the same drag-and-drop
@@ -1123,8 +1154,9 @@ back to showing everything. Each row is also tagged with a small icon so
 the source stays visible even when showing all of them together.
 
 **History survives a restart** — each source keeps its own recent history
-(50 entries for APRS/HamAlert/geomagnetic alerts/Brandmeister favorites,
-100 for fleet online/offline events) in a small local database, not just
+(50 entries for APRS/HamAlert/geomagnetic alerts/Brandmeister favorites/
+QRZ logbook confirmations, 100 for fleet online/offline events) in a
+small local database, not just
 in memory, so restarting the dashboard (an update, a reboot, a container
 recreate) doesn't wipe out what you'd already seen. Each source's history
 is capped independently — a busy source can't crowd out a quiet one.
@@ -1191,6 +1223,13 @@ connection to Brandmeister's own public real-time "Last Heard" feed
 callsign (Settings → Favorites) keys up **anywhere on the Brandmeister
 network**, not just through this fleet's own hotspots — the network-wide
 counterpart to the fleet-scoped APRS favorite alerts above.
+
+**QRZ logbook confirmations** (Settings → Cards → "QRZ logbook
+confirmations in Notifications", off by default) — adds an event when a
+contact in your logbook gets confirmed on QRZ. Needs a QRZ Logbook API
+key (Settings → Integrations → "QRZ Logbook sync"); the same setting also
+syncs your logged contacts into the Recent Contacts card and marks the
+confirmed ones there with a ✓ badge. See "QRZ Logbook sync" above.
 
 All enabled sources share one connection-status readout in the card
 header (Connected / Connecting / Reconnecting per source, where the
@@ -1415,6 +1454,11 @@ to slide out the full detail: a small live map centered on the contact
 (with a line back to your station's QTH when known), band/mode/
 frequency/RST/grid/distance/location, and a "View on full map" button
 for exploring further on the actual Live map.
+
+If **QRZ Logbook sync** is configured (see Integrations), contacts also
+in your QRZ logbook are folded into this list, and a green **✓ QRZ**
+badge marks the ones QRZ has confirmed — the detail drawer shows the
+confirmation date.
 
 <!-- wiki-group: Optional Cards -->
 ## QSO Stats card

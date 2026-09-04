@@ -148,6 +148,10 @@ QSOS = [
         "name": "James", "city": "Birmingham", "state": "", "country": "ENGLAND",
         "rst_sent": "-10", "rst_rcvd": "-12", "frequency_hz": 14074000,
         "logged_at": time.time() - 7200, "source": "wsjtx",
+        # confirmed via the QRZ Logbook sync -- shows the "✓ QRZ" badge on
+        # the Recent Contacts card / the confirmation line in its drawer
+        "qrz_logid": 918273, "qrz_confirmed": True,
+        "qrz_confirmed_at": time.time() - 1800,
     },
     {
         "call": "VE3QRS", "band": "40m", "mode": "SSB", "date": "20260804",
