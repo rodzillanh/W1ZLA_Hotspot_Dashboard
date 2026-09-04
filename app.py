@@ -46,6 +46,7 @@ from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
 from asl_audio import AslAudioManager
 from wsjtx import WsjtxListener
+from qrz_logbook import QrzLogbookClient
 from hamalert import HamAlertListener
 from brandmeister_lastheard import BrandmeisterLastHeardListener
 from satellites import SatelliteTracker
@@ -94,6 +95,7 @@ openspot_manager.reconcile(load_hotspots())  # eager start at boot, mirrors mqtt
 audio_manager = AslAudioManager()
 audio_manager.reconcile(load_hotspots())
 wsjtx_listener  = WsjtxListener(monitor)
+qrz_logbook_client = QrzLogbookClient()
 hamalert_listener = HamAlertListener()
 brandmeister_lh = BrandmeisterLastHeardListener()
 
@@ -199,6 +201,18 @@ def _rebuild_wsjtx() -> None:
     )
 
 _rebuild_wsjtx()
+
+def _rebuild_qrz_logbook() -> None:
+    """configure() just stores enabled/key (no thread of its own -- the
+    background _qrz_logbook_loop drives it), so this is cheap to call on
+    every settings save regardless of which fields changed."""
+    settings = load_settings()
+    qrz_logbook_client.configure(
+        settings.get("qrz_logbook_enabled", False),
+        settings.get("qrz_logbook_api_key", ""),
+    )
+
+_rebuild_qrz_logbook()
 
 def _rebuild_hamalert() -> None:
     """configure() itself is a no-op unless enabled/username/password
@@ -580,6 +594,10 @@ def api_settings_post():
         settings["brandmeister_alerts_enabled"] = bool(data["brandmeister_alerts_enabled"])
     if "brandmeister_api_key" in data:
         settings["brandmeister_api_key"] = data["brandmeister_api_key"]
+    if "qrz_logbook_enabled" in data:
+        settings["qrz_logbook_enabled"] = bool(data["qrz_logbook_enabled"])
+    if "qrz_logbook_api_key" in data:
+        settings["qrz_logbook_api_key"] = data["qrz_logbook_api_key"].strip()
     save_settings(settings)
     _settings_txn.__exit__(None, None, None)
     # Rebuilds below intentionally happen AFTER releasing the lock -- they
@@ -605,6 +623,8 @@ def api_settings_post():
         _rebuild_hamalert()
     if "brandmeister_alerts_enabled" in data:
         _rebuild_brandmeister_lh()
+    if any(k in data for k in ("qrz_logbook_enabled", "qrz_logbook_api_key")):
+        _rebuild_qrz_logbook()
     return jsonify({"ok": True})
 
 
@@ -713,7 +733,7 @@ _SENTINEL_DEFS = [
     ("__wspr_activity__", "show_wspr_activity", "wspr_activity_position", "📶", "Band Activity", "WSPR activity card"),
     ("__digipi__", "digipi_enabled", "digipi_position", "📡", "DigiPi", "APRS/Direwolf card"),
     ("__big_clock__", "show_big_clock", "big_clock_position", "🕐", "Big Ass Clock", "clock card"),
-    ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled", "solar_alerts_enabled", "brandmeister_alerts_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
+    ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled", "solar_alerts_enabled", "brandmeister_alerts_enabled", "qrz_logbook_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
     ("__satellites__", "show_satellites", "satellites_position", "🛰️", "Satellites", "pass prediction card"),
     ("__flights_overhead__", "show_flights_overhead", "flights_overhead_position", "✈️", "Flights Overhead", "nearby aircraft card"),
     ("__recent_contacts__", "show_recent_contacts", "recent_contacts_position", "📻", "Recent Contacts", "logged QSO card"),
@@ -1774,6 +1794,14 @@ def api_brandmeister_lh():
     status["events"] = brandmeister_lh.events()
     return jsonify(status)
 
+@app.route("/api/qrz_confirmations")
+def api_qrz_confirmations():
+    """"Confirmed contact" events for the Notifications card, plus the
+    QRZ Logbook sync's own health (for the source pill's connection dot).
+    The sync itself runs in _qrz_logbook_loop, not here -- see
+    qrz_logbook.py."""
+    return jsonify(qrz_logbook_client.status())
+
 
 @app.route("/api/test_hamalert", methods=["POST"])
 def test_hamalert():
@@ -2223,6 +2251,7 @@ def api_import_backup():
         _rebuild_wsjtx()
         _rebuild_hamalert()
         _rebuild_brandmeister_lh()
+        _rebuild_qrz_logbook()
 
     return jsonify({"ok": True, "result": result})
 
@@ -2249,11 +2278,31 @@ def _aprs_alert_loop():
         time.sleep(config.POLL_INTERVAL)
 
 
+def _qrz_logbook_loop():
+    """Pulls newly-logged QSOs from QRZ Logbook into qsos.json on a slow
+    cadence, and (less often) re-checks unconfirmed ones for a
+    confirmation flip -- both handled inside QrzLogbookClient.sync(),
+    which never raises. Separate background thread, decoupled from the
+    poll loop, same pattern as _aprs_alert_loop / _mqtt_publish_loop."""
+    time.sleep(15)  # let startup settle before the first network round-trip
+    while True:
+        try:
+            if qrz_logbook_client.enabled:
+                qrz_logbook_client.sync(
+                    monitor.lookup_caller_info,
+                    load_settings().get("station_grid", ""),
+                )
+        except Exception as e:  # noqa: BLE001 -- sync() already swallows its own; belt and braces
+            print(f"[qrz_logbook] loop error: {type(e).__name__}: {e}", flush=True)
+        time.sleep(config.QRZ_LOGBOOK_SYNC_INTERVAL)
+
+
 def main():
     threading.Thread(target=monitor.run_forever, daemon=True).start()
     threading.Thread(target=monitor.run_slow_checks_forever, daemon=True).start()
     threading.Thread(target=_mqtt_publish_loop, daemon=True).start()
     threading.Thread(target=_aprs_alert_loop, daemon=True).start()
+    threading.Thread(target=_qrz_logbook_loop, daemon=True).start()
     threading.Thread(target=digipi_monitor.run_forever, daemon=True).start()
     threading.Thread(target=openspot_manager.run_forever, daemon=True).start()
     threading.Thread(target=audio_manager.run_forever, daemon=True).start()

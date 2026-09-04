@@ -381,6 +381,11 @@ BIOS = {
         "blurb": "Guitarist of Detroit's MC5, whose ferocious, politically charged proto-punk on \"Kick Out the Jams\" made him a lasting influence on punk and hard rock.",
         "wiki": "Wayne_Kramer_(guitarist)",
     },
+    "Redding": {
+        "name": "Otis Redding",
+        "blurb": "Stax Records' defining voice and one of soul music's greatest singers, whose \"(Sittin' On) The Dock of the Bay\" topped the charts weeks after he died in a 1967 plane crash at 26.",
+        "wiki": "Otis_Redding",
+    },
 }
 
 

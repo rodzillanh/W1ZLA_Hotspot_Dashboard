@@ -1227,6 +1227,10 @@
             font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
             color: var(--accent); background: var(--accent-dim); padding: 1px 6px; border-radius: 8px;
         }
+        .qso-confirmed {
+            font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+            color: var(--good); background: var(--good-dim); padding: 1px 6px; border-radius: 8px;
+        }
         .qso-time { margin-left: auto; font-size: 10.5px; color: var(--text-dim); flex-shrink: 0; white-space: nowrap; }
         .qso-name { font-size: 11px; color: var(--text-muted); }
         .qso-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
@@ -2567,7 +2571,7 @@
             <span class="asl-fav-status-txt" id="asl-fav-status"></span>
         </div>
         {% endif %}
-        {% set notif_source_count = (1 if settings.get('aprs_inbox_enabled', False) else 0) + (1 if settings.get('hamalert_enabled', False) else 0) + (1 if settings.get('fleet_alerts_enabled', False) else 0) + (1 if settings.get('solar_alerts_enabled', False) else 0) + (1 if settings.get('brandmeister_alerts_enabled', False) else 0) %}
+        {% set notif_source_count = (1 if settings.get('aprs_inbox_enabled', False) else 0) + (1 if settings.get('hamalert_enabled', False) else 0) + (1 if settings.get('fleet_alerts_enabled', False) else 0) + (1 if settings.get('solar_alerts_enabled', False) else 0) + (1 if settings.get('brandmeister_alerts_enabled', False) else 0) + (1 if settings.get('qrz_logbook_enabled', False) else 0) %}
         {% if notif_source_count > 0 %}
         <div class="metrics-card" id="notifications-card"
              style="order:{{ settings.get('notifications_position', 0) }}">
@@ -2590,6 +2594,9 @@
                 {% endif %}
                 {% if settings.get('brandmeister_alerts_enabled', False) %}
                 <span class="source-pill" data-filter="brandmeister" onclick="toggleNotifFilter('brandmeister')">📶 BM<span class="conn-dot" id="brandmeister-lh-conn-dot"></span></span>
+                {% endif %}
+                {% if settings.get('qrz_logbook_enabled', False) %}
+                <span class="source-pill" data-filter="qrz" onclick="toggleNotifFilter('qrz')">✅ QRZ<span class="conn-dot" id="qrz-logbook-conn-dot"></span></span>
                 {% endif %}
             </div>
             <div class="ha-diag" id="hamalert-diag" style="display:none"></div>
@@ -3239,7 +3246,9 @@ const SHOW_SOLAR_ALERTS = {{ 'true' if settings.get('solar_alerts_enabled', Fals
 const SOLAR_ALERTS_POLL_MS = 60000;  // hf_conditions.py's own cache is 1hr -- no reason to poll faster than this
 const SHOW_BRANDMEISTER_ALERTS = {{ 'true' if settings.get('brandmeister_alerts_enabled', False) else 'false' }};
 const BRANDMEISTER_ALERTS_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS/HAMALERT_POLL_MS
-const SHOW_NOTIFICATIONS = SHOW_APRS_INBOX || SHOW_HAMALERT || SHOW_FLEET_ALERTS || SHOW_SOLAR_ALERTS || SHOW_BRANDMEISTER_ALERTS;
+const SHOW_QRZ_CONFIRM = {{ 'true' if settings.get('qrz_logbook_enabled', False) else 'false' }};
+const QRZ_CONFIRM_POLL_MS = 60000;  // qrz_logbook.py's own sync runs every 30 min -- this just re-reads its in-memory event log
+const SHOW_NOTIFICATIONS = SHOW_APRS_INBOX || SHOW_HAMALERT || SHOW_FLEET_ALERTS || SHOW_SOLAR_ALERTS || SHOW_BRANDMEISTER_ALERTS || SHOW_QRZ_CONFIRM;
 const NOTIFICATIONS_POSITION = {{ settings.get('notifications_position', 0) }};
 const SHOW_SATELLITES = {{ 'true' if settings.get('show_satellites', False) else 'false' }};
 const SATELLITES_POSITION = {{ settings.get('satellites_position', 0) }};
@@ -5046,6 +5055,7 @@ let notifHamAlertData = null;
 let notifFleetData = null;
 let notifSolarData = null;
 let notifBrandmeisterData = null;
+let notifQrzData = null;
 let notifFilter = 'all';
 
 // Each source pill IS the filter control -- clicking it isolates that
@@ -5098,6 +5108,20 @@ function renderNotifRow(item, unread) {
             <div class="msg-text">${e.kind === 'offline' ? '🔴 went offline' : '🟢 back online'}</div>
         </div>`;
     }
+    if (item.source === 'qrz') {
+        const e = item.data;
+        const bm = [e.band, e.mode].filter(Boolean).join(' ');
+        return `
+        <div class="msg-row ${unread ? 'unread' : ''}">
+            <div class="msg-top">
+                <span class="notif-source" title="QRZ Logbook confirmation">✅</span>
+                <a class="msg-from" href="https://www.qrz.com/db/${escapeHtml(e.call)}" target="_blank" rel="noopener">${escapeHtml(e.call)}</a>
+                ${bm ? `<span class="msg-to">${escapeHtml(bm)}</span>` : ''}
+                <span class="msg-time">${fmtAgoShort(e.at)}</span>
+            </div>
+            <div class="msg-text">Confirmed in your QRZ logbook</div>
+        </div>`;
+    }
     if (item.source === 'aprs') {
         const m = item.data;
         return `
@@ -5143,6 +5167,9 @@ function renderNotifications() {
     }
     if (notifBrandmeisterData) {
         (notifBrandmeisterData.events || []).forEach(e => items.push({ source: 'brandmeister', received_at: e.at, data: e }));
+    }
+    if (notifQrzData) {
+        (notifQrzData.events || []).forEach(e => items.push({ source: 'qrz', received_at: e.at, data: e }));
     }
     items.sort((a, b) => (b.received_at || 0) - (a.received_at || 0));
 
@@ -5257,6 +5284,27 @@ function fetchNotifBrandmeister() {
 if (SHOW_BRANDMEISTER_ALERTS) {
     fetchNotifBrandmeister();
     setInterval(fetchNotifBrandmeister, BRANDMEISTER_ALERTS_POLL_MS);
+}
+
+function fetchNotifQrz() {
+    if (!SHOW_QRZ_CONFIRM) return;
+    fetch('/api/qrz_confirmations')
+        .then(r => r.json())
+        .then(data => {
+            notifQrzData = data;
+            const dot = document.getElementById('qrz-logbook-conn-dot');
+            if (dot) {
+                dot.classList.toggle('down', !data.ok);
+                dot.title = !data.api_key_set ? 'No API key set'
+                          : data.ok ? 'Synced' : (data.last_error || 'Sync pending…');
+            }
+            renderNotifications();
+        })
+        .catch(() => {});
+}
+if (SHOW_QRZ_CONFIRM) {
+    fetchNotifQrz();
+    setInterval(fetchNotifQrz, QRZ_CONFIRM_POLL_MS);
 }
 
 // --- Satellites card + Live map ground-track overlay ---
@@ -7493,6 +7541,7 @@ function renderRecentContactsCard(qsos) {
                 <div class="qso-top">
                     <a class="qso-call" href="${lookupHref}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(call)}</a>
                     ${bandModeBits ? `<span class="qso-band-badge">${escapeHtml(bandModeBits)}</span>` : ''}
+                    ${q.qrz_confirmed ? '<span class="qso-confirmed" title="Confirmed in your QRZ logbook">✓ QRZ</span>' : ''}
                     ${q.name ? `<span class="qso-name">${escapeHtml(q.name)}</span>` : ''}
                     <span class="qso-time">${escapeHtml(when)}</span>
                 </div>
@@ -8408,6 +8457,7 @@ function ensureQsoDrawerSkeleton() {
                 <div>Grid: <span class="stat-val" id="qso-d-grid"></span></div>
                 <div>Distance: <span class="stat-val" id="qso-d-dist"></span></div>
                 <div>Logged via: <span class="stat-val" id="qso-d-source" style="font-family:inherit"></span></div>
+                <div>QRZ logbook: <span class="stat-val" id="qso-d-qrz" style="font-family:inherit"></span></div>
             </div>
             <div class="hs-drawer-section-title">Location</div>
             <div style="font-size:13px;color:var(--text)" id="qso-d-loc"></div>
@@ -8441,7 +8491,18 @@ function openQsoDrawer(i) {
     const hasQth = q.qth_lat != null && q.qth_lon != null;
     const dist = (hasQth && hasPos) ? fmtDistance(distanceKm(q.qth_lat, q.qth_lon, q.lat, q.lon)) : '—';
     const loc = [q.city, q.state || q.country].filter(Boolean).join(', ') || '—';
-    const source = q.source === 'wsjtx' ? 'Live (WSJT-X)' : 'ADIF import';
+    const source = q.source === 'wsjtx' ? 'Live (WSJT-X)'
+                 : q.source === 'qrz' ? 'QRZ Logbook'
+                 : 'ADIF import';
+    let qrzLine = '—';
+    if (q.qrz_confirmed) {
+        const cd = q.qrz_confirmed_at
+            ? new Date(q.qrz_confirmed_at * 1000).toISOString().slice(0, 10)
+            : '';
+        qrzLine = '✓ confirmed' + (cd ? ' ' + cd : '');
+    } else if (q.qrz_logid != null) {
+        qrzLine = 'in logbook, not confirmed';
+    }
 
     document.getElementById('qso-d-flag').innerHTML = flagHtml;
     const callEl = document.getElementById('qso-d-call');
@@ -8455,6 +8516,7 @@ function openQsoDrawer(i) {
     document.getElementById('qso-d-grid').textContent = q.grid || '—';
     document.getElementById('qso-d-dist').textContent = dist;
     document.getElementById('qso-d-source').textContent = source;
+    document.getElementById('qso-d-qrz').textContent = qrzLine;
     document.getElementById('qso-d-loc').textContent = loc;
 
     const viewBtn = document.getElementById('qso-d-viewmap-btn');

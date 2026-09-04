@@ -3,6 +3,7 @@ import contextlib
 import json
 import os
 import threading
+import time
 import uuid
 
 import config
@@ -261,3 +262,106 @@ def append_qso(qso: dict) -> None:
         qsos.append(qso)
         with open(config.QSOS_FILE, "w") as f:
             json.dump(qsos, f, indent=4)
+
+
+# Mode names that mean the same "voice on SSB" QSO regardless of which
+# sideband the two logs happened to record -- everything else is compared
+# as-is (CW==CW, FT8==FT8, etc.), deliberately NOT grouped into a fuzzy
+# "digital" bucket, since FT8 vs FT4 vs RTTY really are different contacts.
+_PHONE_MODES = {"SSB", "USB", "LSB", "DSB", "FM", "AM", "PHONE"}
+
+
+def _mode_key(mode: str) -> str:
+    m = (mode or "").strip().upper()
+    return "PHONE" if m in _PHONE_MODES else m
+
+
+def _qso_matches(a: dict, b: dict, window_sec: int) -> bool:
+    """True if `a` and `b` are almost certainly the same contact logged
+    from two sources (QRZ Logbook vs. WSJT-X live / ADIF import): same
+    callsign + band + mode-group, and their timestamps within
+    `window_sec`. Falls back to same-date equality only when a usable
+    timestamp is missing on either side."""
+    if (a.get("call") or "").upper() != (b.get("call") or "").upper():
+        return False
+    if (a.get("band") or "").lower() != (b.get("band") or "").lower():
+        return False
+    if _mode_key(a.get("mode")) != _mode_key(b.get("mode")):
+        return False
+    ta, tb = a.get("logged_at"), b.get("logged_at")
+    if ta is None or tb is None:
+        return bool(a.get("date")) and (a.get("date") or "") == (b.get("date") or "")
+    return abs(ta - tb) <= window_sec
+
+
+def merge_qrz_qsos(add_records: list, confirm_map: dict,
+                   window_sec: int = None) -> dict:
+    """Fold a QRZ Logbook sync into qsos.json under _file_lock (so it
+    can't interleave with append_qso()/save_qsos()):
+
+      * `add_records` -- QSO dicts freshly pulled from QRZ (each carrying
+        `qrz_logid` and source "qrz"). One whose `qrz_logid` is already
+        stored is skipped. One that fuzzily matches an existing entry
+        (WSJT-X- or ADIF-logged, see _qso_matches) enriches that entry in
+        place -- attaches the `qrz_logid`, fills only blank fields, never
+        appends a duplicate row. Otherwise it's appended.
+      * `confirm_map` -- {qrz_logid: confirmed_at_epoch} for QSOs QRZ now
+        reports confirmed. Sets `qrz_confirmed`/`qrz_confirmed_at` on the
+        matching stored entry (by logid) if not already set.
+
+    Returns {"added", "matched", "confirmed", "confirmed_logids"} -- the
+    caller (qrz_logbook.py) uses `confirmed_logids` to post one
+    Notifications event per QSO that ACTUALLY flipped to confirmed here
+    (a real transition), never for one that arrived already-confirmed.
+    Never raises."""
+    if window_sec is None:
+        window_sec = config.QRZ_LOGBOOK_MATCH_WINDOW_SEC
+    os.makedirs(config.CONFIG_DIR, exist_ok=True)
+    confirmed_logids = []
+    with _file_lock:
+        try:
+            with open(config.QSOS_FILE, "r") as f:
+                qsos = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            qsos = []
+
+        known_logids = {q.get("qrz_logid") for q in qsos if q.get("qrz_logid") is not None}
+        added = matched = confirmed = 0
+
+        for rec in add_records or []:
+            lid = rec.get("qrz_logid")
+            if lid is not None and lid in known_logids:
+                continue
+            hit = next((q for q in qsos if _qso_matches(rec, q, window_sec)), None)
+            if hit is not None:
+                if lid is not None and hit.get("qrz_logid") is None:
+                    hit["qrz_logid"] = lid
+                    known_logids.add(lid)
+                if rec.get("qrz_confirmed") and not hit.get("qrz_confirmed"):
+                    hit["qrz_confirmed"] = True
+                    hit["qrz_confirmed_at"] = rec.get("qrz_confirmed_at") or time.time()
+                for k in ("name", "city", "state", "country", "grid",
+                          "rst_sent", "rst_rcvd", "frequency_hz"):
+                    if not hit.get(k) and rec.get(k):
+                        hit[k] = rec[k]
+                matched += 1
+            else:
+                qsos.append(rec)
+                if lid is not None:
+                    known_logids.add(lid)
+                added += 1
+
+        if confirm_map:
+            for q in qsos:
+                lid = q.get("qrz_logid")
+                if lid is not None and lid in confirm_map and not q.get("qrz_confirmed"):
+                    q["qrz_confirmed"] = True
+                    q["qrz_confirmed_at"] = confirm_map[lid]
+                    confirmed_logids.append(lid)
+                    confirmed += 1
+
+        with open(config.QSOS_FILE, "w") as f:
+            json.dump(qsos, f, indent=4)
+
+    return {"added": added, "matched": matched, "confirmed": confirmed,
+            "confirmed_logids": confirmed_logids}

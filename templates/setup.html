@@ -771,6 +771,15 @@
                 <div class="toggle {{ 'on' if settings.get('brandmeister_alerts_enabled', False) else '' }}"
                      id="brandmeister-alerts-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">QRZ logbook confirmations in Notifications
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (syncs your QRZ Logbook into Recent Contacts and notifies when a contact is confirmed -- needs a Logbook API key, set in Integrations)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('qrz_logbook_enabled', False) else '' }}"
+                     id="qrz-logbook-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveCards()">Save cards</button>
         <span class="status-txt" id="cards-status"></span>
@@ -825,7 +834,7 @@
             {% set wspr_activity_pos = settings.get('wspr_activity_position', 0) if settings.get('show_wspr_activity', False) else -1 %}
             {% set digipi_pos = settings.get('digipi_position', 0) if settings.get('digipi_enabled', False) else -1 %}
             {% set big_clock_pos = settings.get('big_clock_position', 0) if settings.get('show_big_clock', False) else -1 %}
-            {% set notifications_pos = settings.get('notifications_position', 0) if (settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False)) else -1 %}
+            {% set notifications_pos = settings.get('notifications_position', 0) if (settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False) or settings.get('qrz_logbook_enabled', False)) else -1 %}
             {% set satellites_pos = settings.get('satellites_position', 0) if settings.get('show_satellites', False) else -1 %}
             {% set flights_overhead_pos = settings.get('flights_overhead_position', 0) if settings.get('show_flights_overhead', False) else -1 %}
             {% set recent_contacts_pos = settings.get('recent_contacts_position', 0) if settings.get('show_recent_contacts', False) else -1 %}
@@ -1049,6 +1058,37 @@
             <button class="btn btn-info"    onclick="testQrz()">Test connection</button>
             <button class="btn btn-primary" onclick="saveQrz()">Save QRZ credentials</button>
             <span class="status-txt" id="qrz-status"></span>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">QRZ Logbook sync
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — read-only, pulls your logged QSOs
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            Syncs the contacts in your QRZ Logbook into the Recent Contacts card (deduped
+            against WSJT-X / ADIF entries) and posts a “confirmed contact” event to the
+            Notifications card when a QSO gets confirmed. This is a
+            <strong>separate API key</strong> from your QRZ login above — find it under
+            <a href="https://logbook.qrz.com" target="_blank" style="color:var(--link)">QRZ&nbsp;Logbook</a>
+            → Settings → “This logbook is enabled for the QRZ API”. The XML subscription
+            is <em>not</em> required for this. Turn the sync on under
+            <strong>Cards → Notifications card sources</strong>.
+        </p>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>QRZ Logbook API key</label>
+                <input type="password" id="qrz-logbook-key"
+                       placeholder="••••••••-••••-••••"
+                       value="{{ settings.qrz_logbook_api_key }}">
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="saveQrzLogbook()">Save Logbook key</button>
+            <span class="status-txt" id="qrz-logbook-status"></span>
         </div>
     </div>
 
@@ -1979,6 +2019,7 @@ function saveCards() {
             show_top_activity: document.getElementById('top-activity-toggle').classList.contains('on'),
             show_dvswitch: document.getElementById('dvswitch-card-toggle').classList.contains('on'),
             brandmeister_alerts_enabled: document.getElementById('brandmeister-alerts-toggle').classList.contains('on'),
+            qrz_logbook_enabled: document.getElementById('qrz-logbook-toggle').classList.contains('on'),
         })
     }).then(() => {
         const el = document.getElementById('cards-status');
@@ -2993,6 +3034,20 @@ function saveQrz() {
     }).then(() => {
         status.textContent = '✓ Saved';
         setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+function saveQrzLogbook() {
+    const status = document.getElementById('qrz-logbook-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            qrz_logbook_api_key: document.getElementById('qrz-logbook-key').value.trim(),
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved — enable the sync under Cards';
+        setTimeout(() => status.textContent = '', 3000);
     });
 }
 

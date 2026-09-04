@@ -1574,6 +1574,69 @@ config for per-integration credentials; put it in
   (one unified list, not two tracked separately) rather than an
   oversight; don't build separate storage for the two sources unless a
   real complaint about this surfaces.
+- **QRZ Logbook sync (`qrz_logbook.py`, v4.45) is a THIRD writer into
+  `qsos.json` alongside the ADIF importer (`save_qsos`) and WSJT-X
+  (`append_qso`) — via a new `storage.merge_qrz_qsos(add_records,
+  confirm_map)`, the one QSO write path that dedupes rather than
+  appending blindly.** It is a completely different QRZ API from
+  `qrz.py`'s XML callsign lookup: `logbook.qrz.com/api`, authenticated
+  with a per-logbook **API key** (`settings.qrz_logbook_api_key`, its own
+  Integrations section), which does NOT need the paid XML subscription.
+  One setting, `qrz_logbook_enabled`, gates the whole feature (background
+  sync + the Recent Contacts ✓ badge + a 6th Notifications source
+  `qrz_confirm`) — same "one switch" model as `aprs_inbox_enabled`, so it
+  was added to `_SENTINEL_DEFS`' Notifications `enabled_key` tuple (now 6
+  strings), `dashboard.html`'s `notif_source_count` Jinja sum, and
+  `setup.html`'s `notifications_pos` guard, all three of which already
+  handle any tuple length / any number of terms.
+  - **NOT live-verified — `logbook.qrz.com` is outside this dev
+    environment's egress allowlist**, so it shipped the openspot.py way
+    ("verify against a real response later"). Two specific unknowns
+    flagged in the module docstring: (1) which ADIF field marks a QSO
+    CONFIRMED — `_is_confirmed()` accepts `APP_QRZLOG_STATUS == "C"` OR
+    `QSL_RCVD == "Y"` OR `APP_QRZLOG_QSL_RCVD == "Y"` as a belt-and-
+    braces guess; (2) whether `OPTION=AFTERLOGID:n,MAX:n,TYPE:ADIF`'s
+    comma-separated form and `MAX` are honored on FETCH. If a first real
+    sync errors or returns the whole logbook in one response, that's
+    where to look.
+  - **Confirmation is a STATE CHANGE on an existing record**, so the
+    incremental `AFTERLOGID` pull can't see it. `_confirm_sweep()`
+    re-fetches the exact `LOGIDS` of stored QRZ QSOs that are still
+    unconfirmed AND younger than `QRZ_LOGBOOK_CONFIRM_MAX_AGE_DAYS` (365,
+    keeps the recheck set from growing unbounded on a big logbook where
+    most QSOs never confirm), chunked at `QRZ_LOGBOOK_LOGID_CHUNK`. Runs
+    on a slower cadence than the new-QSO pull (`QRZ_LOGBOOK_CONFIRM_INTERVAL`
+    3 h vs. `QRZ_LOGBOOK_SYNC_INTERVAL` 30 min), or immediately when
+    STATUS's `CONFIRMED` count rises since last sync.
+  - **One Notifications event per QSO that ACTUALLY flips to confirmed —
+    never for one pulled in already-confirmed** (surface a transition,
+    not a state, same rule as `monitor.py`'s fleet events /
+    `hf_conditions.py`'s solar alerts). `merge_qrz_qsos` returns
+    `confirmed_logids` (the ones it genuinely flipped this call);
+    `qrz_logbook.py` emits an event only for those, and the
+    `qrz_confirmed` flag on the stored QSO is its own dedupe across
+    restarts (`storage_notifications.py` shadow reseeds the deque the
+    same oldest-first way as the other 5 sources).
+  - **Cross-source dedupe** (a WSJT-X- or ADIF-logged QSO that's ALSO in
+    the QRZ logbook): `storage._qso_matches()` — callsign + band +
+    mode-group (`_PHONE_MODES` collapses SSB/USB/LSB/FM/AM; everything
+    else literal, so FT8≠FT4) + `logged_at` within
+    `QRZ_LOGBOOK_MATCH_WINDOW_SEC` (900). A match ENRICHES the existing
+    row in place (attaches `qrz_logid`, fills only blank fields, keeps
+    its position/lat/lon) rather than appending. Verified with a live
+    mocked-`_post` end-to-end test (new-QSO pull, already-confirmed
+    backfill emitting NO event, a confirm-sweep flip emitting exactly
+    one, idempotent re-sync, and a fuzzy match enriching not
+    duplicating) — the throwaway test wasn't committed, same discipline
+    as the other "verify against real behavior, not against having
+    written the line" checks in this file.
+  - **`renderQsoLayer()` in `dashboard.html` still doesn't guard
+    `q.lat == null`** — a QRZ row with no grid and no QRZ-resolved
+    position gets `lat/lon: null` and simply won't pin on the map (it
+    still shows in Recent Contacts). If that ever throws, add the
+    one-line guard at the top of its `forEach`; it wasn't needed for the
+    other two sources because both `continue`/`return` on a missing
+    position before ever building a row.
 - **The Live map's QSO layer used to be fetched once at map init only
   ("the data only changes on explicit import/clear," a comment that was
   true before this feature existed) — now it's also polled every 20s**

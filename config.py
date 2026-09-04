@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.44"
+APP_VERSION = "4.45"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -144,6 +144,8 @@ VERSION_CODENAMES = [
                         # Creedence Clearwater Revival (1941-1990)
     "Kramer",           # v4.44 -- Wayne Kramer, guitarist of the MC5
                         # (1948-2024)
+    "Redding",          # v4.45 -- Otis Redding, soul singer, "(Sittin'
+                        # On) The Dock of the Bay" (1941-1967)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -751,6 +753,43 @@ QRZ_AGENT     = os.environ.get("QRZ_AGENT", "hotspot-dashboard/1.0")
 QRZ_TIMEOUT   = int(os.environ.get("QRZ_TIMEOUT", 5))
 QRZ_CACHE_TTL = int(os.environ.get("QRZ_CACHE_TTL", 3600))
 
+# --- QRZ Logbook API (read-only sync of manually-logged QSOs into
+# qsos.json, feeding the Recent Contacts card + a "confirmed contact"
+# Notifications source) -- a DIFFERENT API from the XML lookup above:
+# logbook.qrz.com/api, authenticated with a per-logbook API KEY (QRZ
+# Logbook -> Settings), not the XML subscription credentials. The basic
+# read side (ACTION=STATUS / ACTION=FETCH) works with just the key.
+# NOT live-verified against a real logbook from this dev environment
+# (logbook.qrz.com is outside the egress allowlist) -- see qrz_logbook.py's
+# module docstring and CLAUDE.md for the fields that still need confirming
+# against a real response, especially which one carries "confirmed".
+QRZ_LOGBOOK_URL   = os.environ.get("QRZ_LOGBOOK_URL", "https://logbook.qrz.com/api")
+QRZ_LOGBOOK_AGENT = os.environ.get("QRZ_LOGBOOK_AGENT", "hotspot-dashboard/1.0")
+QRZ_LOGBOOK_TIMEOUT = int(os.environ.get("QRZ_LOGBOOK_TIMEOUT", 20))
+# Pull newly-logged QSOs on this cadence (like the Brandmeister profile /
+# WPSD version check -- a real network round-trip, no reason to hammer it).
+QRZ_LOGBOOK_SYNC_INTERVAL = int(os.environ.get("QRZ_LOGBOOK_SYNC_INTERVAL", 1800))  # 30 min
+# Re-check still-unconfirmed QSOs for a confirmation flip on a slower
+# cadence than the new-QSO pull -- a confirmation is a state change on an
+# OLD record, so AFTERLOGID incremental fetching alone can't see it (see
+# qrz_logbook.py's _confirm_sweep).
+QRZ_LOGBOOK_CONFIRM_INTERVAL = int(os.environ.get("QRZ_LOGBOOK_CONFIRM_INTERVAL", 10800))  # 3 h
+# Fuzzy cross-source dedupe window: a QSO logged live by WSJT-X (or bulk-
+# imported from ADIF) that's ALSO in the QRZ logbook is the same contact
+# if callsign + band + mode-group match and the two timestamps are within
+# this many seconds (LoTW/TQSL use 1800; 900 is tighter and still ample
+# for clock skew between WSJT-X / QRZ / a logger).
+QRZ_LOGBOOK_MATCH_WINDOW_SEC = int(os.environ.get("QRZ_LOGBOOK_MATCH_WINDOW_SEC", 900))
+# Only keep re-checking a QSO for confirmation while it's younger than
+# this -- confirmations stop trickling in long before a year, and an
+# unbounded recheck set would grow forever on a big logbook where most
+# QSOs never get QRZ-confirmed at all.
+QRZ_LOGBOOK_CONFIRM_MAX_AGE_DAYS = int(os.environ.get("QRZ_LOGBOOK_CONFIRM_MAX_AGE_DAYS", 365))
+QRZ_LOGBOOK_FETCH_PAGE  = int(os.environ.get("QRZ_LOGBOOK_FETCH_PAGE", 250))   # records per FETCH page
+QRZ_LOGBOOK_MAX_PAGES   = int(os.environ.get("QRZ_LOGBOOK_MAX_PAGES", 60))     # ceiling per sync (~15k QSOs)
+QRZ_LOGBOOK_LOGID_CHUNK = int(os.environ.get("QRZ_LOGBOOK_LOGID_CHUNK", 100))  # LOGIDS per recheck request
+QRZ_LOGBOOK_MAX_EVENTS  = 50   # confirmation-notification history cap, matches the other Notifications sources
+
 # --- RadioID.net lookup (free fallback for caller name/location) ---
 RADIOID_AGENT     = os.environ.get("RADIOID_AGENT", "hotspot-dashboard/1.0")
 RADIOID_TIMEOUT   = int(os.environ.get("RADIOID_TIMEOUT", 5))
@@ -925,6 +964,17 @@ DEFAULT_SETTINGS = {
     # RadioID.net — free, no auth. Used as a fallback when QRZ has no
     # subscription or doesn't have the callsign. On by default.
     "radioid_enabled": True,
+    # QRZ Logbook read-only sync -- off by default. When on, a background
+    # loop pulls your manually-logged QSOs from logbook.qrz.com into
+    # qsos.json (deduped against WSJT-X/ADIF entries) and posts a
+    # "confirmed contact" event to the Notifications card when a QSO gets
+    # confirmed. `qrz_logbook_api_key` is the per-logbook API KEY from QRZ
+    # Logbook -> Settings, NOT your QRZ login / XML-subscription
+    # credentials above. This one setting gates the whole feature (sync +
+    # Recent Contacts ✓ badge + the Notifications source), same "one
+    # switch" model as aprs_inbox_enabled.
+    "qrz_logbook_enabled": False,
+    "qrz_logbook_api_key": "",
     # APRS.fi — requires a free API key from https://aprs.fi/page/api.
     # Blank disables it.
     "aprs_api_key": "",
