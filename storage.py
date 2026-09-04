@@ -332,7 +332,15 @@ def merge_qrz_qsos(add_records: list, confirm_map: dict,
             lid = rec.get("qrz_logid")
             if lid is not None and lid in known_logids:
                 continue
-            hit = next((q for q in qsos if _qso_matches(rec, q, window_sec)), None)
+            # Fuzzy-match only against rows from a DIFFERENT source (a
+            # WSJT-X / ADIF entry) -- two QRZ-sourced rows are already
+            # deduped by qrz_logid above, and the fuzzy window would
+            # otherwise wrongly merge two genuinely distinct QSOs with
+            # the same station a few minutes apart that both came from
+            # the QRZ logbook.
+            hit = next((q for q in qsos
+                        if q.get("qrz_logid") is None
+                        and _qso_matches(rec, q, window_sec)), None)
             if hit is not None:
                 if lid is not None and hit.get("qrz_logid") is None:
                     hit["qrz_logid"] = lid

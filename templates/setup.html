@@ -1088,8 +1088,11 @@
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <button class="btn btn-primary" onclick="saveQrzLogbook()">Save Logbook key</button>
+            <button class="btn btn-info" onclick="syncQrzLogbook()">Sync now</button>
             <span class="status-txt" id="qrz-logbook-status"></span>
         </div>
+        <div id="qrz-logbook-result" style="font-size:12px;color:var(--text-muted);
+             margin-top:8px;line-height:1.5;display:none"></div>
     </div>
 
     <div class="section">
@@ -3049,6 +3052,53 @@ function saveQrzLogbook() {
         status.textContent = '✓ Saved — enable the sync under Cards';
         setTimeout(() => status.textContent = '', 3000);
     });
+}
+
+function syncQrzLogbook() {
+    const status = document.getElementById('qrz-logbook-status');
+    const result = document.getElementById('qrz-logbook-result');
+    status.textContent = 'Syncing…';
+    result.style.display = 'none';
+    fetch('/api/qrz_logbook_sync', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (!d.ok) {
+                status.textContent = '';
+                result.style.display = 'block';
+                result.textContent = '⚠ ' + (d.reason || 'could not start a sync');
+                return;
+            }
+            // The sync runs in the background -- poll the status a few times.
+            let tries = 0;
+            const poll = () => {
+                fetch('/api/qrz_confirmations').then(r => r.json()).then(s => {
+                    tries++;
+                    const ls = s.last_sync;
+                    const fresh = ls && (Date.now() / 1000 - ls.at) < 60;
+                    if (s.last_error && !fresh) {
+                        status.textContent = '';
+                        result.style.display = 'block';
+                        result.textContent = '⚠ ' + s.last_error;
+                    } else if (fresh) {
+                        status.textContent = '✓ Synced';
+                        result.style.display = 'block';
+                        result.textContent =
+                            `Added ${ls.added} · matched ${ls.matched} · newly confirmed ${ls.confirmed}` +
+                            (ls.total != null ? ` · ${ls.total} in logbook` : '') +
+                            (ls.total_confirmed != null ? ` (${ls.total_confirmed} confirmed)` : '');
+                        setTimeout(() => status.textContent = '', 3000);
+                    } else if (tries < 12) {
+                        setTimeout(poll, 2500);
+                    } else {
+                        status.textContent = '';
+                        result.style.display = 'block';
+                        result.textContent = 'Sync started — still running. Check back shortly.';
+                    }
+                }).catch(() => {});
+            };
+            setTimeout(poll, 2500);
+        })
+        .catch(() => { status.textContent = '⚠ request failed'; });
 }
 
 // --- RadioID.net ---

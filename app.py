@@ -1802,6 +1802,23 @@ def api_qrz_confirmations():
     qrz_logbook.py."""
     return jsonify(qrz_logbook_client.status())
 
+@app.route("/api/qrz_logbook_sync", methods=["POST"])
+def api_qrz_logbook_sync():
+    """Run a QRZ Logbook sync right now instead of waiting for the next
+    background cycle -- for the Settings "Sync now" button. Fires in a
+    daemon thread and returns immediately; poll /api/qrz_confirmations
+    for the result (last_sync / last_error). A sync already in progress
+    is a harmless no-op (qrz_logbook.py's own _sync_lock guard)."""
+    if not qrz_logbook_client.enabled:
+        return jsonify({"ok": False, "reason": "QRZ Logbook sync is off or has no API key"}), 400
+    grid = load_settings().get("station_grid", "")
+    threading.Thread(
+        target=qrz_logbook_client.sync,
+        args=(monitor.lookup_caller_info, grid),
+        daemon=True,
+    ).start()
+    return jsonify({"ok": True, "started": True})
+
 
 @app.route("/api/test_hamalert", methods=["POST"])
 def test_hamalert():

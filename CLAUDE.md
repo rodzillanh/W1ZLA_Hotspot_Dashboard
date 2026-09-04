@@ -1589,16 +1589,49 @@ config for per-integration credentials; put it in
   strings), `dashboard.html`'s `notif_source_count` Jinja sum, and
   `setup.html`'s `notifications_pos` guard, all three of which already
   handle any tuple length / any number of terms.
-  - **NOT live-verified — `logbook.qrz.com` is outside this dev
-    environment's egress allowlist**, so it shipped the openspot.py way
-    ("verify against a real response later"). Two specific unknowns
-    flagged in the module docstring: (1) which ADIF field marks a QSO
-    CONFIRMED — `_is_confirmed()` accepts `APP_QRZLOG_STATUS == "C"` OR
-    `QSL_RCVD == "Y"` OR `APP_QRZLOG_QSL_RCVD == "Y"` as a belt-and-
-    braces guess; (2) whether `OPTION=AFTERLOGID:n,MAX:n,TYPE:ADIF`'s
-    comma-separated form and `MAX` are honored on FETCH. If a first real
-    sync errors or returns the whole logbook in one response, that's
-    where to look.
+  - **FULLY VERIFIED LIVE against a real logbook** (W1ZLA, 2026-09,
+    1209 QSOs / 992 confirmed — `logbook.qrz.com` IS reachable from the
+    dev environment, the original "outside the egress allowlist" claim
+    was wrong). What the live probe settled, each of which had been a
+    guess:
+    - **Response parsing.** `&`-joined `KEY=VALUE` metadata (both
+      `RESULT` and `STATUS` carry the result code), EXCEPT `ADIF`, whose
+      value is a whole ADIF document with the tag brackets
+      **HTML-encoded** (`&lt;`/`&gt;`) — so it contains `&` and the
+      original `split("&")` parse silently shredded every FETCH into
+      `RESULT=OK&COUNT=n` with an **empty ADIF** (looked like "logbook
+      has no records" but wasn't). `_parse_response` now takes
+      everything after `&ADIF=` verbatim and `html.unescape`s it.
+    - **Confirmed field.** `app_qrzlog_status` == `C` (vs `N`) — clean
+      binary, 992/1209 were `C`. `_is_confirmed()` is now ONLY that;
+      the `QSL_RCVD` / `APP_QRZLOG_QSL_RCVD` fallbacks were dropped
+      (both `N` on QRZ-confirmed QSOs — separate confirmation channels,
+      not what "confirmed on QRZ" means).
+    - **`AFTERLOGID` is INCLUSIVE** (`>=`), so each page re-returns the
+      previous page's last record — `_fetch_new`'s `lid <= cursor` skip
+      + the `page_max <= cursor` break already handle it. `AFTERLOGID:0`
+      = "from the start". `OPTION=AFTERLOGID:n,MAX:n,TYPE:ADIF`
+      comma-separated IS honored. Full 1209-QSO pull = 1.7 s / 5 pages.
+    - **ADIF tag names come back lowercase**; `adif.py`'s `parse_adif`
+      upper-cases keys and is case-insensitive, transparent. QRZ's ADIF
+      already carries `NAME`/`COUNTRY`/`STATE`/`GRIDSQUARE`, so a row
+      rarely needs the QRZ XML lookup at all (still called for lat/lon).
+  - **`merge_qrz_qsos` fuzzy-matches ONLY across sources** — a candidate
+    QRZ record is compared against stored rows that DON'T have a
+    `qrz_logid` (i.e. WSJT-X / ADIF entries), never against another
+    QRZ-sourced row (those dedupe by `qrz_logid`). Without this guard,
+    the first bulk sync fuzzy-merged 11 pairs of genuinely-distinct
+    QSOs worked with the same station a few minutes apart that both came
+    from the QRZ logbook. Verified: a seeded WSJT-X row for a real QRZ
+    QSO gets enriched in place (gains `qrz_logid`/`qrz_confirmed`/`name`,
+    stays `source: "wsjtx"`, one row not two), while the full 1209 pull
+    stores exactly 1209.
+  - **Settings → Integrations → "QRZ Logbook sync" → "Sync now"**
+    (`POST /api/qrz_logbook_sync`, a daemon-thread trigger guarded by
+    `_sync_lock` so it can't race the 30-min background loop) runs one
+    sync on demand and the button polls `/api/qrz_confirmations` to show
+    `last_sync` (added / matched / newly-confirmed / totals) or
+    `last_error`.
   - **Confirmation is a STATE CHANGE on an existing record**, so the
     incremental `AFTERLOGID` pull can't see it. `_confirm_sweep()`
     re-fetches the exact `LOGIDS` of stored QRZ QSOs that are still

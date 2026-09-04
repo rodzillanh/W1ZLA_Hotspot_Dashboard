@@ -23,19 +23,33 @@ Each returned ADIF record carries APP_QRZLOG_LOGID -- a monotonic
 per-logbook integer, used as BOTH the incremental cursor (OPTION
 AFTERLOGID) and the dedupe key in storage.merge_qrz_qsos.
 
-NOT LIVE-VERIFIED from this dev environment -- logbook.qrz.com is outside
-the egress allowlist. Two things to confirm against a real logbook
-response before trusting them (same "verify against the real thing"
-discipline as openspot.py/wsjtx.py):
+VERIFIED LIVE against a real logbook (W1ZLA, 2026-09, 1209 QSOs /
+992 confirmed):
 
-  1. Which field marks a QSO CONFIRMED. _is_confirmed() below accepts any
-     of APP_QRZLOG_STATUS == "C", QSL_RCVD == "Y", or
-     APP_QRZLOG_QSL_RCVD == "Y" -- belt and braces until the real one is
-     known. STATUS's own CONFIRMED count is used only as a coarse
-     "did anything get confirmed since last time" hint.
-  2. The exact OPTION separator / whether MAX and TYPE are honored on
-     FETCH. If a first real sync returns everything in one giant response
-     or errors on the OPTION string, that's where to look.
+  * Response is `&`-joined `KEY=VALUE` metadata (RESULT/STATUS both carry
+    the result code, plus COUNT/REASON/...), EXCEPT the `ADIF` field,
+    whose value is a whole ADIF document with the tag brackets
+    HTML-encoded (`&lt;`/`&gt;`) -- so it contains `&` and must be taken
+    verbatim from after `&ADIF=` and html-unescaped, not split. An
+    earlier `split("&")` parse silently shredded every FETCH into an
+    empty ADIF (`RESULT=OK&COUNT=n` but no records). See _parse_response.
+  * `OPTION=AFTERLOGID:<n>,MAX:<n>,TYPE:ADIF` (comma-separated) is
+    honored. `AFTERLOGID` is INCLUSIVE (`>=`), so each page re-returns
+    the previous page's last record -- _fetch_new's `lid <= cursor` skip
+    handles that, and the `page_max <= cursor` break stops the loop.
+    `AFTERLOGID:0` means "from the start".
+  * A QSO is confirmed (matched with the other op's QRZ logbook) iff
+    `app_qrzlog_status` == `C` (vs `N`) -- _is_confirmed(). `qsl_rcvd`/
+    `lotw_qsl_rcvd` are separate channels, both `N` on QRZ-confirmed
+    QSOs, deliberately not used.
+  * ADIF tag names come back lowercase; adif.py's parse_adif upper-cases
+    keys and is case-insensitive, so that's transparent. QRZ's own ADIF
+    already carries NAME/COUNTRY/STATE/GRIDSQUARE, so most rows don't
+    even need the QRZ XML lookup (still called for lat/lon + city).
+
+Settings -> Integrations -> "QRZ Logbook sync" has a "Sync now" button
+(POST /api/qrz_logbook_sync) that runs one sync immediately and reports
+last_sync / last_error.
 
 Confirmation is a STATE CHANGE on an existing record, so the AFTERLOGID
 incremental pull can't see it -- _confirm_sweep() re-fetches the specific
@@ -46,6 +60,7 @@ not a state -- same rule as monitor.py's fleet events /
 hf_conditions.py's solar alerts).
 """
 import datetime
+import html
 import threading
 import time
 import urllib.parse
@@ -75,25 +90,37 @@ def _post(body: str) -> str:
 
 
 def _parse_response(text: str) -> dict:
-    """QRZ's response is &-joined KEY=VALUE pairs, values url-encoded.
-    Returns a plain dict with UPPERCASE keys (RESULT, COUNT, ADIF, ...)."""
+    """QRZ's response is &-joined KEY=VALUE pairs (RESULT/STATUS/COUNT/
+    REASON/...). The `ADIF` field is the exception -- its value is a
+    whole ADIF document with the tag brackets HTML-encoded (`&lt;`/`&gt;`),
+    so it CONTAINS `&` and can't go through the same `split("&")`.
+    Confirmed live 2026-09 against a real logbook. So: everything up to
+    `&ADIF=` is parsed as the metadata pairs; everything after it is the
+    raw ADIF, html-unescaped. Keys upper-cased."""
+    marker = text.find("&ADIF=")
+    if marker < 0:
+        meta_str, adif = text, None
+    else:
+        meta_str, adif = text[:marker], html.unescape(text[marker + len("&ADIF="):])
     out = {}
-    for pair in text.split("&"):
+    for pair in meta_str.split("&"):
         if "=" not in pair:
             continue
         k, v = pair.split("=", 1)
         out[k.strip().upper()] = urllib.parse.unquote_plus(v)
+    if adif is not None:
+        out["ADIF"] = adif
     return out
 
 
 def _is_confirmed(rec: dict) -> bool:
-    if (rec.get("APP_QRZLOG_STATUS") or "").strip().upper() == "C":
-        return True
-    if (rec.get("QSL_RCVD") or "").strip().upper() == "Y":
-        return True
-    if (rec.get("APP_QRZLOG_QSL_RCVD") or "").strip().upper() == "Y":
-        return True
-    return False
+    """QRZ marks a QSO confirmed (matched with the other station's own
+    QRZ logbook) via `app_qrzlog_status` = `C` (vs. `N`). Confirmed live
+    2026-09: 992 of 1209 real QSOs were `C`, the rest `N`; `qsl_rcvd` /
+    `lotw_qsl_rcvd` are SEPARATE confirmation channels (both `N` on
+    QRZ-confirmed QSOs here) and deliberately NOT used -- the ask was
+    specifically "confirmed on QRZ"."""
+    return (rec.get("APP_QRZLOG_STATUS") or "").strip().upper() == "C"
 
 
 def _adif_freq_to_hz(freq_mhz_str) -> "int | None":
@@ -129,6 +156,10 @@ def _adif_dt_to_epoch(qso_date: str, time_on) -> "float | None":
 class QrzLogbookClient:
     def __init__(self):
         self._lock = threading.Lock()
+        # Non-blocking guard so a manual "Sync now" and the background
+        # loop can't run sync() concurrently (double-fetch / racing
+        # _last_sync writes) -- a second caller just returns early.
+        self._sync_lock = threading.Lock()
         self._enabled = False
         self._api_key = ""
         self._ok = False
@@ -181,6 +212,8 @@ class QrzLogbookClient:
             if not (self._enabled and self._api_key):
                 return
             key = self._api_key
+        if not self._sync_lock.acquire(blocking=False):
+            return  # a sync is already in progress
         try:
             status = self._fetch_status(key)
             add_records = self._fetch_new(key, lookup_caller_info, station_grid)
@@ -221,6 +254,8 @@ class QrzLogbookClient:
             with self._lock:
                 self._ok = False
                 self._last_error = msg
+        finally:
+            self._sync_lock.release()
 
     # --- internals ---
 
