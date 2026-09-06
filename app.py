@@ -634,6 +634,14 @@ def api_settings_post():
 def dashboard():
     return render_template("dashboard.html", settings=load_settings())
 
+@app.route("/mobile")
+def dashboard_mobile():
+    """Lightweight single-column companion view for phones (see
+    mobile-dashboard-handoff.md, PR 1). Purely a frontend template --
+    it polls the existing /api/data and /api/qsos and owns no backend
+    state of its own. The desktop dashboard at "/" is untouched."""
+    return render_template("dashboard-mobile.html", settings=load_settings())
+
 @app.route("/beta")
 def dashboard_beta_redirect():
     """The "instrument panel" reskin (formerly a side-by-side /beta
