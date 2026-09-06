@@ -642,6 +642,18 @@ def dashboard_mobile():
     state of its own. The desktop dashboard at "/" is untouched."""
     return render_template("dashboard-mobile.html", settings=load_settings())
 
+@app.route("/sw.js")
+def mobile_service_worker():
+    """Serve the mobile PWA's service worker from the site root (PR 2).
+    A worker served from /static/ could only ever control /static/* --
+    serving it here lets its scope cover /mobile. The file itself lives
+    at static/sw.js; this route just relocates its URL and sets a
+    no-cache header so shell updates are picked up promptly."""
+    resp = app.send_static_file("sw.js")
+    resp.headers["Content-Type"] = "application/javascript"
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
 @app.route("/beta")
 def dashboard_beta_redirect():
     """The "instrument panel" reskin (formerly a side-by-side /beta

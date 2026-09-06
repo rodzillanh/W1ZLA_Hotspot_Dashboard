@@ -6,6 +6,12 @@
     <meta name="theme-color" content="#12151a" media="(prefers-color-scheme: dark)">
     <meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)">
     <title>{{ settings.dashboard_name }}</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icon-180.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pocket Dash">
     <style>
     /* ------------------------------------------------------------------ *
      * Pocket Dash -- lightweight mobile companion (mobile-dashboard-
@@ -406,6 +412,7 @@
             return;
         }
         host.innerHTML = data.map(cardHtml).join("");
+        tickTimers();  // fill [data-ts] spans now, not up to 1s later on the next interval
     }
 
     function cardHtml(hs) {
@@ -560,6 +567,14 @@
     }
 
     fetchData();
+
+    /* ---- PWA: register the service worker (mobile shell only) ---- */
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+            navigator.serviceWorker.register("/sw.js", { scope: "/mobile" })
+                .catch(function () { /* not fatal -- page works without it */ });
+        });
+    }
     </script>
 </body>
 </html>
