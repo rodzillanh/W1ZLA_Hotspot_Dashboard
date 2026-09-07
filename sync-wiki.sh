@@ -48,8 +48,16 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_URL="https://git.trytheitguy.com/rodney_berry/W1ZLA_Hotspot_Dashboard"
+# Target repo whose wiki gets updated. Defaults to the canonical Forgejo
+# repo; override to publish to a mirror's wiki instead, e.g.
+#   REPO_URL=https://github.com/rodzillanh/W1ZLA_Hotspot_Dashboard bash sync-wiki.sh
+# or pass it as the first argument. NOTE for a GitHub target: GitHub's
+# <repo>.wiki.git does not exist until you create the first wiki page
+# through the web UI once -- unlike Forgejo, the "initialize a fresh wiki
+# repo and push" fallback below does NOT work there.
+REPO_URL="${1:-${REPO_URL:-https://git.trytheitguy.com/rodney_berry/W1ZLA_Hotspot_Dashboard}}"
 WIKI_URL="${REPO_URL}.wiki.git"
+echo "==> Wiki target: $WIKI_URL"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 

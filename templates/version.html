@@ -117,9 +117,23 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.45 "Redding"</span>
+                <span class="release-version">v4.46 "Strummer"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Mobile dashboard ("Pocket Dash")</span> — a separate lightweight phone view at <em>/mobile</em>, single-column with a Status / Map / Activity / More tab bar. It polls the same data as the main dashboard and doesn't change it. Open it on your phone and use "Add to Home Screen" to install it as an app with an offline shell</li>
+                <li><span>Push notifications</span> — once installed, turn them on under More → Notifications to get a push when a hotspot drops offline (and again when it recovers) or a call starts. Tapping a notification opens a glanceable full-screen view of just that hotspot</li>
+                <li><span>Per-hotspot alert control</span> — toggle the offline and call-start alerts per hotspot, or mute one for 1 / 4 / 24 hours, under More → Notifications → Customize per hotspot. You can also long-press a card on the Status tab for a quick mute</li>
+                <li><span>Mobile map &amp; QRZ links</span> — the Map tab plots your hotspots on a Leaflet map colored by state (in a call / idle / offline); callsigns throughout the mobile view are tappable QRZ lookups, same as the desktop</li>
+                <li>Installing and notifications need the dashboard reachable over HTTPS with a valid certificate — a plain <em>http://</em> LAN address is fine for viewing but not for install or push. Tailscale with <em>tailscale serve</em> is an easy way to get that without opening any ports</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.45 "Redding"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>QRZ Logbook sync</span> — a new read-only integration (Settings → Integrations → "QRZ Logbook sync") that pulls your manually-logged QSOs from QRZ into the Recent Contacts card, deduped against WSJT-X / ADIF entries by callsign + band + mode + time so nothing shows twice. Uses your QRZ Logbook <em>API key</em>, which is separate from the QRZ XML login and doesn't need the paid subscription</li>
