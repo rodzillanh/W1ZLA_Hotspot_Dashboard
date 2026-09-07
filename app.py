@@ -643,6 +643,8 @@ def api_settings_post():
         if contact and not contact.lower().startswith(("mailto:", "http://", "https://")):
             contact = "mailto:" + contact
         settings["push_vapid_contact"] = contact or "mailto:admin@example.com"
+    if "control_pin" in data:
+        settings["control_pin"] = "".join(ch for ch in str(data["control_pin"]) if ch.isdigit())[:12]
     save_settings(settings)
     _settings_txn.__exit__(None, None, None)
     # Rebuilds below intentionally happen AFTER releasing the lock -- they
@@ -1269,6 +1271,8 @@ def host_reboot():
     otherwise deny it."""
     if not HOST_CAN_POWER_CONTROL:
         return jsonify({"success": False, "message": "Not available on this deployment"}), 403
+    if not _control_pin_ok():
+        return _pin_refused()
     ok, message = _run_power_command(["systemctl", "reboot"])
     return jsonify({"success": ok, "message": "Rebooting now" if ok else message})
 
@@ -1279,6 +1283,8 @@ def host_poweroff():
     someone physically restores power."""
     if not HOST_CAN_POWER_CONTROL:
         return jsonify({"success": False, "message": "Not available on this deployment"}), 403
+    if not _control_pin_ok():
+        return _pin_refused()
     ok, message = _run_power_command(["systemctl", "poweroff"])
     return jsonify({"success": ok, "message": "Powering off now" if ok else message})
 
@@ -1751,6 +1757,25 @@ def test_openspot4():
     return jsonify({"success": ok, "message": message})
 
 
+def _control_pin_ok() -> bool:
+    """True unless a control PIN is set AND this is a Pocket Dash mobile
+    request (X-Pocket-Dash header) that didn't send a matching
+    X-Control-Pin. Deliberately only gates the mobile app -- the desktop
+    dashboard and any direct API caller are unaffected, since the threat
+    this covers is a pocketed unlocked phone, not the network."""
+    pin = load_settings().get("control_pin", "").strip()
+    if not pin:
+        return True
+    if not request.headers.get("X-Pocket-Dash"):
+        return True
+    return request.headers.get("X-Control-Pin", "").strip() == pin
+
+
+def _pin_refused():
+    return jsonify({"success": False, "pin_required": True,
+                    "message": "Control PIN required"}), 403
+
+
 @app.route("/api/asl_connect", methods=["POST"])
 def api_asl_connect():
     """Connect, monitor (receive-only), local-monitor (receive-only, no
@@ -1763,6 +1788,8 @@ def api_asl_connect():
     DTMF-simulated `rpt fun <node> *3<remotenode>` form, which requires
     replicating app_rpt's digit-collection state machine and proved
     unreliable in practice."""
+    if not _control_pin_ok():
+        return _pin_refused()
     data       = request.json or {}
     hotspot_id = data.get("id", "").strip()
     node       = data.get("node", "").strip()

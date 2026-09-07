@@ -1245,6 +1245,14 @@ DEFAULT_SETTINGS = {
     # by default; set your own in Settings -> Integrations. mailto: or
     # https: only.
     "push_vapid_contact": "mailto:admin@example.com",
+    # Optional PIN gating CONTROL actions (ASL connect/disconnect, host
+    # reboot/power-off) from the Pocket Dash mobile app -- blank = no gate.
+    # A speed bump for an unlocked phone in a pocket, NOT network security:
+    # it's only enforced for requests carrying the mobile app's own
+    # X-Pocket-Dash header, so the desktop dashboard and any direct API
+    # caller are unaffected. The mobile app prompts for it once per
+    # session; it is never sent to that page, only checked here.
+    "control_pin": "",
 }
 
 # --- Fleet activity ---

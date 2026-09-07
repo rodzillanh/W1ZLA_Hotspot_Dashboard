@@ -427,6 +427,16 @@
                 <label>Dashboard name</label>
                 <input type="text" id="dash-name" value="{{ settings.dashboard_name }}">
             </div>
+            <div>
+                <label>Mobile control PIN
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (digits only — the Pocket Dash mobile app asks for this before connecting/disconnecting
+                        an ASL node or rebooting the host. Blank = off. A speed bump for a pocketed phone, not
+                        network security — the desktop and direct API calls are unaffected.)
+                    </span>
+                </label>
+                <input type="text" inputmode="numeric" id="control-pin" value="{{ settings.get('control_pin', '') }}">
+            </div>
         </div>
         <div class="toggle-group">
             <div class="toggle-row">
@@ -1974,6 +1984,7 @@ function saveAppearance() {
             show_toolbar:    document.getElementById('toolbar-toggle').classList.contains('on'),
             beta_courtesy_tone: document.getElementById('courtesy-tone-toggle').classList.contains('on'),
             beta_spotlight_dimming: document.getElementById('spotlight-dimming-toggle').classList.contains('on'),
+            control_pin: document.getElementById('control-pin').value,
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');

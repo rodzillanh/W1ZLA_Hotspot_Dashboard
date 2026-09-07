@@ -309,6 +309,70 @@
     .tsw[aria-checked="true"]::after { left:19px; }
     @media (prefers-reduced-motion:reduce) { .tsw, .tsw::after { transition:none; } }
 
+    /* ---------------- ASL Control screen (V2) ---------------- */
+    .asl-ctrl-open {
+        margin-top:9px; width:100%; padding:9px 0; border-radius:8px;
+        border:1px solid var(--border); background:var(--panel-2); color:var(--text);
+        font-family:var(--font-ui); font-size:12.5px; font-weight:600; cursor:pointer;
+    }
+    #asl-screen {
+        position:fixed; inset:0; z-index:35; background:var(--bg);
+        display:none; flex-direction:column;
+    }
+    #asl-screen.open { display:flex; }
+    .asl-body { flex:1 1 auto; overflow-y:auto;
+        padding:14px 12px calc(env(safe-area-inset-bottom) + 24px); }
+    .asl-sec { font-family:var(--font-mono); font-size:9px; letter-spacing:.08em;
+        text-transform:uppercase; color:var(--text-dim); margin:16px 2px 8px; }
+    .asl-sec:first-child { margin-top:2px; }
+    .asl-from select {
+        width:100%; padding:9px 10px; border-radius:9px;
+        border:1px solid var(--border); background:var(--panel); color:var(--text);
+        font-family:var(--font-ui); font-size:13px;
+    }
+    .asl-node-row, .asl-fav-row {
+        display:flex; align-items:center; gap:9px; padding:10px 12px;
+        border:1px solid var(--border); border-radius:10px; background:var(--panel);
+        margin-bottom:8px;
+    }
+    .asl-node-row .nd { width:7px; height:7px; border-radius:50%; background:var(--text-dim); flex:0 0 auto; }
+    .asl-node-row.keyed .nd { background:var(--live); animation:pulse 1.9s ease-out infinite; }
+    .asl-node-row .who, .asl-fav-row .who { flex:1; min-width:0; font-family:var(--font-mono);
+        font-size:12.5px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .asl-fav-row .who .sub { color:var(--text-dim); font-size:10.5px; }
+    .asl-node-row button, .asl-fav-row button, .asl-qc button {
+        padding:7px 12px; border-radius:8px; font-family:var(--font-ui); font-size:12px;
+        font-weight:600; cursor:pointer; border:1px solid var(--border); flex:0 0 auto;
+    }
+    .asl-node-row button { border-color:var(--danger); color:var(--danger); background:transparent; }
+    .asl-fav-row button, .asl-qc button { background:var(--live); color:#04211d; border-color:transparent; }
+    .asl-qc { display:flex; gap:8px; }
+    .asl-qc input {
+        flex:1; padding:10px 12px; border-radius:9px; border:1px solid var(--border);
+        background:var(--panel); color:var(--text); font-family:var(--font-mono); font-size:14px;
+    }
+    .asl-empty { font-size:12px; color:var(--text-dim); padding:4px 2px; }
+
+    /* PIN modal */
+    #pin-modal { position:fixed; inset:0; z-index:60; background:rgba(4,6,10,.6);
+        display:none; align-items:center; justify-content:center; padding:24px; }
+    #pin-modal.open { display:flex; }
+    .pin-box { width:100%; max-width:320px; background:var(--panel);
+        border:1px solid var(--border); border-radius:14px; padding:18px; }
+    .pin-box h3 { margin:0 0 6px; font-size:15px; }
+    .pin-box p { margin:0 0 12px; font-size:12px; color:var(--text-muted); }
+    .pin-box input {
+        width:100%; padding:12px; border-radius:9px; border:1px solid var(--border);
+        background:var(--panel-2); color:var(--text); font-family:var(--font-mono);
+        font-size:20px; letter-spacing:.3em; text-align:center;
+    }
+    .pin-box .err { color:var(--danger); font-size:11.5px; margin-top:6px; min-height:14px; }
+    .pin-box .row { display:flex; gap:8px; margin-top:12px; }
+    .pin-box .row button { flex:1; padding:11px 0; border-radius:9px; font-family:var(--font-ui);
+        font-size:13px; font-weight:600; cursor:pointer; border:1px solid var(--border); }
+    .pin-box .row .go { background:var(--accent); color:var(--accent-ink,#241a06); border-color:transparent; }
+    .pin-box .row .no { background:var(--panel-2); color:var(--text-dim); }
+
     /* ---------------- tab bar ---------------- */
     .tabbar {
         position:fixed; left:0; right:0; bottom:0; z-index:20;
@@ -340,6 +404,13 @@
         left:0; right:0;
     }
     #map { width:100%; height:100%; background:var(--panel-2); }
+    #map-contacts-toggle {
+        position:absolute; top:10px; right:10px; z-index:600;
+        padding:7px 11px; border-radius:8px; cursor:pointer;
+        font-family:var(--font-ui); font-size:11.5px; font-weight:600;
+        border:1px solid var(--border); background:var(--panel); color:var(--text-muted);
+    }
+    #map-contacts-toggle.on { color:#ff3fa4; border-color:#ff3fa4; }
     .leaflet-container { background:var(--panel-2); font-family:var(--font-ui); }
     .leaflet-popup-content-wrapper, .leaflet-popup-tip {
         background:var(--panel); color:var(--text); border:1px solid var(--border);
@@ -455,6 +526,7 @@
 
         <section data-tab="map">
             <div id="map"></div>
+            <button id="map-contacts-toggle" hidden>◉ Contacts</button>
         </section>
 
         <section data-tab="activity">
@@ -492,6 +564,27 @@
     <div id="focus-screen" aria-hidden="true">
         <div class="focus-hdr"><button id="focus-close">‹ All hotspots</button></div>
         <div class="focus-body" id="focus-body"></div>
+    </div>
+
+    <div id="asl-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="asl-close">‹ Back</button>
+            <span class="ttl">ASL Control</span>
+        </div>
+        <div class="asl-body" id="asl-body"></div>
+    </div>
+
+    <div id="pin-modal" aria-hidden="true">
+        <div class="pin-box">
+            <h3>Control PIN</h3>
+            <p>Enter the PIN to connect / disconnect a node.</p>
+            <input id="pin-input" type="text" inputmode="numeric" autocomplete="off" maxlength="12">
+            <div class="err" id="pin-err"></div>
+            <div class="row">
+                <button class="no" id="pin-cancel">Cancel</button>
+                <button class="go" id="pin-ok">OK</button>
+            </div>
+        </div>
     </div>
 
     <div class="lp-sheet" id="lp-sheet">
@@ -599,6 +692,7 @@
                 renderCards(data);
                 if (currentTab === "map") renderMapMarkers();
                 maybeShowFocus();
+                if (document.getElementById("asl-screen").classList.contains("open")) renderAslScreen();
             })
             .catch(function () { markStale(); })
             .finally(function () { setTimeout(fetchData, POLL_MS); });
@@ -723,6 +817,7 @@
                identLine +
                '<div class="card-body">' + body + "</div>" +
                extra + recent +
+               (isAsl ? '<button class="asl-ctrl-open">🎛️ ASL Control</button>' : "") +
                "</div>";
     }
 
@@ -1030,6 +1125,11 @@
     /* ---- map tab (lazy Leaflet) ---- */
     var mobMap = null, mobMarkers = {};
 
+    var mobContacts = [];  // L.marker[] for recent QSOs
+    var showMapContacts = (function () {
+        try { return localStorage.getItem("pd-map-contacts") === "1"; } catch (e) { return false; }
+    })();
+
     function showMap() {
         if (typeof L === "undefined") { setTimeout(showMap, 200); return; }
         if (!mobMap) {
@@ -1038,7 +1138,44 @@
             L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
                 { maxNativeZoom: 16, maxZoom: 19 }).addTo(mobMap);
         }
-        setTimeout(function () { mobMap.invalidateSize(); renderMapMarkers(true); }, 60);
+        var tgl = document.getElementById("map-contacts-toggle");
+        tgl.hidden = false;
+        tgl.classList.toggle("on", showMapContacts);
+        tgl.onclick = toggleMapContacts;
+        setTimeout(function () {
+            mobMap.invalidateSize();
+            renderMapMarkers(true);
+            if (showMapContacts) loadMapContacts();
+        }, 60);
+    }
+
+    function toggleMapContacts() {
+        showMapContacts = !showMapContacts;
+        try { localStorage.setItem("pd-map-contacts", showMapContacts ? "1" : "0"); } catch (e) {}
+        document.getElementById("map-contacts-toggle").classList.toggle("on", showMapContacts);
+        if (showMapContacts) loadMapContacts();
+        else { mobContacts.forEach(function (m) { mobMap.removeLayer(m); }); mobContacts = []; }
+    }
+
+    function loadMapContacts() {
+        if (!mobMap) return;
+        fetch("/api/qsos").then(function (r) { return r.json(); }).then(function (list) {
+            mobContacts.forEach(function (m) { mobMap.removeLayer(m); });
+            mobContacts = [];
+            (list || []).slice().sort(function (a, b) {
+                return (b.logged_at || 0) - (a.logged_at || 0);
+            }).filter(function (q) {
+                return q.lat != null && q.lon != null;
+            }).slice(0, 10).forEach(function (q) {
+                var when = q.logged_at ? fmtAgo(q.logged_at) + " ago" : (q.date || "");
+                var m = L.circleMarker([q.lat, q.lon], {
+                    radius: 6, color: "#ff3fa4", weight: 2, fillColor: "#ff3fa4", fillOpacity: 0.55,
+                }).addTo(mobMap).bindTooltip(
+                    (q.call || "?") + " · " + [q.band, q.mode].filter(Boolean).join(" ") +
+                    (when ? " · " + when : ""));
+                mobContacts.push(m);
+            });
+        }).catch(function () {});
     }
 
     function _pinIcon(state) {
@@ -1204,6 +1341,148 @@
         }).then(function () {
             toast("Muted " + (secs >= 86400 ? "24h" : secs >= 14400 ? "4h" : "1h"));
         }).catch(function () { toast("Couldn't mute"); });
+    });
+
+    /* ================= ASL Control + control PIN (V2) ================= */
+
+    function ctrlPin() { try { return sessionStorage.getItem("pd-ctrl-pin") || ""; } catch (e) { return ""; } }
+    function setCtrlPin(v) { try { sessionStorage.setItem("pd-ctrl-pin", v); } catch (e) {} }
+
+    var _pinResolve = null;
+    function promptPin(bad) {
+        document.getElementById("pin-err").textContent = bad ? "That PIN didn't work — try again." : "";
+        document.getElementById("pin-input").value = "";
+        document.getElementById("pin-modal").classList.add("open");
+        setTimeout(function () { document.getElementById("pin-input").focus(); }, 50);
+        return new Promise(function (res) { _pinResolve = res; });
+    }
+    function _closePin(val) {
+        document.getElementById("pin-modal").classList.remove("open");
+        var r = _pinResolve; _pinResolve = null;
+        if (r) r(val);
+    }
+    document.getElementById("pin-ok").onclick = function () { _closePin(document.getElementById("pin-input").value.trim()); };
+    document.getElementById("pin-cancel").onclick = function () { _closePin(null); };
+    document.getElementById("pin-input").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") document.getElementById("pin-ok").click();
+    });
+
+    // POST a control action; on a 403 pin_required, prompt once and retry.
+    async function apiControl(path, body) {
+        for (var attempt = 0; attempt < 3; attempt++) {
+            var res, j;
+            try {
+                res = await fetch(path, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Pocket-Dash": "1",
+                        "X-Control-Pin": ctrlPin(),
+                    },
+                    body: JSON.stringify(body || {}),
+                });
+                j = await res.json();
+            } catch (e) { return { success: false, message: "Network error" }; }
+            if (res.status === 403 && j && j.pin_required) {
+                var pin = await promptPin(attempt > 0);
+                if (pin === null) return { success: false, message: "Cancelled" };
+                setCtrlPin(pin);
+                continue;
+            }
+            return j || {};
+        }
+        return { success: false, message: "PIN rejected" };
+    }
+
+    var aslCtrlId = null;
+
+    document.getElementById("cards").addEventListener("click", function (e) {
+        var b = e.target.closest(".asl-ctrl-open");
+        if (!b) return;
+        var card = b.closest(".card[data-hid]");
+        if (card) openAslScreen(card.getAttribute("data-hid"));
+    });
+    document.getElementById("asl-close").onclick = function () {
+        document.getElementById("asl-screen").classList.remove("open");
+        aslCtrlId = null;
+    };
+
+    var aslFavs = [];
+    async function openAslScreen(hid) {
+        aslCtrlId = hid;
+        try { aslFavs = await fetch("/api/asl_favorites").then(function (r) { return r.json(); }); }
+        catch (e) { aslFavs = []; }
+        renderAslScreen();
+        document.getElementById("asl-screen").classList.add("open");
+    }
+
+    function aslHotspots() {
+        return (lastData || []).filter(function (h) { return h.type === "asl3"; });
+    }
+
+    function renderAslScreen() {
+        var host = document.getElementById("asl-body");
+        var asl = aslHotspots();
+        var hs = asl.filter(function (h) { return h.id === aslCtrlId; })[0] || asl[0];
+        if (!hs) { host.innerHTML = '<div class="asl-empty">No ASL3 hotspots.</div>'; return; }
+        aslCtrlId = hs.id;
+
+        var fromHtml = "";
+        if (asl.length > 1) {
+            fromHtml = '<div class="asl-sec">Control from</div><div class="asl-from"><select id="asl-from-sel">' +
+                asl.map(function (h) {
+                    return '<option value="' + esc(h.id) + '"' + (h.id === hs.id ? " selected" : "") +
+                           ">" + esc(h.name) + " · node " + esc(h.asl_node || "?") + "</option>";
+                }).join("") + "</select></div>";
+        } else {
+            fromHtml = '<div class="asl-sec">Controlling</div><div class="asl-empty">' +
+                esc(hs.name) + " · node " + esc(hs.asl_node || "?") + "</div>";
+        }
+
+        var nodes = hs.asl_linked_nodes || [];
+        var linksHtml = '<div class="asl-sec">Linked nodes</div>' + (nodes.length
+            ? nodes.map(function (n) {
+                var label = n.callsign || n.node;
+                return '<div class="asl-node-row' + (n.keyed ? " keyed" : "") + '">' +
+                       '<span class="nd"></span><span class="who">' + esc(label) + "</span>" +
+                       '<button data-act="disconnect" data-node="' + esc(n.node) + '">Disconnect</button></div>';
+            }).join("")
+            : '<div class="asl-empty">Nothing linked right now.</div>');
+
+        var qcHtml = '<div class="asl-sec">Quick connect</div>' +
+            '<div class="asl-qc"><input id="asl-qc-node" type="text" inputmode="numeric" ' +
+            'placeholder="Node number">' +
+            '<button data-act="connect" data-qc="1">Connect</button></div>';
+
+        var favHtml = "";
+        if (aslFavs.length) {
+            favHtml = '<div class="asl-sec">Favorites</div>' + aslFavs.map(function (f) {
+                return '<div class="asl-fav-row"><span class="who">' + esc(f.label || ("Node " + f.node)) +
+                       '<span class="sub"> · ' + esc(f.node) + "</span></span>" +
+                       '<button data-act="connect" data-node="' + esc(f.node) + '">Connect</button></div>';
+            }).join("");
+        }
+
+        host.innerHTML = fromHtml + linksHtml + qcHtml + favHtml;
+        var sel = document.getElementById("asl-from-sel");
+        if (sel) sel.onchange = function () { aslCtrlId = this.value; renderAslScreen(); };
+    }
+
+    document.getElementById("asl-body").addEventListener("click", async function (e) {
+        var b = e.target.closest("button[data-act]");
+        if (!b) return;
+        var act = b.getAttribute("data-act");
+        var node = b.getAttribute("data-node") || "";
+        if (b.getAttribute("data-qc")) {
+            node = (document.getElementById("asl-qc-node") || {}).value || "";
+            node = node.replace(/\D/g, "");
+        }
+        if (!node) { toast("Enter a node number"); return; }
+        b.disabled = true;
+        var r = await apiControl("/api/asl_connect", { id: aslCtrlId, node: node, action: act });
+        b.disabled = false;
+        toast(r && r.message ? r.message : (r && r.success ? "Done" : "Failed"));
+        if (r && r.success) setTimeout(renderAslScreen, 1200);  // let the next /api/data poll land
     });
     </script>
 </body>
