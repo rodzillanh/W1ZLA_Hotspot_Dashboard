@@ -2412,6 +2412,86 @@ def _aprs_alert_loop():
         time.sleep(config.POLL_INTERVAL)
 
 
+_push_prev = {}       # hotspot_id -> {"status", "is_active", "active_call"}
+_push_cooldown = {}   # (hotspot_id, kind) -> last-sent epoch
+
+
+def _push_dispatch(title: str, body: str, tag: str) -> None:
+    """Send one notification to every registered browser, pruning any that
+    come back gone. Never raises (PushClient.send_all already swallows)."""
+    subs = storage_mod.load_push_subscriptions()
+    if not subs:
+        return
+    _, _, expired = push_client.send_all(subs, {
+        "title": title, "body": body, "tag": tag, "url": "/mobile",
+    })
+    for ep in expired:
+        storage_mod.remove_push_subscription(ep)
+
+
+def _push_maybe(hotspot_id: str, kind: str, now: float, title: str, body: str) -> None:
+    """Fire a push for (hotspot, kind) unless one went out within the
+    cooldown window."""
+    if now - _push_cooldown.get((hotspot_id, kind), 0) < config.PUSH_ALERT_COOLDOWN_SEC:
+        return
+    _push_cooldown[(hotspot_id, kind)] = now
+    _push_dispatch(title, body, f"pocket-dash-{kind}-{hotspot_id}")
+
+
+def _push_alert_tick() -> None:
+    """One pass: diff the current snapshot against _push_prev and fire a
+    push for each transition. A hotspot not yet in _push_prev is only
+    seeded (no alert) -- so a restart never blasts an alert for something
+    already offline / mid-call."""
+    if not (push_client.configured and storage_mod.load_push_subscriptions()):
+        return
+    snap = monitor.snapshot()
+    now = time.time()
+    for hid, entry in snap.items():
+        name = entry.get("name") or hid
+        status = entry.get("status")
+        is_active = bool(entry.get("is_active"))
+        call = entry.get("active_call")
+        prev = _push_prev.get(hid)
+
+        if prev is not None:
+            if prev["status"] != "Offline" and status == "Offline":
+                _push_maybe(hid, "offline", now,
+                            f"\U0001F534 {name} offline", "Stopped responding")
+            elif prev["status"] == "Offline" and status not in ("Offline", None):
+                _push_maybe(hid, "online", now,
+                            f"\U0001F7E2 {name} back online", "")
+            if (status != "Offline" and not prev["is_active"]
+                    and is_active and call):
+                tg = entry.get("talkgroup")
+                _push_maybe(hid, "call", now,
+                            f"\U0001F4FB {call} active",
+                            name + (f" · TG {tg}" if tg else ""))
+
+        _push_prev[hid] = {"status": status, "is_active": is_active,
+                           "active_call": call}
+    for gone in [k for k in _push_prev if k not in snap]:
+        _push_prev.pop(gone, None)
+
+
+def _push_alert_loop():
+    """Fires a web-push notification on the same online<->offline and
+    idle->active transitions mqtt_publisher.py / the fleet-event log
+    already track -- detected from monitor.snapshot() here, NOT threaded
+    through monitor.py (same decoupled-background-loop pattern as
+    _aprs_alert_loop / _mqtt_publish_loop).
+
+    PR 4: notify on every hotspot, no per-hotspot filtering yet (that's
+    notification_prefs.json in PR 5); a per-(hotspot, kind) cooldown
+    covers a flapping node or a busy repeater."""
+    while True:
+        try:
+            _push_alert_tick()
+        except Exception as e:  # never let this loop die
+            print(f"[push] alert loop error: {type(e).__name__}: {e}", flush=True)
+        time.sleep(config.POLL_INTERVAL)
+
+
 def _qrz_logbook_loop():
     """Pulls newly-logged QSOs from QRZ Logbook into qsos.json on a slow
     cadence, and (less often) re-checks unconfirmed ones for a
@@ -2436,6 +2516,7 @@ def main():
     threading.Thread(target=monitor.run_slow_checks_forever, daemon=True).start()
     threading.Thread(target=_mqtt_publish_loop, daemon=True).start()
     threading.Thread(target=_aprs_alert_loop, daemon=True).start()
+    threading.Thread(target=_push_alert_loop, daemon=True).start()
     threading.Thread(target=_qrz_logbook_loop, daemon=True).start()
     threading.Thread(target=digipi_monitor.run_forever, daemon=True).start()
     threading.Thread(target=openspot_manager.run_forever, daemon=True).start()

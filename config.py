@@ -845,6 +845,15 @@ CAMERA_RECONNECT_BACKOFF = int(os.environ.get("CAMERA_RECONNECT_BACKOFF", 5))  #
 CAMERA_IDLE_STOP_SEC     = int(os.environ.get("CAMERA_IDLE_STOP_SEC", 20))   # stop the worker this long after the last viewer disconnects
 CAMERA_TEST_TIMEOUT      = int(os.environ.get("CAMERA_TEST_TIMEOUT", 12))    # Settings "Test connection" button
 
+# --- Web push alerts (Pocket Dash mobile app, PR 4) ---
+# Minimum gap between push notifications of the SAME kind for the SAME
+# hotspot -- edge-triggered detection already stops repeats, this just
+# keeps a flapping node or a busy repeater from spamming. Deliberately
+# tighter than aprs_msg_cooldown_min (10) since a phone push is cheaper
+# to ignore than an APRS message. Per-hotspot filtering / a longer mute
+# is notification_prefs.json in PR 5.
+PUSH_ALERT_COOLDOWN_SEC = int(os.environ.get("PUSH_ALERT_COOLDOWN_SEC", 300))
+
 # --- Home Assistant MQTT auto-discovery ---
 MQTT_PUBLISH_INTERVAL = int(os.environ.get("MQTT_PUBLISH_INTERVAL", POLL_INTERVAL))
 # Runs on a much slower cadence than the main poll loop since it does a
