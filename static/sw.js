@@ -11,7 +11,7 @@
  * can cover /mobile; a worker under /static/ could only control
  * /static/*. Bump CACHE when the shell markup changes.
  */
-const CACHE = "pocket-dash-shell-v3";
+const CACHE = "pocket-dash-shell-v4";  // v4: new W1ZLA-tower app icons
 const SHELL = [
   "/mobile",
   "/static/manifest.json",
