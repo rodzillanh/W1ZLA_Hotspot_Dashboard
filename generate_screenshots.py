@@ -319,9 +319,13 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 BASE_URL = f"http://127.0.0.1:{DEMO_PORT}"
 
 CARD_SHOTS = [
-    (f"card-{HOTSPOT_WPSD_ACTIVE['ip']}", "hotspot-card-wpsd-active.png"),
-    (f"card-{HOTSPOT_WPSD_IDLE['ip']}", "hotspot-card-wpsd-idle.png"),
-    (f"card-{HOTSPOT_ASL3['ip']}", "hotspot-card-asl3.png"),
+    # dashboard.html builds each hotspot card's id as "card-<hotspot id>"
+    # (the stable hs-... id, NOT the ip -- changed by the hotspot-id
+    # migration); _ip_to_id maps the demo ip back to whatever id the
+    # backfill assigned it this run.
+    (f"card-{_ip_to_id[HOTSPOT_WPSD_ACTIVE['ip']]}", "hotspot-card-wpsd-active.png"),
+    (f"card-{_ip_to_id[HOTSPOT_WPSD_IDLE['ip']]}", "hotspot-card-wpsd-idle.png"),
+    (f"card-{_ip_to_id[HOTSPOT_ASL3['ip']]}", "hotspot-card-asl3.png"),
     ("dvswitch-card", "dvswitch-card.png"),  # one consolidated card since v3.99, not one per node
     ("fleet-activity-card", "fleet-activity-card.png"),
     ("asl-favorites-card", "asl-favorites-card.png"),
@@ -360,10 +364,10 @@ with sync_playwright() as p:
     print("wrote dashboard-full.png")
 
     for element_id, filename in CARD_SHOTS:
-        # [id="..."] attribute-equality form, not "#id" -- the hotspot card
-        # ids embed a fake IP address (e.g. "card-198.51.100.10"), and a
-        # bare "#" selector misparses the dots as class-selector separators
-        # (confirmed live: Playwright raised "Unexpected token '.51'").
+        # [id="..."] attribute-equality form, not "#id" -- kept from when
+        # hotspot card ids embedded a dotted fake IP that a bare "#"
+        # selector misparsed ("Unexpected token '.51'"); harmless now that
+        # ids are "card-hs-...", and still the safer form regardless.
         #
         # Retried once on a real, observed race: the dashboard's own 3s
         # poll cycle can replace #cards-grid's innerHTML between querying
@@ -403,6 +407,48 @@ with sync_playwright() as p:
     page.wait_for_timeout(500)
     page.screenshot(path=os.path.join(OUTPUT_DIR, "settings.png"))
     print("wrote settings.png")
+
+    # --- Mobile companion view (Pocket Dash, /mobile) -- a phone-sized
+    # context so the single-column layout + bottom tab bar render as they
+    # would on a real device. Same seeded demo state as everything above.
+    mob_ctx = browser.new_context(
+        viewport={"width": 390, "height": 844},
+        device_scale_factor=2, is_mobile=True, has_touch=True,
+    )
+    mob = mob_ctx.new_page()
+    mob.goto(f"{BASE_URL}/mobile", wait_until="load")
+    mob.wait_for_timeout(2500)  # let the first /api/data poll + card JS populate
+    mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-status.png"), full_page=True)
+    print("wrote mobile-status.png")
+
+    mob.click('.tabbar button[data-go="map"]')
+    mob.wait_for_timeout(3500)  # lazy Leaflet init + tile load
+    mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-map.png"))
+    print("wrote mobile-map.png")
+
+    mob.click('.tabbar button[data-go="more"]')
+    mob.wait_for_timeout(900)
+    mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-notifications.png"), full_page=True)
+    print("wrote mobile-notifications.png")
+
+    # The per-hotspot alerts screen -- opened directly. The "Customize per
+    # hotspot" button that normally opens it only appears once a push
+    # subscription exists, which headless Chromium can't create here.
+    mob.evaluate("openPrefsScreen()")
+    mob.wait_for_timeout(700)
+    mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-alert-prefs.png"), full_page=True)
+    print("wrote mobile-alert-prefs.png")
+
+    # The glanceable focus screen -- what a tapped push notification opens
+    # into. Reached via the ?focus=<hotspot id> deep link the push payload
+    # carries.
+    _focus_id = _ip_to_id[HOTSPOT_WPSD_ACTIVE["ip"]]
+    mob.goto(f"{BASE_URL}/mobile?focus={_focus_id}", wait_until="load")
+    mob.wait_for_timeout(2500)
+    mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-focus.png"))
+    print("wrote mobile-focus.png")
+
+    mob_ctx.close()
 
     browser.close()
 

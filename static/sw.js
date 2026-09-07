@@ -11,7 +11,7 @@
  * can cover /mobile; a worker under /static/ could only control
  * /static/*. Bump CACHE when the shell markup changes.
  */
-const CACHE = "pocket-dash-shell-v2";
+const CACHE = "pocket-dash-shell-v3";
 const SHELL = [
   "/mobile",
   "/static/manifest.json",
@@ -100,7 +100,12 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
       for (const w of wins) {
-        if (w.url.indexOf("/mobile") !== -1 && "focus" in w) return w.focus();
+        if (w.url.indexOf("/mobile") !== -1) {
+          // bring the existing Pocket Dash window up and point it at the
+          // deep link (e.g. ?focus=<id>); navigate() may be unavailable.
+          if ("navigate" in w) { try { w.navigate(target); } catch (e) {} }
+          if ("focus" in w) return w.focus();
+        }
       }
       return self.clients.openWindow(target);
     })

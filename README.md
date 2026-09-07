@@ -1863,6 +1863,85 @@ DigiPi's IP/SSH credentials in Settings → Integrations.
   device actually running them to build against, the same discipline
   used for everything else in this app.
 
+<!-- wiki-group: Mobile -->
+## Mobile dashboard (Pocket Dash)
+<!-- wiki-image: mobile-status.png -->
+
+A separate, lightweight phone view lives at **`/mobile`** ("Pocket Dash").
+It polls the same `/api/data` and `/api/qsos` the desktop dashboard uses and
+keeps none of its own state — the main dashboard at `/` is completely
+untouched. It's a single-column layout with a bottom tab bar:
+
+- **Status** — one card per hotspot, same online / idle / last-heard /
+  offline / away states as the desktop, reflowed for one column. WPSD cards
+  show talkgroup / mode / RSSI / BER; ASL3 cards show the linked-node list
+  (the keyed node pulsing); openSPOT 4 cards show the active profile and, on
+  battery, the charge level. Callsigns are tappable and open a QRZ lookup.
+- **Map** — a Leaflet map (loaded only when you first open the tab) with a
+  pin per hotspot that has map coordinates set, colored by state (cyan and
+  pulsing = a call in progress, grey = idle, red = offline). Tap a pin for a
+  popup, then "Open details" to jump to that hotspot on the Status tab.
+- **Activity** — recent logged contacts (the same `qsos.json` the Live map
+  and Recent Contacts card read), newest first.
+- **More** — links back to the full dashboard, Settings, changelog and
+  README, plus the notification controls below.
+
+<!-- wiki-image: mobile-map.png -->
+
+### Installing it as an app
+
+Open `/mobile` in the phone's browser and use **Add to Home Screen**. It
+installs as a standalone app called *Pocket Dash*, launches without browser
+chrome, and a service worker caches the shell so it still opens on a weak
+signal. On iPhone this step is required for notifications — iOS only
+delivers web push to an installed PWA, not a Safari tab.
+
+Installing and push both need the dashboard reachable over **HTTPS** with a
+valid certificate (a plain `http://` LAN address works for *viewing* but not
+for installing or notifications). The simplest way to get that without
+opening any ports is [Tailscale](https://tailscale.com/) with
+`tailscale serve` in front of the dashboard.
+
+### Push notifications
+<!-- wiki-image: mobile-notifications.png -->
+
+Under **More → Notifications**, tap **Enable notifications** and allow the
+browser prompt. From then on the phone gets a push when:
+
+- a hotspot **stops responding** (and again when it **recovers**), or
+- a **call starts** on any hotspot.
+
+A per-hotspot cooldown keeps a flapping node or a busy repeater from
+spamming. A tapped notification opens a glanceable full-screen view of just
+the hotspot it's about — the triggering callsign large, the talkgroup, and a
+live timer — rather than the whole list.
+
+<!-- wiki-image: mobile-focus.png -->
+
+The VAPID keypair the server needs is generated automatically on first run
+and stored in `settings.json`. There's one contact field
+(`push_vapid_contact`, a `mailto:` the push services can reach you at about
+delivery problems) which ships as a placeholder — set your own in
+Settings → Integrations if you like, but it isn't required for delivery.
+Subscriptions live in `push_subscriptions.json`; dead ones are pruned
+automatically.
+
+### Per-hotspot alerts and muting
+<!-- wiki-image: mobile-alert-prefs.png -->
+
+**More → Notifications → Customize per hotspot** opens a screen with one row
+per hotspot: an **Offline & recovery** toggle, a **Call starts** toggle, and
+a **Mute** control (1 hour / 4 hours / 24 hours). New hotspots default to
+offline alerts **on** and call-start alerts **off**. A muted hotspot shows
+an amber border and a countdown until it un-mutes.
+
+You can also **long-press a hotspot card** on the Status tab for a quick
+mute sheet without opening the settings screen.
+
+Preferences are stored in `notification_prefs.json` and are shared across
+every subscribed device — muting a hotspot on your phone mutes it
+everywhere.
+
 <!-- wiki-group: Admin and Maintenance -->
 ## Known tradeoffs (intentionally left as-is for now)
 

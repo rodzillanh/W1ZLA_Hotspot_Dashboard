@@ -12,6 +12,8 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Pocket Dash">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js" defer></script>
     <style>
     /* ------------------------------------------------------------------ *
      * Pocket Dash -- lightweight mobile companion (mobile-dashboard-
@@ -160,6 +162,7 @@
         font-family:var(--font-mono); font-weight:700; font-size:14px; color:var(--live);
     }
     .card.friend .line-active .call { color:var(--accent); }
+    a.cs-link { color:inherit; text-decoration:none; border-bottom:1px dotted currentColor; }
     .caller-sub { font-size:11.5px; color:var(--text-muted); margin-top:2px; }
     .timer {
         font-family:var(--font-mono); font-size:11px; color:var(--text-dim);
@@ -328,6 +331,112 @@
     @media (prefers-reduced-motion:reduce) {
         .dot.live, .lnode.keyed .nd { animation:none; }
     }
+
+    /* ---------------- map tab (PR 6) ---------------- */
+    section[data-tab="map"].active {
+        position:fixed;
+        top:calc(var(--appbar-h) + env(safe-area-inset-top));
+        bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+        left:0; right:0;
+    }
+    #map { width:100%; height:100%; background:var(--panel-2); }
+    .leaflet-container { background:var(--panel-2); font-family:var(--font-ui); }
+    .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+        background:var(--panel); color:var(--text); border:1px solid var(--border);
+    }
+    .leaflet-popup-content { margin:10px 12px; font-size:12.5px; }
+    .leaflet-popup-content b { font-size:13px; }
+    .leaflet-popup-content .mp-state { font-family:var(--font-mono); font-size:11px; }
+    .leaflet-popup-content .mp-link {
+        display:inline-block; margin-top:7px; color:var(--live); font-weight:600;
+    }
+    .leaflet-bar a { background:var(--panel); color:var(--text); border-color:var(--border); }
+    .map-pin {
+        width:16px; height:16px; border-radius:50%;
+        border:2px solid var(--panel); box-shadow:0 0 0 1px var(--border);
+    }
+    .map-pin.live    { background:var(--live); }
+    .map-pin.idle    { background:var(--text-muted); }
+    .map-pin.offline { background:var(--danger); }
+    .map-pin.live::after {
+        content:""; position:absolute; inset:-5px; border-radius:50%;
+        border:2px solid var(--live); animation:mapPing 1.8s ease-out infinite;
+    }
+    @keyframes mapPing {
+        0% { transform:scale(.6); opacity:.9; }
+        100% { transform:scale(1.5); opacity:0; }
+    }
+
+    /* ---------------- glanceable focus screen (PR 6) ---------------- */
+    #focus-screen {
+        position:fixed; inset:0; z-index:40; background:var(--bg);
+        display:none; flex-direction:column;
+    }
+    #focus-screen.open { display:flex; }
+    .focus-hdr {
+        flex:0 0 auto; display:flex; align-items:center;
+        padding:calc(env(safe-area-inset-top) + 10px) 14px 12px;
+        background:var(--panel); border-bottom:1px solid var(--border);
+    }
+    .focus-hdr button {
+        background:none; border:none; color:var(--live); cursor:pointer; padding:0;
+        font-family:var(--font-ui); font-size:14px;
+    }
+    .focus-body {
+        flex:1 1 auto; display:flex; flex-direction:column;
+        align-items:center; justify-content:center; text-align:center;
+        padding:24px 26px calc(env(safe-area-inset-bottom) + 24px); gap:8px;
+    }
+    .focus-body .fname { font-size:15px; color:var(--text-muted); font-weight:600; }
+    .focus-body .fbig {
+        font-family:var(--font-mono); font-weight:700; font-size:34px;
+        line-height:1.1; margin:6px 0 2px; word-break:break-word;
+    }
+    .focus-body .fbig.live { color:var(--live); }
+    .focus-body .fbig.offline { color:var(--danger); }
+    .focus-body .fsub { font-size:14px; color:var(--text); }
+    .focus-body .fmeta { font-size:12.5px; color:var(--text-muted); }
+    .focus-body .ftimer {
+        font-family:var(--font-mono); font-size:20px; color:var(--text-dim);
+        margin-top:12px; font-variant-numeric:tabular-nums;
+    }
+    .focus-body .fall {
+        margin-top:26px; padding:11px 22px; border-radius:10px;
+        border:1px solid var(--border); background:var(--panel-2);
+        color:var(--text); font-family:var(--font-ui); font-size:13px; font-weight:600;
+        cursor:pointer;
+    }
+
+    /* ---------------- long-press mute sheet + toast (PR 6) ---------------- */
+    .card.lp-armed { outline:2px solid var(--caution); outline-offset:-2px; }
+    .lp-sheet {
+        position:fixed; inset:0; z-index:45; background:rgba(4,6,10,.55);
+        display:none; align-items:flex-end;
+    }
+    .lp-sheet.open { display:flex; }
+    .lp-sheet-inner {
+        width:100%; background:var(--panel); border-top:1px solid var(--border);
+        border-radius:18px 18px 0 0; padding:16px 16px calc(env(safe-area-inset-bottom) + 18px);
+    }
+    .lp-sheet-inner .lp-title {
+        font-size:13px; color:var(--text-muted); margin-bottom:12px; text-align:center;
+    }
+    .lp-sheet-inner .lp-title b { color:var(--text); }
+    .lp-row { display:flex; gap:8px; }
+    .lp-row button {
+        flex:1; padding:13px 0; border-radius:10px; font-size:13px; font-weight:600;
+        border:1px solid var(--border); background:var(--panel-2); color:var(--text);
+        font-family:var(--font-ui); cursor:pointer;
+    }
+    .lp-row button.cancel { background:none; color:var(--text-dim); }
+    .toast {
+        position:fixed; left:50%; bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px);
+        transform:translateX(-50%); z-index:50;
+        background:var(--panel); color:var(--text); border:1px solid var(--border);
+        border-radius:9px; padding:9px 14px; font-size:12.5px;
+        opacity:0; transition:opacity .2s ease; pointer-events:none;
+    }
+    .toast.show { opacity:1; }
     </style>
 </head>
 <body>
@@ -345,11 +454,7 @@
         </section>
 
         <section data-tab="map">
-            <div class="placeholder">
-                <div class="big">Map view is coming in a later update</div>
-                <p>For now, the full interactive map lives on the desktop dashboard.</p>
-                <p style="margin-top:12px"><a href="/">Open the full dashboard →</a></p>
-            </div>
+            <div id="map"></div>
         </section>
 
         <section data-tab="activity">
@@ -384,6 +489,27 @@
         <div class="prefs-body" id="prefs-body"></div>
     </div>
 
+    <div id="focus-screen" aria-hidden="true">
+        <div class="focus-hdr"><button id="focus-close">‹ All hotspots</button></div>
+        <div class="focus-body" id="focus-body"></div>
+    </div>
+
+    <div class="lp-sheet" id="lp-sheet">
+        <div class="lp-sheet-inner">
+            <div class="lp-title" id="lp-title">Mute alerts for this hotspot</div>
+            <div class="lp-row">
+                <button data-lp="3600">1 hour</button>
+                <button data-lp="14400">4 hours</button>
+                <button data-lp="86400">24 hours</button>
+            </div>
+            <div class="lp-row" style="margin-top:8px">
+                <button class="cancel" data-lp="cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
     <nav class="tabbar" role="tablist">
         <button role="tab" data-go="status" aria-selected="true" aria-label="Status">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg>
@@ -411,6 +537,13 @@
         return String(s == null ? "" : s)
             .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+    // Callsign -> a QRZ lookup link (same destination the desktop cards use).
+    function csLink(call) {
+        var c = String(call == null ? "" : call).trim();
+        if (!c || c === "?") return esc(call == null ? "?" : call);
+        return '<a class="cs-link" href="https://www.qrz.com/db/' + encodeURIComponent(c) +
+            '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(c) + '</a>';
     }
     function nowSec() { return Date.now() / 1000; }
     function fmtClock(ts) {
@@ -446,6 +579,7 @@
             window.scrollTo(0, 0);
             if (currentTab === "activity") fetchQsos();
             if (currentTab === "more") refreshNotifState();
+            if (currentTab === "map") showMap();
         });
     });
 
@@ -463,6 +597,8 @@
                 clearStale();
                 renderFleet(data);
                 renderCards(data);
+                if (currentTab === "map") renderMapMarkers();
+                maybeShowFocus();
             })
             .catch(function () { markStale(); })
             .finally(function () { setTimeout(fetchData, POLL_MS); });
@@ -505,6 +641,11 @@
         }
         host.innerHTML = data.map(cardHtml).join("");
         tickTimers();  // fill [data-ts] spans now, not up to 1s later on the next interval
+        // keep the long-press outline on across a poll re-render (PR 6)
+        if (_lpHid && document.getElementById("lp-sheet").classList.contains("open")) {
+            var armed = host.querySelector('.card[data-hid="' + _lpHid + '"]');
+            if (armed) armed.classList.add("lp-armed");
+        }
     }
 
     function cardHtml(hs) {
@@ -547,13 +688,13 @@
                    '<span data-ts="' + (hs.offline_since || "") + '" data-kind="ago"></span>' +
                    " · last data may be stale</div>";
         } else if (hs.is_active) {
-            body = '<div class="line-active">📡 ACTIVE: <span class="call">' + esc(hs.active_call || "?") + "</span>" +
+            body = '<div class="line-active">📡 ACTIVE: <span class="call">' + csLink(hs.active_call) + "</span>" +
                    (isFav && hs.favorite_label ? " · " + esc(hs.favorite_label) : "") + "</div>" +
                    callerSub(hs) +
                    '<div class="timer" data-ts="' + (hs.tx_start || "") + '" data-kind="tx"></div>';
         } else if (isLastHeard) {
             body = '<div class="line-active">Last heard: <span class="call" style="color:var(--text-muted)">' +
-                   esc(hs.active_call) + "</span></div>" +
+                   csLink(hs.active_call) + "</span></div>" +
                    callerSub(hs) +
                    '<div class="timer">' +
                    '<span data-ts="' + (hs.last_heard || "") + '" data-kind="ago"></span> ago</div>';
@@ -569,11 +710,11 @@
         var recent = (!isAway && hs.history && hs.history.length)
             ? '<div class="recent">Recent:' +
               hs.history.slice(0, 5).map(function (h) {
-                  return '<span class="call">' + esc(h.call) + "</span>";
+                  return '<span class="call">' + csLink(h.call) + "</span>";
               }).join("") + "</div>"
             : "";
 
-        return '<div class="card ' + cls + '">' +
+        return '<div class="card ' + cls + '" data-hid="' + esc(hs.id) + '">' +
                '<div class="card-head">' +
                  '<span class="card-name">' + esc(hs.name) + "</span>" +
                  '<span class="type-badge">' + typeLabel + "</span>" +
@@ -608,8 +749,9 @@
         return '<div class="linked"><div class="lh">Linked nodes</div>' +
             nodes.slice(0, 6).map(function (n) {
                 var label = n.callsign || n.node;
+                var labelHtml = /[A-Za-z]/.test(String(label)) ? csLink(label) : esc(label);
                 return '<div class="lnode' + (n.keyed ? " keyed" : "") + '">' +
-                       '<span class="nd"></span>' + esc(label) +
+                       '<span class="nd"></span>' + labelHtml +
                        (n.keyed ? " · keyed" : "") + "</div>";
             }).join("") + "</div>";
     }
@@ -651,7 +793,7 @@
             var meta = [ [q.band, q.mode].filter(Boolean).join(" "), q.name, q.grid ]
                 .filter(Boolean).join(" · ");
             return '<div class="qso">' +
-                   '<span class="cs">' + esc(q.call || "?") + "</span>" +
+                   '<span class="cs">' + csLink(q.call) + "</span>" +
                    '<span class="meta">' + esc(meta) + "</span>" +
                    '<span class="ago">' + esc(when) + "</span>" +
                    "</div>";
@@ -867,6 +1009,201 @@
             savePref(mb.getAttribute("data-hid"), "muted_until",
                      secs ? (Date.now() / 1000 + secs) : null);
         }
+    });
+
+    /* ================= PR 6 ================= */
+
+    function switchToTab(name) {
+        var btn = document.querySelector('.tabbar button[data-go="' + name + '"]');
+        if (btn) btn.click();
+    }
+
+    var _toastTimer = null;
+    function toast(msg) {
+        var t = document.getElementById("toast");
+        t.textContent = msg;
+        t.classList.add("show");
+        clearTimeout(_toastTimer);
+        _toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2200);
+    }
+
+    /* ---- map tab (lazy Leaflet) ---- */
+    var mobMap = null, mobMarkers = {};
+
+    function showMap() {
+        if (typeof L === "undefined") { setTimeout(showMap, 200); return; }
+        if (!mobMap) {
+            mobMap = L.map("map", { maxZoom: 19, attributionControl: false })
+                .setView([39.5, -98.35], 3);
+            L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+                { maxNativeZoom: 16, maxZoom: 19 }).addTo(mobMap);
+        }
+        setTimeout(function () { mobMap.invalidateSize(); renderMapMarkers(true); }, 60);
+    }
+
+    function _pinIcon(state) {
+        return L.divIcon({
+            className: "",
+            html: '<div class="map-pin ' + state + '" style="position:relative"></div>',
+            iconSize: [16, 16], iconAnchor: [8, 8],
+        });
+    }
+
+    function renderMapMarkers(fit) {
+        if (!mobMap || !lastData) return;
+        var seen = {}, pts = [];
+        lastData.forEach(function (hs) {
+            if (hs.lat == null || hs.lon == null) return;
+            var off = hs.status === "Offline";
+            var state = off ? "offline" : (hs.is_active ? "live" : "idle");
+            var pos = [hs.lat, hs.lon];
+            seen[hs.id] = true;
+            pts.push(pos);
+            if (mobMarkers[hs.id]) {
+                mobMarkers[hs.id].setLatLng(pos).setIcon(_pinIcon(state));
+            } else {
+                mobMarkers[hs.id] = L.marker(pos, { icon: _pinIcon(state) }).addTo(mobMap);
+            }
+            var line = off ? "Offline"
+                : (hs.is_active && hs.active_call ? "Active: " + esc(hs.active_call)
+                   : (hs.active_call ? "Last: " + esc(hs.active_call) : "Idle"));
+            mobMarkers[hs.id].bindPopup(
+                '<b>' + esc(hs.name) + '</b><br><span class="mp-state">' + line + '</span>' +
+                '<br><span class="mp-link" data-jump="' + esc(hs.id) + '">Open details →</span>');
+        });
+        Object.keys(mobMarkers).forEach(function (id) {
+            if (!seen[id]) { mobMap.removeLayer(mobMarkers[id]); delete mobMarkers[id]; }
+        });
+        if (fit && pts.length) mobMap.fitBounds(pts, { padding: [40, 40], maxZoom: 12 });
+    }
+
+    document.getElementById("map").addEventListener("click", function (e) {
+        var j = e.target.closest("[data-jump]");
+        if (!j) return;
+        switchToTab("status");
+        showFocus(j.getAttribute("data-jump"));
+    });
+
+    /* ---- glanceable focus screen (push-tap landing) ---- */
+    var _focusPending = (function () {
+        var m = /[?&]focus=([^&]+)/.exec(location.search);
+        return m ? decodeURIComponent(m[1]) : null;
+    })();
+    var _focusHid = null;
+
+    function maybeShowFocus() {
+        if (_focusPending && lastData) {
+            var hid = _focusPending;
+            _focusPending = null;
+            if (history.replaceState) history.replaceState(null, "", location.pathname);
+            showFocus(hid);
+            return;
+        }
+        if (_focusHid && document.getElementById("focus-screen").classList.contains("open")) {
+            var hs = (lastData || []).filter(function (h) { return h.id === _focusHid; })[0];
+            if (hs) renderFocus(hs);
+        }
+    }
+
+    function showFocus(hid) {
+        var hs = (lastData || []).filter(function (h) { return h.id === hid; })[0];
+        if (!hs) return;
+        _focusHid = hid;
+        renderFocus(hs);
+        document.getElementById("focus-screen").classList.add("open");
+    }
+    function closeFocus() {
+        document.getElementById("focus-screen").classList.remove("open");
+        _focusHid = null;
+    }
+
+    function renderFocus(hs) {
+        var off = hs.status === "Offline";
+        var bigClass = off ? "offline" : (hs.is_active ? "live" : "");
+        var big, sub = "", meta = "", timer = "";
+        if (off) {
+            big = "OFFLINE";
+            sub = hs.portable ? "Portable — not connected" : "Stopped responding";
+            timer = hs.offline_since ? "for " + fmtAgo(hs.offline_since) : "";
+        } else if (hs.is_active && hs.active_call) {
+            big = csLink(hs.active_call);
+            sub = "active on " + esc(hs.name) + (hs.talkgroup ? " · TG " + esc(hs.talkgroup) : "");
+            meta = [hs.caller_name, hs.caller_location].filter(Boolean).map(esc).join(" — ");
+            timer = hs.tx_start ? fmtClock(hs.tx_start) : "";
+        } else if (hs.active_call) {
+            big = csLink(hs.active_call);
+            sub = "last heard on " + esc(hs.name);
+            meta = [hs.caller_name, hs.caller_location].filter(Boolean).map(esc).join(" — ");
+            timer = hs.last_heard ? fmtAgo(hs.last_heard) + " ago" : "";
+        } else {
+            big = esc(hs.name);
+            sub = "Listening…";
+        }
+        document.getElementById("focus-body").innerHTML =
+            '<div class="fname">' + esc(hs.name) + '</div>' +
+            '<div class="fbig ' + bigClass + '">' + big + '</div>' +
+            (sub ? '<div class="fsub">' + sub + '</div>' : '') +
+            (meta ? '<div class="fmeta">' + meta + '</div>' : '') +
+            (timer ? '<div class="ftimer">' + timer + '</div>' : '') +
+            '<button class="fall" id="focus-all">Show all hotspots</button>';
+        document.getElementById("focus-all").onclick = closeFocus;
+    }
+    document.getElementById("focus-close").onclick = closeFocus;
+
+    /* ---- long-press a Status card -> mute sheet ---- */
+    var _lpTimer = null, _lpHid = null, _lpStartY = 0;
+    var cardsEl = document.getElementById("cards");
+
+    cardsEl.addEventListener("touchstart", function (e) {
+        var card = e.target.closest(".card[data-hid]");
+        if (!card || e.touches.length !== 1) return;
+        _lpStartY = e.touches[0].clientY;
+        var hid = card.getAttribute("data-hid");
+        _lpTimer = setTimeout(function () {
+            _lpTimer = null;
+            _lpHid = hid;
+            card.classList.add("lp-armed");
+            var nm = card.querySelector(".card-name");
+            document.getElementById("lp-title").innerHTML =
+                "Mute alerts for <b>" + esc(nm ? nm.textContent : "this hotspot") + "</b>";
+            document.getElementById("lp-sheet").classList.add("open");
+            if (navigator.vibrate) navigator.vibrate(15);
+        }, 500);
+    }, { passive: true });
+
+    cardsEl.addEventListener("touchmove", function (e) {
+        if (_lpTimer && Math.abs(e.touches[0].clientY - _lpStartY) > 10) {
+            clearTimeout(_lpTimer); _lpTimer = null;
+        }
+    }, { passive: true });
+
+    cardsEl.addEventListener("touchend", function () {
+        if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+    });
+
+    function closeLpSheet() {
+        document.getElementById("lp-sheet").classList.remove("open");
+        var armed = document.querySelector(".card.lp-armed");
+        if (armed) armed.classList.remove("lp-armed");
+        _lpHid = null;
+    }
+
+    document.getElementById("lp-sheet").addEventListener("click", function (e) {
+        if (e.target.id === "lp-sheet") { closeLpSheet(); return; }
+        var b = e.target.closest("[data-lp]");
+        if (!b) return;
+        var v = b.getAttribute("data-lp");
+        if (v === "cancel") { closeLpSheet(); return; }
+        var secs = parseInt(v, 10);
+        var hid = _lpHid;
+        closeLpSheet();
+        if (!hid) return;
+        fetch("/api/notification_prefs", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ hotspot_id: hid, muted_until: Date.now() / 1000 + secs }),
+        }).then(function () {
+            toast("Muted " + (secs >= 86400 ? "24h" : secs >= 14400 ? "4h" : "1h"));
+        }).catch(function () { toast("Couldn't mute"); });
     });
     </script>
 </body>

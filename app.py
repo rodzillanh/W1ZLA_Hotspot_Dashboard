@@ -2443,14 +2443,16 @@ _push_prev = {}       # hotspot_id -> {"status", "is_active", "active_call"}
 _push_cooldown = {}   # (hotspot_id, kind) -> last-sent epoch
 
 
-def _push_dispatch(title: str, body: str, tag: str) -> None:
+def _push_dispatch(title: str, body: str, tag: str, url: str = "/mobile") -> None:
     """Send one notification to every registered browser, pruning any that
-    come back gone. Never raises (PushClient.send_all already swallows)."""
+    come back gone. Never raises (PushClient.send_all already swallows).
+    `url` is where a tap lands -- the mobile view deep-links a specific
+    hotspot's glanceable view via /mobile?focus=<id> (PR 6)."""
     subs = storage_mod.load_push_subscriptions()
     if not subs:
         return
     _, _, expired = push_client.send_all(subs, {
-        "title": title, "body": body, "tag": tag, "url": "/mobile",
+        "title": title, "body": body, "tag": tag, "url": url,
     })
     for ep in expired:
         storage_mod.remove_push_subscription(ep)
@@ -2470,7 +2472,8 @@ def _push_maybe(hotspot_id: str, kind: str, now: float, title: str, body: str) -
     if now - _push_cooldown.get((hotspot_id, kind), 0) < config.PUSH_ALERT_COOLDOWN_SEC:
         return
     _push_cooldown[(hotspot_id, kind)] = now
-    _push_dispatch(title, body, f"pocket-dash-{kind}-{hotspot_id}")
+    _push_dispatch(title, body, f"pocket-dash-{kind}-{hotspot_id}",
+                   url=f"/mobile?focus={hotspot_id}")
 
 
 def _push_alert_tick() -> None:
