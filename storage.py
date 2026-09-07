@@ -287,6 +287,59 @@ def remove_push_subscription(endpoint: str) -> None:
         save_push_subscriptions(subs)
 
 
+# --- per-hotspot notification preferences (Pocket Dash, PR 5) ---
+
+_NOTIFICATION_PREF_DEFAULTS = {"offline": True, "call_start": False, "muted_until": None}
+
+
+def load_notification_prefs() -> dict:
+    """Raw stored prefs: {hotspot_id: {offline, call_start, muted_until}}.
+    A hotspot missing from this dict just means "use the defaults" --
+    see notification_pref_for()."""
+    if not os.path.exists(config.NOTIFICATION_PREFS_FILE):
+        return {}
+    try:
+        with _file_lock, open(config.NOTIFICATION_PREFS_FILE, "r") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_notification_prefs(prefs: dict) -> None:
+    os.makedirs(config.CONFIG_DIR, exist_ok=True)
+    with _file_lock, open(config.NOTIFICATION_PREFS_FILE, "w") as f:
+        json.dump(prefs, f, indent=4)
+
+
+def notification_pref_for(hotspot_id: str) -> dict:
+    """Effective prefs for one hotspot: stored values merged over the
+    defaults (offline on, call-start off, not muted). Same `.get()`-
+    defaulted convention as `enabled` elsewhere -- an unconfigured
+    hotspot still behaves sensibly."""
+    stored = load_notification_prefs().get(hotspot_id) or {}
+    merged = dict(_NOTIFICATION_PREF_DEFAULTS)
+    for k in merged:
+        if k in stored:
+            merged[k] = stored[k]
+    return merged
+
+
+def set_notification_pref(hotspot_id: str, patch: dict) -> dict:
+    """Read-modify-write one hotspot's prefs under the shared lock.
+    `patch` may carry any of offline/call_start/muted_until. Returns the
+    hotspot's full stored entry afterwards."""
+    with _file_lock:
+        prefs = load_notification_prefs()
+        entry = dict(prefs.get(hotspot_id) or {})
+        for k in ("offline", "call_start", "muted_until"):
+            if k in patch:
+                entry[k] = patch[k]
+        prefs[hotspot_id] = entry
+        save_notification_prefs(prefs)
+        return entry
+
+
 def append_qso(qso: dict) -> None:
     """Adds one QSO to the existing list -- for live WSJT-X logging
     (wsjtx.py), which arrives one QSO at a time, unlike a bulk ADIF

@@ -724,6 +724,33 @@ def api_push_test():
         storage_mod.remove_push_subscription(ep)
     return jsonify({"ok": True, "sent": sent, "failed": failed, "pruned": len(expired)})
 
+@app.route("/api/notification_prefs", methods=["GET"])
+def api_notification_prefs_get():
+    """Per-hotspot push prefs (PR 5). Returns only what's actually stored;
+    the mobile screen fills in defaults (offline on, call-start off) for
+    any hotspot not present here."""
+    return jsonify(storage_mod.load_notification_prefs())
+
+@app.route("/api/notification_prefs", methods=["POST"])
+def api_notification_prefs_post():
+    data = request.json or {}
+    hid = (data.get("hotspot_id") or "").strip()
+    if not hid:
+        return jsonify({"ok": False, "error": "hotspot_id required"}), 400
+    patch = {}
+    if "offline" in data:
+        patch["offline"] = bool(data["offline"])
+    if "call_start" in data:
+        patch["call_start"] = bool(data["call_start"])
+    if "muted_until" in data:
+        mu = data["muted_until"]
+        try:
+            patch["muted_until"] = float(mu) if mu else None
+        except (TypeError, ValueError):
+            patch["muted_until"] = None
+    entry = storage_mod.set_notification_pref(hid, patch)
+    return jsonify({"ok": True, "prefs": entry})
+
 
 # --- pages ---
 
@@ -2430,8 +2457,16 @@ def _push_dispatch(title: str, body: str, tag: str) -> None:
 
 
 def _push_maybe(hotspot_id: str, kind: str, now: float, title: str, body: str) -> None:
-    """Fire a push for (hotspot, kind) unless one went out within the
-    cooldown window."""
+    """Fire a push for (hotspot, kind) unless the per-hotspot prefs
+    (PR 5) opt it out or mute it, or one went out within the cooldown."""
+    pref = storage_mod.notification_pref_for(hotspot_id)
+    muted_until = pref.get("muted_until")
+    if muted_until and now < muted_until:
+        return
+    if kind in ("offline", "online") and not pref.get("offline", True):
+        return
+    if kind == "call" and not pref.get("call_start", False):
+        return
     if now - _push_cooldown.get((hotspot_id, kind), 0) < config.PUSH_ALERT_COOLDOWN_SEC:
         return
     _push_cooldown[(hotspot_id, kind)] = now

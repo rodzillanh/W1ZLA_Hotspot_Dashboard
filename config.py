@@ -169,6 +169,11 @@ QSOS_FILE    = os.path.join(CONFIG_DIR, "qsos.json")
 # one PushSubscription object per entry, unique by `endpoint`. Same
 # flat-JSON-in-CONFIG_DIR convention as favorites.json.
 PUSH_SUBSCRIPTIONS_FILE = os.path.join(CONFIG_DIR, "push_subscriptions.json")
+# Per-hotspot push preferences (Pocket Dash, PR 5): a dict keyed by
+# hotspot id -> {"offline": bool, "call_start": bool, "muted_until": epoch|None}.
+# A hotspot absent from the file uses the defaults in
+# storage.notification_pref_for() -- offline on, call-start off.
+NOTIFICATION_PREFS_FILE = os.path.join(CONFIG_DIR, "notification_prefs.json")
 
 # --- Server ---
 HOST = "0.0.0.0"

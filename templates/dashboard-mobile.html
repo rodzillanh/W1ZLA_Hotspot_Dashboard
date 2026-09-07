@@ -249,6 +249,63 @@
     .notif-actions button:disabled { opacity:.55; }
     .notif-hint { font-size:11px; color:var(--text-dim); margin-top:11px; line-height:1.5; }
 
+    /* per-hotspot alert prefs sub-screen */
+    #prefs-screen {
+        position:fixed; inset:0; z-index:30; background:var(--bg);
+        display:none; flex-direction:column;
+    }
+    #prefs-screen.open { display:flex; }
+    .prefs-hdr {
+        flex:0 0 auto; display:flex; align-items:center; gap:12px;
+        padding:calc(env(safe-area-inset-top) + 10px) 14px 12px;
+        background:var(--panel); border-bottom:1px solid var(--border);
+    }
+    .prefs-hdr .back {
+        background:none; border:none; color:var(--live); cursor:pointer; padding:0;
+        font-family:var(--font-ui); font-size:14px;
+    }
+    .prefs-hdr .ttl { font-weight:600; font-size:15px; }
+    .prefs-body {
+        flex:1 1 auto; overflow-y:auto;
+        padding:14px 12px calc(env(safe-area-inset-bottom) + 24px);
+    }
+    .pref-card {
+        background:var(--panel); border:1px solid var(--border);
+        border-radius:12px; padding:12px 13px; margin-bottom:10px;
+    }
+    .pref-card.is-muted { border-color:var(--caution); }
+    .pref-name { font-weight:600; font-size:14px; display:flex; align-items:center; gap:8px; }
+    .pref-toggle-row {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:9px 0; margin-top:8px; border-top:1px solid var(--border-soft);
+    }
+    .pref-toggle-row .lbl { font-size:12.5px; color:var(--text-muted); }
+    .pref-mute-row {
+        display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+        padding-top:10px; margin-top:6px; border-top:1px solid var(--border-soft);
+    }
+    .pref-mute-row .lbl { font-size:11px; color:var(--text-dim); }
+    .pref-mute-row button {
+        padding:6px 10px; border-radius:7px; font-size:11.5px; font-weight:600;
+        border:1px solid var(--border); background:var(--panel-2); color:var(--text);
+        cursor:pointer; font-family:var(--font-ui);
+    }
+    .pref-mute-row .muted-note { font-size:11.5px; color:var(--caution); font-family:var(--font-mono); }
+    .pref-mute-row .unmute { border-color:var(--caution); color:var(--caution); background:transparent; }
+    .tsw {
+        width:40px; height:23px; border-radius:12px; flex:0 0 auto;
+        background:var(--border); border:none; position:relative; cursor:pointer;
+        transition:background .15s ease;
+    }
+    .tsw::after {
+        content:""; position:absolute; top:2px; left:2px; width:19px; height:19px;
+        border-radius:50%; background:#fff; transition:left .15s ease;
+        box-shadow:0 1px 3px rgba(0,0,0,.4);
+    }
+    .tsw[aria-checked="true"] { background:var(--live); }
+    .tsw[aria-checked="true"]::after { left:19px; }
+    @media (prefers-reduced-motion:reduce) { .tsw, .tsw::after { transition:none; } }
+
     /* ---------------- tab bar ---------------- */
     .tabbar {
         position:fixed; left:0; right:0; bottom:0; z-index:20;
@@ -318,6 +375,14 @@
             <p class="sec-label" style="margin-top:18px">Pocket Dash · single-column companion to the main dashboard</p>
         </section>
     </main>
+
+    <div id="prefs-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="prefs-back">‹ Back</button>
+            <span class="ttl">Per-hotspot alerts</span>
+        </div>
+        <div class="prefs-body" id="prefs-body"></div>
+    </div>
 
     <nav class="tabbar" role="tablist">
         <button role="tab" data-go="status" aria-selected="true" aria-label="Status">
@@ -646,9 +711,11 @@
         if (sub && Notification.permission === "granted") {
             stateEl.innerHTML = '<span class="on">On</span> — this device will get alerts';
             actEl.innerHTML =
+                '<button class="primary" id="notif-customize">Customize per hotspot</button>' +
                 '<button id="notif-test">Send test</button>' +
                 '<button id="notif-off">Turn off</button>';
-            hintEl.textContent = "You'll be alerted when any hotspot drops offline or a call starts. Per-hotspot control and mute are coming in a later update.";
+            hintEl.textContent = "Alerts fire on offline and call-start. Tap Customize to tune each hotspot or mute one.";
+            document.getElementById("notif-customize").onclick = openPrefsScreen;
             document.getElementById("notif-test").onclick = sendNotifTest;
             document.getElementById("notif-off").onclick = disableNotifs;
         } else {
@@ -711,6 +778,96 @@
         } catch (e) { if (btn) btn.textContent = "Failed"; }
         setTimeout(refreshNotifState, 1600);
     }
+
+    /* ---- per-hotspot alert prefs (PR 5) ---- */
+    var notifPrefs = {};   // hotspot_id -> stored prefs (partial; defaults filled by prefFor)
+
+    function prefFor(hid) {
+        var p = notifPrefs[hid] || {};
+        return {
+            offline: p.offline !== undefined ? p.offline : true,
+            call_start: p.call_start !== undefined ? p.call_start : false,
+            muted_until: p.muted_until || null,
+        };
+    }
+    function fmtLeft(secs) {
+        secs = Math.max(0, Math.floor(secs));
+        var h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60);
+        return h ? h + "h " + m + "m" : m + "m";
+    }
+
+    async function openPrefsScreen() {
+        try { notifPrefs = await fetch("/api/notification_prefs").then(function (r) { return r.json(); }); }
+        catch (e) { notifPrefs = {}; }
+        renderPrefsScreen();
+        document.getElementById("prefs-screen").classList.add("open");
+    }
+    function closePrefsScreen() {
+        document.getElementById("prefs-screen").classList.remove("open");
+    }
+
+    function renderPrefsScreen() {
+        var host = document.getElementById("prefs-body");
+        var list = lastData || [];
+        if (!list.length) {
+            host.innerHTML = '<div class="empty"><p>No hotspots configured.</p></div>';
+            return;
+        }
+        var now = Date.now() / 1000;
+        host.innerHTML = list.map(function (hs) {
+            var p = prefFor(hs.id);
+            var muted = p.muted_until && p.muted_until > now;
+            var typeLabel = hs.type === "asl3" ? "ASL3" : hs.type === "openspot4" ? "OSP4" : "WPSD";
+            var muteRow = muted
+                ? '<span class="muted-note">Muted · ' + fmtLeft(p.muted_until - now) + ' left</span>' +
+                  '<button class="unmute" data-hid="' + esc(hs.id) + '" data-mute="0">Unmute</button>'
+                : '<span class="lbl">Mute</span>' +
+                  '<button data-hid="' + esc(hs.id) + '" data-mute="3600">1h</button>' +
+                  '<button data-hid="' + esc(hs.id) + '" data-mute="14400">4h</button>' +
+                  '<button data-hid="' + esc(hs.id) + '" data-mute="86400">24h</button>';
+            return '<div class="pref-card' + (muted ? ' is-muted' : '') + '">' +
+                '<div class="pref-name">' + esc(hs.name) +
+                  '<span class="type-badge">' + typeLabel + '</span></div>' +
+                '<div class="pref-toggle-row"><span class="lbl">Offline &amp; recovery</span>' +
+                  '<button class="tsw" role="switch" aria-checked="' + (p.offline ? "true" : "false") +
+                  '" data-hid="' + esc(hs.id) + '" data-key="offline"></button></div>' +
+                '<div class="pref-toggle-row"><span class="lbl">Call starts</span>' +
+                  '<button class="tsw" role="switch" aria-checked="' + (p.call_start ? "true" : "false") +
+                  '" data-hid="' + esc(hs.id) + '" data-key="call_start"></button></div>' +
+                '<div class="pref-mute-row">' + muteRow + '</div>' +
+            '</div>';
+        }).join("");
+    }
+
+    async function savePref(hid, key, value) {
+        var body = { hotspot_id: hid };
+        body[key] = value;
+        try {
+            var r = await fetch("/api/notification_prefs", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            }).then(function (x) { return x.json(); });
+            if (r && r.prefs) notifPrefs[hid] = r.prefs;
+        } catch (e) { /* leave optimistic UI as-is */ }
+        renderPrefsScreen();
+    }
+
+    document.getElementById("prefs-back").onclick = closePrefsScreen;
+    document.getElementById("prefs-body").addEventListener("click", function (e) {
+        var sw = e.target.closest(".tsw");
+        if (sw) {
+            var on = sw.getAttribute("aria-checked") !== "true";
+            sw.setAttribute("aria-checked", on ? "true" : "false");
+            savePref(sw.getAttribute("data-hid"), sw.getAttribute("data-key"), on);
+            return;
+        }
+        var mb = e.target.closest("[data-mute]");
+        if (mb) {
+            var secs = parseInt(mb.getAttribute("data-mute"), 10);
+            savePref(mb.getAttribute("data-hid"), "muted_until",
+                     secs ? (Date.now() / 1000 + secs) : null);
+        }
+    });
     </script>
 </body>
 </html>
