@@ -3436,5 +3436,28 @@ if (location.hash) {
     if (btn) switchTab(tabName, btn);
 }
 </script>
+<script>
+/* Reached from the Pocket Dash mobile app (?m=1): point "back to
+   dashboard" at /mobile, and carry the flag on links between these
+   sub-pages. Session-scoped so a redirect that drops the query string
+   (e.g. after saving a hotspot) still remembers. */
+(function () {
+    var fromMobile = new URLSearchParams(location.search).get('m') === '1';
+    try {
+        if (fromMobile) sessionStorage.setItem('pd-from-mobile', '1');
+        else fromMobile = sessionStorage.getItem('pd-from-mobile') === '1';
+    } catch (e) {}
+    if (!fromMobile) return;
+    document.querySelectorAll('a[href]').forEach(function (a) {
+        var h = a.getAttribute('href');
+        if (h === '/') {
+            a.setAttribute('href', '/mobile');
+            a.textContent = a.textContent.replace(/dashboard/i, 'Pocket Dash');
+        } else if (/^\/(setup|version|readme)(\?|$)/.test(h) && h.indexOf('m=1') === -1) {
+            a.setAttribute('href', h + (h.indexOf('?') === -1 ? '?' : '&') + 'm=1');
+        }
+    });
+})();
+</script>
 </body>
 </html>
