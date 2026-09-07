@@ -1717,10 +1717,16 @@ appear as pins — the QRZ subscription caveat above applies here too.
     whichever port you set here) explicitly, and keep it in sync if you
     ever change the port in Settings.
 - **POTA spots** — a "POTA spots" checkbox in the map legend plots
-  current Parks on the Air activator spots worldwide, color-coded
-  separately from every hotspot/QSO color (shown in the Map key). Free,
-  no-auth public feed (`api.pota.app`), no configuration needed — just
-  turn it on. Off by default, only polls while the checkbox is checked.
+  current Parks on the Air activator spots worldwide. Pins are styled by
+  what you still need: a park you haven't hunted shows as a bright pin, a
+  park you've worked is dimmed, spots early in an activation (under 10
+  QSOs) are drawn a little larger, and just-spotted ones pulse. Click a
+  pin to draw a line back to your station (the tooltip shows distance and
+  bearing). Free, no-auth public feed (`api.pota.app`) — turn it on with
+  no configuration; add a callsign under Settings → Integrations → Parks
+  on the Air and it also knows which parks are new to you. Off by
+  default, only polls while the checkbox is checked. See also the **POTA
+  card** for the ranked spot list + hunter stats.
 - **SOTA spots** — same idea for Summits on the Air: a "SOTA spots"
   checkbox plots current activator spots worldwide (`api2.sota.org.uk`,
   free, no key). Each spot's summit position is resolved server-side

@@ -396,6 +396,11 @@ BIOS = {
         "blurb": "Mississippi-born bluesman whose hypnotic, one-chord boogie and foot-stomping rhythm on records like \"Boogie Chillen'\" became foundational DNA for rock and roll.",
         "wiki": "John_Lee_Hooker",
     },
+    "Waters": {
+        "name": "Muddy Waters",
+        "blurb": "The father of modern Chicago blues, who took the Delta slide sound electric on \"Hoochie Coochie Man\" and \"Rollin' Stone\" — the latter giving the Rolling Stones their name.",
+        "wiki": "Muddy_Waters",
+    },
 }
 
 

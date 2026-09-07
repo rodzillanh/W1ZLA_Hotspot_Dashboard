@@ -1464,6 +1464,8 @@ def api_pota():
         "callsign": call or None,
         "has_callsign": bool(call),
         "worked_count": len(worked),
+        "qth_lat": qth[0] if qth is not None else None,
+        "qth_lon": qth[1] if qth is not None else None,
         "hunter": hunter,
     })
 

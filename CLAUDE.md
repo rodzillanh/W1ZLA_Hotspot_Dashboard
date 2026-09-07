@@ -1687,11 +1687,23 @@ config for per-integration credentials; put it in
   `⚙ Stats` button both call `openPotaDrawer()`.
   - **`/api/pota` enriches `/api/pota_spots`' feed** with `dist_mi` +
     `bearing` (a plain great-circle solve, `_haversine_bearing()` in
-    app.py — the card only needs "560 mi NW", not survey precision) and
-    `new_to_you`, plus the `hunter` block from `pota_client.hunter()`.
-    The map overlay still uses the bare `/api/pota_spots` — don't route
-    it through `/api/pota` (that does a `load_qsos()` scan + a profile
-    fetch the overlay doesn't need).
+    app.py — only needs "560 mi NW", not survey precision), `new_to_you`,
+    `qth_lat`/`qth_lon`, plus the `hunter` block from
+    `pota_client.hunter()`.
+  - **v4.48: the Live map's "POTA spots" overlay ALSO uses `/api/pota`
+    now** (was the bare `/api/pota_spots`) so pins can be styled by
+    `new_to_you` — bright cyan = a park you need, dim/hollow = worked,
+    early-in-the-activation (`qso_count < 10`) drawn larger, fresh spots
+    pulse via the existing `.qso-new-pulse` class. Clicking a pin draws
+    a dashed line to `qth_lat`/`qth_lon` (`potaLineLayer`, cleared on the
+    next click / toggle-off). The extra server cost vs. the old bare
+    feed — a `load_qsos()` scan (local JSON read) + `hunter()` (cached
+    10 min, skipped with no callsign) — is fine at the overlay's
+    tab-visible-only 20 s poll. `/api/pota_spots` is now unused by this
+    app but kept as a documented public endpoint. The card's
+    `fetchPota()` and the map's `updatePota()` poll `/api/pota`
+    independently (they can be enabled separately); both lean on the
+    same server-side caches so it's not doubled external load.
   - **`new_to_you`** = a spot's `reference` not in (POTA refs found on
     your logged QSOs) ∪ (refs from your recent POTA hunts on the
     profile). The QSO side needs the ADIF importer to have captured

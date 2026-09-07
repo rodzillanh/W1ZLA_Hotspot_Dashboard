@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.47"
+APP_VERSION = "4.48"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -151,6 +151,10 @@ VERSION_CODENAMES = [
     "Hooker",           # v4.47 -- John Lee Hooker, Delta-blues guitarist
                         # and singer, a foundational influence on rock
                         # (1917-2001)
+    "Waters",           # v4.48 -- Muddy Waters, "the father of modern
+                        # Chicago blues", whose electrified sound shaped
+                        # rock and roll (the Rolling Stones took their
+                        # name from his song) (1913-1983)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 

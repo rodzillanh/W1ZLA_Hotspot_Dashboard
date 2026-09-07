@@ -6893,7 +6893,7 @@ function renderMapKey(nodes, hotspotColors) {
         ${potaOn ? `
         <div class="map-key-row">
             <span class="map-key-swatch" style="background:${POTA_COLOR}"></span>
-            <b>POTA spots</b>
+            <b>POTA</b> <span style="color:var(--text-muted)">— bright = new to you, dim = worked</span>
         </div>` : ''}
         ${sotaOn ? `
         <div class="map-key-row">
@@ -7288,22 +7288,57 @@ function toggleAurora() {
 
 // --- map: POTA (Parks on the Air) activator spots -- same lazy on/off
 // toggle pattern as Aurora oval above, for the same reason (real
-// backend/external-API cost). No per-user config needed (see pota.py) --
-// unlike PSK Reporter below, there's no "my callsign" involved.
+// backend/external-API cost). Pulls /api/pota (not the bare
+// /api/pota_spots) so pins can be styled by new_to_you and a clicked
+// pin can draw a line back to the station QTH -- both enrichments the
+// POTA card also uses. Still needs no config to be useful (with no
+// pota_callsign / no POTA-tagged QSOs every pin is just "new to you").
 const POTA_KEY = 'w1zla_show_pota';
 let potaLayer = null;
 let potaTimer = null;
+let potaLineLayer = null;
+const POTA_DIR16 = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+
+function clearPotaLine() {
+    if (potaLineLayer) { leafletMap.removeLayer(potaLineLayer); potaLineLayer = null; }
+}
 
 function updatePota() {
     if (!leafletMap) return;
-    fetch('/api/pota_spots').then(r => r.json()).then(data => {
+    fetch('/api/pota').then(r => r.json()).then(data => {
         if (potaLayer) { leafletMap.removeLayer(potaLayer); potaLayer = null; }
         if (!data || data.error) return;
         const group = L.layerGroup();
+        const qla = data.qth_lat, qlo = data.qth_lon;
         (data.spots || []).forEach(s => {
-            L.circleMarker([s.lat, s.lon], {
-                radius: 5, color: POTA_COLOR, weight: 1, fillColor: POTA_COLOR, fillOpacity: 0.85,
-            }).bindTooltip(`${s.activator} - ${s.reference}${s.park_name ? ' (' + s.park_name + ')' : ''}<br>${s.band || '?'} ${s.mode}`).addTo(group);
+            const age = potaAgeMin(s.spot_time);
+            const need = !!s.new_to_you;
+            const early = (typeof s.qso_count === 'number') && s.qso_count < 10;
+            const m = L.circleMarker([s.lat, s.lon], {
+                radius: early ? 7 : 5,
+                color: need ? POTA_COLOR : '#6b7480',
+                weight: need ? 2 : 1,
+                fillColor: POTA_COLOR,
+                fillOpacity: need ? 0.9 : 0.12,
+                className: age <= 5 ? 'qso-new-pulse' : '',
+            });
+            const dist = (s.dist_mi != null && s.bearing != null)
+                ? `${s.dist_mi} mi ${POTA_DIR16[Math.round((((s.bearing % 360) + 360) % 360) / 22.5) % 16]}` : '';
+            m.bindTooltip(
+                `${s.activator} - ${s.reference}${s.park_name ? ' (' + s.park_name + ')' : ''}`
+                + `<br>${s.band || '?'} ${s.mode}${dist ? ' - ' + dist : ''}`
+                + `<br><b style="color:${need ? POTA_COLOR : '#9aa2ad'}">${need ? '🚩 new to you' : 'worked before'}</b>`
+                + (typeof s.qso_count === 'number' ? ` - ${s.qso_count} Q` : '')
+            );
+            if (qla != null && qlo != null) {
+                m.on('click', () => {
+                    clearPotaLine();
+                    potaLineLayer = L.polyline([[qla, qlo], [s.lat, s.lon]], {
+                        color: POTA_COLOR, weight: 2, opacity: 0.7, dashArray: '5,5', interactive: false,
+                    }).addTo(leafletMap);
+                });
+            }
+            m.addTo(group);
         });
         potaLayer = group;
         if (document.getElementById('pota-toggle').checked) group.addTo(leafletMap);
@@ -7325,6 +7360,7 @@ function togglePota() {
     } else {
         if (potaLayer) { leafletMap.removeLayer(potaLayer); potaLayer = null; }
         if (potaTimer) { clearInterval(potaTimer); potaTimer = null; }
+        clearPotaLine();
     }
     renderMapKey();
 }
