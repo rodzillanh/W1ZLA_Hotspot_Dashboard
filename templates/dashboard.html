@@ -1298,6 +1298,10 @@
         .pota-d-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
         .pota-d-stat { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 8px;
             padding: 10px 6px; text-align: center; display: flex; flex-direction: column; gap: 3px; }
+        a.pota-d-stat { text-decoration: none; color: inherit; cursor: pointer;
+            transition: border-color .12s, background .12s; }
+        a.pota-d-stat:hover { border-color: color-mix(in srgb, var(--live) 55%, var(--border));
+            background: var(--live-dim); }
         .pota-d-stat b { font-family: var(--font-mono); font-size: 19px; font-weight: 600;
             font-variant-numeric: tabular-nums; line-height: 1; }
         .pota-d-stat span { font-size: 9px; letter-spacing: .09em; text-transform: uppercase; color: var(--text-muted); }
@@ -7806,14 +7810,21 @@ function renderPotaDrawer() {
     if (!d || !d.classList.contains('open') || !potaData) return;
     const h = potaData.hunter;
     const call = potaData.callsign || '—';
+    // Each stat tile links to the operator's POTA profile page (which is
+    // where all of parks/QSOs/awards/endorsements are broken out) -- but
+    // only when there's a real callsign; otherwise it's a plain div.
+    const profHref = potaData.callsign
+        ? `https://pota.app/#/profile/${encodeURIComponent(potaData.callsign)}` : null;
+    const statTile = (val, label) => profHref
+        ? `<a class="pota-d-stat" href="${profHref}" target="_blank" rel="noopener"><b>${val ?? '—'}</b><span>${label}</span></a>`
+        : `<div class="pota-d-stat"><b>${val ?? '—'}</b><span>${label}</span></div>`;
     let statsHtml;
     if (h) {
         const tiles = [
             [h.parks, 'parks'], [h.qsos, 'QSOs'], [h.awards, 'awards'],
             [h.endorsements, 'endorse'], [h.attempt_activations, 'attempts'],
         ];
-        statsHtml = '<div class="pota-d-stat-grid">' + tiles.map(t =>
-            `<div class="pota-d-stat"><b>${t[0] ?? '—'}</b><span>${t[1]}</span></div>`).join('') + '</div>';
+        statsHtml = '<div class="pota-d-stat-grid">' + tiles.map(t => statTile(t[0], t[1])).join('') + '</div>';
         const recent = h.recent_hunts || [];
         const huntsHtml = recent.length
             ? recent.slice(0, 12).map(x => {
@@ -7824,10 +7835,7 @@ function renderPotaDrawer() {
               }).join('')
             : '<div style="font-size:12px;color:var(--text-muted);font-style:italic">No recent hunts.</div>';
         const actHtml = h.is_activator
-            ? `<div class="pota-d-stat-grid" style="grid-template-columns:repeat(2,1fr)">
-                 <div class="pota-d-stat"><b>${h.activations ?? '—'}</b><span>activations</span></div>
-                 <div class="pota-d-stat"><b>${h.parks ?? '—'}</b><span>parks</span></div>
-               </div>`
+            ? `<div class="pota-d-stat-grid" style="grid-template-columns:repeat(2,1fr)">${statTile(h.activations, 'activations')}${statTile(h.parks, 'parks')}</div>`
             : '<div style="font-size:12px;color:var(--text-muted);font-style:italic">No activations yet — this section fills in once you have one.</div>';
         statsHtml += `<div style="font-size:11px;color:var(--text-muted);margin-top:9px;line-height:1.5">`
             + `From <span style="font-family:var(--font-mono)">api.pota.app/profile/${escapeHtml(call)}</span>, cached ~10&nbsp;min.</div>`
