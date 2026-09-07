@@ -386,6 +386,16 @@ BIOS = {
         "blurb": "Stax Records' defining voice and one of soul music's greatest singers, whose \"(Sittin' On) The Dock of the Bay\" topped the charts weeks after he died in a 1967 plane crash at 26.",
         "wiki": "Otis_Redding",
     },
+    "Strummer": {
+        "name": "Joe Strummer",
+        "blurb": "Frontman, rhythm guitarist and co-songwriter of The Clash, the punk band that pulled reggae, rockabilly and dub into a politically charged sound on \"London Calling\".",
+        "wiki": "Joe_Strummer",
+    },
+    "Hooker": {
+        "name": "John Lee Hooker",
+        "blurb": "Mississippi-born bluesman whose hypnotic, one-chord boogie and foot-stomping rhythm on records like \"Boogie Chillen'\" became foundational DNA for rock and roll.",
+        "wiki": "John_Lee_Hooker",
+    },
 }
 
 

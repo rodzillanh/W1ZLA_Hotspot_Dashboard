@@ -726,6 +726,15 @@
                      id="top-activity-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show POTA card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (ranked Parks on the Air activator spots + your hunter stats -- set your callsign under Integrations for stats)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_pota', False) else '' }}"
+                     id="pota-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show DVSwitch card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (only appears if an ASL3 hotspot also has "This node also runs DVSwitch" on -- turn this off to hide the card while keeping that enabled)
@@ -850,6 +859,7 @@
             {% set recent_contacts_pos = settings.get('recent_contacts_position', 0) if settings.get('show_recent_contacts', False) else -1 %}
             {% set qso_stats_pos = settings.get('qso_stats_position', 0) if settings.get('show_qso_stats', False) else -1 %}
             {% set top_activity_pos = settings.get('top_activity_position', 0) if settings.get('show_top_activity', False) else -1 %}
+            {% set pota_pos = settings.get('pota_position', 0) if settings.get('show_pota', False) else -1 %}
             {# DVSwitch (v3.99) -- one consolidated card, shown when the
                "Show DVSwitch card" toggle (show_dvswitch, default on) is
                on AND any hotspot has dvswitch_enabled set. #}
@@ -952,6 +962,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🏆 Top 5 Activity</span>
                     <span class="node-meta">fleet callsign activity ranking card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == pota_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__pota__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🏕️ POTA</span>
+                    <span class="node-meta">hunter + spots card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -1332,6 +1349,31 @@
         </div>
         <button class="btn btn-primary" onclick="savePskReporter()">Save PSK Reporter settings</button>
         <span class="status-txt" id="psk-status"></span>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Parks on the Air (POTA)
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — for the POTA card's hunter stats
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            The POTA card (Settings → Cards) shows live activator spots with no config at
+            all. Add your callsign here and it also shows your <b>hunter stats</b> (parks,
+            QSOs, awards) and flags which spotted parks are new to you. This is a plain
+            callsign, <b>not a login</b> — every <a href="https://api.pota.app" target="_blank"
+            style="color:var(--link)">api.pota.app</a> endpoint used is public.
+        </p>
+        <div class="form-grid one" style="margin-bottom:10px">
+            <div>
+                <label>Your callsign</label>
+                <input type="text" id="pota-callsign" placeholder="W1ZLA" style="width:140px;text-transform:uppercase"
+                       value="{{ settings.get('pota_callsign', '') }}">
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="savePota()">Save POTA settings</button>
+        <span class="status-txt" id="pota-status"></span>
     </div>
 
     <div class="section">
@@ -2031,6 +2073,7 @@ function saveCards() {
             fleet_alerts_enabled: document.getElementById('fleet-alerts-toggle').classList.contains('on'),
             solar_alerts_enabled: document.getElementById('solar-alerts-toggle').classList.contains('on'),
             show_top_activity: document.getElementById('top-activity-toggle').classList.contains('on'),
+            show_pota: document.getElementById('pota-toggle').classList.contains('on'),
             show_dvswitch: document.getElementById('dvswitch-card-toggle').classList.contains('on'),
             brandmeister_alerts_enabled: document.getElementById('brandmeister-alerts-toggle').classList.contains('on'),
             qrz_logbook_enabled: document.getElementById('qrz-logbook-toggle').classList.contains('on'),
@@ -3269,6 +3312,21 @@ function savePskReporter() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             psk_reporter_callsign: document.getElementById('psk-callsign').value.trim(),
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+// --- POTA ---
+function savePota() {
+    const status = document.getElementById('pota-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            pota_callsign: document.getElementById('pota-callsign').value.trim().toUpperCase(),
         })
     }).then(() => {
         status.textContent = '✓ Saved';

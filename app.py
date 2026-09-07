@@ -3,6 +3,7 @@ import threading
 import hashlib
 import inspect
 import datetime
+import math
 import os
 import re
 import subprocess
@@ -590,6 +591,15 @@ def api_settings_post():
             settings["top_activity_position"] = max(0, int(data["top_activity_position"]))
         except (TypeError, ValueError):
             pass
+    if "show_pota" in data:
+        settings["show_pota"] = bool(data["show_pota"])
+    if "pota_position" in data:
+        try:
+            settings["pota_position"] = max(0, int(data["pota_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "pota_callsign" in data:
+        settings["pota_callsign"] = data["pota_callsign"].strip().upper()
     if "dvswitch_position" in data:
         try:
             settings["dvswitch_position"] = max(0, int(data["dvswitch_position"]))
@@ -885,6 +895,7 @@ _SENTINEL_DEFS = [
     ("__recent_contacts__", "show_recent_contacts", "recent_contacts_position", "📻", "Recent Contacts", "logged QSO card"),
     ("__qso_stats__", "show_qso_stats", "qso_stats_position", "📈", "QSO Stats", "logbook summary card"),
     ("__top_activity__", "show_top_activity", "top_activity_position", "🏆", "Top 5 Activity", "fleet callsign activity ranking card"),
+    ("__pota__", "show_pota", "pota_position", "🏕️", "POTA", "hunter + spots card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -1387,6 +1398,75 @@ def api_pota_spots():
         return jsonify({"error": "unavailable"}), 503
     return jsonify(data)
 
+_MI_PER_KM = 0.621371
+
+def _haversine_bearing(lat1, lon1, lat2, lon2):
+    """(distance in miles, initial bearing in degrees 0-360) from point 1
+    to point 2. Plain great-circle math -- the POTA card only needs a
+    rough '560 mi NW' per spot, not survey precision."""
+    r1, r2 = math.radians(lat1), math.radians(lat2)
+    dlon = math.radians(lon2 - lon1)
+    dlat = r2 - r1
+    a = math.sin(dlat / 2) ** 2 + math.cos(r1) * math.cos(r2) * math.sin(dlon / 2) ** 2
+    dist_km = 6371.0 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    y = math.sin(dlon) * math.cos(r2)
+    x = math.cos(r1) * math.sin(r2) - math.sin(r1) * math.cos(r2) * math.cos(dlon)
+    brg = (math.degrees(math.atan2(y, x)) + 360) % 360
+    return dist_km * _MI_PER_KM, brg
+
+@app.route("/api/pota")
+def api_pota():
+    """The POTA card: the same activator spot feed as /api/pota_spots,
+    enriched with distance/bearing from the station grid and a
+    `new_to_you` flag (a park not in your logged QSOs' POTA refs nor your
+    recent POTA hunts), plus your POTA hunter profile for the card's
+    drawer. `pota_callsign` (Settings -> Integrations) is a plain
+    callsign, not a credential -- every api.pota.app endpoint used is
+    public. Blank callsign still returns the spot list; it just can't
+    fill the hunter block or flag new-to-you parks from recent hunts."""
+    settings = load_settings()
+    call = settings.get("pota_callsign", "").strip().upper()
+    spots_data = pota_client.get()
+    if spots_data is None:
+        return jsonify({"error": "unavailable"}), 503
+
+    hunter = pota_client.hunter(call) if call else None
+
+    # "Parks you've already worked" = POTA refs on your logged QSOs +
+    # every park in your recent POTA hunts from the profile.
+    worked = set()
+    for q in load_qsos():
+        for ref in (q.get("pota_refs") or []):
+            worked.add(str(ref).upper())
+    if hunter:
+        for h in hunter.get("recent_hunts", []):
+            if h.get("reference"):
+                worked.add(str(h["reference"]).upper())
+
+    qth = grid_to_latlon(settings.get("station_grid", ""))
+    out = []
+    for s in spots_data.get("spots", []):
+        row = dict(s)
+        ref = (s.get("reference") or "").upper()
+        row["new_to_you"] = bool(ref) and ref not in worked
+        if qth is not None and s.get("lat") is not None and s.get("lon") is not None:
+            dist_mi, brg = _haversine_bearing(qth[0], qth[1], s["lat"], s["lon"])
+            row["dist_mi"] = round(dist_mi)
+            row["bearing"] = round(brg)
+        else:
+            row["dist_mi"] = None
+            row["bearing"] = None
+        out.append(row)
+
+    return jsonify({
+        "spots": out,
+        "fetched_at": spots_data.get("fetched_at"),
+        "callsign": call or None,
+        "has_callsign": bool(call),
+        "worked_count": len(worked),
+        "hunter": hunter,
+    })
+
 @app.route("/api/sota_spots")
 def api_sota_spots():
     """Live Summits on the Air activator spots for the Live map's optional
@@ -1428,6 +1508,21 @@ def _adif_freq_to_hz(freq_mhz_str) -> "int | None":
         return round(float(freq_mhz_str) * 1_000_000)
     except (TypeError, ValueError):
         return None
+
+_POTA_REF_RE = re.compile(r"[A-Z0-9]{1,4}-\d{3,6}", re.IGNORECASE)
+
+def _adif_pota_refs(r: dict) -> "list | None":
+    """POTA park reference(s) for one ADIF record, or None. Prefers
+    POTA_REF (a real ADIF field, comma-separated for a multi-park hunt),
+    falls back to SIG_INFO when SIG is POTA. Returned uppercased with the
+    normal `US-1234` shape; anything not matching that shape is dropped."""
+    raw = (r.get("POTA_REF") or "").strip()
+    if not raw and (r.get("SIG") or "").strip().upper() == "POTA":
+        raw = (r.get("SIG_INFO") or "").strip()
+    if not raw:
+        return None
+    refs = [m.group(0).upper() for m in _POTA_REF_RE.finditer(raw)]
+    return refs or None
 
 def _adif_datetime_to_epoch(qso_date: str, time_on) -> "float | None":
     """QSO_DATE is YYYYMMDD, TIME_ON is HHMM or HHMMSS -- both UTC per the
@@ -1519,6 +1614,12 @@ def api_import_adif():
             "frequency_hz": _adif_freq_to_hz(r.get("FREQ")),
             "lat": lat, "lon": lon,
             "qth_lat": qth_lat, "qth_lon": qth_lon,
+            # POTA park reference(s) hunted in this QSO, if the log carries
+            # them -- POTA_REF (may be a comma list for a multi-park hunt)
+            # or SIG_INFO when SIG=POTA. Used by /api/pota to flag which
+            # currently-spotted parks are new to you. Absent for a normal
+            # non-POTA QSO.
+            "pota_refs": _adif_pota_refs(r),
             # ADIF's own NAME/COUNTRY fields (when the logging software
             # already captured them) take priority over QRZ's -- more
             # likely to reflect what was actually true at QSO time, and

@@ -1501,6 +1501,37 @@ favorite alerts above for the one place this dashboard *does* use a
 Brandmeister live connection, for a different, narrower purpose).
 
 <!-- wiki-group: Optional Cards -->
+## POTA card
+
+Optional dashboard card (Settings → Cards → "Show POTA card", off by
+default) for Parks on the Air hunters. It's a **fixed-size card** — a
+one-line stat glance, then a ranked activator-spot list at a fixed
+height that scrolls — so it sits level with your other cards no matter
+what.
+
+The spot list is the same live `api.pota.app/spot/activator` feed the
+Live map's "POTA spots" overlay uses, but **ranked** rather than
+newest-first: "Smart rank" (the default) surfaces parks that are new to
+you, freshly spotted, close to you, and early in the activation (a
+low QSO count means you'll get through and the activator still needs
+contacts). Other views: **New parks only**, **Nearest**, **Freshest**,
+or by mode (CW / SSB / FT8·FT4). Each row shows the activator (linked to
+QRZ), park reference and name, frequency/band/mode, **distance and
+bearing from your grid**, location, spot comment, age, and QSO count.
+
+A **🚩 NEW** tag marks parks you haven't worked — checked against the
+POTA references in your logged QSOs (ADIF imports now keep `POTA_REF` /
+`SIG_INFO`) plus your recent POTA hunts.
+
+The **⚙ Stats** button (or the glance line) opens a side drawer with
+your POTA **hunter stats** — parks, QSOs, awards, endorsements — and
+your recent hunts. That needs your callsign under Settings →
+Integrations → Parks on the Air. It's a plain callsign, **not a login**:
+every `api.pota.app` endpoint used here is public, no account or key.
+Without a callsign the card still works — it just shows the spot list
+without stats.
+
+<!-- wiki-group: Optional Cards -->
 ## Big Ass Clock card
 <!-- wiki-image: big-clock-card.png -->
 

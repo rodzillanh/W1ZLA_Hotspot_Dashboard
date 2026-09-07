@@ -1236,6 +1236,80 @@
         .qso-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
         .qso-grid { font-family: var(--font-mono); color: var(--text-dim); }
 
+        /* --- POTA card --- */
+        .pota-call-chip { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .03em;
+            padding: 2px 7px; border-radius: 5px; border: 1px solid var(--border);
+            color: var(--text-dim); background: var(--panel-2); font-weight: 400; }
+        .pota-gear { appearance: none; border: 1px solid var(--border); background: var(--panel-2);
+            border-radius: 7px; color: var(--text-dim); font: inherit; font-size: 11px; padding: 3px 9px;
+            cursor: pointer; }
+        .pota-gear:hover { color: var(--text); border-color: var(--text-muted); }
+        .pota-glance { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em;
+            margin-top: 8px; cursor: pointer; }
+        .pota-glance:hover { color: var(--text-dim); }
+        .pota-glance b { color: var(--text-dim); font-weight: 600; }
+        .pota-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--text-muted);
+            padding-top: 8px; margin-top: 6px; border-top: 1px solid var(--border-soft); }
+        .pota-cnt b { font-family: var(--font-mono); color: var(--text-dim); font-weight: 600; }
+        .pota-cnt .pota-newn { color: var(--live); margin-left: 4px; }
+        .pota-controls select { background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border);
+            border-radius: 6px; font: inherit; font-size: 10.5px; padding: 2px 6px; letter-spacing: 0;
+            text-transform: none; cursor: pointer; }
+        .pota-spots { display: flex; flex-direction: column; height: 300px; overflow-y: auto;
+            margin: 8px -4px 0; padding: 0 4px; scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent; }
+        .pota-spots::-webkit-scrollbar { width: 8px; }
+        .pota-spots::-webkit-scrollbar-track { background: transparent; }
+        .pota-spots::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px;
+            border: 2px solid var(--panel); }
+        .pota-spots::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+        .pota-spot { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; padding: 8px 4px;
+            border-radius: 6px; cursor: pointer; }
+        .pota-spot + .pota-spot { border-top: 1px solid var(--border-soft); }
+        .pota-spot:hover { background: var(--panel-2); }
+        .pota-spot.isnew { background: color-mix(in srgb, var(--live) 7%, transparent); }
+        .pota-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); margin-top: 5px; }
+        .pota-dot.fresh { background: var(--live);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 22%, transparent);
+            animation: potaPulse 2.2s ease-in-out infinite; }
+        @keyframes potaPulse { 0%,100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 22%, transparent); }
+            50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--live) 5%, transparent); } }
+        .pota-spot-main { min-width: 0; }
+        .pota-spot-top { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+        .pota-spot-act { font-family: var(--font-mono); font-weight: 650; font-size: 12.5px;
+            color: var(--text); letter-spacing: .02em; text-decoration: none; }
+        .pota-spot-act:hover { color: var(--live); }
+        .pota-spot-ref { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); text-decoration: none; }
+        .pota-spot-ref:hover { text-decoration: underline; }
+        .pota-spot-park { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; display: block; max-width: 100%; }
+        .pota-spot-sub { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); margin-top: 1px; }
+        .pota-spot-dist { color: var(--text-muted); }
+        .pota-spot-cmt { font-style: italic; color: var(--text-muted); }
+        .pota-spot-right { text-align: right; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
+            display: flex; flex-direction: column; gap: 3px; align-items: flex-end; font-variant-numeric: tabular-nums; }
+        .pota-spot-q.early { color: var(--caution); }
+        .pota-newtag { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .06em;
+            padding: 1px 5px; border-radius: 4px; color: var(--live);
+            background: color-mix(in srgb, var(--live) 14%, transparent);
+            border: 1px solid color-mix(in srgb, var(--live) 40%, var(--border)); }
+        .pota-d-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
+        .pota-d-stat { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 8px;
+            padding: 10px 6px; text-align: center; display: flex; flex-direction: column; gap: 3px; }
+        .pota-d-stat b { font-family: var(--font-mono); font-size: 19px; font-weight: 600;
+            font-variant-numeric: tabular-nums; line-height: 1; }
+        .pota-d-stat span { font-size: 9px; letter-spacing: .09em; text-transform: uppercase; color: var(--text-muted); }
+        .pota-d-hunt { display: grid; grid-template-columns: auto 1fr auto; gap: 9px; align-items: baseline;
+            font-size: 11.5px; padding: 4px 0; }
+        .pota-d-hunt + .pota-d-hunt { border-top: 1px solid var(--border-soft); }
+        .pota-d-hunt .h-call { font-family: var(--font-mono); color: var(--text-dim); white-space: nowrap; }
+        .pota-d-hunt .h-park { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+        .pota-d-hunt .h-park small { font-family: var(--font-mono); color: var(--text-dim); }
+        .pota-d-hunt .h-when { font-family: var(--font-mono); color: var(--text-muted); font-size: 10px; white-space: nowrap; }
+        @media (prefers-reduced-motion: reduce) { .pota-dot.fresh { animation: none; } }
+
         /* --- HamAlert card --- */
         .ha-badge {
             font-size: 10px; font-weight: 600; letter-spacing: .3px; padding: 1px 7px; border-radius: 9px;
@@ -2748,6 +2822,31 @@
             <div class="msg-empty" id="ta-empty" style="display:none">No fleet activity logged yet -- enable "Show fleet activity card" in Settings → Cards to start tracking callsign activity.</div>
         </div>
         {% endif %}
+        {% if settings.get('show_pota', False) %}
+        <div class="metrics-card" id="pota-card"
+             style="order:{{ settings.get('pota_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">🏕️ POTA{% if settings.get('pota_callsign', '') %} <span class="pota-call-chip">{{ settings.get('pota_callsign', '') }}</span>{% endif %}</div>
+                <button class="pota-gear" type="button" onclick="openPotaDrawer()">⚙ Stats</button>
+            </div>
+            <div class="pota-glance" id="pota-glance" role="button" tabindex="0"
+                 onclick="openPotaDrawer()">—</div>
+            <div class="pota-controls">
+                <span class="pota-cnt">Spots <b id="pota-cnt">—</b><span id="pota-newcnt"></span></span>
+                <select id="pota-sort" onchange="renderPotaCard()">
+                    <option value="smart">Smart rank</option>
+                    <option value="new">New parks only</option>
+                    <option value="near">Nearest</option>
+                    <option value="fresh">Freshest</option>
+                    <option value="CW">CW</option>
+                    <option value="SSB">SSB</option>
+                    <option value="FT8">FT8 / FT4</option>
+                </select>
+            </div>
+            <div class="pota-spots" id="pota-spots"></div>
+            <div class="msg-empty" id="pota-empty" style="display:none">No POTA activator spots right now.</div>
+        </div>
+        {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
         <div class="metrics-card" id="hf-conditions-card"
              style="order:{{ settings.get('hf_conditions_position', 0) }}">
@@ -3068,6 +3167,7 @@
 <div class="hs-drawer" id="camera-drawer"></div>
 <div class="hs-drawer" id="asl-drawer"></div>
 <div class="hs-drawer" id="flights-drawer"></div>
+<div class="hs-drawer" id="pota-drawer"></div>
 
 <!-- ASL Control's "Disconnect all links on this node" confirm dialog
      (v4.8) -- a standalone overlay, not one more hs-drawer, since it
@@ -3276,6 +3376,9 @@ const QSO_STATS_POSITION = {{ settings.get('qso_stats_position', 0) }};
 const QSO_STATS_POLL_MS = 20000;  // same cadence as Recent Contacts/the map -- same qsos.json source
 const SHOW_TOP_ACTIVITY = {{ 'true' if settings.get('show_top_activity', False) else 'false' }};
 const TOP_ACTIVITY_POSITION = {{ settings.get('top_activity_position', 0) }};
+const SHOW_POTA = {{ 'true' if settings.get('show_pota', False) else 'false' }};
+const POTA_POSITION = {{ settings.get('pota_position', 0) }};
+const POTA_POLL_MS = 20000;  // matches pota.py's spot cache TTL
 // DVSwitch card shows when SHOW_DVSWITCH is on AND at least one hotspot
 // has dvswitch_enabled (derived per-poll from data.some(...)). Default
 // true, so an install that already had a DVSwitch hotspot is unaffected
@@ -3844,7 +3947,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     notifications: '__notifications__', satellites: '__satellites__',
     flightsoverhead: '__flights_overhead__',
     recentcontacts: '__recent_contacts__', qsostats: '__qso_stats__',
-    topactivity: '__top_activity__', dvswitch: '__dvswitch__',
+    topactivity: '__top_activity__', pota: '__pota__', dvswitch: '__dvswitch__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -3987,6 +4090,9 @@ function renderCards(data) {
     }
     if (SHOW_TOP_ACTIVITY) {
         sentinels.push({ key: 'topactivity', pos: Math.max(0, TOP_ACTIVITY_POSITION) });
+    }
+    if (SHOW_POTA) {
+        sentinels.push({ key: 'pota', pos: Math.max(0, POTA_POSITION) });
     }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, hfcond, bandplan,
@@ -7611,6 +7717,165 @@ if (SHOW_QSO_STATS) {
     setInterval(fetchQsoStats, QSO_STATS_POLL_MS);
 }
 
+// --- POTA card (hunter + spots) -- one /api/pota poll feeds both the
+// fixed-size card body (ranked spot list) and the side drawer (full
+// hunter stats + recent hunts). See pota.py / api_pota().
+let potaData = null;
+
+function potaAgeMin(iso) {
+    if (!iso) return 999;
+    const t = Date.parse(iso.endsWith('Z') || iso.includes('+') ? iso : iso + 'Z');
+    if (isNaN(t)) return 999;
+    return Math.max(0, Math.round((Date.now() - t) / 60000));
+}
+function potaAgeStr(m) { return m < 60 ? m + 'm' : Math.floor(m / 60) + 'h' + (m % 60) + 'm'; }
+function potaScore(s) {
+    const age = potaAgeMin(s.spot_time);
+    const fresh = Math.max(0, 40 - age);
+    const near = (s.dist_mi != null) ? Math.max(0, 30 - s.dist_mi / 100) : 0;
+    const q = (typeof s.qso_count === 'number') ? s.qso_count : 99;
+    const early = q < 10 ? (10 - q) : 0;
+    return (s.new_to_you ? 100 : 0) + fresh + near + early;
+}
+
+function renderPotaCard() {
+    const listEl = document.getElementById('pota-spots');
+    if (!listEl || !potaData) return;
+    const spots = potaData.spots || [];
+    const v = (document.getElementById('pota-sort') || {}).value || 'smart';
+
+    let list = spots.slice();
+    if (v === 'new')      list = list.filter(s => s.new_to_you);
+    else if (v === 'CW')  list = list.filter(s => s.mode === 'CW');
+    else if (v === 'SSB') list = list.filter(s => s.mode === 'SSB');
+    else if (v === 'FT8') list = list.filter(s => s.mode === 'FT8' || s.mode === 'FT4');
+    if (v === 'near')       list.sort((a, b) => (a.dist_mi ?? 1e9) - (b.dist_mi ?? 1e9));
+    else if (v === 'fresh') list.sort((a, b) => potaAgeMin(a.spot_time) - potaAgeMin(b.spot_time));
+    else                    list.sort((a, b) => potaScore(b) - potaScore(a));
+
+    const newCount = spots.filter(s => s.new_to_you).length;
+    document.getElementById('pota-cnt').textContent = spots.length;
+    document.getElementById('pota-newcnt').innerHTML = newCount
+        ? ` <span class="pota-newn">· ${newCount} new</span>` : '';
+
+    const h = potaData.hunter;
+    const glance = document.getElementById('pota-glance');
+    if (h) {
+        const last = (h.recent_hunts && h.recent_hunts[0]) ? h.recent_hunts[0].reference : null;
+        glance.innerHTML = `<b>${h.parks ?? '—'}</b> parks · <b>${h.qsos ?? '—'}</b> Q · <b>${h.awards ?? '—'}</b> awards`
+            + (last ? ` · last ${escapeHtml(last)}` : '');
+    } else {
+        glance.innerHTML = potaData.has_callsign
+            ? 'Hunter stats unavailable right now'
+            : 'Set your callsign in Settings → Integrations for hunter stats';
+    }
+
+    const emptyEl = document.getElementById('pota-empty');
+    if (emptyEl) emptyEl.style.display = list.length ? 'none' : 'block';
+
+    const dirName = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+    listEl.innerHTML = list.map(s => {
+        const age = potaAgeMin(s.spot_time);
+        const call = s.activator || '?';
+        const lookupHref = QRZ_ENABLED
+            ? `https://www.qrz.com/db/${encodeURIComponent(call)}`
+            : `https://www.pota.app/#/profile/${encodeURIComponent(call)}`;
+        const freqMhz = s.freq_hz ? (s.freq_hz / 1e6).toFixed(3) : '';
+        const distBit = (s.dist_mi != null && s.bearing != null)
+            ? `${s.dist_mi} mi ${dirName[Math.round(((s.bearing % 360) + 360) % 360 / 22.5) % 16]}` : '';
+        const q = (typeof s.qso_count === 'number') ? s.qso_count : null;
+        return `
+        <div class="pota-spot${s.new_to_you ? ' isnew' : ''}">
+            <div class="pota-dot${age <= 5 ? ' fresh' : ''}"></div>
+            <div class="pota-spot-main">
+                <div class="pota-spot-top">
+                    <a class="pota-spot-act" href="${lookupHref}" target="_blank" rel="noopener">${escapeHtml(call)}</a>
+                    ${s.new_to_you ? '<span class="pota-newtag">🚩 NEW</span>' : ''}
+                    <a class="pota-spot-ref" href="https://www.pota.app/#/park/${encodeURIComponent(s.reference || '')}" target="_blank" rel="noopener">${escapeHtml(s.reference || '')}</a>
+                </div>
+                <span class="pota-spot-park">${escapeHtml(s.park_name || '')}</span>
+                <div class="pota-spot-sub">${freqMhz ? freqMhz + ' ' : ''}${escapeHtml(s.band || '')} · ${escapeHtml(s.mode || '')}${distBit ? ' · <span class="pota-spot-dist">' + distBit + '</span>' : ''}${s.location_desc ? ' · ' + escapeHtml(s.location_desc) : ''}${s.comments ? ' · <span class="pota-spot-cmt">' + escapeHtml(s.comments) + '</span>' : ''}</div>
+            </div>
+            <div class="pota-spot-right"><span>${potaAgeStr(age)}</span>${q != null ? `<span class="pota-spot-q${q < 10 ? ' early' : ''}">${q} Q</span>` : ''}</div>
+        </div>`;
+    }).join('');
+}
+
+function renderPotaDrawer() {
+    const d = document.getElementById('pota-drawer');
+    if (!d || !d.classList.contains('open') || !potaData) return;
+    const h = potaData.hunter;
+    const call = potaData.callsign || '—';
+    let statsHtml;
+    if (h) {
+        const tiles = [
+            [h.parks, 'parks'], [h.qsos, 'QSOs'], [h.awards, 'awards'],
+            [h.endorsements, 'endorse'], [h.attempt_activations, 'attempts'],
+        ];
+        statsHtml = '<div class="pota-d-stat-grid">' + tiles.map(t =>
+            `<div class="pota-d-stat"><b>${t[0] ?? '—'}</b><span>${t[1]}</span></div>`).join('') + '</div>';
+        const recent = h.recent_hunts || [];
+        const huntsHtml = recent.length
+            ? recent.slice(0, 12).map(x => {
+                const dt = x.date ? String(x.date).slice(0, 10) : '';
+                return `<div class="pota-d-hunt"><span class="h-call">${escapeHtml(x.callsign || '')}</span>`
+                    + `<span class="h-park">${escapeHtml(x.park || '')} <small>${escapeHtml(x.reference || '')}</small></span>`
+                    + `<span class="h-when">${escapeHtml(x.band || '')} · ${dt}</span></div>`;
+              }).join('')
+            : '<div style="font-size:12px;color:var(--text-muted);font-style:italic">No recent hunts.</div>';
+        const actHtml = h.is_activator
+            ? `<div class="pota-d-stat-grid" style="grid-template-columns:repeat(2,1fr)">
+                 <div class="pota-d-stat"><b>${h.activations ?? '—'}</b><span>activations</span></div>
+                 <div class="pota-d-stat"><b>${h.parks ?? '—'}</b><span>parks</span></div>
+               </div>`
+            : '<div style="font-size:12px;color:var(--text-muted);font-style:italic">No activations yet — this section fills in once you have one.</div>';
+        statsHtml += `<div style="font-size:11px;color:var(--text-muted);margin-top:9px;line-height:1.5">`
+            + `From <span style="font-family:var(--font-mono)">api.pota.app/profile/${escapeHtml(call)}</span>, cached ~10&nbsp;min.</div>`
+            + `<div class="hs-drawer-section-title" style="margin-top:16px">Recent hunts</div>${huntsHtml}`
+            + `<div class="hs-drawer-section-title" style="margin-top:16px">Activator</div>${actHtml}`;
+    } else if (potaData.has_callsign) {
+        statsHtml = '<div style="font-size:12px;color:var(--text-muted)">Hunter stats unavailable right now — POTA may be slow, or the callsign has no POTA profile.</div>';
+    } else {
+        statsHtml = '<div style="font-size:12px;color:var(--text-muted)">Set a callsign under <a href="/setup#integrations" style="color:var(--link)">Settings → Integrations → Parks on the Air</a> to see your hunter stats here. No POTA login needed.</div>';
+    }
+
+    d.innerHTML = `
+        <div class="hs-drawer-header">
+            <div class="hs-drawer-title-row">
+                <div class="hs-drawer-title">🏕️ POTA — <span style="font-family:var(--font-mono);font-size:13px">${escapeHtml(call)}</span></div>
+                <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
+            </div>
+            <div class="hs-drawer-sub">Parks on the Air — hunter</div>
+        </div>
+        <div class="hs-drawer-body">
+            <div class="hs-drawer-section-title">Hunter</div>
+            ${statsHtml}
+            <a href="https://www.pota.app/#/user/stats" target="_blank" rel="noopener" style="display:inline-block;margin-top:18px;font-size:12px;color:var(--link)">Open on pota.app →</a>
+        </div>`;
+}
+
+function openPotaDrawer() {
+    closeAllDrawers();
+    document.getElementById('pota-drawer').classList.add('open');
+    document.getElementById('hs-drawer-backdrop').classList.add('open');
+    renderPotaDrawer();
+}
+
+function fetchPota() {
+    if (!SHOW_POTA) return;
+    fetch('/api/pota').then(r => r.json()).then(data => {
+        if (data && data.spots) {
+            potaData = data;
+            renderPotaCard();
+            renderPotaDrawer();
+        }
+    }).catch(() => {});
+}
+if (SHOW_POTA) {
+    fetchPota();
+    setInterval(fetchPota, POTA_POLL_MS);
+}
+
 function handleAdifFile(file) {
     if (!file) return;
     const reader = new FileReader();
@@ -8410,6 +8675,7 @@ function closeAllDrawers() {
     document.getElementById('camera-drawer').classList.remove('open');
     document.getElementById('asl-drawer').classList.remove('open');
     document.getElementById('flights-drawer').classList.remove('open');
+    document.getElementById('pota-drawer').classList.remove('open');
     document.getElementById('hs-drawer-backdrop').classList.remove('open');
 }
 function closeHotspotDrawer() { closeAllDrawers(); }

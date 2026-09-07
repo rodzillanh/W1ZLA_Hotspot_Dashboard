@@ -133,12 +133,19 @@ wsjtx.py           WsjtxListener: listens for WSJT-X's own UDP telemetry
 
 pota.py            PotaClient: live Parks on the Air activator spots
                    (api.pota.app, free/no-auth/CORS-open, confirmed live)
-                   for the Live map's "POTA spots" overlay. No per-user
-                   config needed -- unlike psk_reporter.py below, POTA's
-                   feed already carries lat/lon directly, no grid-square
-                   conversion needed. Reuses wsjtx.py's freq_to_band()
-                   (after converting POTA's kHz-string frequency to Hz)
-                   rather than a third duplicate band-edge table.
+                   for the Live map's "POTA spots" overlay AND (v4.47) the
+                   POTA card. No per-user config needed for spots --
+                   unlike psk_reporter.py below, POTA's feed already
+                   carries lat/lon directly, no grid-square conversion
+                   needed. Reuses wsjtx.py's freq_to_band() (after
+                   converting POTA's kHz-string frequency to Hz) rather
+                   than a third duplicate band-edge table. `hunter(call)`
+                   (added v4.47) fetches api.pota.app/profile/<call>
+                   (nested `stats` + `recent_activity.hunter_qsos`, one
+                   call covers the card's drawer) -- cached per-call for
+                   10 min, still no auth (a plain callsign, NOT a
+                   credential -- confirmed live: queried W1ZLA's real
+                   profile with zero authentication).
 
 sota.py            SotaClient: live Summits on the Air activator spots
                    (api2.sota.org.uk, free/no-auth, confirmed live) for
@@ -1670,6 +1677,50 @@ config for per-integration credentials; put it in
     one-line guard at the top of its `forEach`; it wasn't needed for the
     other two sources because both `continue`/`return` on a missing
     position before ever building a row.
+- **The POTA card (v4.47) is a FIXED-SIZE card + a side drawer, on
+  purpose** — the mockup round that landed after a "keep it the same
+  size as other cards" note. The card body is a hard `height: 300px`
+  scrolling spot list; everything variable (full hunter stats, recent
+  hunts, activator section) lives in `#pota-drawer` (the `.hs-drawer`
+  pattern — added to `closeAllDrawers()` and the drawer markup list next
+  to `flights-drawer`). The header's one-line `.pota-glance` and the
+  `⚙ Stats` button both call `openPotaDrawer()`.
+  - **`/api/pota` enriches `/api/pota_spots`' feed** with `dist_mi` +
+    `bearing` (a plain great-circle solve, `_haversine_bearing()` in
+    app.py — the card only needs "560 mi NW", not survey precision) and
+    `new_to_you`, plus the `hunter` block from `pota_client.hunter()`.
+    The map overlay still uses the bare `/api/pota_spots` — don't route
+    it through `/api/pota` (that does a `load_qsos()` scan + a profile
+    fetch the overlay doesn't need).
+  - **`new_to_you`** = a spot's `reference` not in (POTA refs found on
+    your logged QSOs) ∪ (refs from your recent POTA hunts on the
+    profile). The QSO side needs the ADIF importer to have captured
+    them: `_adif_pota_refs()` reads `POTA_REF` (comma-list) or
+    `SIG_INFO` when `SIG == "POTA"`, stored as `pota_refs` on each QSO.
+    WSJT-X / QRZ Logbook sync do NOT populate `pota_refs` (WSJT-X has no
+    POTA concept; QRZ's logbook ADIF didn't carry `SIG_INFO` in the live
+    sample), so a fresh install with only those sources falls back to
+    the recent-hunts set alone until a POTA-tagged ADIF is imported.
+  - **`pota_callsign` is a plain callsign, NOT a credential** —
+    confirmed live by querying W1ZLA's real `stats`/`profile` with zero
+    auth. Blank still shows the spot list; it just can't fill the hunter
+    block or flag new-to-you from recent hunts. Same "callsign, not a
+    login" shape as `psk_reporter_callsign`.
+  - **Ranking is client-side** (`potaScore()` in dashboard.html): the
+    "Smart rank" default weighs `new_to_you` (+100) + freshness + inverse
+    distance + low QSO count (an activator at 40+ QSOs = you're late to
+    the pileup; under 10 = valid activation not yet reached, easier +
+    they still need you). Other sorts: New only / Nearest / Freshest /
+    by mode.
+  - **Deliberately deferred**: a Notifications source for "a new-to-you
+    park was just spotted." Real payoff, but it's a 7th notification
+    source + a background spot-snapshot differ + `storage_notifications`
+    shadow — its own increment, not this card.
+  - Verified live end-to-end (throwaway Playwright script, deleted
+    after — same discipline as the ASL Control checks): 127 real spots
+    rendered, 124 flagged NEW against W1ZLA's real 21 hunted parks, the
+    "new only" filter leaves only `.isnew` rows, the drawer opens with
+    real stat tiles (21/24/3/4/0) and 12 recent-hunt rows.
 - **The Live map's QSO layer used to be fetched once at map init only
   ("the data only changes on explicit import/clear," a comment that was
   true before this feature existed) — now it's also polled every 20s**

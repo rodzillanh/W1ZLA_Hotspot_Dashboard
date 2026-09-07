@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.46"
+APP_VERSION = "4.47"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -148,6 +148,9 @@ VERSION_CODENAMES = [
                         # On) The Dock of the Bay" (1941-1967)
     "Strummer",         # v4.46 -- Joe Strummer, frontman and rhythm
                         # guitarist of The Clash (1952-2002)
+    "Hooker",           # v4.47 -- John Lee Hooker, Delta-blues guitarist
+                        # and singer, a foundational influence on rock
+                        # (1917-2001)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1137,6 +1140,18 @@ DEFAULT_SETTINGS = {
     # YSF research that ruled that out as a clean REST-pollable option.
     "show_top_activity": False,
     "top_activity_position": 0,
+    # POTA card (v4.47) -- a ranked, new-to-you-aware view of the same
+    # api.pota.app/spot/activator feed the Live map overlay already uses,
+    # plus your POTA hunter stats (parks/QSOs/awards) in a side drawer.
+    # `pota_callsign` is the call to look up stats for -- a plain string
+    # like psk_reporter_callsign, NOT a credential (every POTA endpoint
+    # used here is public/no-auth). Blank still shows the spot list; it
+    # just can't show stats or flag new-to-you parks from your recent
+    # hunts. New-to-you detection also reads POTA park refs off your
+    # logged QSOs (adif.py import captures SIG_INFO/POTA_REF).
+    "show_pota": False,
+    "pota_position": 0,
+    "pota_callsign": "",
     # DVSwitch card (v3.99) -- one consolidated card covering every
     # DVSwitch-enabled ASL3 hotspot via its own "Show:" node picker, not
     # one card per hotspot. Shown when ANY hotspot has dvswitch_enabled
