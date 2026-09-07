@@ -245,6 +245,48 @@ def save_qsos(qsos: list) -> None:
         json.dump(qsos, f, indent=4)
 
 
+# --- push subscriptions ---
+
+def load_push_subscriptions() -> list:
+    """Browser Web Push subscription objects (Pocket Dash, PR 3), one per
+    entry, unique by `endpoint`. Same flat-JSON-in-CONFIG_DIR convention
+    as favorites.json -- absent file just means nobody's subscribed."""
+    if not os.path.exists(config.PUSH_SUBSCRIPTIONS_FILE):
+        return []
+    try:
+        with _file_lock, open(config.PUSH_SUBSCRIPTIONS_FILE, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_push_subscriptions(subs: list) -> None:
+    os.makedirs(config.CONFIG_DIR, exist_ok=True)
+    with _file_lock, open(config.PUSH_SUBSCRIPTIONS_FILE, "w") as f:
+        json.dump(subs, f, indent=4)
+
+
+def add_push_subscription(sub: dict) -> None:
+    """Upsert by endpoint -- a browser re-subscribing (permission
+    re-granted, key rotated) replaces its old entry rather than stacking
+    a duplicate. Read-modify-write under _file_lock, same as append_qso."""
+    endpoint = sub.get("endpoint")
+    if not endpoint:
+        return
+    with _file_lock:
+        subs = [s for s in load_push_subscriptions() if s.get("endpoint") != endpoint]
+        subs.append(sub)
+        save_push_subscriptions(subs)
+
+
+def remove_push_subscription(endpoint: str) -> None:
+    if not endpoint:
+        return
+    with _file_lock:
+        subs = [s for s in load_push_subscriptions() if s.get("endpoint") != endpoint]
+        save_push_subscriptions(subs)
+
+
 def append_qso(qso: dict) -> None:
     """Adds one QSO to the existing list -- for live WSJT-X logging
     (wsjtx.py), which arrives one QSO at a time, unlike a bulk ADIF

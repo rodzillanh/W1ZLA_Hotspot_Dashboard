@@ -4,13 +4,14 @@
  * dead signal. Live data (/api/*) is never cached -- it goes straight
  * to the network and the page shows its own "stale" flag on failure.
  *
- * Push-event handling is added in PR 3, alongside the subscribe flow.
+ * It also handles the `push` event (PR 3): shows the notification and,
+ * on tap, focuses an open Pocket Dash window or opens one.
  *
  * Served from the site root (see app.py's /sw.js route) so its scope
  * can cover /mobile; a worker under /static/ could only control
  * /static/*. Bump CACHE when the shell markup changes.
  */
-const CACHE = "pocket-dash-shell-v1";
+const CACHE = "pocket-dash-shell-v2";
 const SHELL = [
   "/mobile",
   "/static/manifest.json",
@@ -75,4 +76,33 @@ self.addEventListener("fetch", (event) => {
       )
     );
   }
+});
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { /* non-JSON */ }
+  const title = data.title || "Pocket Dash";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || "",
+      icon: "/static/icon-192.png",
+      badge: "/static/icon-192.png",
+      tag: data.tag || "pocket-dash",
+      renotify: !!data.tag,
+      data: { url: data.url || "/mobile" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "/mobile";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) {
+        if (w.url.indexOf("/mobile") !== -1 && "focus" in w) return w.focus();
+      }
+      return self.clients.openWindow(target);
+    })
+  );
 });

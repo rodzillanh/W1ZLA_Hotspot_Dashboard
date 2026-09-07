@@ -230,6 +230,25 @@
     }
     .link-list span.disabled { color:var(--text-dim); }
 
+    .notif-card {
+        background:var(--panel); border:1px solid var(--border);
+        border-radius:12px; padding:14px;
+    }
+    .notif-state { font-size:13px; color:var(--text-muted); margin-bottom:11px; }
+    .notif-state .on  { color:var(--live); font-weight:600; }
+    .notif-state .off { color:var(--text-dim); font-weight:600; }
+    .notif-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .notif-actions button {
+        flex:1 1 auto; min-width:120px; padding:11px 12px; border-radius:9px;
+        font-family:var(--font-ui); font-size:13px; font-weight:600; cursor:pointer;
+        border:1px solid var(--border); background:var(--panel-2); color:var(--text);
+    }
+    .notif-actions button.primary {
+        background:var(--accent); color:var(--accent-ink,#241a06); border-color:transparent;
+    }
+    .notif-actions button:disabled { opacity:.55; }
+    .notif-hint { font-size:11px; color:var(--text-dim); margin-top:11px; line-height:1.5; }
+
     /* ---------------- tab bar ---------------- */
     .tabbar {
         position:fixed; left:0; right:0; bottom:0; z-index:20;
@@ -282,12 +301,19 @@
         </section>
 
         <section data-tab="more">
+            <div class="sec-label">Notifications</div>
+            <div class="notif-card">
+                <div class="notif-state" id="notif-state">Checking…</div>
+                <div class="notif-actions" id="notif-actions"></div>
+                <div class="notif-hint" id="notif-hint"></div>
+            </div>
+
+            <div class="sec-label" style="margin-top:18px">Links</div>
             <div class="link-list">
                 <a href="/">Open full dashboard <span class="r">↗</span></a>
                 <a href="/setup">Dashboard settings <span class="r">/setup</span></a>
                 <a href="/version">Version &amp; changelog <span class="r">/version</span></a>
                 <a href="/readme">README <span class="r">/readme</span></a>
-                <span class="disabled">Notification alerts <span class="r">soon</span></span>
             </div>
             <p class="sec-label" style="margin-top:18px">Pocket Dash · single-column companion to the main dashboard</p>
         </section>
@@ -354,6 +380,7 @@
             });
             window.scrollTo(0, 0);
             if (currentTab === "activity") fetchQsos();
+            if (currentTab === "more") refreshNotifState();
         });
     });
 
@@ -574,6 +601,115 @@
             navigator.serviceWorker.register("/sw.js", { scope: "/mobile" })
                 .catch(function () { /* not fatal -- page works without it */ });
         });
+    }
+
+    /* ---- Notifications (More tab): enable / disable / test ---- *
+     * PR 3 -- this is the whole-device on/off. Per-hotspot control
+     * (which hotspots, offline vs. call-start, mute-until) is PR 5.  */
+    var pushCfg = null;
+
+    function urlB64ToUint8Array(b64) {
+        var pad = "=".repeat((4 - b64.length % 4) % 4);
+        var s = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
+        var raw = atob(s);
+        var arr = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+        return arr;
+    }
+
+    async function refreshNotifState() {
+        var stateEl = document.getElementById("notif-state");
+        var actEl = document.getElementById("notif-actions");
+        var hintEl = document.getElementById("notif-hint");
+        if (!stateEl) return;
+
+        if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+            stateEl.innerHTML = '<span class="off">Not available here</span>';
+            actEl.innerHTML = "";
+            hintEl.textContent = "On iPhone, add Pocket Dash to your Home Screen first — iOS only delivers push to the installed app, not a Safari tab.";
+            return;
+        }
+        if (!pushCfg) {
+            try { pushCfg = await fetch("/api/push/config").then(function (r) { return r.json(); }); }
+            catch (e) { pushCfg = { configured: false }; }
+        }
+        if (!pushCfg.configured || !pushCfg.public_key) {
+            stateEl.innerHTML = '<span class="off">Server not ready</span>';
+            actEl.innerHTML = "";
+            hintEl.textContent = "The dashboard hasn't generated its push keys yet — restart it, or check that pywebpush is installed.";
+            return;
+        }
+
+        var reg = await navigator.serviceWorker.ready;
+        var sub = await reg.pushManager.getSubscription();
+
+        if (sub && Notification.permission === "granted") {
+            stateEl.innerHTML = '<span class="on">On</span> — this device will get alerts';
+            actEl.innerHTML =
+                '<button id="notif-test">Send test</button>' +
+                '<button id="notif-off">Turn off</button>';
+            hintEl.textContent = "Per-hotspot control (which hotspots, offline vs. call start, mute) is coming in a later update.";
+            document.getElementById("notif-test").onclick = sendNotifTest;
+            document.getElementById("notif-off").onclick = disableNotifs;
+        } else {
+            stateEl.innerHTML = '<span class="off">Off</span>';
+            actEl.innerHTML = '<button class="primary" id="notif-on">Enable notifications</button>';
+            hintEl.textContent = (Notification.permission === "denied")
+                ? "Notifications are blocked for this site — allow them in your browser/OS settings first."
+                : "You'll get a notification when a hotspot drops offline or a call starts.";
+            document.getElementById("notif-on").onclick = enableNotifs;
+        }
+    }
+
+    async function enableNotifs() {
+        var btn = document.getElementById("notif-on");
+        if (btn) { btn.disabled = true; btn.textContent = "Enabling…"; }
+        try {
+            var perm = await Notification.requestPermission();
+            if (perm === "granted") {
+                var reg = await navigator.serviceWorker.ready;
+                var sub = await reg.pushManager.getSubscription();
+                if (!sub) {
+                    sub = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlB64ToUint8Array(pushCfg.public_key),
+                    });
+                }
+                await fetch("/api/push/subscribe", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(sub),
+                });
+            }
+        } catch (e) { /* fall through to a state refresh */ }
+        refreshNotifState();
+    }
+
+    async function disableNotifs() {
+        try {
+            var reg = await navigator.serviceWorker.ready;
+            var sub = await reg.pushManager.getSubscription();
+            if (sub) {
+                await fetch("/api/push/unsubscribe", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ endpoint: sub.endpoint }),
+                });
+                await sub.unsubscribe();
+            }
+        } catch (e) { /* ignore */ }
+        refreshNotifState();
+    }
+
+    async function sendNotifTest() {
+        var btn = document.getElementById("notif-test");
+        if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
+        try {
+            var r = await fetch("/api/push/test", { method: "POST" })
+                .then(function (x) { return x.json(); });
+            if (btn) btn.textContent = r.sent ? "Sent ✓" : "No delivery";
+        } catch (e) { if (btn) btn.textContent = "Failed"; }
+        setTimeout(refreshNotifState, 1600);
     }
     </script>
 </body>

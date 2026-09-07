@@ -55,6 +55,7 @@ from flights import FlightsClient
 from adsbdb import AdsbdbClient
 from aslstats import AslStatsClient
 from rockstar_bios import get_bio as get_codename_bio
+from push_notifications import PushClient, generate_vapid_keys
 
 import host_stats as host_stats_mod
 
@@ -236,6 +237,45 @@ def _rebuild_brandmeister_lh() -> None:
     brandmeister_lh.configure(settings.get("brandmeister_alerts_enabled", False))
 
 _rebuild_brandmeister_lh()
+
+
+def _ensure_vapid_keys() -> None:
+    """Generate the Web Push VAPID keypair once, on first run, and persist
+    it to settings.json (Pocket Dash, PR 3). Idempotent -- a no-op once
+    both keys are present. Wrapped in settings_transaction() so a
+    concurrent /api/settings POST can't race the write."""
+    settings = load_settings()
+    if settings.get("push_vapid_public_key") and settings.get("push_vapid_private_key"):
+        return
+    try:
+        pub, priv = generate_vapid_keys()
+    except Exception as e:
+        print(f"[push] could not generate VAPID keys: {e}")
+        return
+    with settings_transaction():
+        s = load_settings()
+        if not (s.get("push_vapid_public_key") and s.get("push_vapid_private_key")):
+            s["push_vapid_public_key"] = pub
+            s["push_vapid_private_key"] = priv
+            save_settings(s)
+            print("[push] generated a new VAPID keypair")
+
+
+push_client = PushClient()
+
+def _rebuild_push_client() -> None:
+    """Rebuild the Web Push client from current settings -- same
+    hot-swap-on-settings-change pattern as the other integration clients."""
+    global push_client
+    settings = load_settings()
+    push_client = PushClient(
+        settings.get("push_vapid_public_key", ""),
+        settings.get("push_vapid_private_key", ""),
+        settings.get("push_vapid_contact", "mailto:admin@example.com"),
+    )
+
+_ensure_vapid_keys()
+_rebuild_push_client()
 
 import radioid as radioid_mod
 import aprs as aprs_mod
@@ -598,6 +638,11 @@ def api_settings_post():
         settings["qrz_logbook_enabled"] = bool(data["qrz_logbook_enabled"])
     if "qrz_logbook_api_key" in data:
         settings["qrz_logbook_api_key"] = data["qrz_logbook_api_key"].strip()
+    if "push_vapid_contact" in data:
+        contact = (data["push_vapid_contact"] or "").strip()
+        if contact and not contact.lower().startswith(("mailto:", "http://", "https://")):
+            contact = "mailto:" + contact
+        settings["push_vapid_contact"] = contact or "mailto:admin@example.com"
     save_settings(settings)
     _settings_txn.__exit__(None, None, None)
     # Rebuilds below intentionally happen AFTER releasing the lock -- they
@@ -625,7 +670,59 @@ def api_settings_post():
         _rebuild_brandmeister_lh()
     if any(k in data for k in ("qrz_logbook_enabled", "qrz_logbook_api_key")):
         _rebuild_qrz_logbook()
+    if "push_vapid_contact" in data:
+        _rebuild_push_client()
     return jsonify({"ok": True})
+
+
+# --- web push (Pocket Dash mobile app, PR 3) ---
+
+@app.route("/api/push/config")
+def api_push_config():
+    """The browser needs the VAPID public key to build its subscription."""
+    return jsonify({
+        "public_key": push_client.public_key,
+        "configured": push_client.configured,
+    })
+
+@app.route("/api/push/subscribe", methods=["POST"])
+def api_push_subscribe():
+    sub = request.json or {}
+    if not sub.get("endpoint") or not isinstance(sub.get("keys"), dict):
+        return jsonify({"ok": False, "error": "not a valid PushSubscription"}), 400
+    storage_mod.add_push_subscription({
+        "endpoint": sub["endpoint"],
+        "keys": sub["keys"],
+        "expirationTime": sub.get("expirationTime"),
+    })
+    return jsonify({"ok": True})
+
+@app.route("/api/push/unsubscribe", methods=["POST"])
+def api_push_unsubscribe():
+    endpoint = (request.json or {}).get("endpoint", "")
+    storage_mod.remove_push_subscription(endpoint)
+    return jsonify({"ok": True})
+
+@app.route("/api/push/test", methods=["POST"])
+def api_push_test():
+    """Send a test notification to every registered browser, pruning any
+    that come back gone (404/410). The real state-transition triggers
+    land in PR 4 -- this route just proves the round trip end to end."""
+    if not push_client.configured:
+        return jsonify({"ok": False, "error": "push not configured on the server"}), 503
+    subs = storage_mod.load_push_subscriptions()
+    if not subs:
+        return jsonify({"ok": True, "sent": 0, "failed": 0, "pruned": 0,
+                        "note": "no browsers are subscribed yet"})
+    sent, failed, expired = push_client.send_all(subs, {
+        "title": "Pocket Dash",
+        "body": "Test notification — push is working.",
+        "tag": "pocket-dash-test",
+        "url": "/mobile",
+    })
+    for ep in expired:
+        storage_mod.remove_push_subscription(ep)
+    return jsonify({"ok": True, "sent": sent, "failed": failed, "pruned": len(expired)})
 
 
 # --- pages ---

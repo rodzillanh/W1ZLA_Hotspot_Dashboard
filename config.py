@@ -165,6 +165,10 @@ ASL_FAV_CARD_CAP = 5
 BM_TG_FAVORITES_FILE = os.path.join(CONFIG_DIR, "bm_tg_favorites.json")
 CAMERAS_FILE = os.path.join(CONFIG_DIR, "cameras.json")
 QSOS_FILE    = os.path.join(CONFIG_DIR, "qsos.json")
+# Web Push browser subscriptions for the Pocket Dash mobile app (PR 3) --
+# one PushSubscription object per entry, unique by `endpoint`. Same
+# flat-JSON-in-CONFIG_DIR convention as favorites.json.
+PUSH_SUBSCRIPTIONS_FILE = os.path.join(CONFIG_DIR, "push_subscriptions.json")
 
 # --- Server ---
 HOST = "0.0.0.0"
@@ -1213,6 +1217,18 @@ DEFAULT_SETTINGS = {
     # need no key at all; this only gates the hotspot card drawer's
     # link/unlink talkgroup controls.
     "brandmeister_api_key": "",
+    # --- Web push notifications (Pocket Dash mobile app, PR 3) ---
+    # The VAPID keypair is generated once on first run (app.py's
+    # _ensure_vapid_keys) and stored here -- don't hand-edit it.
+    # Regenerating it invalidates every browser subscription in
+    # push_subscriptions.json (they'd all need to re-subscribe).
+    "push_vapid_public_key": "",
+    "push_vapid_private_key": "",
+    # VAPID "sub" claim -- an address the push services (Apple/Google/
+    # Mozilla) can use to reach you about delivery problems. Placeholder
+    # by default; set your own in Settings -> Integrations. mailto: or
+    # https: only.
+    "push_vapid_contact": "mailto:admin@example.com",
 }
 
 # --- Fleet activity ---

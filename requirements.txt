@@ -6,3 +6,4 @@ bambulabs_api>=2.6
 waitress>=3.0
 websocket-client>=1.7
 sgp4>=2.23
+pywebpush>=1.14
