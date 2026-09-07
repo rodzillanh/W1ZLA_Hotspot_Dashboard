@@ -7779,7 +7779,7 @@ function renderPotaCard() {
         const call = s.activator || '?';
         const lookupHref = QRZ_ENABLED
             ? `https://www.qrz.com/db/${encodeURIComponent(call)}`
-            : `https://www.pota.app/#/profile/${encodeURIComponent(call)}`;
+            : `https://pota.app/#/profile/${encodeURIComponent(call)}`;
         const freqMhz = s.freq_hz ? (s.freq_hz / 1e6).toFixed(3) : '';
         const distBit = (s.dist_mi != null && s.bearing != null)
             ? `${s.dist_mi} mi ${dirName[Math.round(((s.bearing % 360) + 360) % 360 / 22.5) % 16]}` : '';
@@ -7791,7 +7791,7 @@ function renderPotaCard() {
                 <div class="pota-spot-top">
                     <a class="pota-spot-act" href="${lookupHref}" target="_blank" rel="noopener">${escapeHtml(call)}</a>
                     ${s.new_to_you ? '<span class="pota-newtag">🚩 NEW</span>' : ''}
-                    <a class="pota-spot-ref" href="https://www.pota.app/#/park/${encodeURIComponent(s.reference || '')}" target="_blank" rel="noopener">${escapeHtml(s.reference || '')}</a>
+                    <a class="pota-spot-ref" href="https://pota.app/#/park/${encodeURIComponent(s.reference || '')}" target="_blank" rel="noopener">${escapeHtml(s.reference || '')}</a>
                 </div>
                 <span class="pota-spot-park">${escapeHtml(s.park_name || '')}</span>
                 <div class="pota-spot-sub">${freqMhz ? freqMhz + ' ' : ''}${escapeHtml(s.band || '')} · ${escapeHtml(s.mode || '')}${distBit ? ' · <span class="pota-spot-dist">' + distBit + '</span>' : ''}${s.location_desc ? ' · ' + escapeHtml(s.location_desc) : ''}${s.comments ? ' · <span class="pota-spot-cmt">' + escapeHtml(s.comments) + '</span>' : ''}</div>
@@ -7850,7 +7850,7 @@ function renderPotaDrawer() {
         <div class="hs-drawer-body">
             <div class="hs-drawer-section-title">Hunter</div>
             ${statsHtml}
-            <a href="https://www.pota.app/#/user/stats" target="_blank" rel="noopener" style="display:inline-block;margin-top:18px;font-size:12px;color:var(--link)">Open on pota.app →</a>
+            ${potaData.callsign ? `<a href="https://pota.app/#/profile/${encodeURIComponent(potaData.callsign)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:18px;font-size:12px;color:var(--link)">Open your profile on pota.app →</a>` : ''}
         </div>`;
 }
 
