@@ -1621,17 +1621,16 @@ the same [Rig control](#rig-control-rigctld) connection.
 - **TX/RX** indicator with a keyed timer
 
 Every field degrades on its own: a reading the rig or Hamlib build
-doesn't expose just shows a dash. **How much you get depends on the
-rigctld:** stock Hamlib `rigctld` talking to the radio directly maps the
-full meter set (SWR, forward power, PA temperature), while **WFView's
-built-in RigCtld is a minimal re-implementation** — on an IC-7300 it
-gives you frequency / mode / VFO / split / PTT / S-meter / ALC / func
-flags, but not SWR, forward power, or PA temperature (those come back as
-a flat default, which the card treats as "not reported"). The **⚙
-drawer's "Raw readings"** section shows exactly what your rigctld
-answers for each field, so it's easy to see which is which. If you want
-the full meter set, point a stock `rigctld -m 3073` at the radio's CI-V
-port instead of using WFView's.
+doesn't expose just shows a dash. **How much you get, and how fast,
+depends on the rigctld.** WFView's built-in RigCtld works but is a
+lean re-implementation: its TX meters (SWR, forward power) are cached on
+WFView's own slow cadence, so they lag a few seconds behind a key-up and
+sit at a resting value until then; PA temperature it doesn't expose at
+all (comes back as a flat 0, shown as "not reported"). A stock Hamlib
+`rigctld` talking to the radio's CI-V port maps the full set and updates
+promptly. The **⚙ drawer's "Raw readings"** section shows exactly what
+your rigctld is answering for each field, so it's easy to see what's
+real vs. defaulted vs. still settling.
 
 Polling is split so it stays light on the CAT link (shared with your
 logger and WSJT-X): the fast readings — frequency, mode, S-meter, PTT,

@@ -165,9 +165,12 @@ class RigPanelPoller:
         if ptt:  # TX meters -- only worth reading while transmitting
             power_set = _num(self._get1(sock, "l RFPOWER", raw))
             swr = _num(self._get1(sock, "l SWR", raw))
-            # SWR is physically >= 1.0; a flat 1.000 (WFView's rigctld) or
-            # anything below means it isn't actually being metered.
-            if swr is not None and swr <= 1.0:
+            # SWR is physically >= 1.0; anything BELOW is a garbage /
+            # uninitialised read. A flat 1.000 right after key-up is
+            # WFView's rigctld meter cache not yet refreshed -- it
+            # settles to the real value a few seconds into a sustained
+            # transmit, so it's shown as-is rather than suppressed.
+            if swr is not None and swr < 1.0:
                 swr = None
             alc = _num(self._get1(sock, "l ALC", raw))
             comp = _num(self._get1(sock, "l COMP_METER", raw))
@@ -215,12 +218,24 @@ class RigPanelPoller:
             lo, hi = self._temp_cal
             temp_c = lo + (hi - lo) * temp_frac
 
-        # RFPOWER_METER_WATTS is Hamlib >= 4.6 and backend-specific --
-        # WFView's rigctld answers a flat 0 for it, so treat a falsy value
-        # (None OR 0) as "unavailable" and fall back to RFPOWER_METER
-        # (0..1) x the rig's rated watts.
+        # Forward power in watts. RFPOWER_METER_WATTS is Hamlib >= 4.6 /
+        # backend-specific (WFView's rigctld answers RPRT -1). Fall back
+        # to RFPOWER_METER -- which Hamlib nominally specifies as 0..1,
+        # but WFView's rigctld returns in *watts* (e.g. 4.52), so a value
+        # above ~1.5 is taken as already-watts and only a true 0..1
+        # fraction is scaled by the rig's rated watts.
         if not power_w:
-            power_w = power_meter * config.RIG_RATED_WATTS if power_meter else None
+            if power_meter is not None and power_meter > 1.5:
+                power_w = power_meter
+            elif power_meter:
+                power_w = power_meter * config.RIG_RATED_WATTS
+            else:
+                power_w = None
+        power_frac = None  # clean 0..1 for the PWR bar
+        if power_w is not None:
+            power_frac = min(1.0, power_w / config.RIG_RATED_WATTS) if config.RIG_RATED_WATTS else None
+        elif power_set is not None:
+            power_frac = power_set
 
         return {
             "reachable": True,
@@ -238,7 +253,8 @@ class RigPanelPoller:
             "alc": alc,
             "comp": comp,
             "power_w": round(power_w, 1) if power_w is not None else None,
-            "power_meter": power_meter,  # 0..1 measured -- clean fraction for the PWR bar
+            "power_frac": power_frac,   # clean 0..1 for the PWR bar
+            "power_meter": power_meter,  # raw RFPOWER_METER reply (may be watts or 0..1 -- diagnostic only)
             "temp_frac": temp_frac,
             "temp_c": round(temp_c, 1) if temp_c is not None else None,
             "funcs": funcs,
