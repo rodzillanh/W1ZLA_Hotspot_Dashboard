@@ -990,8 +990,9 @@ HF_FAVORITE_MODES = ["USB", "LSB", "CW", "PKTUSB", "PKTLSB", "AM", "FM", "RTTY"]
 # One persistent-socket poller (rig_panel.py) shared by all three. Poll
 # is deliberately gentle -- rigctld serializes CAT with the operator's
 # own WSJT-X / logger.
-RIG_PANEL_POLL_SEC        = int(os.environ.get("RIG_PANEL_POLL_SEC", "3"))       # RX cadence
-RIG_PANEL_TX_POLL_SEC     = int(os.environ.get("RIG_PANEL_TX_POLL_SEC", "1"))    # while PTT
+RIG_PANEL_POLL_SEC        = float(os.environ.get("RIG_PANEL_POLL_SEC", "1"))     # fast set (freq/mode/S-meter/PTT) cadence on RX
+RIG_PANEL_TX_POLL_SEC     = float(os.environ.get("RIG_PANEL_TX_POLL_SEC", "1"))  # while PTT (adds SWR/ALC/PWR/comp)
+RIG_PANEL_SLOW_EVERY_SEC  = float(os.environ.get("RIG_PANEL_SLOW_EVERY_SEC", "4"))  # PA temp + ATU/NB/NR/notch/antenna -- none move fast
 RIG_PANEL_RECONNECT_SEC   = int(os.environ.get("RIG_PANEL_RECONNECT_SEC", "10"))
 RIG_PANEL_TIMEOUT         = float(os.environ.get("RIG_PANEL_TIMEOUT", "4"))
 RIG_PANEL_TEMP_HISTORY    = 120   # samples kept for the PA sparkline

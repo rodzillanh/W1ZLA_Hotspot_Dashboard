@@ -40,6 +40,12 @@ class RigPanelPoller:
         self._gen = 0
 
         self._snap = {"reachable": False}
+        # Poll-thread-only state (no lock): the "slow set" (PA temp, ATU/
+        # NB/NR/notch/antenna) is refreshed every RIG_PANEL_SLOW_EVERY_SEC
+        # and merged into every fast snapshot, so the fast poll stays ~6
+        # cheap commands and freq/mode/S-meter feel responsive.
+        self._slow_cache = {}
+        self._slow_at = 0.0
         self._temps = collections.deque(maxlen=config.RIG_PANEL_TEMP_HISTORY)     # (epoch, frac)
         self._timeline = collections.deque(maxlen=config.RIG_PANEL_TIMELINE_MAX)  # {band, mode, start, end}
         self._pa_events = collections.deque(maxlen=50)
@@ -122,6 +128,7 @@ class RigPanelPoller:
                 if sock is None:
                     sock = socket.create_connection((host, port), timeout=config.RIG_PANEL_TIMEOUT)
                     sock.settimeout(config.RIG_PANEL_TIMEOUT)
+                    self._slow_at = 0.0  # force a full slow-set read on the first poll of a new connection
                 snap = self._poll_once(sock)
                 self._apply(snap)
                 nap = config.RIG_PANEL_TX_POLL_SEC if snap.get("ptt") else config.RIG_PANEL_POLL_SEC
@@ -137,6 +144,9 @@ class RigPanelPoller:
     # --- polling ---
 
     def _poll_once(self, sock):
+        now = time.time()
+
+        # --- fast set: everything that actually moves, every poll ---
         freq = _num(self._get1(sock, "f"))
         mode_lines = self._cmd(sock, "m", 2)
         mode = mode_lines[0] if mode_lines and not mode_lines[0].startswith("RPRT") else None
@@ -146,24 +156,39 @@ class RigPanelPoller:
         split = (split_lines and split_lines[0] == "1")
         tx_freq = _num(self._get1(sock, "i")) if split else None
         ptt = (self._get1(sock, "t") == "1")
-
         strength = _num(self._get1(sock, "l STRENGTH"))
-        power_set = _num(self._get1(sock, "l RFPOWER"))
-        swr = _num(self._get1(sock, "l SWR"))
-        alc = _num(self._get1(sock, "l ALC"))
-        comp = _num(self._get1(sock, "l COMP_METER"))
-        power_w = _num(self._get1(sock, "l RFPOWER_METER_WATTS"))
-        power_meter = _num(self._get1(sock, "l RFPOWER_METER"))
-        temp_frac = _num(self._get1(sock, "l TEMP_METER"))
 
-        funcs = {
-            "tuner": _flag(self._get1(sock, "u TUNER")),
-            "nb":    _flag(self._get1(sock, "u NB")),
-            "nr":    _flag(self._get1(sock, "u NR")),
-            "anf":   _flag(self._get1(sock, "u ANF")),
-            "comp":  _flag(self._get1(sock, "u COMP")),
-        }
-        antenna = _num(self._get1(sock, "y"))
+        swr = alc = comp = power_w = power_meter = power_set = None
+        if ptt:  # TX meters -- only worth reading while transmitting
+            power_set = _num(self._get1(sock, "l RFPOWER"))
+            swr = _num(self._get1(sock, "l SWR"))
+            alc = _num(self._get1(sock, "l ALC"))
+            comp = _num(self._get1(sock, "l COMP_METER"))
+            power_w = _num(self._get1(sock, "l RFPOWER_METER_WATTS"))
+            power_meter = _num(self._get1(sock, "l RFPOWER_METER"))
+
+        # --- slow set: PA temp + flags + antenna, refreshed every N sec
+        #     and carried on every snapshot in between ---
+        if now - self._slow_at >= config.RIG_PANEL_SLOW_EVERY_SEC:
+            self._slow_cache = {
+                "temp_frac": _num(self._get1(sock, "l TEMP_METER")),
+                "funcs": {
+                    "tuner": _flag(self._get1(sock, "u TUNER")),
+                    "nb":    _flag(self._get1(sock, "u NB")),
+                    "nr":    _flag(self._get1(sock, "u NR")),
+                    "anf":   _flag(self._get1(sock, "u ANF")),
+                    "comp":  _flag(self._get1(sock, "u COMP")),
+                },
+                "antenna": _num(self._get1(sock, "y")),
+                "power_set": _num(self._get1(sock, "l RFPOWER")),
+            }
+            self._slow_at = now
+        sc = self._slow_cache
+        temp_frac = sc.get("temp_frac")
+        funcs = sc.get("funcs") or {"tuner": None, "nb": None, "nr": None, "anf": None, "comp": None}
+        antenna = sc.get("antenna")
+        if power_set is None:
+            power_set = sc.get("power_set")  # slider position (RX fallback for the PWR bar frac)
 
         band = freq_to_band(int(freq)) if freq else ""
         if not band and freq and 5_250_000 <= freq <= 5_450_000:
@@ -199,7 +224,7 @@ class RigPanelPoller:
             "temp_c": round(temp_c, 1) if temp_c is not None else None,
             "funcs": funcs,
             "antenna": (int(antenna) + 1) if antenna is not None else None,  # 1-indexed for display
-            "polled_at": time.time(),
+            "polled_at": now,
         }
 
     def _apply(self, snap):

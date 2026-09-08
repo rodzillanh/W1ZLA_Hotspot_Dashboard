@@ -1621,9 +1621,12 @@ the same [Rig control](#rig-control-rigctld) connection.
 - **TX/RX** indicator with a keyed timer
 
 Every field degrades on its own: a rig or Hamlib build that doesn't
-support a given reading just shows a dash. The card polls gently — every
-few seconds on receive, ~1 s while transmitting — since `rigctld` shares
-the CAT link with your logger and WSJT-X.
+support a given reading just shows a dash. Polling is split so it stays
+light on the CAT link (shared with your logger and WSJT-X): the fast
+readings — frequency, mode, S-meter, PTT, and the TX meters — refresh
+about once a second, while the slower ones — PA temperature, ATU / NB /
+NR / notch / antenna — refresh every few seconds. Raise
+`RIG_PANEL_POLL_SEC` if the radio ever feels busier with the card on.
 
 The **⚙ drawer** holds the **Operating Timeline**: every band and mode
 the rig has sat on since the dashboard started ("20 m FT8 14:02–14:37 ·

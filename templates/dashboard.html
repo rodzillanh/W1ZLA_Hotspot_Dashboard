@@ -3622,7 +3622,7 @@ const HF_FAV_MODES = ['USB', 'LSB', 'CW', 'PKTUSB', 'PKTLSB', 'AM', 'FM', 'RTTY'
 const HF_FAV_FILTER_KEY = 'w1zla_hf_fav_filter';
 const SHOW_RIG_PANEL = {{ 'true' if settings.get('show_rig_panel', False) else 'false' }};
 const RIG_PANEL_POSITION = {{ settings.get('rig_panel_position', 0) }};
-const RIG_PANEL_POLL_MS = 2500;
+const RIG_PANEL_POLL_MS = 1000;
 const POTA_POLL_MS = 20000;  // matches pota.py's spot cache TTL
 const RIG_CONTROL_ENABLED = {{ 'true' if settings.get('rig_control_enabled', False) else 'false' }};
 // DVSwitch card shows when SHOW_DVSWITCH is on AND at least one hotspot
