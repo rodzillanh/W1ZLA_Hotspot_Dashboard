@@ -1495,6 +1495,12 @@
             border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
         .rp-tl-row .tt { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
         .rp-tl-row .td { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); text-align: right; }
+        .rp-raw { border: 1px solid var(--border-soft); border-radius: 8px; overflow: hidden; }
+        .rp-raw-row { display: grid; grid-template-columns: 150px 1fr; gap: 10px; padding: 5px 10px;
+            font-family: var(--font-mono); font-size: 11px; }
+        .rp-raw-row + .rp-raw-row { border-top: 1px solid var(--border-soft); }
+        .rp-raw-row .rk { color: var(--text-muted); }
+        .rp-raw-row .rv { color: var(--text-dim); word-break: break-all; }
 
         /* --- HamAlert card --- */
         .ha-badge {
@@ -8594,17 +8600,23 @@ function renderRigPanelCard() {
     const sFrac = sDb == null ? 0 : Math.max(0, Math.min(1, (sDb + 54) / 114));
     const sMeter = `<div class="rp-meter"><span class="lab">S</span>${rpBar(sFrac)}<span class="val">${s.ptt ? 'TX' : rpSMeter(s.strength_db)}</span></div>`;
 
-    // TX meters
+    // TX meters. The bar prefers the *measured* fraction (power_meter,
+    // 0..1); the setting slider (power_set) is only a fallback so the bar
+    // isn't dead on rigs that don't meter forward power.
     const swr = s.swr, alc = s.alc, cmp = s.comp;
-    const pwrW = s.power_w, pwrSet = s.power_set;
+    const pwrW = s.power_w, pwrSet = s.power_set, pwrMtr = s.power_meter;
     const swrCls = swr == null ? '' : (swr > 2 ? 'hot' : swr > 1.5 ? 'warn' : '');
-    const pwrFrac = pwrSet != null ? pwrSet : (pwrW != null ? Math.min(1, pwrW / 100) : 0);
+    const pwrFrac = pwrMtr != null ? pwrMtr : (pwrSet != null ? pwrSet : 0);
+    const pwrVal = (pwrW != null && pwrW > 0) ? Math.round(pwrW) + ' W'
+                 : (pwrMtr != null && pwrMtr > 0) ? Math.round(pwrMtr * 100) + '%'
+                 : (pwrSet != null) ? Math.round(pwrSet * 100) + '% set'
+                 : '—';
     const txMeters = `
         <div class="rp-tx-meters${s.ptt ? '' : ' idle'}">
             <span class="rp-sec">on transmit</span>
             <div class="rp-meter"><span class="lab">SWR</span>${rpBar(swr == null ? 0 : Math.min(1, (swr - 1) / 2), swrCls)}<span class="val">${swr == null ? '—' : swr.toFixed(2) + ':1'}</span></div>
             <div class="rp-meter"><span class="lab">ALC</span>${rpBar(alc || 0, alc != null && alc > 0.6 ? 'warn' : '')}<span class="val">${alc == null ? '—' : Math.round(alc * 100) + '%'}</span></div>
-            <div class="rp-meter"><span class="lab">PWR</span>${rpBar(pwrFrac)}<span class="val">${pwrW != null ? pwrW + ' W' : (pwrSet != null ? Math.round(pwrSet * 100) + '%' : '—')}</span></div>
+            <div class="rp-meter"><span class="lab">PWR</span>${rpBar(pwrFrac)}<span class="val">${pwrVal}</span></div>
             <div class="rp-meter"><span class="lab">CMP</span>${rpBar(cmp || 0)}<span class="val">${cmp == null ? '—' : Math.round(cmp * 100) + '%'}</span></div>
         </div>`;
 
@@ -8676,17 +8688,23 @@ function renderRigPanelDrawer() {
             <span class="td">${rpDur(end - seg.start)}</span>
         </div>`;
     }).join('');
+    const raw = rigPanelData.raw || {};
+    const rawRows = Object.keys(raw).map(k =>
+        `<div class="rp-raw-row"><span class="rk">${escapeHtml(k)}</span><span class="rv">${escapeHtml(String(raw[k]))}</span></div>`).join('');
     d.innerHTML = `
         <div class="hs-drawer-header">
             <div class="hs-drawer-title-row">
                 <div class="hs-drawer-title">📻 Rig Panel</div>
                 <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
             </div>
-            <div class="hs-drawer-sub">Operating timeline — every band/mode the rig has sat on</div>
+            <div class="hs-drawer-sub">Operating timeline + raw rigctld readings</div>
         </div>
         <div class="hs-drawer-body">
             <div class="hs-drawer-section-title">Timeline</div>
             <div class="rp-tl">${rows || '<div style="padding:14px;color:var(--text-muted);font-size:12px">No band changes logged yet. This fills in as the rig moves between bands and modes while the dashboard runs. It is not saved across a restart.</div>'}</div>
+            <div class="hs-drawer-section-title" style="margin-top:18px">Raw readings</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Exactly what your rigctld answers for each field this poll — an <code>RPRT -n</code> means the rig or Hamlib build does not support it.</div>
+            <div class="rp-raw">${rawRows || '<div style="padding:10px;color:var(--text-muted);font-size:12px">Nothing yet.</div>'}</div>
         </div>`;
 }
 

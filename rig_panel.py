@@ -145,42 +145,47 @@ class RigPanelPoller:
 
     def _poll_once(self, sock):
         now = time.time()
+        raw = {}  # exact rigctld reply per level/func -- shown in the drawer
 
         # --- fast set: everything that actually moves, every poll ---
-        freq = _num(self._get1(sock, "f"))
+        freq = _num(self._get1(sock, "f", raw))
         mode_lines = self._cmd(sock, "m", 2)
+        raw["m"] = " / ".join(mode_lines) or "(no reply)"
         mode = mode_lines[0] if mode_lines and not mode_lines[0].startswith("RPRT") else None
         passband = _num(mode_lines[1]) if len(mode_lines) > 1 and not mode_lines[1].startswith("RPRT") else None
-        vfo = self._get1(sock, "v")
+        vfo = self._get1(sock, "v", raw)
         split_lines = self._cmd(sock, "s", 2)
+        raw["s"] = " / ".join(split_lines) or "(no reply)"
         split = (split_lines and split_lines[0] == "1")
-        tx_freq = _num(self._get1(sock, "i")) if split else None
-        ptt = (self._get1(sock, "t") == "1")
-        strength = _num(self._get1(sock, "l STRENGTH"))
+        tx_freq = _num(self._get1(sock, "i", raw)) if split else None
+        ptt = (self._get1(sock, "t", raw) == "1")
+        strength = _num(self._get1(sock, "l STRENGTH", raw))
 
         swr = alc = comp = power_w = power_meter = power_set = None
         if ptt:  # TX meters -- only worth reading while transmitting
-            power_set = _num(self._get1(sock, "l RFPOWER"))
-            swr = _num(self._get1(sock, "l SWR"))
-            alc = _num(self._get1(sock, "l ALC"))
-            comp = _num(self._get1(sock, "l COMP_METER"))
-            power_w = _num(self._get1(sock, "l RFPOWER_METER_WATTS"))
-            power_meter = _num(self._get1(sock, "l RFPOWER_METER"))
+            power_set = _num(self._get1(sock, "l RFPOWER", raw))
+            swr = _num(self._get1(sock, "l SWR", raw))
+            alc = _num(self._get1(sock, "l ALC", raw))
+            comp = _num(self._get1(sock, "l COMP_METER", raw))
+            power_w = _num(self._get1(sock, "l RFPOWER_METER_WATTS", raw))
+            power_meter = _num(self._get1(sock, "l RFPOWER_METER", raw))
 
         # --- slow set: PA temp + flags + antenna, refreshed every N sec
         #     and carried on every snapshot in between ---
         if now - self._slow_at >= config.RIG_PANEL_SLOW_EVERY_SEC:
+            sraw = {}
             self._slow_cache = {
-                "temp_frac": _num(self._get1(sock, "l TEMP_METER")),
+                "temp_frac": _num(self._get1(sock, "l TEMP_METER", sraw)),
                 "funcs": {
-                    "tuner": _flag(self._get1(sock, "u TUNER")),
-                    "nb":    _flag(self._get1(sock, "u NB")),
-                    "nr":    _flag(self._get1(sock, "u NR")),
-                    "anf":   _flag(self._get1(sock, "u ANF")),
-                    "comp":  _flag(self._get1(sock, "u COMP")),
+                    "tuner": _flag(self._get1(sock, "u TUNER", sraw)),
+                    "nb":    _flag(self._get1(sock, "u NB", sraw)),
+                    "nr":    _flag(self._get1(sock, "u NR", sraw)),
+                    "anf":   _flag(self._get1(sock, "u ANF", sraw)),
+                    "comp":  _flag(self._get1(sock, "u COMP", sraw)),
                 },
-                "antenna": _num(self._get1(sock, "y")),
-                "power_set": _num(self._get1(sock, "l RFPOWER")),
+                "antenna": _num(self._get1(sock, "y", sraw)),
+                "power_set": _num(self._get1(sock, "l RFPOWER", sraw)),
+                "raw": sraw,
             }
             self._slow_at = now
         sc = self._slow_cache
@@ -189,6 +194,7 @@ class RigPanelPoller:
         antenna = sc.get("antenna")
         if power_set is None:
             power_set = sc.get("power_set")  # slider position (RX fallback for the PWR bar frac)
+        raw = {**sc.get("raw", {}), **raw}
 
         band = freq_to_band(int(freq)) if freq else ""
         if not band and freq and 5_250_000 <= freq <= 5_450_000:
@@ -199,10 +205,12 @@ class RigPanelPoller:
             lo, hi = self._temp_cal
             temp_c = lo + (hi - lo) * temp_frac
 
-        # RFPOWER_METER is 0..1; scale by the rig's rated watts as a
-        # fallback when RFPOWER_METER_WATTS isn't supported.
-        if power_w is None and power_meter is not None:
-            power_w = power_meter * config.RIG_RATED_WATTS
+        # RFPOWER_METER_WATTS is Hamlib >= 4.6 and backend-specific --
+        # WFView's rigctld answers a flat 0 for it, so treat a falsy value
+        # (None OR 0) as "unavailable" and fall back to RFPOWER_METER
+        # (0..1) x the rig's rated watts.
+        if not power_w:
+            power_w = power_meter * config.RIG_RATED_WATTS if power_meter else None
 
         return {
             "reachable": True,
@@ -220,10 +228,12 @@ class RigPanelPoller:
             "alc": alc,
             "comp": comp,
             "power_w": round(power_w, 1) if power_w is not None else None,
+            "power_meter": power_meter,  # 0..1 measured -- clean fraction for the PWR bar
             "temp_frac": temp_frac,
             "temp_c": round(temp_c, 1) if temp_c is not None else None,
             "funcs": funcs,
             "antenna": (int(antenna) + 1) if antenna is not None else None,  # 1-indexed for display
+            "raw": raw,
             "polled_at": now,
         }
 
@@ -302,11 +312,19 @@ class RigPanelPoller:
         return got
 
     @classmethod
-    def _get1(cls, sock, line):
+    def _get1(cls, sock, line, raw=None):
+        """Send a 1-line-reply command; return the reply string, or None
+        on an error / empty reply. If `raw` is a dict, the exact reply
+        (incl. an `RPRT -n` error) is recorded under `line` -- surfaced
+        in the card's drawer so it's obvious what a given rig / Hamlib
+        build actually answers for each level/func."""
         r = cls._cmd(sock, line, 1)
-        if not r or r[0].startswith("RPRT") or r[0] == "":
+        val = r[0] if r else ""
+        if raw is not None:
+            raw[line] = val or "(no reply)"
+        if not val or val.startswith("RPRT"):
             return None
-        return r[0]
+        return val
 
 
 def _close(sock):
