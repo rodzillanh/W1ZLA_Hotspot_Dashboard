@@ -8606,7 +8606,7 @@ function renderRigPanelCard() {
     const swr = s.swr, alc = s.alc, cmp = s.comp;
     const pwrW = s.power_w, pwrSet = s.power_set, pwrMtr = s.power_meter;
     const swrCls = swr == null ? '' : (swr > 2 ? 'hot' : swr > 1.5 ? 'warn' : '');
-    const pwrFrac = pwrMtr != null ? pwrMtr : (pwrSet != null ? pwrSet : 0);
+    const pwrFrac = pwrMtr ? pwrMtr : (pwrSet != null ? pwrSet : 0);  // 0/None measured -> fall to the setting
     const pwrVal = (pwrW != null && pwrW > 0) ? Math.round(pwrW) + ' W'
                  : (pwrMtr != null && pwrMtr > 0) ? Math.round(pwrMtr * 100) + '%'
                  : (pwrSet != null) ? Math.round(pwrSet * 100) + '% set'

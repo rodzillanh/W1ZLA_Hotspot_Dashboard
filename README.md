@@ -1620,13 +1620,25 @@ the same [Rig control](#rig-control-rigctld) connection.
   compression, antenna — only the ones your rig actually reports
 - **TX/RX** indicator with a keyed timer
 
-Every field degrades on its own: a rig or Hamlib build that doesn't
-support a given reading just shows a dash. Polling is split so it stays
-light on the CAT link (shared with your logger and WSJT-X): the fast
-readings — frequency, mode, S-meter, PTT, and the TX meters — refresh
-about once a second, while the slower ones — PA temperature, ATU / NB /
-NR / notch / antenna — refresh every few seconds. Raise
-`RIG_PANEL_POLL_SEC` if the radio ever feels busier with the card on.
+Every field degrades on its own: a reading the rig or Hamlib build
+doesn't expose just shows a dash. **How much you get depends on the
+rigctld:** stock Hamlib `rigctld` talking to the radio directly maps the
+full meter set (SWR, forward power, PA temperature), while **WFView's
+built-in RigCtld is a minimal re-implementation** — on an IC-7300 it
+gives you frequency / mode / VFO / split / PTT / S-meter / ALC / func
+flags, but not SWR, forward power, or PA temperature (those come back as
+a flat default, which the card treats as "not reported"). The **⚙
+drawer's "Raw readings"** section shows exactly what your rigctld
+answers for each field, so it's easy to see which is which. If you want
+the full meter set, point a stock `rigctld -m 3073` at the radio's CI-V
+port instead of using WFView's.
+
+Polling is split so it stays light on the CAT link (shared with your
+logger and WSJT-X): the fast readings — frequency, mode, S-meter, PTT,
+and the TX meters — refresh about once a second, while the slower ones —
+PA temperature, ATU / NB / NR / notch / antenna — refresh every few
+seconds. Raise `RIG_PANEL_POLL_SEC` if the radio ever feels busier with
+the card on.
 
 The **⚙ drawer** holds the **Operating Timeline**: every band and mode
 the rig has sat on since the dashboard started ("20 m FT8 14:02–14:37 ·

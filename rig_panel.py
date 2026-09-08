@@ -165,6 +165,10 @@ class RigPanelPoller:
         if ptt:  # TX meters -- only worth reading while transmitting
             power_set = _num(self._get1(sock, "l RFPOWER", raw))
             swr = _num(self._get1(sock, "l SWR", raw))
+            # SWR is physically >= 1.0; a flat 1.000 (WFView's rigctld) or
+            # anything below means it isn't actually being metered.
+            if swr is not None and swr <= 1.0:
+                swr = None
             alc = _num(self._get1(sock, "l ALC", raw))
             comp = _num(self._get1(sock, "l COMP_METER", raw))
             power_w = _num(self._get1(sock, "l RFPOWER_METER_WATTS", raw))
@@ -190,6 +194,12 @@ class RigPanelPoller:
             self._slow_at = now
         sc = self._slow_cache
         temp_frac = sc.get("temp_frac")
+        # A finals-temp meter never truly reads 0.000 -- WFView's rigctld
+        # answers `l TEMP_METER` but returns a flat 0 for a rig it doesn't
+        # map, so treat that as "not reported" (card shows a dash, the
+        # PA-temp alert can't fire on it) rather than a misleading "0%".
+        if not temp_frac:
+            temp_frac = None
         funcs = sc.get("funcs") or {"tuner": None, "nb": None, "nr": None, "anf": None, "comp": None}
         antenna = sc.get("antenna")
         if power_set is None:
