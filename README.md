@@ -498,6 +498,34 @@ background connection, extra dependency, reconnect handling) from the rest
 of this app's SSH-poll model. That's not implemented here; this feature
 covers the device/talkgroup REST endpoints only.
 
+<!-- wiki-group: Integrations -->
+## Rig control (rigctld)
+
+Optional — Settings → Integrations → **Rig control (rigctld)**, off by
+default. Point it at a [Hamlib](https://hamlib.github.io/) `rigctld`
+server on your LAN and every activator-spot frequency in the [POTA
+card](#pota-card) becomes a **tap-to-tune button**: click it and your
+radio jumps to that frequency, and — when "send mode" is on — its mode
+too (`SSB` maps to USB/LSB by band, `CW` to CW, `FT8`/`FT4`/`DATA` to
+PKTUSB).
+
+Any `rigctld` source works. [WFView](https://wfview.org/) has one built
+in — Settings → enable **RigCtld**, and make sure it's set to listen on
+the LAN interface, not just localhost. A standalone `rigctld` (Hamlib),
+or anything else that speaks the rigctl protocol (SparkSDR, Thetis, …),
+works the same way. Default port is **4532**; a bare `host:port` in the
+host field works too.
+
+Under the hood this is a short-lived TCP connection per click — connect,
+send `F <hz>` (and `M <mode> 0`), read `RPRT 0`, disconnect. `rigctld`
+serializes CAT access, so it doesn't collide with WSJT-X or a logger
+holding their own connections. A small pill on the POTA card shows
+whether the rig server is reachable (and the rig model, if it reports
+one); when it isn't reachable the frequency is just plain text. **No
+login** — `rigctld` has no auth, so this assumes a trusted LAN, same as
+the links to hotspot web UIs. Use the **Test connection** button in
+Settings to check reachability.
+
 <!-- wiki-group: Hotspot Types -->
 ## WPSD/Pi-Star update check
 
@@ -1502,6 +1530,7 @@ Brandmeister live connection, for a different, narrower purpose).
 
 <!-- wiki-group: Optional Cards -->
 ## POTA card
+<!-- wiki-image: pota-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show POTA card", off by
 default) for Parks on the Air hunters. It's a **fixed-size card** — a
@@ -1530,6 +1559,11 @@ Integrations → Parks on the Air. It's a plain callsign, **not a login**:
 every `api.pota.app` endpoint used here is public, no account or key.
 Without a callsign the card still works — it just shows the spot list
 without stats.
+
+**Tap-to-tune:** with [Rig control](#rig-control-rigctld) configured,
+each spot's frequency becomes a button that tunes your radio to it (and
+sets the mode, optionally). A pill in the card header shows whether the
+rig server is reachable; when it isn't, the frequency is plain text.
 
 <!-- wiki-group: Optional Cards -->
 ## Big Ass Clock card

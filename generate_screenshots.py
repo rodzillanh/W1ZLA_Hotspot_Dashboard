@@ -114,6 +114,15 @@ SETTINGS = {
     "show_recent_contacts": True,
     "show_qso_stats": True,
     "show_top_activity": True,
+    "show_pota": True,
+    "pota_callsign": "W1ZLA",
+    # Rig control on so the POTA card screenshot shows the tap-to-tune
+    # frequency chips + the reachability pill -- the actual rigctld
+    # probe is monkeypatched to a fixed "reachable" reply below (there's
+    # no rig server in this sandbox), same screenshot-only trick as the
+    # audio_manager.snapshot patch further down.
+    "rig_control_enabled": True,
+    "rig_host": "192.168.1.44",
 }
 
 # 7 favorites, no "pinned" key -- deliberately legacy-shaped so this run
@@ -272,6 +281,14 @@ with app.monitor._lock:
 # AslAudioManager.snapshot()'s real shape.
 app.audio_manager.snapshot = lambda: {_ip_to_id[HOTSPOT_ASL3["ip"]]: {"level_dbfs": -26.0, "connected": True}}
 
+# Same idea for the POTA card's rig-control pill / tap-to-tune chips:
+# /api/pota calls rig_client.status(), which can only ever fail against a
+# fake host in this sandbox. Pin it to a "reachable" reply so the chips
+# render enabled and the pill shows a rig model. Screenshot-only.
+app.rig_client.status = lambda *a, **k: {
+    "reachable": True, "rig": "IC-7300", "freq_hz": 14074000, "error": None,
+}
+
 # --- 4. Seed Fleet Activity / Top 5 Activity (storage_activity.py) --
 # log_activity() always timestamps "now", which is fine for a demo chart.
 # Durations are deliberately NOT proportional to call count -- W2ECR's one
@@ -339,6 +356,7 @@ CARD_SHOTS = [
     ("license-quiz-card", "license-quiz-card.png"),
     ("wspr-activity-card", "band-activity-card.png"),
     ("big-clock-card", "big-clock-card.png"),
+    ("pota-card", "pota-card.png"),
 ]
 
 with sync_playwright() as p:
