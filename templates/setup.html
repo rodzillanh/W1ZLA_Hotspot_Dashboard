@@ -1377,6 +1377,51 @@
     </div>
 
     <div class="section">
+        <div class="section-title">Rig control (rigctld)
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — tap a POTA spot's frequency to tune your radio
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            Point this at a <a href="https://hamlib.github.io/" target="_blank" rel="noopener"
+            style="color:var(--link)">Hamlib <code>rigctld</code></a> server on your LAN and every
+            spot's frequency in the <b>POTA card</b> becomes a tap-to-tune button — click it and your
+            radio jumps to that frequency. <b>WFView</b> has one built in (Settings → enable
+            <em>RigCtld</em>, and make sure it listens on the LAN, not just localhost); a standalone
+            <code>rigctld</code> works too. <b>No login</b> — rigctld has no auth, so this is LAN-only,
+            same as the hotspot web-UI links.
+        </p>
+        <div class="toggle-group" style="margin-bottom:10px">
+            <div class="toggle-row">
+                <span class="toggle-label">Enable tap-to-tune from the POTA card</span>
+                <div class="toggle {{ 'on' if settings.get('rig_control_enabled') else '' }}"
+                     id="rig-enabled-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Also set the rig's mode from the spot (SSB / CW / FT8)</span>
+                <div class="toggle {{ 'on' if settings.get('rig_send_mode', True) else '' }}"
+                     id="rig-mode-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>Rig server host</label>
+                <input type="text" id="rig-host" placeholder="192.168.1.44"
+                       value="{{ settings.get('rig_host', '') }}">
+            </div>
+            <div>
+                <label>Port</label>
+                <input type="text" id="rig-port" placeholder="4532" style="width:90px"
+                       value="{{ settings.get('rig_port', 4532) }}">
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveRigControl()">Save rig control settings</button>
+        <button class="btn btn-info" onclick="testRigControl()">Test connection</button>
+        <span class="status-txt" id="rig-status"></span>
+    </div>
+
+    <div class="section">
         <div class="section-title">HamAlert
             <span style="font-size:10px;color:var(--text-dim);font-weight:400;
                          text-transform:none;letter-spacing:0;margin-left:6px">
@@ -3332,6 +3377,44 @@ function savePota() {
         status.textContent = '✓ Saved';
         setTimeout(() => status.textContent = '', 2000);
     });
+}
+
+// --- Rig control (rigctld) ---
+function saveRigControl() {
+    const status = document.getElementById('rig-status');
+    fetch('/api/settings', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            rig_control_enabled: document.getElementById('rig-enabled-toggle').classList.contains('on'),
+            rig_host: document.getElementById('rig-host').value.trim(),
+            rig_port: parseInt(document.getElementById('rig-port').value, 10) || 4532,
+            rig_send_mode: document.getElementById('rig-mode-toggle').classList.contains('on'),
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved'; status.style.color = '';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+async function testRigControl() {
+    const status = document.getElementById('rig-status');
+    status.textContent = 'Testing...'; status.style.color = '';
+    try {
+        const r = await fetch('/api/test_rigctl', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                host: document.getElementById('rig-host').value.trim(),
+                port: parseInt(document.getElementById('rig-port').value, 10) || 4532,
+            })
+        });
+        const data = await r.json();
+        status.textContent = (data.success ? '✓ ' : '✕ ') + data.message;
+        status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
+    } catch (e) {
+        status.textContent = '✕ ' + e;
+        status.style.color = 'var(--danger)';
+    }
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
 }
 
 function saveHamAlert() {

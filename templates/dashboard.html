@@ -1313,6 +1313,38 @@
         .pota-d-hunt .h-park small { font-family: var(--font-mono); color: var(--text-dim); }
         .pota-d-hunt .h-when { font-family: var(--font-mono); color: var(--text-muted); font-size: 10px; white-space: nowrap; }
         @media (prefers-reduced-motion: reduce) { .pota-dot.fresh { animation: none; } }
+        /* --- POTA card: tap-to-tune via rigctld (rigctl.py) --- */
+        .pota-rig-pill { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono);
+            font-size: 9px; letter-spacing: .04em; padding: 2px 7px 2px 6px; border-radius: 20px;
+            border: 1px solid var(--border); color: var(--text-muted); background: var(--panel-2);
+            white-space: nowrap; cursor: default; }
+        .pota-rig-pill .d { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+        .pota-rig-pill.live { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }
+        .pota-rig-pill.live .d { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+        .pota-tune-chip { appearance: none; font: inherit; font-family: var(--font-mono); font-size: 10px;
+            font-weight: 600; display: inline-flex; align-items: center; gap: 3px; padding: 0 6px 0 4px;
+            border-radius: 5px; cursor: pointer; vertical-align: baseline;
+            border: 1px solid color-mix(in srgb, var(--live) 45%, var(--border)); color: var(--live);
+            background: color-mix(in srgb, var(--live) 10%, transparent);
+            transition: background .12s, border-color .12s, color .12s; }
+        .pota-tune-chip .ic { font-size: 7px; }
+        .pota-tune-chip:hover { background: color-mix(in srgb, var(--live) 20%, transparent); border-color: var(--live); }
+        .pota-tune-chip.pending { color: var(--caution); border-color: color-mix(in srgb, var(--caution) 55%, var(--border));
+            background: color-mix(in srgb, var(--caution) 12%, transparent); animation: rigPulse 1s ease-in-out infinite; }
+        .pota-tune-chip.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 55%, var(--border));
+            background: color-mix(in srgb, var(--good) 14%, transparent); }
+        .pota-tune-chip.err { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+            background: color-mix(in srgb, var(--danger) 12%, transparent); }
+        @keyframes rigPulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        #rig-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(16px);
+            opacity: 0; pointer-events: none; background: var(--panel); border: 1px solid var(--border);
+            border-radius: 9px; box-shadow: 0 8px 26px -10px rgba(0, 0, 0, .45); padding: 9px 13px;
+            font-size: 12px; color: var(--text); max-width: 90vw; z-index: 6000;
+            transition: opacity .16s, transform .16s; }
+        #rig-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #rig-toast.ok { border-color: color-mix(in srgb, var(--good) 55%, var(--border)); }
+        #rig-toast.err { border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); }
+        @media (prefers-reduced-motion: reduce) { .pota-tune-chip.pending { animation: none; } }
 
         /* --- HamAlert card --- */
         .ha-badge {
@@ -2831,7 +2863,12 @@
              style="order:{{ settings.get('pota_position', 0) }}">
             <div class="metrics-header">
                 <div class="card-name">🏕️ POTA{% if settings.get('pota_callsign', '') %} <span class="pota-call-chip">{{ settings.get('pota_callsign', '') }}</span>{% endif %}</div>
-                <button class="pota-gear" type="button" onclick="openPotaDrawer()">⚙ Stats</button>
+                <div style="display:flex;align-items:center;gap:8px">
+                    {% if settings.get('rig_control_enabled', False) %}
+                    <span class="pota-rig-pill" id="pota-rig-pill" title="Rig control via rigctld"><span class="d"></span><span id="pota-rig-pill-txt">rig</span></span>
+                    {% endif %}
+                    <button class="pota-gear" type="button" onclick="openPotaDrawer()">⚙ Stats</button>
+                </div>
             </div>
             <div class="pota-glance" id="pota-glance" role="button" tabindex="0"
                  onclick="openPotaDrawer()">—</div>
@@ -3383,6 +3420,7 @@ const TOP_ACTIVITY_POSITION = {{ settings.get('top_activity_position', 0) }};
 const SHOW_POTA = {{ 'true' if settings.get('show_pota', False) else 'false' }};
 const POTA_POSITION = {{ settings.get('pota_position', 0) }};
 const POTA_POLL_MS = 20000;  // matches pota.py's spot cache TTL
+const RIG_CONTROL_ENABLED = {{ 'true' if settings.get('rig_control_enabled', False) else 'false' }};
 // DVSwitch card shows when SHOW_DVSWITCH is on AND at least one hotspot
 // has dvswitch_enabled (derived per-poll from data.some(...)). Default
 // true, so an install that already had a DVSwitch hotspot is unaffected
@@ -7813,6 +7851,19 @@ function renderPotaCard() {
     const emptyEl = document.getElementById('pota-empty');
     if (emptyEl) emptyEl.style.display = list.length ? 'none' : 'block';
 
+    // rig-control pill + whether the tap-to-tune chips should render
+    const rig = potaData.rig;
+    const rigOk = RIG_CONTROL_ENABLED && !!(rig && rig.reachable);
+    const rigPill = document.getElementById('pota-rig-pill');
+    if (rigPill && rig) {
+        rigPill.classList.toggle('live', !!rig.reachable);
+        document.getElementById('pota-rig-pill-txt').textContent =
+            rig.reachable ? (rig.rig || 'rig ready') : 'rig offline';
+        rigPill.title = rig.reachable
+            ? 'rigctld reachable' + (rig.freq_hz ? ' — on ' + (rig.freq_hz / 1e6).toFixed(3) + ' MHz' : '')
+            : (rig.error || 'Rig server not reachable');
+    }
+
     const dirName = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
     listEl.innerHTML = list.map(s => {
         const age = potaAgeMin(s.spot_time);
@@ -7821,6 +7872,14 @@ function renderPotaCard() {
             ? `https://www.qrz.com/db/${encodeURIComponent(call)}`
             : `https://pota.app/#/profile/${encodeURIComponent(call)}`;
         const freqMhz = s.freq_hz ? (s.freq_hz / 1e6).toFixed(3) : '';
+        // sanitized to bare alphanumerics -- pota_mode_to_rig() only
+        // cares about tokens like SSB/CW/FT8 anyway, and this keeps the
+        // value safe to drop into the inline onclick string literal
+        const modeTok = (s.mode || '').replace(/[^A-Za-z0-9]/g, '');
+        const freqCell = (freqMhz && rigOk && s.freq_hz)
+            ? `<button class="pota-tune-chip" data-mhz="${freqMhz}" title="Tune the rig to ${freqMhz} MHz via rigctld"
+                 onclick="rigTune(this, ${s.freq_hz}, '${modeTok}')"><span class="ic">▶</span>${freqMhz}</button> `
+            : (freqMhz ? freqMhz + ' ' : '');
         const distBit = (s.dist_mi != null && s.bearing != null)
             ? `${s.dist_mi} mi ${dirName[Math.round(((s.bearing % 360) + 360) % 360 / 22.5) % 16]}` : '';
         const q = (typeof s.qso_count === 'number') ? s.qso_count : null;
@@ -7834,11 +7893,56 @@ function renderPotaCard() {
                     <a class="pota-spot-ref" href="https://pota.app/#/park/${encodeURIComponent(s.reference || '')}" target="_blank" rel="noopener">${escapeHtml(s.reference || '')}</a>
                 </div>
                 <span class="pota-spot-park">${escapeHtml(s.park_name || '')}</span>
-                <div class="pota-spot-sub">${freqMhz ? freqMhz + ' ' : ''}${escapeHtml(s.band || '')} · ${escapeHtml(s.mode || '')}${distBit ? ' · <span class="pota-spot-dist">' + distBit + '</span>' : ''}${s.location_desc ? ' · ' + escapeHtml(s.location_desc) : ''}${s.comments ? ' · <span class="pota-spot-cmt">' + escapeHtml(s.comments) + '</span>' : ''}</div>
+                <div class="pota-spot-sub">${freqCell}${escapeHtml(s.band || '')} · ${escapeHtml(s.mode || '')}${distBit ? ' · <span class="pota-spot-dist">' + distBit + '</span>' : ''}${s.location_desc ? ' · ' + escapeHtml(s.location_desc) : ''}${s.comments ? ' · <span class="pota-spot-cmt">' + escapeHtml(s.comments) + '</span>' : ''}</div>
             </div>
             <div class="pota-spot-right"><span>${potaAgeStr(age)}</span>${q != null ? `<span class="pota-spot-q${q < 10 ? ' early' : ''}">${q} Q</span>` : ''}</div>
         </div>`;
     }).join('');
+}
+
+let _rigToastT = null;
+function rigToast(msg, kind) {
+    let t = document.getElementById('rig-toast');
+    if (!t) { t = document.createElement('div'); t.id = 'rig-toast'; document.body.appendChild(t); }
+    t.textContent = msg;
+    t.className = 'show' + (kind ? ' ' + kind : '');
+    clearTimeout(_rigToastT);
+    _rigToastT = setTimeout(() => { t.className = ''; }, 3200);
+}
+
+// Tap-to-tune: POST the clicked spot's frequency (+ optional mode) to a
+// Hamlib rigctld server via /api/rig_tune. See rigctl.py.
+function rigTune(btn, freqHz, mode) {
+    if (!btn || btn.classList.contains('pending')) return;
+    const mhz = btn.dataset.mhz || '';
+    btn.classList.remove('ok', 'err');
+    btn.classList.add('pending');
+    btn.innerHTML = '<span class="ic">◔</span>…';
+    fetch('/api/rig_tune', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ freq_hz: freqHz, mode: mode }),
+    }).then(r => r.json()).then(d => {
+        btn.classList.remove('pending');
+        if (d.ok) {
+            btn.classList.add('ok');
+            btn.innerHTML = '<span class="ic">✓</span>' + mhz;
+            rigToast('Rig → ' + d.message, 'ok');
+        } else {
+            btn.classList.add('err');
+            btn.innerHTML = '<span class="ic">✕</span>' + mhz;
+            rigToast('Tune failed: ' + (d.message || 'rig server error'), 'err');
+        }
+    }).catch(() => {
+        btn.classList.remove('pending');
+        btn.classList.add('err');
+        btn.innerHTML = '<span class="ic">✕</span>' + mhz;
+        rigToast('Tune failed: no response from the dashboard', 'err');
+    }).finally(() => {
+        setTimeout(() => {
+            btn.classList.remove('ok', 'err');
+            btn.innerHTML = '<span class="ic">▶</span>' + mhz;
+        }, 2600);
+    });
 }
 
 function renderPotaDrawer() {

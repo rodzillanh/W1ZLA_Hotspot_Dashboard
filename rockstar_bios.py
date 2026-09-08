@@ -401,6 +401,11 @@ BIOS = {
         "blurb": "The father of modern Chicago blues, who took the Delta slide sound electric on \"Hoochie Coochie Man\" and \"Rollin' Stone\" — the latter giving the Rolling Stones their name.",
         "wiki": "Muddy_Waters",
     },
+    "Perkins": {
+        "name": "Carl Perkins",
+        "blurb": "Sun Records rockabilly pioneer who wrote and first recorded \"Blue Suede Shoes\" in 1955 — a direct bridge from country and blues into rock and roll, and a touchstone for the Beatles.",
+        "wiki": "Carl_Perkins",
+    },
 }
 
 

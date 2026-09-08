@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.48 "Waters"</span>
+                <span class="release-version">v4.49 "Perkins"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Tap-to-tune your rig from the POTA card</span> — point Settings → Integrations → "Rig control" at a Hamlib <em>rigctld</em> server on your LAN (WFView has one built in — enable RigCtld; a standalone <em>rigctld</em> also works) and every spot's frequency in the POTA card becomes a button. Click it and your radio jumps to that frequency, and optionally its mode (USB/LSB/CW/data). A small pill on the card shows whether the rig server is reachable; when it isn't, the frequency stays plain text. No login — rigctld has no auth, so it's LAN-only</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.48 "Waters"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>POTA spots on the Live map, colored by what you need</span> — the "POTA spots" overlay now pulls the same new-to-you data as the POTA card. A park you haven't hunted shows as a bright pin; one you've worked is dimmed. Spots early in an activation (under 10 QSOs) are drawn a little larger, and just-spotted ones pulse. Click a pin to draw a line back to your station with the distance and bearing in the tooltip</li>

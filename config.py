@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.48"
+APP_VERSION = "4.49"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -155,6 +155,10 @@ VERSION_CODENAMES = [
                         # Chicago blues", whose electrified sound shaped
                         # rock and roll (the Rolling Stones took their
                         # name from his song) (1913-1983)
+    "Perkins",          # v4.49 -- Carl Perkins, Sun Records rockabilly
+                        # pioneer who wrote and first recorded "Blue Suede
+                        # Shoes"; a direct bridge from country and blues
+                        # into rock and roll (1932-1998)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1156,6 +1160,18 @@ DEFAULT_SETTINGS = {
     "show_pota": False,
     "pota_position": 0,
     "pota_callsign": "",
+    # Tap-to-tune from the POTA card via a Hamlib rigctld server -- see
+    # rigctl.py. Off by default. `rig_host` is the machine running
+    # WFView (Settings -> enable RigCtld) or a standalone `rigctld`;
+    # `rig_port` is Hamlib's default 4532 (a bare "host:port" in
+    # rig_host works too). `rig_send_mode` also sets the rig's mode
+    # (USB/LSB/CW/PKTUSB) from the spot, not just the frequency. Not a
+    # credential -- rigctld has no auth; same trusted-LAN assumption as
+    # the hotspot web-UI links.
+    "rig_control_enabled": False,
+    "rig_host": "",
+    "rig_port": 4532,
+    "rig_send_mode": True,
     # DVSwitch card (v3.99) -- one consolidated card covering every
     # DVSwitch-enabled ASL3 hotspot via its own "Show:" node picker, not
     # one card per hotspot. Shown when ANY hotspot has dvswitch_enabled

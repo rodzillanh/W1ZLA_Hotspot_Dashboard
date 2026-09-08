@@ -40,6 +40,7 @@ from license_quiz import LicenseQuizPool, DEFAULT_CLASS as LICENSE_QUIZ_DEFAULT_
 from wspr_activity import WsprActivityClient, grid_to_latlon
 from aurora import AuroraClient
 from pota import PotaClient
+from rigctl import RigctlClient
 from sota import SotaClient
 from psk_reporter import PskReporterClient
 from adif import parse_adif
@@ -86,6 +87,10 @@ aurora_client   = AuroraClient()
 # (favorite_stats(), not linked_node_info()) with its own cache keys.
 asl_stats_client = AslStatsClient()
 pota_client     = PotaClient()
+# Short-lived Hamlib rigctld client for the POTA card's tap-to-tune
+# chips -- no persistent connection, no rebuild-on-settings-save (it
+# reads host/port fresh from settings on every call). See rigctl.py.
+rig_client      = RigctlClient()
 sota_client     = SotaClient()
 psk_reporter    = PskReporterClient()
 digipi_monitor  = DigipiMonitor()
@@ -614,6 +619,17 @@ def api_settings_post():
             pass
     if "psk_reporter_callsign" in data:
         settings["psk_reporter_callsign"] = data["psk_reporter_callsign"].strip().upper()
+    if "rig_control_enabled" in data:
+        settings["rig_control_enabled"] = bool(data["rig_control_enabled"])
+    if "rig_host" in data:
+        settings["rig_host"] = data["rig_host"].strip()
+    if "rig_port" in data:
+        try:
+            settings["rig_port"] = max(1, min(65535, int(data["rig_port"])))
+        except (TypeError, ValueError):
+            pass
+    if "rig_send_mode" in data:
+        settings["rig_send_mode"] = bool(data["rig_send_mode"])
     if "onboarding_tour_seen" in data:
         settings["onboarding_tour_seen"] = bool(data["onboarding_tour_seen"])
     if "card_order_tiebreak" in data:
@@ -1458,6 +1474,15 @@ def api_pota():
             row["bearing"] = None
         out.append(row)
 
+    # Rig-control status for the card's tap-to-tune chips (see rigctl.py).
+    # Cached ~20s inside the client, so most 20s POTA polls are a no-op.
+    rig = None
+    if settings.get("rig_control_enabled"):
+        rig = rig_client.status(
+            settings.get("rig_host", ""), settings.get("rig_port", 4532)
+        )
+        rig["send_mode"] = bool(settings.get("rig_send_mode", True))
+
     return jsonify({
         "spots": out,
         "fetched_at": spots_data.get("fetched_at"),
@@ -1467,7 +1492,34 @@ def api_pota():
         "qth_lat": qth[0] if qth is not None else None,
         "qth_lon": qth[1] if qth is not None else None,
         "hunter": hunter,
+        "rig": rig,
     })
+
+@app.route("/api/rig_tune", methods=["POST"])
+def api_rig_tune():
+    """Tap-to-tune from the POTA card: point a Hamlib rigctld server
+    (WFView's built-in one, or a standalone rigctld) at the clicked
+    spot's frequency, and optionally its mode. Short-lived connection --
+    see rigctl.py."""
+    settings = load_settings()
+    if not settings.get("rig_control_enabled"):
+        return jsonify({"ok": False, "message": "Rig control is turned off"}), 400
+    data = request.json or {}
+    ok, message = rig_client.tune(
+        settings.get("rig_host", ""),
+        settings.get("rig_port", 4532),
+        data.get("freq_hz"),
+        (data.get("mode") or "") if settings.get("rig_send_mode", True) else "",
+    )
+    return jsonify({"ok": ok, "message": message})
+
+@app.route("/api/test_rigctl", methods=["POST"])
+def test_rigctl():
+    """Test reachability of a Hamlib rigctld server for the Settings
+    'Test connection' button -- see rigctl.py."""
+    data = request.json or {}
+    ok, message = rig_client.test(data.get("host", ""), data.get("port") or 4532)
+    return jsonify({"success": ok, "message": message})
 
 @app.route("/api/sota_spots")
 def api_sota_spots():
