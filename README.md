@@ -1598,6 +1598,46 @@ reachable rig server the card still lists everything — the frequencies
 are just plain text instead of buttons.
 
 <!-- wiki-group: Optional Cards -->
+## Rig Panel card
+<!-- wiki-image: rig-panel-card.png -->
+
+Optional dashboard card (Settings → Cards → "Show Rig Panel card", off
+by default) — a **read-only software front panel** for your radio, over
+the same [Rig control](#rig-control-rigctld) connection.
+
+- **Frequency, mode, filter, VFO, split** (with the TX frequency when
+  split's on)
+- **S-meter** on receive
+- On **transmit**: SWR, ALC, power (watts if the rig reports them,
+  otherwise the power setting), and speech compression, as bars
+- **PA (finals) temperature** with a short sparkline. Radios like the
+  IC-7300 run hot at 100% duty (FT8, RTTY, JS8) — this answers "am I
+  cooking the finals?" at a glance. `rigctld` reports the PA meter as a
+  raw 0–100% of full scale; enter a 2-point °C calibration under
+  Settings → Integrations if you know your rig's curve, otherwise it
+  shows a percentage
+- **Status pills** for ATU, noise blanker, noise reduction, auto-notch,
+  compression, antenna — only the ones your rig actually reports
+- **TX/RX** indicator with a keyed timer
+
+Every field degrades on its own: a rig or Hamlib build that doesn't
+support a given reading just shows a dash. The card polls gently — every
+few seconds on receive, ~1 s while transmitting — since `rigctld` shares
+the CAT link with your logger and WSJT-X.
+
+The **⚙ drawer** holds the **Operating Timeline**: every band and mode
+the rig has sat on since the dashboard started ("20 m FT8 14:02–14:37 ·
+40 m SSB 14:37–now"), built by watching the frequency change. It's
+in-memory only — it starts fresh after a restart.
+
+**PA-temperature alerts:** turn on "Rig PA-temperature alerts in
+Notifications" (Settings → Cards) and the [Notifications card](#notifications-card)
+gains a 7th source — one alert when the finals meter sits above your
+threshold for a sustained spell, and one when it drops back. The
+threshold (% of full scale) is under Settings → Integrations → Rig
+control. This works whether or not the Rig Panel card itself is shown.
+
+<!-- wiki-group: Optional Cards -->
 ## Big Ass Clock card
 <!-- wiki-image: big-clock-card.png -->
 

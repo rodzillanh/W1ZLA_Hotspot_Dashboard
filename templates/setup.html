@@ -744,6 +744,15 @@
                      id="hf-favorites-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show Rig Panel card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (live software front panel -- freq/mode/S-meter/SWR/PA temp over rigctld; needs "Rig control" set up under Integrations)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_rig_panel', False) else '' }}"
+                     id="rig-panel-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show DVSwitch card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (only appears if an ASL3 hotspot also has "This node also runs DVSwitch" on -- turn this off to hide the card while keeping that enabled)
@@ -808,6 +817,15 @@
                 <div class="toggle {{ 'on' if settings.get('qrz_logbook_enabled', False) else '' }}"
                      id="qrz-logbook-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Rig PA-temperature alerts in Notifications
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (alerts when the rig's finals run hot for a sustained spell, and again when they cool -- needs "Rig control" set up under Integrations; threshold there too)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('rig_pa_alert_enabled', False) else '' }}"
+                     id="rig-pa-alert-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveCards()">Save cards</button>
         <span class="status-txt" id="cards-status"></span>
@@ -862,7 +880,7 @@
             {% set wspr_activity_pos = settings.get('wspr_activity_position', 0) if settings.get('show_wspr_activity', False) else -1 %}
             {% set digipi_pos = settings.get('digipi_position', 0) if settings.get('digipi_enabled', False) else -1 %}
             {% set big_clock_pos = settings.get('big_clock_position', 0) if settings.get('show_big_clock', False) else -1 %}
-            {% set notifications_pos = settings.get('notifications_position', 0) if (settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False) or settings.get('qrz_logbook_enabled', False)) else -1 %}
+            {% set notifications_pos = settings.get('notifications_position', 0) if (settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False) or settings.get('qrz_logbook_enabled', False) or settings.get('rig_pa_alert_enabled', False)) else -1 %}
             {% set satellites_pos = settings.get('satellites_position', 0) if settings.get('show_satellites', False) else -1 %}
             {% set flights_overhead_pos = settings.get('flights_overhead_position', 0) if settings.get('show_flights_overhead', False) else -1 %}
             {% set recent_contacts_pos = settings.get('recent_contacts_position', 0) if settings.get('show_recent_contacts', False) else -1 %}
@@ -870,6 +888,7 @@
             {% set top_activity_pos = settings.get('top_activity_position', 0) if settings.get('show_top_activity', False) else -1 %}
             {% set pota_pos = settings.get('pota_position', 0) if settings.get('show_pota', False) else -1 %}
             {% set hf_favorites_pos = settings.get('hf_favorites_position', 0) if settings.get('show_hf_favorites', False) else -1 %}
+            {% set rig_panel_pos = settings.get('rig_panel_position', 0) if settings.get('show_rig_panel', False) else -1 %}
             {# DVSwitch (v3.99) -- one consolidated card, shown when the
                "Show DVSwitch card" toggle (show_dvswitch, default on) is
                on AND any hotspot has dvswitch_enabled set. #}
@@ -986,6 +1005,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">📻 HF Favorites</span>
                     <span class="node-meta">tap-to-tune memory card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == rig_panel_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__rig_panel__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📻 Rig Panel</span>
+                    <span class="node-meta">live rig front-panel card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -1431,6 +1457,24 @@
                 <label>Port</label>
                 <input type="text" id="rig-port" placeholder="4532" style="width:90px"
                        value="{{ settings.get('rig_port', 4532) }}">
+            </div>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin:6px 0 8px;line-height:1.5">
+            <b>Rig Panel card</b> (Settings → Cards) and its <b>PA-temperature alert</b> both read from this
+            same connection. The rig reports its PA meter as a raw 0–100&nbsp;% of full scale, not degrees —
+            leave the calibration blank to show a percentage, or enter <code>°C&nbsp;at&nbsp;0,°C&nbsp;at&nbsp;full</code>
+            (e.g. <code>20,80</code>) if you know your rig's curve.
+        </p>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>PA alert threshold (% of full scale)</label>
+                <input type="text" id="rig-pa-alert-pct" placeholder="60" style="width:90px"
+                       value="{{ settings.get('rig_pa_alert_pct', 60) }}">
+            </div>
+            <div>
+                <label>PA temp calibration (optional)</label>
+                <input type="text" id="rig-pa-temp-cal" placeholder="20,80" style="width:120px"
+                       value="{{ settings.get('rig_pa_temp_cal', '') }}">
             </div>
         </div>
         <button class="btn btn-primary" onclick="saveRigControl()">Save rig control settings</button>
@@ -2137,6 +2181,8 @@ function saveCards() {
             show_top_activity: document.getElementById('top-activity-toggle').classList.contains('on'),
             show_pota: document.getElementById('pota-toggle').classList.contains('on'),
             show_hf_favorites: document.getElementById('hf-favorites-toggle').classList.contains('on'),
+            show_rig_panel: document.getElementById('rig-panel-toggle').classList.contains('on'),
+            rig_pa_alert_enabled: document.getElementById('rig-pa-alert-toggle').classList.contains('on'),
             show_dvswitch: document.getElementById('dvswitch-card-toggle').classList.contains('on'),
             brandmeister_alerts_enabled: document.getElementById('brandmeister-alerts-toggle').classList.contains('on'),
             qrz_logbook_enabled: document.getElementById('qrz-logbook-toggle').classList.contains('on'),
@@ -3407,6 +3453,8 @@ function saveRigControl() {
             rig_host: document.getElementById('rig-host').value.trim(),
             rig_port: parseInt(document.getElementById('rig-port').value, 10) || 4532,
             rig_send_mode: document.getElementById('rig-mode-toggle').classList.contains('on'),
+            rig_pa_alert_pct: parseInt(document.getElementById('rig-pa-alert-pct').value, 10) || 60,
+            rig_pa_temp_cal: document.getElementById('rig-pa-temp-cal').value.trim(),
         })
     }).then(() => {
         status.textContent = '✓ Saved'; status.style.color = '';

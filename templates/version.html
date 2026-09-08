@@ -117,9 +117,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.50 "Vincent"</span>
+                <span class="release-version">v4.51 "Valens"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Rig Panel card</span> — a new optional dashboard card (Settings → Cards → "Show Rig Panel card"): a read-only <em>software front panel</em> over the same rigctld connection. Live frequency, mode, filter, VFO and split; an S-meter; on transmit, SWR / ALC / PWR / compression bars; the rig's PA (finals) temperature with a short sparkline; ATU / NB / NR / notch / antenna status; and a TX/RX indicator with a keyed timer. Everything degrades field-by-field on rigs that don't report a given reading. Polls gently — every 3 s on receive, 1 s while transmitting</li>
+                <li><span>Operating Timeline</span> — the Rig Panel's ⚙ drawer logs every band and mode the rig has sat on ("20 m FT8 14:02–14:37 · 40 m SSB 14:37–now") by watching the frequency change. In memory only — it starts fresh on a restart</li>
+                <li><span>PA-temperature alerts</span> — a 7th Notifications source (Settings → Cards → "Rig PA-temperature alerts in Notifications"): one alert when the finals meter sits above your threshold for a sustained spell, and one when it drops back — handy for FT8/RTTY sessions on rigs that run hot at full duty. Threshold and an optional °C calibration are under Settings → Integrations → Rig control</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.50 "Vincent"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>HF Favorites card</span> — a new optional dashboard card (Settings → Cards → "Show HF Favorites card"): a tap-to-tune memory bank of common HF activity frequencies, 80 m through 6 m, grouped by band. Each frequency is a button that tunes your radio to it via the same rigctld path as the POTA card, sending the stored mode (USB / LSB / CW / data / AM / FM) too. Ships with a curated ~20-entry default set; add your own, edit any row in place, or delete what you don't use — "Restore default set" brings the curated ones back. The card header shows the live rig dial frequency, and the favorite you're currently sitting on is highlighted <em>ON AIR</em>. Needs "Rig control" configured under Settings → Integrations</li>

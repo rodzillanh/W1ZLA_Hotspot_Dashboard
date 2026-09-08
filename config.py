@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.50"
+APP_VERSION = "4.51"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -162,6 +162,9 @@ VERSION_CODENAMES = [
     "Vincent",          # v4.50 -- Gene Vincent, rockabilly pioneer whose
                         # "Be-Bop-A-Lula" (1956) was one of the genre's
                         # defining early hits (1935-1971)
+    "Valens",           # v4.51 -- Ritchie Valens, "La Bamba" / "Donna",
+                        # a founding voice of Chicano rock, killed in the
+                        # 1959 plane crash at 17 (1941-1959)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -983,6 +986,22 @@ HF_FAVORITE_DEFAULTS = [
 # Rig modes the HF Favorites edit UI / POST route accept for an entry.
 HF_FAVORITE_MODES = ["USB", "LSB", "CW", "PKTUSB", "PKTLSB", "AM", "FM", "RTTY"]
 
+# --- Rig Panel card + Operating Timeline + PA-temp alert (v4.51) -------
+# One persistent-socket poller (rig_panel.py) shared by all three. Poll
+# is deliberately gentle -- rigctld serializes CAT with the operator's
+# own WSJT-X / logger.
+RIG_PANEL_POLL_SEC        = int(os.environ.get("RIG_PANEL_POLL_SEC", "3"))       # RX cadence
+RIG_PANEL_TX_POLL_SEC     = int(os.environ.get("RIG_PANEL_TX_POLL_SEC", "1"))    # while PTT
+RIG_PANEL_RECONNECT_SEC   = int(os.environ.get("RIG_PANEL_RECONNECT_SEC", "10"))
+RIG_PANEL_TIMEOUT         = float(os.environ.get("RIG_PANEL_TIMEOUT", "4"))
+RIG_PANEL_TEMP_HISTORY    = 120   # samples kept for the PA sparkline
+RIG_PANEL_TIMELINE_MAX    = 200   # band/mode segments kept (in-memory, not persisted)
+RIG_RATED_WATTS           = int(os.environ.get("RIG_RATED_WATTS", "100"))        # for the RFPOWER_METER fallback
+# PA-temp alert fires once on a sustained low->high crossing of
+# TEMP_METER (0..1) and once on the way back down -- "surface a
+# transition, not a state", same rule as the fleet/solar alerts.
+RIG_PA_ALERT_SUSTAIN_SEC  = int(os.environ.get("RIG_PA_ALERT_SUSTAIN_SEC", "60"))
+
 DEFAULT_SETTINGS = {
     "dashboard_name": "W1ZLA Hotspot Dashboard",
     "dark_mode": True,
@@ -1224,6 +1243,25 @@ DEFAULT_SETTINGS = {
     # two keys are just the usual optional-card show/position pair.
     "show_hf_favorites": False,
     "hf_favorites_position": 0,
+    # Rig Panel card (v4.51) -- a read-only software front panel over the
+    # same rigctld connection: freq/mode/VFO/split, S-meter, TX SWR/ALC/
+    # PWR/comp, PA temperature + sparkline, ATU/NB/NR/notch flags,
+    # antenna, TX/RX. The ⚙ drawer also holds the Operating Timeline
+    # (band/mode history, poll-and-diff -- in-memory, not persisted).
+    # Needs rig_control_enabled + rig_host set (Integrations).
+    "show_rig_panel": False,
+    "rig_panel_position": 0,
+    # Optional 2-point linear calibration for the PA temp meter, which
+    # rigctld reports as a raw 0..1 fraction, not degrees. "20,80" =>
+    # 20 C at meter 0, 80 C at meter full-scale. Blank => the card shows
+    # a percentage instead.
+    "rig_pa_temp_cal": "",
+    # PA-temperature Notifications source: alert when the finals meter
+    # sits above rig_pa_alert_pct (% of full scale) for
+    # RIG_PA_ALERT_SUSTAIN_SEC, and again when it drops back. Its own
+    # switch, like the other 6 notification sources.
+    "rig_pa_alert_enabled": False,
+    "rig_pa_alert_pct": 60,
     # DVSwitch card (v3.99) -- one consolidated card covering every
     # DVSwitch-enabled ASL3 hotspot via its own "Show:" node picker, not
     # one card per hotspot. Shown when ANY hotspot has dvswitch_enabled

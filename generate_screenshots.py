@@ -117,6 +117,7 @@ SETTINGS = {
     "show_pota": True,
     "pota_callsign": "W1ZLA",
     "show_hf_favorites": True,
+    "show_rig_panel": True,
     # Rig control on so the POTA card screenshot shows the tap-to-tune
     # frequency chips + the reachability pill -- the actual rigctld
     # probe is monkeypatched to a fixed "reachable" reply below (there's
@@ -290,6 +291,26 @@ app.rig_client.status = lambda *a, **k: {
     "reachable": True, "rig": "IC-7300", "freq_hz": 14074000, "error": None,
 }
 
+# Rig Panel card: /api/rig_panel serves rig_panel_poller.snapshot(), which
+# can only ever be "unreachable" in this sandbox -- pin it to a rich RX
+# snapshot (plus a temp sparkline + a short operating timeline) so the
+# card screenshots fully. Screenshot-only, same trick as above.
+_now = time.time()
+app.rig_panel_poller.snapshot = lambda: {
+    "reachable": True, "freq_hz": 14074000, "mode": "USB", "passband_hz": 2400,
+    "band": "20m", "vfo": "A", "split": False, "tx_freq_hz": None, "ptt": False,
+    "strength_db": -8.0, "power_set": 0.85, "swr": None, "alc": None, "comp": None,
+    "power_w": None, "temp_frac": 0.46, "temp_c": None,
+    "funcs": {"tuner": True, "nb": False, "nr": True, "anf": True, "comp": False},
+    "antenna": 1, "polled_at": _now, "alert_pct": 60,
+    "temp_history": [{"at": _now - (30 - i) * 3, "frac": 0.40 + 0.06 * (i / 30.0)} for i in range(30)],
+    "timeline": [
+        {"band": "40m", "mode": "LSB", "start": _now - 5400, "end": _now - 3300},
+        {"band": "20m", "mode": "PKTUSB", "start": _now - 3300, "end": _now - 900},
+        {"band": "20m", "mode": "USB", "start": _now - 900, "end": None},
+    ],
+}
+
 # --- 4. Seed Fleet Activity / Top 5 Activity (storage_activity.py) --
 # log_activity() always timestamps "now", which is fine for a demo chart.
 # Durations are deliberately NOT proportional to call count -- W2ECR's one
@@ -359,6 +380,7 @@ CARD_SHOTS = [
     ("big-clock-card", "big-clock-card.png"),
     ("pota-card", "pota-card.png"),
     ("hf-favorites-card", "hf-favorites-card.png"),
+    ("rig-panel-card", "rig-panel-card.png"),
 ]
 
 with sync_playwright() as p:

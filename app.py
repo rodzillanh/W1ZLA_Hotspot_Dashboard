@@ -42,6 +42,7 @@ from wspr_activity import WsprActivityClient, grid_to_latlon
 from aurora import AuroraClient
 from pota import PotaClient
 from rigctl import RigctlClient
+from rig_panel import RigPanelPoller
 from sota import SotaClient
 from psk_reporter import PskReporterClient
 from adif import parse_adif
@@ -92,6 +93,11 @@ pota_client     = PotaClient()
 # chips -- no persistent connection, no rebuild-on-settings-save (it
 # reads host/port fresh from settings on every call). See rigctl.py.
 rig_client      = RigctlClient()
+# Persistent-socket rigctld poller for the Rig Panel card / Operating
+# Timeline / PA-temp alert -- distinct from rig_client's connect-per-tune
+# path. Its own background thread (started in main()); reconfigured from
+# settings by _rebuild_rig_panel() below.
+rig_panel_poller = RigPanelPoller()
 sota_client     = SotaClient()
 psk_reporter    = PskReporterClient()
 digipi_monitor  = DigipiMonitor()
@@ -283,6 +289,25 @@ def _rebuild_push_client() -> None:
 
 _ensure_vapid_keys()
 _rebuild_push_client()
+
+
+def _rebuild_rig_panel() -> None:
+    """(Re)point the rigctld poller at the current settings -- runs only
+    when rig control is on AND something consumes it (the Rig Panel card
+    or the PA-temp alert). Same hot-swap-on-settings-save pattern as the
+    other integration clients; the poller's own generation counter
+    handles an in-flight reconnect."""
+    s = load_settings()
+    active = bool(s.get("rig_control_enabled")) and (
+        bool(s.get("show_rig_panel")) or bool(s.get("rig_pa_alert_enabled"))
+    )
+    rig_panel_poller.configure(
+        s.get("rig_host", ""), s.get("rig_port", 4532), active,
+        bool(s.get("rig_pa_alert_enabled")), s.get("rig_pa_alert_pct", 60),
+        s.get("rig_pa_temp_cal", ""),
+    )
+
+_rebuild_rig_panel()
 
 import radioid as radioid_mod
 import aprs as aprs_mod
@@ -631,6 +656,22 @@ def api_settings_post():
             pass
     if "rig_send_mode" in data:
         settings["rig_send_mode"] = bool(data["rig_send_mode"])
+    if "show_rig_panel" in data:
+        settings["show_rig_panel"] = bool(data["show_rig_panel"])
+    if "rig_panel_position" in data:
+        try:
+            settings["rig_panel_position"] = max(0, int(data["rig_panel_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "rig_pa_temp_cal" in data:
+        settings["rig_pa_temp_cal"] = str(data["rig_pa_temp_cal"] or "").strip()
+    if "rig_pa_alert_enabled" in data:
+        settings["rig_pa_alert_enabled"] = bool(data["rig_pa_alert_enabled"])
+    if "rig_pa_alert_pct" in data:
+        try:
+            settings["rig_pa_alert_pct"] = max(0, min(100, int(data["rig_pa_alert_pct"])))
+        except (TypeError, ValueError):
+            pass
     if "show_hf_favorites" in data:
         settings["show_hf_favorites"] = bool(data["show_hf_favorites"])
     if "hf_favorites_position" in data:
@@ -708,6 +749,10 @@ def api_settings_post():
         _rebuild_qrz_logbook()
     if "push_vapid_contact" in data:
         _rebuild_push_client()
+    if any(k in data for k in ("rig_control_enabled", "rig_host", "rig_port",
+                               "show_rig_panel", "rig_pa_alert_enabled",
+                               "rig_pa_alert_pct", "rig_pa_temp_cal")):
+        _rebuild_rig_panel()
     return jsonify({"ok": True})
 
 
@@ -913,7 +958,7 @@ _SENTINEL_DEFS = [
     ("__wspr_activity__", "show_wspr_activity", "wspr_activity_position", "📶", "Band Activity", "WSPR activity card"),
     ("__digipi__", "digipi_enabled", "digipi_position", "📡", "DigiPi", "APRS/Direwolf card"),
     ("__big_clock__", "show_big_clock", "big_clock_position", "🕐", "Big Ass Clock", "clock card"),
-    ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled", "solar_alerts_enabled", "brandmeister_alerts_enabled", "qrz_logbook_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
+    ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled", "solar_alerts_enabled", "brandmeister_alerts_enabled", "qrz_logbook_enabled", "rig_pa_alert_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
     ("__satellites__", "show_satellites", "satellites_position", "🛰️", "Satellites", "pass prediction card"),
     ("__flights_overhead__", "show_flights_overhead", "flights_overhead_position", "✈️", "Flights Overhead", "nearby aircraft card"),
     ("__recent_contacts__", "show_recent_contacts", "recent_contacts_position", "📻", "Recent Contacts", "logged QSO card"),
@@ -921,6 +966,7 @@ _SENTINEL_DEFS = [
     ("__top_activity__", "show_top_activity", "top_activity_position", "🏆", "Top 5 Activity", "fleet callsign activity ranking card"),
     ("__pota__", "show_pota", "pota_position", "🏕️", "POTA", "hunter + spots card"),
     ("__hf_favorites__", "show_hf_favorites", "hf_favorites_position", "📻", "HF Favorites", "tap-to-tune memory card"),
+    ("__rig_panel__", "show_rig_panel", "rig_panel_position", "📻", "Rig Panel", "live rig front-panel card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -1614,6 +1660,20 @@ def test_rigctl():
     data = request.json or {}
     ok, message = rig_client.test(data.get("host", ""), data.get("port") or 4532)
     return jsonify({"success": ok, "message": message})
+
+@app.route("/api/rig_panel")
+def api_rig_panel():
+    """Live rig state for the Rig Panel card + the Operating Timeline in
+    its drawer -- the persistent rigctld poller's latest snapshot, temp
+    history and band/mode segments. See rig_panel.py."""
+    return jsonify(rig_panel_poller.snapshot())
+
+@app.route("/api/rig_pa_alerts")
+def api_rig_pa_alerts():
+    """PA-temperature threshold-crossing events for the Notifications
+    card's 'rig_pa' source, plus whether the poller is currently
+    connected (for the source pill's dot). See rig_panel.py."""
+    return jsonify(rig_panel_poller.pa_alert_status())
 
 @app.route("/api/sota_spots")
 def api_sota_spots():
@@ -2835,6 +2895,7 @@ def main():
     threading.Thread(target=digipi_monitor.run_forever, daemon=True).start()
     threading.Thread(target=openspot_manager.run_forever, daemon=True).start()
     threading.Thread(target=audio_manager.run_forever, daemon=True).start()
+    threading.Thread(target=rig_panel_poller.run_forever, daemon=True).start()
     # waitress, not Flask's own dev server -- see CLAUDE.md gotcha on why
     # this must stay a single process (no --workers-style forking): the
     # FleetMonitor/camera/APRS-inbox background threads started above are

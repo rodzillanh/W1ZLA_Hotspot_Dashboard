@@ -1430,6 +1430,72 @@
         .hf-e-row.editing input.ef { font-family: var(--font-mono); }
         .hf-e-bulk { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 
+        /* --- Rig Panel card (v4.51) --- */
+        .rp-card.rp-tx::before { background: var(--danger); }
+        .rp-pill { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono);
+            font-size: 9px; letter-spacing: .04em; padding: 2px 7px 2px 6px; border-radius: 20px;
+            border: 1px solid var(--border); color: var(--text-muted); background: var(--panel-2);
+            white-space: nowrap; cursor: default; }
+        .rp-pill .d { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+        .rp-pill.live { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }
+        .rp-pill.live .d { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+        .rp-body { display: flex; flex-direction: column; gap: 10px; }
+        .rp-empty { color: var(--text-muted); font-size: 12px; text-align: center; padding: 34px 10px; }
+        .rp-vfo { background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 9px; padding: 10px 12px 9px; }
+        .rp-vfo-main { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+        .rp-freq { font-family: var(--font-mono); font-size: 25px; font-weight: 600; line-height: 1;
+            font-variant-numeric: tabular-nums; }
+        .rp-freq .hz { font-size: 14px; color: var(--text-muted); }
+        .rp-mode { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: .06em;
+            padding: 2px 7px; border-radius: 5px; border: 1px solid var(--border); color: var(--text-dim); }
+        .rp-fil { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+        .rp-vfo-sub { margin-top: 5px; font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);
+            display: flex; gap: 12px; flex-wrap: wrap; }
+        .rp-vfo-sub b { color: var(--text-dim); font-weight: 600; }
+        .rp-vfo-sub .split { color: var(--caution); }
+        .rp-meter { display: grid; grid-template-columns: 28px minmax(0, 1fr) 62px; gap: 9px; align-items: center; }
+        .rp-meter .lab { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: .04em; }
+        .rp-meter .val { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); text-align: right;
+            font-variant-numeric: tabular-nums; }
+        .rp-bar { display: flex; gap: 2px; height: 12px; }
+        .rp-bar .seg { flex: 1; border-radius: 1px; background: var(--border-soft); }
+        .rp-bar .seg.on { background: var(--live); }
+        .rp-bar.warn .seg.on { background: var(--caution); }
+        .rp-bar.hot .seg.on { background: var(--danger); }
+        .rp-tx-meters { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+        .rp-tx-meters.idle { opacity: .38; }
+        .rp-sec { font-size: 9px; letter-spacing: .13em; text-transform: uppercase; color: var(--text-muted); }
+        .rp-pa { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
+            padding-top: 8px; border-top: 1px solid var(--border-soft); }
+        .rp-pa .lab { font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-muted); }
+        .rp-pa .t { font-family: var(--font-mono); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .rp-pa .t.warn { color: var(--caution); }
+        .rp-pa .t.hot { color: var(--danger); }
+        .rp-pa .na { font-size: 11px; color: var(--text-muted); font-style: italic; }
+        .rp-pa svg { display: block; }
+        .rp-pills { display: flex; gap: 5px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--border-soft); }
+        .rp-pill-f { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .04em;
+            padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); color: var(--text-muted); background: var(--panel-2); }
+        .rp-pill-f.on { color: var(--live); border-color: color-mix(in srgb, var(--live) 45%, var(--border));
+            background: color-mix(in srgb, var(--live) 10%, transparent); }
+        .rp-foot { display: flex; align-items: center; justify-content: space-between; font-family: var(--font-mono);
+            font-size: 10px; color: var(--text-muted); padding-top: 7px; border-top: 1px solid var(--border-soft); }
+        .rp-txtag { font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: .06em;
+            padding: 2px 7px; border-radius: 4px; }
+        .rp-txtag.rx { color: var(--good); border: 1px solid color-mix(in srgb, var(--good) 45%, var(--border)); }
+        .rp-txtag.tx { color: #fff; background: var(--danger); animation: rigPulse 1s ease-in-out infinite; }
+        /* Operating Timeline (drawer) */
+        .rp-tl { display: flex; flex-direction: column; }
+        .rp-tl-row { display: grid; grid-template-columns: 84px 70px 1fr auto; gap: 9px; align-items: baseline;
+            padding: 7px 2px; font-size: 12px; }
+        .rp-tl-row + .rp-tl-row { border-top: 1px solid var(--border-soft); }
+        .rp-tl-row.live-seg { background: color-mix(in srgb, var(--live) 7%, transparent); }
+        .rp-tl-row .tb { font-family: var(--font-mono); font-weight: 650; color: var(--text-dim); }
+        .rp-tl-row .tm { font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--text-muted);
+            border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+        .rp-tl-row .tt { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
+        .rp-tl-row .td { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); text-align: right; }
+
         /* --- HamAlert card --- */
         .ha-badge {
             font-size: 10px; font-weight: 600; letter-spacing: .3px; padding: 1px 7px; border-radius: 9px;
@@ -2765,7 +2831,7 @@
             <span class="asl-fav-status-txt" id="asl-fav-status"></span>
         </div>
         {% endif %}
-        {% set notif_source_count = (1 if settings.get('aprs_inbox_enabled', False) else 0) + (1 if settings.get('hamalert_enabled', False) else 0) + (1 if settings.get('fleet_alerts_enabled', False) else 0) + (1 if settings.get('solar_alerts_enabled', False) else 0) + (1 if settings.get('brandmeister_alerts_enabled', False) else 0) + (1 if settings.get('qrz_logbook_enabled', False) else 0) %}
+        {% set notif_source_count = (1 if settings.get('aprs_inbox_enabled', False) else 0) + (1 if settings.get('hamalert_enabled', False) else 0) + (1 if settings.get('fleet_alerts_enabled', False) else 0) + (1 if settings.get('solar_alerts_enabled', False) else 0) + (1 if settings.get('brandmeister_alerts_enabled', False) else 0) + (1 if settings.get('qrz_logbook_enabled', False) else 0) + (1 if settings.get('rig_pa_alert_enabled', False) else 0) %}
         {% if notif_source_count > 0 %}
         <div class="metrics-card" id="notifications-card"
              style="order:{{ settings.get('notifications_position', 0) }}">
@@ -2791,6 +2857,9 @@
                 {% endif %}
                 {% if settings.get('qrz_logbook_enabled', False) %}
                 <span class="source-pill" data-filter="qrz" onclick="toggleNotifFilter('qrz')">✅ QRZ<span class="conn-dot" id="qrz-logbook-conn-dot"></span></span>
+                {% endif %}
+                {% if settings.get('rig_pa_alert_enabled', False) %}
+                <span class="source-pill" data-filter="rig" onclick="toggleNotifFilter('rig')">📻 PA temp<span class="conn-dot" id="rig-pa-conn-dot"></span></span>
                 {% endif %}
             </div>
             <div class="ha-diag" id="hamalert-diag" style="display:none"></div>
@@ -2995,6 +3064,21 @@
             </div>
             <div class="hf-fav-list" id="hf-fav-list"></div>
             <div class="hf-fav-foot" id="hf-fav-foot"></div>
+        </div>
+        {% endif %}
+        {% if settings.get('show_rig_panel', False) %}
+        <div class="metrics-card rp-card" id="rig-panel-card"
+             style="order:{{ settings.get('rig_panel_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">📻 Rig Panel</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="rp-pill" id="rp-pill"><span class="d"></span><span id="rp-pill-txt">rig</span></span>
+                    <button class="pota-gear" type="button" onclick="openRigPanelDrawer()">⚙</button>
+                </div>
+            </div>
+            <div class="rp-body" id="rp-body">
+                <div class="rp-empty" id="rp-empty">Waiting for the rig…</div>
+            </div>
         </div>
         {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
@@ -3319,6 +3403,7 @@
 <div class="hs-drawer" id="flights-drawer"></div>
 <div class="hs-drawer" id="pota-drawer"></div>
 <div class="hs-drawer" id="hf-fav-drawer"></div>
+<div class="hs-drawer" id="rig-panel-drawer"></div>
 
 <!-- ASL Control's "Disconnect all links on this node" confirm dialog
      (v4.8) -- a standalone overlay, not one more hs-drawer, since it
@@ -3498,8 +3583,9 @@ const SOLAR_ALERTS_POLL_MS = 60000;  // hf_conditions.py's own cache is 1hr -- n
 const SHOW_BRANDMEISTER_ALERTS = {{ 'true' if settings.get('brandmeister_alerts_enabled', False) else 'false' }};
 const BRANDMEISTER_ALERTS_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS/HAMALERT_POLL_MS
 const SHOW_QRZ_CONFIRM = {{ 'true' if settings.get('qrz_logbook_enabled', False) else 'false' }};
+const SHOW_RIG_PA_ALERTS = {{ 'true' if settings.get('rig_pa_alert_enabled', False) else 'false' }};
 const QRZ_CONFIRM_POLL_MS = 60000;  // qrz_logbook.py's own sync runs every 30 min -- this just re-reads its in-memory event log
-const SHOW_NOTIFICATIONS = SHOW_APRS_INBOX || SHOW_HAMALERT || SHOW_FLEET_ALERTS || SHOW_SOLAR_ALERTS || SHOW_BRANDMEISTER_ALERTS || SHOW_QRZ_CONFIRM;
+const SHOW_NOTIFICATIONS = SHOW_APRS_INBOX || SHOW_HAMALERT || SHOW_FLEET_ALERTS || SHOW_SOLAR_ALERTS || SHOW_BRANDMEISTER_ALERTS || SHOW_QRZ_CONFIRM || SHOW_RIG_PA_ALERTS;
 const NOTIFICATIONS_POSITION = {{ settings.get('notifications_position', 0) }};
 const SHOW_SATELLITES = {{ 'true' if settings.get('show_satellites', False) else 'false' }};
 const SATELLITES_POSITION = {{ settings.get('satellites_position', 0) }};
@@ -3534,6 +3620,9 @@ const HF_FAVORITES_POSITION = {{ settings.get('hf_favorites_position', 0) }};
 const HF_FAV_POLL_MS = 15000;
 const HF_FAV_MODES = ['USB', 'LSB', 'CW', 'PKTUSB', 'PKTLSB', 'AM', 'FM', 'RTTY'];
 const HF_FAV_FILTER_KEY = 'w1zla_hf_fav_filter';
+const SHOW_RIG_PANEL = {{ 'true' if settings.get('show_rig_panel', False) else 'false' }};
+const RIG_PANEL_POSITION = {{ settings.get('rig_panel_position', 0) }};
+const RIG_PANEL_POLL_MS = 2500;
 const POTA_POLL_MS = 20000;  // matches pota.py's spot cache TTL
 const RIG_CONTROL_ENABLED = {{ 'true' if settings.get('rig_control_enabled', False) else 'false' }};
 // DVSwitch card shows when SHOW_DVSWITCH is on AND at least one hotspot
@@ -4105,7 +4194,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     flightsoverhead: '__flights_overhead__',
     recentcontacts: '__recent_contacts__', qsostats: '__qso_stats__',
     topactivity: '__top_activity__', pota: '__pota__', dvswitch: '__dvswitch__',
-    hffav: '__hf_favorites__',
+    hffav: '__hf_favorites__', rigpanel: '__rig_panel__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -4255,10 +4344,13 @@ function renderCards(data) {
     if (SHOW_HF_FAVORITES) {
         sentinels.push({ key: 'hffav', pos: Math.max(0, HF_FAVORITES_POSITION) });
     }
+    if (SHOW_RIG_PANEL) {
+        sentinels.push({ key: 'rigpanel', pos: Math.max(0, RIG_PANEL_POSITION) });
+    }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, hfcond, bandplan,
     // licensequiz, wspractivity, digipi, bigclock, notifications, satellites,
-    // recentcontacts, qsostats, topactivity, pota, hffav, THEN cameras), since
+    // recentcontacts, qsostats, topactivity, pota, hffav, rigpanel, THEN cameras), since
     // computeCardOrders() below now relies on a stable sort to break ties
     // by insertion order, not by an independent alphabetical rule. Two
     // sentinels can easily tie on position (e.g. right after enabling
@@ -4318,6 +4410,8 @@ function renderCards(data) {
     if (potaCard && 'pota' in sentinelOrders) potaCard.style.order = sentinelOrders.pota;
     const hfFavCard = document.getElementById('hf-favorites-card');
     if (hfFavCard && 'hffav' in sentinelOrders) hfFavCard.style.order = sentinelOrders.hffav;
+    const rigPanelCard = document.getElementById('rig-panel-card');
+    if (rigPanelCard && 'rigpanel' in sentinelOrders) rigPanelCard.style.order = sentinelOrders.rigpanel;
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -5327,6 +5421,7 @@ let notifFleetData = null;
 let notifSolarData = null;
 let notifBrandmeisterData = null;
 let notifQrzData = null;
+let notifRigData = null;
 let notifFilter = 'all';
 
 // Each source pill IS the filter control -- clicking it isolates that
@@ -5393,6 +5488,21 @@ function renderNotifRow(item, unread) {
             <div class="msg-text">Confirmed in your QRZ logbook</div>
         </div>`;
     }
+    if (item.source === 'rig') {
+        const e = item.data;
+        const lvl = e.temp_c != null ? Math.round(e.temp_c) + '°C' : (e.pct != null ? e.pct + '%' : '');
+        return `
+        <div class="msg-row ${unread ? 'unread' : ''}">
+            <div class="msg-top">
+                <span class="notif-source" title="Rig PA temperature">📻</span>
+                <span class="msg-from">${e.kind === 'high' ? 'PA running hot' : 'PA cooled down'}</span>
+                <span class="msg-time">${fmtAgoShort(e.at)}</span>
+            </div>
+            <div class="msg-text">${e.kind === 'high'
+                ? 'Finals temperature has been above the alert threshold' + (lvl ? ' (' + lvl + ')' : '') + ' — ease the duty cycle or drop power'
+                : 'Finals temperature back below the threshold' + (lvl ? ' (' + lvl + ')' : '')}</div>
+        </div>`;
+    }
     if (item.source === 'aprs') {
         const m = item.data;
         return `
@@ -5441,6 +5551,9 @@ function renderNotifications() {
     }
     if (notifQrzData) {
         (notifQrzData.events || []).forEach(e => items.push({ source: 'qrz', received_at: e.at, data: e }));
+    }
+    if (notifRigData) {
+        (notifRigData.events || []).forEach(e => items.push({ source: 'rig', received_at: e.at, data: e }));
     }
     items.sort((a, b) => (b.received_at || 0) - (a.received_at || 0));
 
@@ -5576,6 +5689,26 @@ function fetchNotifQrz() {
 if (SHOW_QRZ_CONFIRM) {
     fetchNotifQrz();
     setInterval(fetchNotifQrz, QRZ_CONFIRM_POLL_MS);
+}
+
+function fetchNotifRig() {
+    if (!SHOW_RIG_PA_ALERTS) return;
+    fetch('/api/rig_pa_alerts')
+        .then(r => r.json())
+        .then(data => {
+            notifRigData = data;
+            const dot = document.getElementById('rig-pa-conn-dot');
+            if (dot) {
+                dot.classList.toggle('down', !data.connected);
+                dot.title = data.connected ? 'Rig poller connected' : 'Rig server not reachable';
+            }
+            renderNotifications();
+        })
+        .catch(() => {});
+}
+if (SHOW_RIG_PA_ALERTS) {
+    fetchNotifRig();
+    setInterval(fetchNotifRig, 15000);
 }
 
 // --- Satellites card + Live map ground-track overlay ---
@@ -8384,6 +8517,199 @@ if (SHOW_HF_FAVORITES) {
     setInterval(fetchHfFavorites, HF_FAV_POLL_MS);
 }
 
+// --- Rig Panel card (v4.51): read-only software front panel ----------
+// Fed by /api/rig_panel (rig_panel.py's persistent rigctld poller).
+let rigPanelData = null;
+let rpTxStart = null;
+
+function rpBar(frac, cls) {
+    const N = 16, on = Math.max(0, Math.min(N, Math.round((frac || 0) * N)));
+    return `<div class="rp-bar${cls ? ' ' + cls : ''}">` +
+        Array.from({ length: N }, (_, i) => `<span class="seg${i < on ? ' on' : ''}"></span>`).join('') + '</div>';
+}
+function rpSMeter(db) {
+    if (db == null) return '—';
+    if (db >= 0) return 'S9+' + Math.round(db);
+    const s = Math.max(0, Math.round(9 + db / 6));
+    return 'S' + s;
+}
+function rpSpark(hist) {
+    if (!hist || hist.length < 2) return '';
+    const w = 132, h = 24, lo = 0, hi = 1;
+    const pts = hist.map((p, i) => {
+        const x = (i / (hist.length - 1)) * w;
+        const y = h - ((Math.max(lo, Math.min(hi, p.frac)) - lo) / (hi - lo)) * h;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none"
+        stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+function rpClock(sec) {
+    return new Date(sec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function rpDur(sec) {
+    sec = Math.max(0, Math.round(sec));
+    if (sec < 60) return sec + 's';
+    const m = Math.round(sec / 60);
+    return m < 60 ? m + 'm' : Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
+}
+function rpMSS(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+}
+
+function renderRigPanelCard() {
+    const body = document.getElementById('rp-body');
+    if (!body || !rigPanelData) return;
+    const s = rigPanelData;
+    const card = document.getElementById('rig-panel-card');
+    const pill = document.getElementById('rp-pill');
+
+    card.classList.toggle('rp-tx', !!(s.reachable && s.ptt));
+    pill.classList.toggle('live', !!s.reachable);
+    document.getElementById('rp-pill-txt').textContent = s.reachable ? 'rig' : 'rig offline';
+    pill.title = s.reachable ? 'rigctld poller connected' : (s.error || 'Rig server not reachable');
+
+    if (!s.reachable) {
+        rpTxStart = null;
+        body.innerHTML = `<div class="rp-empty">Rig server not reachable${s.error ? ' — ' + escapeHtml(s.error) : ''}.<br>
+            Check Settings → Integrations → Rig control.</div>`;
+        return;
+    }
+
+    if (s.ptt && !rpTxStart) rpTxStart = Date.now();
+    if (!s.ptt) rpTxStart = null;
+
+    let freqHtml = `<span class="rp-freq">— — —</span>`;
+    if (s.freq_hz) {
+        const mHz = Math.floor(s.freq_hz / 1e6);
+        const kHz = String(Math.floor((s.freq_hz % 1e6) / 1000)).padStart(3, '0');
+        const sub = String(s.freq_hz % 1000).padStart(3, '0');
+        freqHtml = `<span class="rp-freq">${mHz}.${kHz}<span class="hz">.${sub}</span></span>`;
+    }
+    const fil = s.passband_hz ? (s.passband_hz >= 1000 ? (s.passband_hz / 1000).toFixed(1).replace('.0', '') + 'k' : s.passband_hz + ' Hz') : '';
+
+    // S-meter (RX); shown dimmed on TX
+    const sDb = s.ptt ? null : s.strength_db;
+    const sFrac = sDb == null ? 0 : Math.max(0, Math.min(1, (sDb + 54) / 114));
+    const sMeter = `<div class="rp-meter"><span class="lab">S</span>${rpBar(sFrac)}<span class="val">${s.ptt ? 'TX' : rpSMeter(s.strength_db)}</span></div>`;
+
+    // TX meters
+    const swr = s.swr, alc = s.alc, cmp = s.comp;
+    const pwrW = s.power_w, pwrSet = s.power_set;
+    const swrCls = swr == null ? '' : (swr > 2 ? 'hot' : swr > 1.5 ? 'warn' : '');
+    const pwrFrac = pwrSet != null ? pwrSet : (pwrW != null ? Math.min(1, pwrW / 100) : 0);
+    const txMeters = `
+        <div class="rp-tx-meters${s.ptt ? '' : ' idle'}">
+            <span class="rp-sec">on transmit</span>
+            <div class="rp-meter"><span class="lab">SWR</span>${rpBar(swr == null ? 0 : Math.min(1, (swr - 1) / 2), swrCls)}<span class="val">${swr == null ? '—' : swr.toFixed(2) + ':1'}</span></div>
+            <div class="rp-meter"><span class="lab">ALC</span>${rpBar(alc || 0, alc != null && alc > 0.6 ? 'warn' : '')}<span class="val">${alc == null ? '—' : Math.round(alc * 100) + '%'}</span></div>
+            <div class="rp-meter"><span class="lab">PWR</span>${rpBar(pwrFrac)}<span class="val">${pwrW != null ? pwrW + ' W' : (pwrSet != null ? Math.round(pwrSet * 100) + '%' : '—')}</span></div>
+            <div class="rp-meter"><span class="lab">CMP</span>${rpBar(cmp || 0)}<span class="val">${cmp == null ? '—' : Math.round(cmp * 100) + '%'}</span></div>
+        </div>`;
+
+    // PA temp
+    let paRow;
+    if (s.temp_frac == null) {
+        paRow = `<div class="rp-pa"><span class="lab">PA</span><span class="na">temperature not reported by this rig / Hamlib build</span><span></span></div>`;
+    } else {
+        const pctNow = s.temp_frac * 100;
+        const tCls = pctNow >= s.alert_pct ? 'hot' : pctNow >= s.alert_pct - 12 ? 'warn' : '';
+        const disp = s.temp_c != null ? Math.round(s.temp_c) + '°C' : Math.round(pctNow) + '%';
+        paRow = `<div class="rp-pa"><span class="lab">PA</span>
+            <span style="color:${tCls === 'hot' ? 'var(--danger)' : tCls === 'warn' ? 'var(--caution)' : 'var(--live)'}">${rpSpark(s.temp_history)}</span>
+            <span class="t ${tCls}">${disp}</span></div>`;
+    }
+
+    // status pills -- only for funcs the rig actually reports
+    const f = s.funcs || {};
+    const pills = [
+        ['VFO ' + (s.vfo || 'A'), true],
+        s.split ? ['SPLIT', true] : null,
+        f.tuner != null ? ['ATU', f.tuner] : null,
+        f.nb != null ? ['NB', f.nb] : null,
+        f.nr != null ? ['NR', f.nr] : null,
+        f.anf != null ? ['NOTCH', f.anf] : null,
+        f.comp != null ? ['COMP', f.comp] : null,
+        s.antenna != null ? ['ANT ' + s.antenna, true] : null,
+    ].filter(Boolean);
+    const pillRow = `<div class="rp-pills">` +
+        pills.map(([t, on]) => `<span class="rp-pill-f${on ? ' on' : ''}">${escapeHtml(t)}</span>`).join('') + `</div>`;
+
+    const age = s.polled_at ? Math.max(0, Math.round(Date.now() / 1000 - s.polled_at)) : null;
+    const foot = `<div class="rp-foot">
+        <span class="rp-txtag ${s.ptt ? 'tx' : 'rx'}">${s.ptt ? 'TX ' + rpMSS((Date.now() - (rpTxStart || Date.now())) / 1000) : 'RX'}</span>
+        <span>${age != null ? 'updated ' + age + 's ago' : ''} · poll ${(RIG_PANEL_POLL_MS / 1000).toFixed(1)}s</span>
+    </div>`;
+
+    body.innerHTML = `
+        <div class="rp-vfo">
+            <div class="rp-vfo-main">${freqHtml}
+                ${s.mode ? `<span class="rp-mode">${escapeHtml(s.mode)}</span>` : ''}
+                ${fil ? `<span class="rp-fil">${fil}</span>` : ''}
+            </div>
+            <div class="rp-vfo-sub">
+                <span>VFO <b>${s.vfo || 'A'}</b></span>
+                ${s.band ? `<span>${escapeHtml(s.band)}</span>` : ''}
+                ${s.split && s.tx_freq_hz ? `<span class="split">↕ split · TX <b>${(s.tx_freq_hz / 1e6).toFixed(4)}</b></span>` : ''}
+            </div>
+        </div>
+        ${sMeter}
+        ${txMeters}
+        ${paRow}
+        ${pillRow}
+        ${foot}`;
+}
+
+function renderRigPanelDrawer() {
+    const d = document.getElementById('rig-panel-drawer');
+    if (!d || !d.classList.contains('open') || !rigPanelData) return;
+    const tl = (rigPanelData.timeline || []).slice().reverse();  // newest first
+    const now = Date.now() / 1000;
+    const rows = tl.map(seg => {
+        const end = seg.end || now;
+        const live = seg.end == null;
+        return `<div class="rp-tl-row${live ? ' live-seg' : ''}">
+            <span class="tb">${escapeHtml(seg.band || '?')}</span>
+            <span class="tm">${escapeHtml(seg.mode || '')}</span>
+            <span class="tt">${rpClock(seg.start)} – ${live ? 'now' : rpClock(seg.end)}</span>
+            <span class="td">${rpDur(end - seg.start)}</span>
+        </div>`;
+    }).join('');
+    d.innerHTML = `
+        <div class="hs-drawer-header">
+            <div class="hs-drawer-title-row">
+                <div class="hs-drawer-title">📻 Rig Panel</div>
+                <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
+            </div>
+            <div class="hs-drawer-sub">Operating timeline — every band/mode the rig has sat on</div>
+        </div>
+        <div class="hs-drawer-body">
+            <div class="hs-drawer-section-title">Timeline</div>
+            <div class="rp-tl">${rows || '<div style="padding:14px;color:var(--text-muted);font-size:12px">No band changes logged yet. This fills in as the rig moves between bands and modes while the dashboard runs. It is not saved across a restart.</div>'}</div>
+        </div>`;
+}
+
+function openRigPanelDrawer() {
+    closeAllDrawers();
+    document.getElementById('rig-panel-drawer').classList.add('open');
+    document.getElementById('hs-drawer-backdrop').classList.add('open');
+    renderRigPanelDrawer();
+}
+
+function fetchRigPanel() {
+    if (!SHOW_RIG_PANEL) return;
+    fetch('/api/rig_panel').then(r => r.json()).then(data => {
+        rigPanelData = data;
+        renderRigPanelCard();
+        renderRigPanelDrawer();
+    }).catch(() => {});
+}
+if (SHOW_RIG_PANEL) {
+    fetchRigPanel();
+    setInterval(fetchRigPanel, RIG_PANEL_POLL_MS);
+}
+
 function handleAdifFile(file) {
     if (!file) return;
     const reader = new FileReader();
@@ -9185,6 +9511,7 @@ function closeAllDrawers() {
     document.getElementById('flights-drawer').classList.remove('open');
     document.getElementById('pota-drawer').classList.remove('open');
     document.getElementById('hf-fav-drawer').classList.remove('open');
+    document.getElementById('rig-panel-drawer').classList.remove('open');
     document.getElementById('hs-drawer-backdrop').classList.remove('open');
 }
 function closeHotspotDrawer() { closeAllDrawers(); }

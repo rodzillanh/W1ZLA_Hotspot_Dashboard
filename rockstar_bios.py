@@ -411,6 +411,11 @@ BIOS = {
         "blurb": "Rockabilly wild man whose 1956 hit \"Be-Bop-A-Lula\" — all echo, hiccupping vocals and Cliff Gallup's guitar — became one of early rock and roll's defining records.",
         "wiki": "Gene_Vincent",
     },
+    "Valens": {
+        "name": "Ritchie Valens",
+        "blurb": "Teenage founder of Chicano rock — \"La Bamba\", \"Donna\", \"Come On, Let's Go\" — killed at 17 in the February 1959 plane crash alongside Buddy Holly and the Big Bopper.",
+        "wiki": "Ritchie_Valens",
+    },
 }
 
 
