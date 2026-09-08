@@ -189,6 +189,48 @@ def save_asl_favorites(favorites: list) -> None:
         json.dump(favorites, f, indent=4)
 
 
+# --- HF Favorites card (v4.50): tap-to-tune memory channels ---
+
+def load_hf_favorites() -> list:
+    """Return list of dicts: [{id, freq_hz, label, mode}, ...].
+
+    Seed-on-first-run: if hf_favorites.json doesn't exist yet, it's
+    created from config.HF_FAVORITE_DEFAULTS and every entry becomes
+    ordinary user-editable data -- there's no "default vs custom"
+    distinction after that (the card's "Restore default set" button just
+    re-adds any of the curated entries the user has since deleted,
+    matched on freq+mode). Entries missing an `id` are backfilled and
+    re-saved, same self-healing pattern as load_asl_favorites()."""
+    if not os.path.exists(config.HF_FAVORITES_FILE):
+        seeded = [
+            {"id": uuid.uuid4().hex[:10], "freq_hz": hz, "label": label, "mode": mode}
+            for hz, label, mode in config.HF_FAVORITE_DEFAULTS
+        ]
+        save_hf_favorites(seeded)
+        return seeded
+    try:
+        with _file_lock, open(config.HF_FAVORITES_FILE, "r") as f:
+            favs = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+    if not isinstance(favs, list):
+        return []
+    changed = False
+    for fav in favs:
+        if not fav.get("id"):
+            fav["id"] = uuid.uuid4().hex[:10]
+            changed = True
+    if changed:
+        save_hf_favorites(favs)
+    return favs
+
+
+def save_hf_favorites(favorites: list) -> None:
+    os.makedirs(config.CONFIG_DIR, exist_ok=True)
+    with _file_lock, open(config.HF_FAVORITES_FILE, "w") as f:
+        json.dump(favorites, f, indent=4)
+
+
 # --- Brandmeister talkgroup favorites (quick-link chips, distinct from
 # both callsign and ASL node favorites above) ---
 

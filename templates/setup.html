@@ -735,6 +735,15 @@
                      id="pota-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show HF Favorites card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (tap-to-tune memory bank of common HF frequencies -- needs "Rig control" set up under Integrations)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_hf_favorites', False) else '' }}"
+                     id="hf-favorites-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show DVSwitch card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (only appears if an ASL3 hotspot also has "This node also runs DVSwitch" on -- turn this off to hide the card while keeping that enabled)
@@ -860,6 +869,7 @@
             {% set qso_stats_pos = settings.get('qso_stats_position', 0) if settings.get('show_qso_stats', False) else -1 %}
             {% set top_activity_pos = settings.get('top_activity_position', 0) if settings.get('show_top_activity', False) else -1 %}
             {% set pota_pos = settings.get('pota_position', 0) if settings.get('show_pota', False) else -1 %}
+            {% set hf_favorites_pos = settings.get('hf_favorites_position', 0) if settings.get('show_hf_favorites', False) else -1 %}
             {# DVSwitch (v3.99) -- one consolidated card, shown when the
                "Show DVSwitch card" toggle (show_dvswitch, default on) is
                on AND any hotspot has dvswitch_enabled set. #}
@@ -969,6 +979,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🏕️ POTA</span>
                     <span class="node-meta">hunter + spots card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == hf_favorites_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__hf_favorites__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📻 HF Favorites</span>
+                    <span class="node-meta">tap-to-tune memory card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -2119,6 +2136,7 @@ function saveCards() {
             solar_alerts_enabled: document.getElementById('solar-alerts-toggle').classList.contains('on'),
             show_top_activity: document.getElementById('top-activity-toggle').classList.contains('on'),
             show_pota: document.getElementById('pota-toggle').classList.contains('on'),
+            show_hf_favorites: document.getElementById('hf-favorites-toggle').classList.contains('on'),
             show_dvswitch: document.getElementById('dvswitch-card-toggle').classList.contains('on'),
             brandmeister_alerts_enabled: document.getElementById('brandmeister-alerts-toggle').classList.contains('on'),
             qrz_logbook_enabled: document.getElementById('qrz-logbook-toggle').classList.contains('on'),

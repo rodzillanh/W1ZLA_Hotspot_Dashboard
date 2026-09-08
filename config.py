@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.49"
+APP_VERSION = "4.50"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -159,6 +159,9 @@ VERSION_CODENAMES = [
                         # pioneer who wrote and first recorded "Blue Suede
                         # Shoes"; a direct bridge from country and blues
                         # into rock and roll (1932-1998)
+    "Vincent",          # v4.50 -- Gene Vincent, rockabilly pioneer whose
+                        # "Be-Bop-A-Lula" (1956) was one of the genre's
+                        # defining early hits (1935-1971)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -178,6 +181,11 @@ ASL_FAV_CARD_CAP = 5
 BM_TG_FAVORITES_FILE = os.path.join(CONFIG_DIR, "bm_tg_favorites.json")
 CAMERAS_FILE = os.path.join(CONFIG_DIR, "cameras.json")
 QSOS_FILE    = os.path.join(CONFIG_DIR, "qsos.json")
+# HF Favorites card (v4.50) -- a flat list of tap-to-tune memory
+# channels, seeded once from HF_FAVORITE_DEFAULTS below and then fully
+# user-editable. Same flat-JSON-in-CONFIG_DIR convention as
+# asl_favorites.json.
+HF_FAVORITES_FILE = os.path.join(CONFIG_DIR, "hf_favorites.json")
 # Web Push browser subscriptions for the Pocket Dash mobile app (PR 3) --
 # one PushSubscription object per entry, unique by `endpoint`. Same
 # flat-JSON-in-CONFIG_DIR convention as favorites.json.
@@ -939,6 +947,42 @@ HOTSPOT_INFO_CHECK_CMD = (
 )
 
 # --- Dashboard defaults (overridden by settings.json) ---
+# HF Favorites card default set -- (freq_hz, label, rig-mode token). One
+# FT8 + one phone frequency per band, plus FM simplex on 10 m / 6 m.
+# Deliberately short (~20): SSTV / FT4 / JS8 / PSK31 / beacons / MSK144 /
+# AM windows are "add your own". Seeded into hf_favorites.json once on
+# first run (storage.load_hf_favorites), then every entry is ordinary
+# user-editable data -- there is no "default vs custom" distinction after
+# that, only a "Restore default set" button that re-adds any of these a
+# user has since deleted (matched on freq+mode). Common-use conventions,
+# same "verify against the ARRL band plan before a real ship" care as the
+# Band Plan card -- treat this list as a starting point, not gospel.
+HF_FAVORITE_DEFAULTS = [
+    (3_573_000,  "FT8",                "PKTUSB"),
+    (3_985_000,  "SSB ragchew (US)",   "LSB"),
+    (5_357_000,  "FT8 (60m Ch 3)",     "PKTUSB"),
+    (7_074_000,  "FT8",                "PKTUSB"),
+    (7_185_000,  "SSB ragchew (US)",   "LSB"),
+    (10_136_000, "FT8",                "PKTUSB"),
+    (14_074_000, "FT8",                "PKTUSB"),
+    (14_290_000, "SSB (US)",           "USB"),
+    (18_100_000, "FT8",                "PKTUSB"),
+    (18_130_000, "SSB calling",        "USB"),
+    (21_074_000, "FT8",                "PKTUSB"),
+    (21_285_000, "QRP SSB calling",    "USB"),
+    (24_915_000, "FT8",                "PKTUSB"),
+    (24_930_000, "SSB calling",        "USB"),
+    (28_074_000, "FT8",                "PKTUSB"),
+    (28_400_000, "SSB calling",        "USB"),
+    (29_600_000, "FM simplex calling", "FM"),
+    (50_313_000, "FT8",                "PKTUSB"),
+    (50_125_000, "SSB calling",        "USB"),
+    (52_525_000, "FM simplex calling", "FM"),
+]
+
+# Rig modes the HF Favorites edit UI / POST route accept for an entry.
+HF_FAVORITE_MODES = ["USB", "LSB", "CW", "PKTUSB", "PKTLSB", "AM", "FM", "RTTY"]
+
 DEFAULT_SETTINGS = {
     "dashboard_name": "W1ZLA Hotspot Dashboard",
     "dark_mode": True,
@@ -1172,6 +1216,14 @@ DEFAULT_SETTINGS = {
     "rig_host": "",
     "rig_port": 4532,
     "rig_send_mode": True,
+    # HF Favorites card (v4.50) -- a tap-to-tune memory bank (80m-6m
+    # common activity frequencies), each row a button that drives the
+    # same rigctld path as the POTA card. The favorites list itself
+    # lives in hf_favorites.json (seeded from config.HF_FAVORITE_DEFAULTS
+    # on first run, then fully editable in the card's own drawer); these
+    # two keys are just the usual optional-card show/position pair.
+    "show_hf_favorites": False,
+    "hf_favorites_position": 0,
     # DVSwitch card (v3.99) -- one consolidated card covering every
     # DVSwitch-enabled ASL3 hotspot via its own "Show:" node picker, not
     # one card per hotspot. Shown when ANY hotspot has dvswitch_enabled

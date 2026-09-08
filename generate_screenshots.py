@@ -116,6 +116,7 @@ SETTINGS = {
     "show_top_activity": True,
     "show_pota": True,
     "pota_callsign": "W1ZLA",
+    "show_hf_favorites": True,
     # Rig control on so the POTA card screenshot shows the tap-to-tune
     # frequency chips + the reachability pill -- the actual rigctld
     # probe is monkeypatched to a fixed "reachable" reply below (there's
@@ -357,6 +358,7 @@ CARD_SHOTS = [
     ("wspr-activity-card", "band-activity-card.png"),
     ("big-clock-card", "big-clock-card.png"),
     ("pota-card", "pota-card.png"),
+    ("hf-favorites-card", "hf-favorites-card.png"),
 ]
 
 with sync_playwright() as p:

@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.49 "Perkins"</span>
+                <span class="release-version">v4.50 "Vincent"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>HF Favorites card</span> — a new optional dashboard card (Settings → Cards → "Show HF Favorites card"): a tap-to-tune memory bank of common HF activity frequencies, 80 m through 6 m, grouped by band. Each frequency is a button that tunes your radio to it via the same rigctld path as the POTA card, sending the stored mode (USB / LSB / CW / data / AM / FM) too. Ships with a curated ~20-entry default set; add your own, edit any row in place, or delete what you don't use — "Restore default set" brings the curated ones back. The card header shows the live rig dial frequency, and the favorite you're currently sitting on is highlighted <em>ON AIR</em>. Needs "Rig control" configured under Settings → Integrations</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.49 "Perkins"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Tap-to-tune your rig from the POTA card</span> — point Settings → Integrations → "Rig control" at a Hamlib <em>rigctld</em> server on your LAN (WFView has one built in — enable RigCtld; a standalone <em>rigctld</em> also works) and every spot's frequency in the POTA card becomes a button. Click it and your radio jumps to that frequency, and optionally its mode (USB/LSB/CW/data). A small pill on the card shows whether the rig server is reachable; when it isn't, the frequency stays plain text. No login — rigctld has no auth, so it's LAN-only</li>

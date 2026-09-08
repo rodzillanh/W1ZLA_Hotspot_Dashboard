@@ -406,6 +406,11 @@ BIOS = {
         "blurb": "Sun Records rockabilly pioneer who wrote and first recorded \"Blue Suede Shoes\" in 1955 — a direct bridge from country and blues into rock and roll, and a touchstone for the Beatles.",
         "wiki": "Carl_Perkins",
     },
+    "Vincent": {
+        "name": "Gene Vincent",
+        "blurb": "Rockabilly wild man whose 1956 hit \"Be-Bop-A-Lula\" — all echo, hiccupping vocals and Cliff Gallup's guitar — became one of early rock and roll's defining records.",
+        "wiki": "Gene_Vincent",
+    },
 }
 
 

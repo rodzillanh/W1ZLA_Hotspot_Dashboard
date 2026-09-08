@@ -57,8 +57,9 @@ def pota_mode_to_rig(pota_mode, freq_hz):
     m = (pota_mode or "").strip().upper()
     if not m:
         return None
-    if m in ("USB", "LSB", "CW", "CWR", "AM", "FM", "RTTY"):
-        return m
+    if m in ("USB", "LSB", "CW", "CWR", "AM", "FM", "RTTY",
+             "PKTUSB", "PKTLSB", "PKTFM", "USB-D", "LSB-D"):
+        return {"USB-D": "PKTUSB", "LSB-D": "PKTLSB"}.get(m, m)
     if m == "SSB":
         # No USB/LSB in the spot -- universal HF convention: LSB below
         # 10 MHz, USB at/above.

@@ -1566,6 +1566,38 @@ sets the mode, optionally). A pill in the card header shows whether the
 rig server is reachable; when it isn't, the frequency is plain text.
 
 <!-- wiki-group: Optional Cards -->
+## HF Favorites card
+<!-- wiki-image: hf-favorites-card.png -->
+
+Optional dashboard card (Settings → Cards → "Show HF Favorites card",
+off by default) — a **tap-to-tune memory bank** of common HF activity
+frequencies, 80 m through 6 m, grouped by band. It's the same
+fixed-size scrolling shape as the POTA card, and it uses the same
+[Rig control](#rig-control-rigctld) path: click a frequency and your
+radio jumps to it, sending the stored **mode** (USB / LSB / CW / data /
+AM / FM) along with it.
+
+It ships with a **curated ~20-entry default set** — one FT8 and one
+phone frequency per band, plus FM simplex on 10 m / 6 m. On first run
+that set is copied into `hf_favorites.json` as ordinary rows: **add your
+own**, **edit any row in place** (frequency, label, mode), or delete
+what you don't use. There's no "default vs custom" distinction after the
+first run — a **Restore default set** button in the edit drawer just
+re-adds any of the curated entries you've since deleted. SSTV, FT4, JS8,
+PSK31, beacons, MSK144 and AM windows aren't in the defaults on purpose;
+add the ones you want.
+
+The card header shows the **live rig dial frequency** (from the same
+reachability probe the pill uses), and whichever favorite you're
+currently tuned to is highlighted **ON AIR**. A mode filter (all / FT8 &
+data / phone / CW) sits in the card and remembers its last setting per
+browser.
+
+Needs "Rig control" configured under Settings → Integrations. Without a
+reachable rig server the card still lists everything — the frequencies
+are just plain text instead of buttons.
+
+<!-- wiki-group: Optional Cards -->
 ## Big Ass Clock card
 <!-- wiki-image: big-clock-card.png -->
 

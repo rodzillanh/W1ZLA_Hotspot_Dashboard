@@ -23,7 +23,8 @@ from monitor import FleetMonitor
 from storage import load_hotspots, save_hotspots, load_settings, save_settings, \
                    load_favorites, save_favorites, load_asl_favorites, save_asl_favorites, \
                    load_bm_tg_favorites, save_bm_tg_favorites, \
-                   load_cameras, save_cameras, load_qsos, save_qsos, settings_transaction
+                   load_cameras, save_cameras, load_qsos, save_qsos, settings_transaction, \
+                   load_hf_favorites, save_hf_favorites
 from weather import WeatherClient
 from qrz import QrzClient
 from aprs import AprsClient
@@ -47,7 +48,7 @@ from adif import parse_adif
 from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
 from asl_audio import AslAudioManager
-from wsjtx import WsjtxListener
+from wsjtx import WsjtxListener, freq_to_band
 from qrz_logbook import QrzLogbookClient
 from hamalert import HamAlertListener
 from brandmeister_lastheard import BrandmeisterLastHeardListener
@@ -630,6 +631,13 @@ def api_settings_post():
             pass
     if "rig_send_mode" in data:
         settings["rig_send_mode"] = bool(data["rig_send_mode"])
+    if "show_hf_favorites" in data:
+        settings["show_hf_favorites"] = bool(data["show_hf_favorites"])
+    if "hf_favorites_position" in data:
+        try:
+            settings["hf_favorites_position"] = max(0, int(data["hf_favorites_position"]))
+        except (TypeError, ValueError):
+            pass
     if "onboarding_tour_seen" in data:
         settings["onboarding_tour_seen"] = bool(data["onboarding_tour_seen"])
     if "card_order_tiebreak" in data:
@@ -912,6 +920,7 @@ _SENTINEL_DEFS = [
     ("__qso_stats__", "show_qso_stats", "qso_stats_position", "📈", "QSO Stats", "logbook summary card"),
     ("__top_activity__", "show_top_activity", "top_activity_position", "🏆", "Top 5 Activity", "fleet callsign activity ranking card"),
     ("__pota__", "show_pota", "pota_position", "🏕️", "POTA", "hunter + spots card"),
+    ("__hf_favorites__", "show_hf_favorites", "hf_favorites_position", "📻", "HF Favorites", "tap-to-tune memory card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -1476,12 +1485,7 @@ def api_pota():
 
     # Rig-control status for the card's tap-to-tune chips (see rigctl.py).
     # Cached ~20s inside the client, so most 20s POTA polls are a no-op.
-    rig = None
-    if settings.get("rig_control_enabled"):
-        rig = rig_client.status(
-            settings.get("rig_host", ""), settings.get("rig_port", 4532)
-        )
-        rig["send_mode"] = bool(settings.get("rig_send_mode", True))
+    rig = _rig_status_block(settings)
 
     return jsonify({
         "spots": out,
@@ -1494,6 +1498,96 @@ def api_pota():
         "hunter": hunter,
         "rig": rig,
     })
+
+def _rig_status_block(settings: dict):
+    """The `rig` object served on /api/pota and /api/hf_favorites -- the
+    rigctld reachability probe (cached ~20s in rig_client) plus the
+    shared send-mode flag. None when rig control is turned off."""
+    if not settings.get("rig_control_enabled"):
+        return None
+    rig = rig_client.status(settings.get("rig_host", ""), settings.get("rig_port", 4532))
+    rig["send_mode"] = bool(settings.get("rig_send_mode", True))
+    return rig
+
+
+_HF_BAND_LO, _HF_BAND_HI = 5_250_000, 5_450_000  # 60m -- channelized, not in wsjtx._BAND_EDGES
+
+def _hf_band_of(hz: int) -> str:
+    b = freq_to_band(int(hz))
+    if b:
+        return b
+    return "60m" if _HF_BAND_LO <= hz <= _HF_BAND_HI else ""
+
+def _hf_fav_out(favs: list) -> list:
+    """Normalize stored favorites for the frontend -- adds `mhz` (string)
+    and `band`, both derived, so the card never has to recompute them."""
+    out = []
+    for f in favs:
+        try:
+            hz = int(f["freq_hz"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        out.append({
+            "id": f.get("id") or uuid.uuid4().hex[:10],
+            "freq_hz": hz,
+            "mhz": f"{hz / 1e6:.4f}".rstrip("0").rstrip("."),
+            "label": str(f.get("label") or f"{hz / 1e6:.3f} MHz")[:60],
+            "mode": f.get("mode") if f.get("mode") in config.HF_FAVORITE_MODES else "USB",
+            "band": _hf_band_of(hz),
+        })
+    return out
+
+@app.route("/api/hf_favorites")
+def api_hf_favorites():
+    """The HF Favorites card: the tap-to-tune memory list (seeded from
+    config.HF_FAVORITE_DEFAULTS on first run, then user-editable) plus
+    the same `rig` reachability block /api/pota carries. See rigctl.py /
+    storage.load_hf_favorites()."""
+    settings = load_settings()
+    return jsonify({
+        "favorites": _hf_fav_out(load_hf_favorites()),
+        "rig": _rig_status_block(settings),
+    })
+
+@app.route("/api/hf_favorites", methods=["POST"])
+def api_hf_favorites_post():
+    """Full-list replace of the HF favorites (same shape as
+    /api/asl_favorites). Every entry is validated: freq_hz must land in
+    an amateur HF/6m band, mode must be one of config.HF_FAVORITE_MODES,
+    label is trimmed to 60 chars. Bad entries are dropped, not rejected
+    wholesale -- the card always sends its full current list."""
+    data = request.json or {}
+    if data.get("restore_defaults"):
+        # Re-add any curated default the user has since deleted (matched
+        # on freq+mode), keeping their own entries and order untouched.
+        favs = load_hf_favorites()
+        have = {(int(f["freq_hz"]), f.get("mode")) for f in favs if str(f.get("freq_hz", "")).lstrip("-").isdigit()}
+        for hz, label, mode in config.HF_FAVORITE_DEFAULTS:
+            if (hz, mode) not in have:
+                favs.append({"id": uuid.uuid4().hex[:10], "freq_hz": hz, "label": label, "mode": mode})
+        save_hf_favorites(favs)
+        return jsonify({"ok": True, "favorites": _hf_fav_out(favs)})
+    rows = data.get("favorites")
+    if not isinstance(rows, list):
+        return jsonify({"ok": False, "error": "expected a favorites list"}), 400
+    cleaned = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        try:
+            hz = int(r.get("freq_hz"))
+        except (TypeError, ValueError):
+            continue
+        if not _hf_band_of(hz):
+            continue
+        mode = r.get("mode") if r.get("mode") in config.HF_FAVORITE_MODES else "USB"
+        label = str(r.get("label") or "").strip()[:60] or f"{hz / 1e6:.3f} MHz"
+        cleaned.append({
+            "id": str(r.get("id") or "").strip() or uuid.uuid4().hex[:10],
+            "freq_hz": hz, "label": label, "mode": mode,
+        })
+    save_hf_favorites(cleaned)
+    return jsonify({"ok": True, "favorites": _hf_fav_out(cleaned)})
 
 @app.route("/api/rig_tune", methods=["POST"])
 def api_rig_tune():
