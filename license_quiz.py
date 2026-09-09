@@ -39,7 +39,12 @@ training-data recall:
   discrepancy" between the export's 599 and NCVEC's originally-cited
   603; both numbers were correct for different points in the errata
   history. 27 of the 599 reference a circuit-diagram figure and are
-  excluded, leaving 572.
+  excluded, leaving 572 -- then 571 (2026-09): a re-check of the
+  bundled set against the GitHub export (whose Aug 2026 commits added a
+  "Fix missing figure in question E7G02" note) found E7G02 also depends
+  on a figure ("...the circuit in E7-3...") -- its reference reads as a
+  bare "E7-3" rather than "Figure E7-3", so the original figure filter
+  missed it. Removed for the same reason as the other 27.
 
 If any of these ever needs re-verifying or updating for the next pool
 cycle, re-fetch from the GitHub export AND cross-check the active-

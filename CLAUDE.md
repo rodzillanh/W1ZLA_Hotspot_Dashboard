@@ -827,7 +827,15 @@ config for per-integration credentials; put it in
   export already reflected — both numbers were correct for different
   points in the errata history, not a real conflict. 27 of the 599
   reference a circuit diagram figure and are excluded (the images aren't
-  bundled), leaving the 572 in `extra_2024_2028.json`. If this ever
+  bundled), leaving 572 — then **571 (2026-09)**: an "check for pool
+  updates" re-verification against the GitHub export (whose Aug 2026
+  commits carry a "Fix missing figure in question E7G02" note) found
+  **E7G02** also depends on an unbundled figure ("…the frequency
+  response of the circuit **in E7-3**…") — phrased as a bare `E7-3`
+  rather than `Figure E7-3`, so the original figure filter missed it.
+  Removed for the same reason as the other 27; nothing else changed
+  (the Feb 2026 Extra/Technician errata were already reflected, and the
+  export had no other post-bundle commits). If this ever
   needs updating for the next pool cycle (2028), re-fetch from the
   export AND cross-check the active-question-ID set against NCVEC's own
   current errata PDF the same way — don't just trust the export

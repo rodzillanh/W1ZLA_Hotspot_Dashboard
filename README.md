@@ -1338,8 +1338,8 @@ each poll fetches exactly one question.
     aren't bundled).
   - **General** ([2023-2027](https://ncvec.org/index.php/2023-2027-general-question-pool-release), effective through June 30, 2027): 418
     questions (5 diagram-based excluded).
-  - **Extra** ([2024-2028](https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release), effective through June 30, 2028): 572
-    questions (27 diagram-based excluded).
+  - **Extra** ([2024-2028](https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release), effective through June 30, 2028): 571
+    questions (28 diagram-based excluded).
 - **Click an answer to reveal** correct (green) / wrong (red); the other
   choices dim. Two-column layout keeps the card's height in line with
   the others regardless of answer length.
