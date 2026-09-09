@@ -233,3 +233,14 @@ BUILD_COMMIT
 # generate_screenshots.py) -- a build artifact copied into the Forgejo
 # wiki's own images/ folder by sync-wiki.sh, not source for this repo.
 screenshots/
+
+# Hotspot Dashboard: standalone design-iteration mockup pages -- scratch
+# artifacts from working out a card/feature visually before building it,
+# not source. Same "keep on disk, don't commit" treatment as screenshots/.
+Mockups/
+*-mockup.html
+
+# Claude Code local project config / memory -- machine-local, not source.
+# (If you ever want to share .claude/settings.json across the team,
+# `git add -f` it.)
+.claude/
