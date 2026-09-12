@@ -436,6 +436,11 @@ BIOS = {
         "blurb": "Frontman of Suicide, whose stripped-down synth-and-drum-machine sound and confrontational live shows made them a foundational, decade-ahead influence on punk and industrial music.",
         "wiki": "Alan_Vega",
     },
+    "Havens": {
+        "name": "Richie Havens",
+        "blurb": "Folk-rock singer-guitarist whose improvised, thunderous rhythm-guitar performance opened the Woodstock festival in 1969, becoming one of its defining moments.",
+        "wiki": "Richie_Havens",
+    },
 }
 
 

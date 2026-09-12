@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.55"
+APP_VERSION = "4.56"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -180,6 +180,8 @@ VERSION_CODENAMES = [
                         # "Cat's in the Cradle" (1942-1981)
     "Vega",             # v4.55 -- Alan Vega, Suicide's frontman, a
                         # synth-punk pioneer (1938-2016)
+    "Havens",           # v4.56 -- Richie Havens, folk-rock singer-
+                        # guitarist, opened Woodstock (1941-2013)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -367,6 +369,114 @@ DVSWITCH_TAIL_MARKER    = "===DVSWITCH_TAIL==="
 DVSWITCH_VOCODER_MARKER = "===DVSWITCH_VOCODER==="
 DVSWITCH_ABINFO_MARKER  = "===DVSWITCH_ABINFO==="  # this app appends the port number right after, e.g. "===DVSWITCH_ABINFO===31000"
 DVSWITCH_MMDVM_MARKER   = "===DVSWITCH_MMDVM==="
+
+
+# YSF/P25/NXDN "currently linked reflector" read-only display -- WPSD-only,
+# per-hotspot opt-in (ysf_status_enabled/p25_status_enabled/
+# nxdn_status_enabled). Piggybacks on the SAME slow (30 min) SSH round-trip
+# HOTSPOT_INFO_CHECK_CMD already makes for frequency/duplex/identity, via
+# build_hotspot_info_cmd() below -- reflector links persist for a long time
+# once made (this isn't a live "who's transmitting right now" signal like
+# DVSwitch's dvswitch_live, it's structural state closer to Brandmeister's
+# static talkgroups, which already live on this same slow cadence), so
+# there's no need to fold it into the fast 5s SSH_STATUS_CMD.
+#
+# YSF is CONFIRMED LIVE (2026-09) against a real WPSD hotspot running
+# YSFGateway (GitID #57e5498, built Sep 2026) via `journalctl -u
+# ysfgateway`: it logs to /var/log/pi-star/YSFGateway-YYYY-MM-DD.log
+# (date-stamped, same convention as MMDVM_Bridge's own file) -- NOT
+# /var/log/mmdvm/ as an earlier DVSwitch-era note in this file claimed for
+# all three gateways. That directory doesn't exist at all on this box (no
+# DVSwitch installed) -- /var/log/mmdvm/ was apparently only ever confirmed
+# for a DIFFERENT WPSD deployment/version, not a universal path. If this is
+# ever ported to another box and the glob below matches nothing, re-check
+# with `sudo find / -iname "*ysfgateway*" -type f` the way this was
+# actually found, don't assume the path.
+#
+# Real confirmed lines from that live capture:
+#   "Automatic (re-)connection to 32592 - "US-America Link "" -- the
+#   gateway-level reconnect ATTEMPT (YSFGateway.cpp), fires on startup/
+#   config even before the link is confirmed
+#   "Linked to US-America Link" -- the real link-CONFIRMED signal, from
+#   YSFNetwork.cpp/FCSNetwork.cpp (fires once the reflector actually ACKs
+#   the handshake), NOT YSFGateway.cpp -- this is what YSF_LINKED_PATTERN
+#   matches, since it means the link genuinely succeeded, not just that a
+#   request was sent. (One case, unconfirmed live: YSFNetwork.cpp special-
+#   cases a reflector literally named "MMDVM" as "Link successful to
+#   MMDVM" instead -- a self-loopback test target, not a real room; not
+#   matched by the pattern below, so a hotspot linked to it would show
+#   "not linked" rather than a wrong name.)
+# The disconnect lines below are from YSFGateway.cpp's own source but were
+# NOT independently captured live in this session (no disconnect happened
+# during the live check) -- same disclosed-gap tier as this project's
+# other not-fully-live-tested integrations (hamalert.py, wsjtx.py).
+YSF_LOG_GLOB        = "/var/log/pi-star/YSFGateway-*.log"
+YSF_LOG_TAIL_LINES  = 60
+YSF_LINKED_PATTERN   = r'Linked to (.+)'
+YSF_UNLINKED_PATTERN = r'Disconnecting due to inactivity|Disconnect has been requested by'
+
+# P25/NXDN: the SAME /var/log/pi-star/<Type>Gateway-YYYY-MM-DD.log naming
+# convention is INFERRED from YSF's now-confirmed pattern (WPSD packages
+# all its MMDVM-family gateways the same way), NOT independently
+# live-confirmed -- neither P25Gateway nor NXDNGateway has been checked
+# against a real running instance. Re-verify with `sudo find / -iname
+# "*p25gateway*"/"*nxdngateway*" -type f` against a real device before
+# fully trusting this if it doesn't work. Log line shapes are from the
+# current g4klx source (P25Clients/P25Gateway/P25Gateway.cpp,
+# NXDNClients/NXDNGateway/NXDNGateway.cpp) -- both use a bare numeric
+# talkgroup ID, not a named reflector like YSF, and both share near-
+# identical wording:
+#   "Statically linked to reflector %u"           -- from config, at startup
+#   "Switched to reflector %u due to network activity"
+#   "Switched to reflector %u due to RF activity from %s"
+#   "Switched to reflector %u by remote command"
+#   "Unlinking from reflector %u by %s"
+#   "Unlinking from reflector %u due to inactivity"
+#   "Unlinked from reflector %u by remote command"
+P25_LOG_GLOB  = "/var/log/pi-star/P25Gateway-*.log"
+NXDN_LOG_GLOB = "/var/log/pi-star/NXDNGateway-*.log"
+P25_NXDN_LOG_TAIL_LINES = 60
+P25_NXDN_LINKED_PATTERN   = r'(?:Statically linked to reflector|Switched to reflector) (\d+)'
+P25_NXDN_UNLINKED_PATTERN = r'Unlink(?:ed|ing) from reflector'
+
+YSF_MARKER  = "===YSF_LINK==="
+P25_MARKER  = "===P25_LINK==="
+NXDN_MARKER = "===NXDN_LINK==="
+
+
+def build_hotspot_info_cmd(
+    ysf_enabled: bool = False, p25_enabled: bool = False, nxdn_enabled: bool = False
+) -> str:
+    """Extends HOTSPOT_INFO_CHECK_CMD (frequency/duplex/identity) with an
+    optional tail of each enabled digital-voice gateway's own log, one more
+    `;`-chained clause on the SAME one-shot SSH command/connection --
+    check_one_slow() already opens one connection per hotspot per slow-poll
+    cycle, no reason to open a second one just for this. Echo'd markers
+    (see monitor.py's _split_hotspot_info_sections) let the caller split
+    the combined output back into the original info-command lines plus one
+    section per enabled gateway, same technique config.build_asl_status_cmd
+    already uses for DVSwitch's own multi-part SSH output.
+    """
+    cmd = HOTSPOT_INFO_CHECK_CMD
+    if ysf_enabled:
+        cmd += (
+            f"; echo {YSF_MARKER}"
+            f'; L=$(ls -1tr {YSF_LOG_GLOB} 2>/dev/null | tail -1)'
+            f'; tail -n {YSF_LOG_TAIL_LINES} "$L" 2>/dev/null'
+        )
+    if p25_enabled:
+        cmd += (
+            f"; echo {P25_MARKER}"
+            f'; L=$(ls -1tr {P25_LOG_GLOB} 2>/dev/null | tail -1)'
+            f'; tail -n {P25_NXDN_LOG_TAIL_LINES} "$L" 2>/dev/null'
+        )
+    if nxdn_enabled:
+        cmd += (
+            f"; echo {NXDN_MARKER}"
+            f'; L=$(ls -1tr {NXDN_LOG_GLOB} 2>/dev/null | tail -1)'
+            f'; tail -n {P25_NXDN_LOG_TAIL_LINES} "$L" 2>/dev/null'
+        )
+    return cmd
 
 
 def build_asl_status_cmd(

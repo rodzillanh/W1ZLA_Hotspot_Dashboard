@@ -245,26 +245,31 @@ class FleetMonitor:
         except Exception:
             pass  # slow checks are best-effort -- never affect the main poll loop
 
+        ysf_on  = bool(hotspot.get("ysf_status_enabled"))
+        p25_on  = bool(hotspot.get("p25_status_enabled"))
+        nxdn_on = bool(hotspot.get("nxdn_status_enabled"))
         try:
-            info_output = self._ssh_exec(hotspot, config.HOTSPOT_INFO_CHECK_CMD, config.SSH_TIMEOUT).strip()
+            info_cmd = config.build_hotspot_info_cmd(ysf_on, p25_on, nxdn_on)
+            raw_output = self._ssh_exec(hotspot, info_cmd, config.SSH_TIMEOUT).splitlines()
+            info_lines, sections = self._split_hotspot_info_sections(raw_output)
             rx_mhz = tx_mhz = None
             duplex = callsign = dmr_id = location = None
-            for line in info_output.splitlines():
-                key, sep, val = line.partition("=")
+            for line in info_lines:
+                line_key, sep, val = line.partition("=")
                 if not sep:
                     continue
                 val = val.strip().strip('"')
-                if key == "RXFrequency" and val.isdigit():
+                if line_key == "RXFrequency" and val.isdigit():
                     rx_mhz = int(val) / 1_000_000
-                elif key == "TXFrequency" and val.isdigit():
+                elif line_key == "TXFrequency" and val.isdigit():
                     tx_mhz = int(val) / 1_000_000
-                elif key == "Duplex":
+                elif line_key == "Duplex":
                     duplex = {"0": "Simplex", "1": "Duplex"}.get(val)
-                elif key == "Callsign" and val:
+                elif line_key == "Callsign" and val:
                     callsign = val
-                elif key == "Id" and val and val != "0":
+                elif line_key == "Id" and val and val != "0":
                     dmr_id = val
-                elif key == "Location" and val:
+                elif line_key == "Location" and val:
                     location = val
 
             updates = {}
@@ -282,6 +287,31 @@ class FleetMonitor:
                 updates["hotspot_callsign"] = f"{callsign} ({dmr_id})" if dmr_id else callsign
             if location:
                 updates["hotspot_location"] = location
+
+            # YSF/P25/NXDN reflector status is STICKY -- only overwritten
+            # when this poll's log tail actually contains fresh evidence
+            # (see models.py's own comment on these fields for why: the
+            # same "don't blank a known link just because a short tail
+            # happened not to contain a fresh line" reasoning as DVSwitch's
+            # dmr_linked/dstar_status elsewhere in this file).
+            if ysf_on:
+                value, matched = self._parse_reflector_link(
+                    sections.get("ysf", []), config.YSF_LINKED_PATTERN, config.YSF_UNLINKED_PATTERN
+                )
+                if matched:
+                    updates["ysf_reflector"] = value
+            if p25_on:
+                value, matched = self._parse_reflector_link(
+                    sections.get("p25", []), config.P25_NXDN_LINKED_PATTERN, config.P25_NXDN_UNLINKED_PATTERN
+                )
+                if matched:
+                    updates["p25_reflector"] = value
+            if nxdn_on:
+                value, matched = self._parse_reflector_link(
+                    sections.get("nxdn", []), config.P25_NXDN_LINKED_PATTERN, config.P25_NXDN_UNLINKED_PATTERN
+                )
+                if matched:
+                    updates["nxdn_reflector"] = value
 
             if updates:
                 with self._lock:
@@ -530,6 +560,65 @@ class FleetMonitor:
             elif current_key is not None:
                 sections[current_key].append(line)
         return sections
+
+    @staticmethod
+    def _split_hotspot_info_sections(output: list[str]) -> tuple[list[str], dict[str, list[str]]]:
+        """Splits a WPSD hotspot's combined slow-check SSH output (the
+        original HOTSPOT_INFO_CHECK_CMD frequency/duplex/identity lines,
+        plus an optional YSF/P25/NXDN log tail per enabled gateway -- see
+        config.build_hotspot_info_cmd) into (info_lines, sections).
+        info_lines is everything BEFORE the first marker (there's no marker
+        on the original info command itself, since its own per-line
+        key=value parsing was already unambiguous before this feature
+        existed); sections is keyed "ysf"/"p25"/"nxdn" by the echo'd
+        markers each gateway's tail is wrapped in -- same technique as
+        _split_dvswitch_sections above, not a new pattern."""
+        info_lines: list[str] = []
+        sections: dict[str, list[str]] = {}
+        current_key = None
+        for line in output:
+            stripped = line.strip()
+            if stripped == config.YSF_MARKER:
+                current_key = "ysf"
+                sections[current_key] = []
+            elif stripped == config.P25_MARKER:
+                current_key = "p25"
+                sections[current_key] = []
+            elif stripped == config.NXDN_MARKER:
+                current_key = "nxdn"
+                sections[current_key] = []
+            elif current_key is None:
+                info_lines.append(line)
+            else:
+                sections[current_key].append(line)
+        return info_lines, sections
+
+    @staticmethod
+    def _parse_reflector_link(lines: list[str], linked_pattern: str, unlinked_pattern: str) -> tuple[str | None, bool]:
+        """Scans a log tail for the MOST RECENT of a link/unlink event,
+        returning (value, matched). `matched=False` means this tail had NO
+        evidence either way (the real event has simply scrolled out of a
+        short tail window, or nothing has happened since the last poll) --
+        the caller must carry forward whatever it already knew rather than
+        overwriting with None, same "sticky, only update on fresh evidence"
+        contract as _parse_dvswitch_mmdvm_live's dmr_linked/dstar_status.
+        Iterates top-to-bottom (a `tail -n N` is already oldest-first) so
+        whichever pattern matches on the LAST line wins, reflecting current
+        state rather than the first thing that happened in the window."""
+        linked_re = re.compile(linked_pattern)
+        unlinked_re = re.compile(unlinked_pattern)
+        value: str | None = None
+        matched = False
+        for line in lines:
+            m = linked_re.search(line)
+            if m:
+                value = m.group(1).strip() if m.groups() else "linked"
+                matched = True
+                continue
+            if unlinked_re.search(line):
+                value = None
+                matched = True
+        return value, matched
 
     def _check_dvswitch_tx(self, key: str, sections: dict[str, list[str]]) -> None:
         """`key` is the hotspot's stable id (self._data/self._dvswitch_last_tx

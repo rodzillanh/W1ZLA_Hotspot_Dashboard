@@ -392,6 +392,18 @@ def api_data():
         # via /api/ircddb_status, not part of this 3s poll.
         if hs.get("ircddb_enabled"):
             entry["ircddb_enabled"] = True
+        # YSF/P25/NXDN reflector status -- static config passthrough (which
+        # of the three are turned on for this hotspot) so the drawer knows
+        # whether to render each row at all. The actual reflector value
+        # (ysf_reflector/p25_reflector/nxdn_reflector) is already part of
+        # `entry` via monitor.snapshot()'s wholesale HotspotStatus
+        # serialization above -- no separate passthrough needed for those.
+        if hs.get("ysf_status_enabled"):
+            entry["ysf_status_enabled"] = True
+        if hs.get("p25_status_enabled"):
+            entry["p25_status_enabled"] = True
+        if hs.get("nxdn_status_enabled"):
+            entry["nxdn_status_enabled"] = True
     ordered_ids = [h["id"] for h in hotspots]
     # Return as an ARRAY so the browser preserves order — JS objects keyed by
     # id strings get silently re-sorted by some engines (especially for
@@ -1230,6 +1242,14 @@ def setup():
             ircddb_callsign = request.form.get("ircddb_callsign", "").strip().upper()
             if ircddb_callsign:
                 new_hotspot["ircddb_callsign"] = ircddb_callsign
+            # YSF/P25/NXDN "currently linked reflector" read-only display --
+            # WPSD-only, see config.py's YSF_*/P25_NXDN_* constants for the
+            # log-tail parsing this backs. Opt-in per mode (a hotspot might
+            # run any subset of the three), same "absent means off"
+            # checkbox convention as dvswitch_enabled/ircddb_enabled above.
+            new_hotspot["ysf_status_enabled"]  = "ysf_status_enabled" in request.form
+            new_hotspot["p25_status_enabled"]  = "p25_status_enabled" in request.form
+            new_hotspot["nxdn_status_enabled"] = "nxdn_status_enabled" in request.form
         # Replace in place at its EXISTING index when editing -- a plain
         # filter-out-then-append (the previous approach) always moved the
         # edited hotspot to the end of the list, which /api/data's own
@@ -1386,6 +1406,17 @@ def api_update_hotspot():
             hotspot["ircddb_callsign"] = ircddb_callsign
         else:
             hotspot.pop("ircddb_callsign", None)
+        # YSF/P25/NXDN reflector status -- WPSD-only, same validation rules
+        # as /setup's form handler above (kept in sync manually).
+        hotspot["ysf_status_enabled"] = bool(
+            data.get("ysf_status_enabled", hotspot.get("ysf_status_enabled", False))
+        )
+        hotspot["p25_status_enabled"] = bool(
+            data.get("p25_status_enabled", hotspot.get("p25_status_enabled", False))
+        )
+        hotspot["nxdn_status_enabled"] = bool(
+            data.get("nxdn_status_enabled", hotspot.get("nxdn_status_enabled", False))
+        )
 
     # Replace in place at its EXISTING index -- this route only ever edits
     # an existing hotspot (see the docstring above), and every field

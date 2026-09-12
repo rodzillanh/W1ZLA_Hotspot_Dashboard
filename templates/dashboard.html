@@ -2392,6 +2392,12 @@
         .hs-update-note { font-size: 11.5px; color: var(--text-dim); background: var(--panel-2); border-radius: 6px; padding: 8px 10px; line-height: 1.5; margin-top: 4px; }
         .hs-update-note b { color: var(--accent); }
         .hs-empty-note { font-size: 12px; color: var(--text-dim); padding: 4px 0; }
+        /* YSF/P25/NXDN read-only reflector rows -- same row shape as
+           .hs-talker-row, just a label/value pair instead of call/meta. */
+        .hs-reflector-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+        .hs-reflector-row:last-child { border-bottom: none; }
+        .hs-reflector-mode { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .3px; flex-shrink: 0; }
+        .hs-reflector-value { font-size: 13px; font-family: var(--font-mono); color: var(--text); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         /* --- card drawer Settings block -- per-field instant save (POSTs
            on blur, no page-wide Save button), plus the Test buttons the
@@ -8994,6 +9000,31 @@ function openHotspotDrawer(hotspotId) {
     // round-trip (ircddbgateway.py), not part of this 3s-polled snapshot,
     // so this just renders a loading placeholder and kicks off
     // fetchIrcddbStatus() below once the drawer is actually in the DOM.
+    // YSF/P25/NXDN "currently linked reflector" -- WPSD-only, opt-in per
+    // mode, read-only (no link/unlink control, unlike Brandmeister/
+    // ircDDBGateway above). Unlike ircDDBGateway's live UDP status, this
+    // value is already sitting on `hs` (monitor.snapshot()'s wholesale
+    // HotspotStatus serialization) -- no separate fetch needed. `null`
+    // means "no link/unlink line seen yet this process's lifetime," not
+    // necessarily "definitely not linked" (see models.py's own comment on
+    // these fields) -- shown as a neutral "Not linked (yet)" rather than a
+    // confident "Not linked".
+    let reflectorHtml = '';
+    if (!isAsl && !isOpenSpot4 && (hs.ysf_status_enabled || hs.p25_status_enabled || hs.nxdn_status_enabled)) {
+        const reflectorRow = (label, value, unit) => `
+            <div class="hs-reflector-row">
+                <span class="hs-reflector-mode">${label}</span>
+                <span class="hs-reflector-value">${value ? escapeHtml(unit ? `${unit} ${value}` : value) : 'Not linked (yet)'}</span>
+            </div>`;
+        reflectorHtml = `
+        <div class="hs-drawer-section">
+            <div class="hs-drawer-section-title">Digital Voice Reflectors</div>
+            ${hs.ysf_status_enabled  ? reflectorRow('YSF',  hs.ysf_reflector) : ''}
+            ${hs.p25_status_enabled  ? reflectorRow('P25',  hs.p25_reflector, 'TG') : ''}
+            ${hs.nxdn_status_enabled ? reflectorRow('NXDN', hs.nxdn_reflector, 'TG') : ''}
+        </div>`;
+    }
+
     let ircddbHtml = '';
     if (!isAsl && !isOpenSpot4 && hs.ircddb_enabled) {
         ircddbHtml = `
@@ -9114,6 +9145,7 @@ function openHotspotDrawer(hotspotId) {
             ${linkedHtml}
             ${sa818Html}
             ${bmHtml}
+            ${reflectorHtml}
             ${ircddbHtml}
             ${updateHtml}
             ${openspot4Html}
@@ -9332,7 +9364,20 @@ function renderHotspotSettingsFields(hs, cfg) {
                     <span class="hs-test-result" id="hs-test-ircddb-result"></span>
                 </div>
             </div>
-        </div>`;
+        </div>
+        <div class="hs-toggle-row">
+            <span class="hs-toggle-label">YSF reflector status</span>
+            <div class="hs-switch" id="hsf-ysf-status-enabled" onclick="hsToggleField(this, 'ysf_status_enabled')"></div>
+        </div>
+        <div class="hs-toggle-row">
+            <span class="hs-toggle-label">P25 reflector status</span>
+            <div class="hs-switch" id="hsf-p25-status-enabled" onclick="hsToggleField(this, 'p25_status_enabled')"></div>
+        </div>
+        <div class="hs-toggle-row">
+            <span class="hs-toggle-label">NXDN reflector status</span>
+            <div class="hs-switch" id="hsf-nxdn-status-enabled" onclick="hsToggleField(this, 'nxdn_status_enabled')"></div>
+        </div>
+        <div class="hs-help" style="margin-top:-6px;margin-bottom:8px">Read-only "currently linked" display in this card's drawer, checked on the same slow ~30 min cycle as frequency/duplex above -- no link/unlink control.</div>`;
     }
 
     fieldsHtml += `
@@ -9382,6 +9427,9 @@ function renderHotspotSettingsFields(hs, cfg) {
         // to glance at, so start collapsed. Missing any of them (freshly
         // enabled, mid-setup) starts expanded so there's something to fill in.
         setIrcddbDetailsCollapsed(!!(cfg.ircddb_port && cfg.ircddb_password && cfg.ircddb_callsign));
+        document.getElementById('hsf-ysf-status-enabled').classList.toggle('on', !!cfg.ysf_status_enabled);
+        document.getElementById('hsf-p25-status-enabled').classList.toggle('on', !!cfg.p25_status_enabled);
+        document.getElementById('hsf-nxdn-status-enabled').classList.toggle('on', !!cfg.nxdn_status_enabled);
     }
     document.getElementById('hsf-enabled').classList.toggle('on', cfg.enabled !== false);
     document.getElementById('hsf-portable').classList.toggle('on', !!cfg.portable);
@@ -9458,6 +9506,15 @@ function hsTogglePortable(el) {
 function hsToggleAudioMeter(el) {
     el.classList.toggle('on');
     saveHotspotField('audio_meter_enabled', el.classList.contains('on'));
+}
+
+// Generic version of the above for the YSF/P25/NXDN reflector-status
+// toggles -- three fields with the identical "flip the switch, save the
+// field" body and no nested UI to show/hide (unlike hsToggleIrcddb/
+// hsToggleDvswitch), so one shared function instead of three copies.
+function hsToggleField(el, field) {
+    el.classList.toggle('on');
+    saveHotspotField(field, el.classList.contains('on'));
 }
 
 // Per-field instant save -- builds the full merged hotspot config (never

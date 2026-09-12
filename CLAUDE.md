@@ -5940,6 +5940,132 @@ config for per-integration credentials; put it in
   DIFFERENT hotspot's drawer too (confirming the preference is global,
   not accidentally scoped to one hotspot id).
 
+- **YSF/P25/NXDN "currently linked reflector" read-only display (v4.56)
+  -- prompted by browsing g4klx's own GitHub repos for feature ideas
+  (JYSFGateway/P25Gateway/NXDNGateway are all his), then built after the
+  user directly confirmed they run YSF and pulled a real live log capture
+  from their own hotspot -- not built from upstream source alone.**
+  - **A real repo-location correction found while researching this**:
+    `YSFGateway`/`P25Gateway`/`NXDNGateway` are NOT standalone g4klx repos
+    -- they're subdirectories of `YSFClients`/`P25Clients`/`NXDNClients`
+    (`.../YSFClients/YSFGateway/YSFGateway.cpp`, etc.), confirmed via the
+    GitHub API after a first guess at bare repo names 404'd.
+  - **A real, live-confirmed correction to THIS FILE's own earlier
+    DVSwitch-era claim**: that section says these three gateways log
+    under `/var/log/mmdvm/` (confirmed, it says, "via a real `ls /var/log/
+    mmdvm/`"). On the user's actual current WPSD hotspot, `/var/log/
+    mmdvm/` **doesn't exist at all** (no DVSwitch installed) --
+    YSFGateway instead logs to `/var/log/pi-star/YSFGateway-YYYY-MM-DD.log`
+    (found live via `sudo find / -iname "*ysfgateway*" -type f`, after
+    the naive `ls /var/log/mmdvm/`/`tail` guess came back "No such file or
+    directory"). Whichever earlier session confirmed `/var/log/mmdvm/`
+    was evidently looking at a different WPSD deployment/version, not a
+    universal path -- **don't trust an earlier "confirmed live" claim in
+    this very file as still-current without re-checking on the actual box
+    in front of you**, the same lesson as the openSPOT4/DMRGateway
+    protocol-generation gotchas elsewhere in this file, just this time the
+    stale source was this project's own prior notes, not a vendor's docs.
+  - **The real "Linked to X" line does NOT come from where a first read of
+    the upstream source suggests.** `YSFGateway.cpp` itself has a
+    plausible-looking `"(re-)connection to %5.5s - \"%s\""` line, and a
+    real live `journalctl -u ysfgateway` capture from the user's own box
+    DOES show `"Automatic (re-)connection to 32592 - \"US-America Link
+    \""` -- but that line only announces the gateway's own reconnect
+    ATTEMPT/intent, fired immediately on startup, before the reflector has
+    actually answered. The real link-CONFIRMED signal, also present in
+    that same live capture (`"Linked to US-America Link"`), comes from a
+    DIFFERENT file entirely -- `YSFNetwork.cpp`/`FCSNetwork.cpp`'s own
+    `LogMessage("Linked to %s", ...)`, fired only once the reflector's
+    own handshake response (`YSFP`/a 7- or 10-byte FCS ack) is actually
+    received. Grepping only the gateway's own top-level .cpp file (the
+    first, obvious place to look) would have missed this and used the
+    wrong signal -- confirmed correct only by cross-referencing the exact
+    real captured text against the full source tree, not by reading one
+    file and assuming it was authoritative. (One YSFNetwork.cpp special
+    case, NOT independently confirmed live: a reflector literally named
+    "MMDVM" -- a self-loopback test target -- logs `"Link successful to
+    MMDVM"` instead, a different string the current pattern doesn't
+    match, so a hotspot linked to that specific test target would show
+    "not linked" rather than a wrong name.)
+  - **This upstream source (2025-era, copyright headers through 2025,
+    real MQTT status-publishing code alongside the plain-text
+    LogMessage() calls) could in principle be the SAME "WPSD ships an
+    older pre-refactor fork" trap this file's own DMRGateway entry
+    documents** -- but the user's live capture's own build banner
+    (`"Built 16:11:43 Sep 11 2026 (GitID #57e5498)"`) shows a genuinely
+    recent build, and its real output matches the current source's
+    LogMessage() text closely (once looked up in the right file) -- so
+    unlike DMRGateway, this one checked out as current, not stale. Still
+    worth re-checking the same way if a report ever suggests otherwise.
+  - **P25/NXDN are explicitly NOT live-verified** -- the user only runs
+    YSF. `config.P25_LOG_GLOB`/`NXDN_LOG_GLOB` (same
+    `/var/log/pi-star/<Type>Gateway-YYYY-MM-DD.log` naming, INFERRED from
+    YSF's now-confirmed convention, not independently checked) and
+    `P25_NXDN_LINKED_PATTERN`/`P25_NXDN_UNLINKED_PATTERN` (from
+    `P25Clients/P25Gateway/P25Gateway.cpp`/`NXDNClients/NXDNGateway/
+    NXDNGateway.cpp`'s real source, both using a bare numeric talkgroup ID
+    rather than YSF's named reflector) are shipped at the same disclosed-
+    gap tier as this project's other not-fully-live-tested integrations
+    (hamalert.py, wsjtx.py's D-STAR/NXDN/P25 gap in openspot.py). If
+    either ever fails to populate, re-verify with `sudo find / -iname
+    "*p25gateway*"/"*nxdngateway*" -type f` and a real log/journalctl
+    capture the same way YSF was, before assuming the parser is still
+    correct.
+  - **Piggybacks on the SAME slow (~30 min) SSH round-trip
+    `HOTSPOT_INFO_CHECK_CMD` already makes for frequency/duplex/identity**
+    (`config.build_hotspot_info_cmd()`, a new per-hotspot-conditional
+    wrapper around the previously-fixed constant), not the fast 5s
+    `SSH_STATUS_CMD` DVSwitch's live RX/TX state uses -- a deliberate
+    choice: a reflector link persists for a long time once made (this
+    isn't "who's transmitting right now," it's structural state closer to
+    Brandmeister's static talkgroups, which already live on this same
+    slow cadence), so there's no reason to pay for a second, more frequent
+    round-trip. Markers (`YSF_MARKER`/`P25_MARKER`/`NXDN_MARKER`) let
+    `monitor._split_hotspot_info_sections()` split the combined output
+    back into the ORIGINAL info-command lines (no marker of its own, since
+    its per-line `key=value` parsing predates this feature and was
+    already unambiguous) plus one tail section per enabled gateway -- same
+    technique as `_split_dvswitch_sections`, not a new pattern.
+  - **`ysf_reflector`/`p25_reflector`/`nxdn_reflector` are STICKY across
+    polls** -- `monitor._parse_reflector_link()` returns `(value,
+    matched)`, and the caller only overwrites the field when `matched` is
+    true, exactly the same "don't blank a known link just because a short
+    tail happened not to contain fresh evidence" contract as DVSwitch's
+    `dmr_linked`/`dstar_status` (see that gotcha's own real-bug story
+    above for why this matters -- the identical class of bug would
+    resurface here without it, just for reflector names instead of DMR
+    master link state).
+  - **Three independent per-hotspot opt-in toggles
+    (`ysf_status_enabled`/`p25_status_enabled`/`nxdn_status_enabled`), not
+    one combined switch** -- a WPSD hotspot might run any subset of the
+    three gateways, same reasoning as `dvswitch_enabled` being its own
+    field rather than folded into `type`. WPSD-only (same `else:` branch
+    as `ircddb_enabled` in both `/setup`'s POST handler and
+    `/api/update_hotspot`) -- ASL3/openSPOT4 have no MMDVM-family gateway
+    concept at all.
+  - **Read-only display, deliberately no link/unlink control** -- unlike
+    the Brandmeister/ircDDBGateway sections in the same drawer, this
+    section only ever shows current state. YSF's own WiresX/DTMF-based
+    linking and P25/NXDN's remote-command support exist in the real
+    source but weren't investigated for a write path here; if that's ever
+    wanted, it's a separate, larger feature (a real remote-control
+    mechanism would need its own protocol verification the way
+    ircDDBGateway's UDP link/unlink got).
+  - Verified live end-to-end with a throwaway Playwright script (deleted
+    after, same discipline as every other UI-verification entry in this
+    file): seeded a fake hotspot with all three toggles on and
+    `ysf_reflector`/`p25_reflector` set + `nxdn_reflector` left `None`
+    (the never-seen-evidence case), confirmed the drawer's "Digital Voice
+    Reflectors" section renders all three rows with the exact expected
+    text ("US-America Link", "TG 10201", "Not linked (yet)"), and
+    confirmed the drawer's Settings block switches reflect the saved
+    per-hotspot state. The parser itself was unit-tested directly against
+    the user's REAL captured journalctl lines (not synthetic text) for
+    the YSF case, confirming `_parse_reflector_link()` extracts
+    "US-America Link" correctly from that exact real capture; P25/NXDN
+    parsing was only tested against synthetic lines built from the source
+    text, per the disclosed-unverified tier above.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

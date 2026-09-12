@@ -112,6 +112,23 @@ class HotspotStatus:
     # boolean, since Brandmeister's numeric status codes aren't documented.
     bm_status_text: Optional[str] = None
     bm_static_tgs: List[dict] = field(default_factory=list)  # [{talkgroup, slot}, ...]
+    # YSF/P25/NXDN "currently linked reflector" -- WPSD-only, per-hotspot
+    # opt-in (ysf_status_enabled/p25_status_enabled/nxdn_status_enabled),
+    # read-only (no link/unlink control, unlike the Brandmeister/ircDDBGateway
+    # sections -- see config.py's YSF_*/P25_NXDN_* constants and
+    # monitor.py's check_one_slow for the log-tail parsing this comes from).
+    # ysf_reflector is a real reflector/room NAME (YSF has one); p25_reflector/
+    # nxdn_reflector are bare numeric talkgroup ID strings, since neither
+    # protocol has a named-reflector concept the way YSF does. All three are
+    # STICKY across polls (only overwritten when a poll's log tail actually
+    # contains fresh evidence, same "carry forward on missing evidence"
+    # precedent as dvswitch_dmr_linked/dvswitch_dstar_status above) -- None
+    # means "no link/unlink line seen yet in this process's lifetime, or the
+    # corresponding *_status_enabled toggle isn't on," not necessarily
+    # "definitely unlinked right now."
+    ysf_reflector: Optional[str] = None
+    p25_reflector: Optional[str] = None
+    nxdn_reflector: Optional[str] = None
     # WPSD/Pi-Star dashboard update check (checked on a slow background
     # cadence, not every poll -- see config.VERSION_CHECK_INTERVAL).
     # Checks all three WPSD repos (WebCode/Scripts/Binaries); dashboard_version
