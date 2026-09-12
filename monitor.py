@@ -17,6 +17,7 @@ from radioid import RadioIdClient
 from aprs import AprsClient
 from brandmeister import BrandmeisterClient
 from aslstats import AslStatsClient
+from ircddbgateway import IrcddbGatewayClient
 import storage_activity
 import storage_notifications
 
@@ -36,6 +37,19 @@ class FleetMonitor:
         self._aprs          = AprsClient("")
         self._brandmeister  = BrandmeisterClient()
         self._aslstats      = AslStatsClient()
+        # A SEPARATE IrcddbGatewayClient instance from app.py's own
+        # module-level one -- same "different call shape, no need to
+        # reach into the other's internals" reasoning as
+        # asl_stats_client/bm_write_client being separate from this
+        # class's own aslstats/brandmeister clients elsewhere in this
+        # file. app.py's instance serves the drawer's interactive Link/
+        # Unlink/Test actions (a live round-trip, on demand); this one
+        # only ever gets called from check_one_slow's periodic sweep, to
+        # populate ircddb_reflector for the card-level Digital Voice
+        # Network Status strip -- IrcddbGatewayClient itself is a plain
+        # stateless-per-call class (opens/closes a UDP socket per call,
+        # no persistent connection), so two instances cost nothing extra.
+        self._ircddb        = IrcddbGatewayClient()
         # Last-seen DVSwitch "Begin TX:" line per hotspot ip -- there's no
         # confirmed end-of-transmission line for DVSwitch (see
         # config.DVSWITCH_BEGIN_TX_PATTERN), so a Fleet Activity row is
@@ -312,6 +326,29 @@ class FleetMonitor:
                 )
                 if matched:
                     updates["nxdn_reflector"] = value
+
+            # ircDDBGateway (D-STAR) current reflector, on this SAME slow
+            # cadence -- feeds ircddb_reflector, the card-level Digital
+            # Voice Network Status strip's D-STAR chip and the drawer's
+            # own summary section, NOT the drawer's separate D-STAR
+            # section (which keeps its own live /api/ircddb_status fetch
+            # for a fresher read right when a user actually opens it).
+            # `status()` returning None means the UDP round-trip itself
+            # failed this poll (unreachable/bad login) -- no fresh
+            # evidence, carry the previous value forward, same sticky
+            # contract as ysf_reflector/p25_reflector/nxdn_reflector
+            # above. A SUCCESSFUL round-trip reporting no reflector IS
+            # authoritative "not linked" though (unlike the log-tail
+            # modes' ambiguity), so that case still overwrites to None.
+            if hotspot.get("ircddb_enabled"):
+                info = self._ircddb.status(
+                    hotspot["ip"],
+                    hotspot.get("ircddb_port", config.IRCDDB_DEFAULT_PORT),
+                    hotspot.get("ircddb_password", ""),
+                    hotspot.get("ircddb_callsign", ""),
+                )
+                if info is not None:
+                    updates["ircddb_reflector"] = info.get("reflector")
 
             if updates:
                 with self._lock:

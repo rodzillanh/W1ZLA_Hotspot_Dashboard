@@ -6066,6 +6066,105 @@ config for per-integration credentials; put it in
     parsing was only tested against synthetic lines built from the source
     text, per the disclosed-unverified tier above.
 
+- **Digital Voice Network Status (v4.57) -- a unified "what's every
+  digital-voice mode currently linked to" chip row on the card, and the
+  same as a summary section at the top of the drawer, replacing three
+  separately-scattered displays with one. Mockup-first (a published
+  Artifact with two labeled options -- a chip row vs. a single joined
+  text line -- the user picked the chip row, matching the recommendation
+  given with it), same workflow as every other UI feature in this
+  project.**
+  - **A real gap only found by testing, not by reading the code**: the
+    first implementation's DMR chip depended on `hs.brandmeister_id` to
+    decide whether to show a DMR chip at all (vs. `hs.bm_static_tgs`,
+    which only tells you whether a static TG happens to be set right
+    now) -- but `brandmeister_id` was never part of `/api/data`'s
+    response at all. The OLD standalone "BM static" line this feature
+    absorbs never needed it (it only ever checked
+    `bm_static_tgs.length`), so this gap was invisible until a live
+    Playwright check actually counted the rendered chips and got 4
+    instead of 5. Fixed by adding `entry["brandmeister_id"] =
+    hs.get("brandmeister_id")` to `/api/data`'s existing static-config
+    passthrough block (same reasoning as `card_url`/`type`/`lat`/`lon`
+    being there) -- this is what lets the DMR chip distinguish "Brandmeister
+    not configured for this hotspot at all" (chip hidden) from
+    "configured, but no static TG right now" (chip shown as "not
+    linked"), the same P25/NXDN-style distinction the mockup's own DMR
+    row demonstrated.
+  - **D-STAR's card-level chip needed a genuinely new data path, not just
+    new markup** -- ircDDBGateway's own current-reflector status was, as
+    of v4.52-v4.56, ONLY ever fetched lazily and live (a UDP round-trip)
+    the instant the drawer's own D-STAR section opened
+    (`/api/ircddb_status/<id>`), deliberately kept OFF the 3s-polled
+    `/api/data` snapshot for exactly that reason. A card-level chip
+    visible on the always-on dashboard needs something to show even when
+    no drawer is open, so `monitor.py`'s `check_one_slow` (the same slow
+    ~30 min cadence YSF/P25/NXDN already use) now ALSO calls a SEPARATE
+    `IrcddbGatewayClient` instance (`FleetMonitor._ircddb`, distinct from
+    app.py's own module-level one used by the drawer's interactive Link/
+    Unlink/Test actions -- same "different call shape, no need to reach
+    into the other's internals" reasoning as `asl_stats_client`/
+    `bm_write_client` being separate from this class's own internal
+    clients elsewhere in this file; `IrcddbGatewayClient` is a plain
+    stateless-per-call class, so a second instance costs nothing) and
+    stores the result on a new sticky `ircddb_reflector` field. The
+    drawer's own D-STAR section keeps its existing live fetch UNCHANGED,
+    for a fresher read right when someone actually opens it -- two
+    independent sources of the same underlying fact, on two different
+    cadences for two different jobs, not a duplicate/redundant call.
+  - **`ircddb_reflector`'s sticky rule has a real, disclosed exception
+    from ysf_reflector/p25_reflector/nxdn_reflector's**: those three can
+    only ever report "matched" or "no evidence this poll" from a log
+    tail, never an authoritative "confirmed not linked" -- but
+    ircDDBGateway's own UDP protocol genuinely CAN report "linked to
+    nothing" on a successful round-trip (a real `GRP`/`RPT` response with
+    an empty reflector field). So `check_one_slow` only treats a FAILED
+    round-trip (`status()` returning `None` -- unreachable/bad login) as
+    "no fresh evidence, carry forward" -- a SUCCESSFUL round-trip
+    reporting no reflector still overwrites to `None`, since that's a
+    real, confirmed "not linked," not an information gap. Verified live
+    with both a success-path test and a failure-path sticky test
+    (pre-seed a known reflector, mock `status()` to return `None`,
+    confirm the field is unchanged).
+  - **The unified drawer summary REPLACES the standalone "Digital Voice
+    Reflectors" section v4.56 added, rather than sitting alongside it**
+    -- it would otherwise show the exact same YSF/P25/NXDN values twice
+    in one drawer, in two different visual styles, which is worse than
+    either display alone. Same reasoning applies to the card's old
+    standalone "BM static: ..." line (`.card-tg`), which is now folded
+    into the strip's DMR chip and removed from the template -- the
+    `.card-tg` CSS class itself was NOT deleted, since it's still used
+    by the unrelated active-talkgroup "Linked: TG" line and ASL3's own
+    "Linked:" header.
+  - **DMR/D-STAR rows get a "manage ↓" jump-link (a plain
+    `scrollIntoView({behavior:'smooth'})` to `#bm-section`/
+    `#ircddb-section`, new ids added to those sections' own divs for
+    this); YSF/P25/NXDN rows deliberately don't**, per the mockup's own
+    flagged asymmetry (those three have no write path as of v4.56) --
+    resolved by the user picking the honest-asymmetry version shown in
+    the mockup over inventing a uniform-but-dead link for three of the
+    five rows.
+  - **Deliberately ONE color scheme across all 5 modes (cyan dot + bright
+    text = linked, dim grey = not-linked-or-unknown), not a distinct hue
+    per mode** -- this app reserves `--accent` for brand identity only
+    (never status, per this file's own dashboard.html architecture
+    comment), and `FLEET_MODE_COLOR_VARS` (the Fleet Activity card's own
+    per-mode color array) is assigned POSITIONALLY by activity share, not
+    a fixed per-mode mapping, so it couldn't be reused as a stable
+    "DMR is always X color" scheme even if there were enough spare status
+    tokens for 5 more distinct hues. Mode identity is carried by the text
+    label instead -- same status-is-color/identity-is-text split as
+    `.linked-item`/`.asl-ctrl-mode-badge` elsewhere in this file.
+  - Verified live end-to-end with a throwaway Playwright script (deleted
+    after): seeded a hotspot with all 5 modes configured (DMR linked,
+    D-STAR linked, YSF linked, P25 enabled-but-not-linked, NXDN linked)
+    and confirmed the card renders exactly 5 chips with the right
+    linked/not-linked styling and the old BM-static line is gone;
+    confirmed the drawer's summary renders the same 5 rows, exactly 2 of
+    which have a "manage" link, clicking the DMR one actually scrolls
+    `#bm-section` into view, and the old standalone "Digital Voice
+    Reflectors" section no longer exists in the DOM.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

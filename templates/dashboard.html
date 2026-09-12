@@ -603,6 +603,23 @@
         }
         .card-tg span { color: var(--text); }
 
+        /* Digital Voice Network Status chip row (v4.57) -- mockup-approved
+           "Option A" over a single joined text line, since a long
+           reflector name degrades gracefully here (ellipsis + a title
+           tooltip) instead of just running off the card's edge. */
+        .dv-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .dv-chip {
+            display: inline-flex; align-items: center; gap: 5px; max-width: 168px;
+            padding: 3px 9px 3px 7px; border-radius: 20px; font-size: 11px;
+            background: var(--panel-2); border: 1px solid var(--border);
+        }
+        .dv-chip .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--text-dim); }
+        .dv-chip.linked .dot { background: var(--live); }
+        .dv-chip .mode { font-family: var(--font-mono); font-weight: 700; color: var(--text-muted); flex-shrink: 0; }
+        .dv-chip.linked .mode { color: var(--text); }
+        .dv-chip .val { font-family: var(--font-mono); color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dv-chip.linked .val { color: var(--text-muted); }
+
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
         .active-label {
             color: var(--live);
@@ -2191,6 +2208,18 @@
             color: var(--text-dim); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
         }
         .hs-drawer-section-title .count { font-family: var(--font-mono); font-weight: 400; color: var(--text-dim); }
+        /* Digital Voice Network Status drawer rows (v4.57) -- same
+           semantic-color-not-mode-color scheme as the card's .dv-chip. */
+        .dvns-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+        .dvns-row:last-child { border-bottom: none; }
+        .dvns-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+        .dvns-row.linked .dvns-dot { background: var(--live); }
+        .dvns-mode { width: 58px; flex-shrink: 0; font-size: 11px; font-weight: 700; font-family: var(--font-mono); color: var(--text-dim); text-transform: uppercase; letter-spacing: .3px; }
+        .dvns-row.linked .dvns-mode { color: var(--text-muted); }
+        .dvns-val { flex: 1; font-size: 13px; font-family: var(--font-mono); color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .dvns-row.linked .dvns-val { color: var(--text); }
+        .dvns-manage { font-size: 10.5px; color: var(--live); text-decoration: none; flex-shrink: 0; font-family: var(--font-mono); opacity: .8; }
+        .dvns-manage:hover { opacity: 1; text-decoration: underline; }
         .hs-talker-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
         .hs-talker-row:last-child { border-bottom: none; }
         .hs-talker-call { color: var(--link); font-weight: 600; font-size: 13px; text-decoration: none; width: 76px; flex-shrink: 0; }
@@ -2392,12 +2421,6 @@
         .hs-update-note { font-size: 11.5px; color: var(--text-dim); background: var(--panel-2); border-radius: 6px; padding: 8px 10px; line-height: 1.5; margin-top: 4px; }
         .hs-update-note b { color: var(--accent); }
         .hs-empty-note { font-size: 12px; color: var(--text-dim); padding: 4px 0; }
-        /* YSF/P25/NXDN read-only reflector rows -- same row shape as
-           .hs-talker-row, just a label/value pair instead of call/meta. */
-        .hs-reflector-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
-        .hs-reflector-row:last-child { border-bottom: none; }
-        .hs-reflector-mode { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .3px; flex-shrink: 0; }
-        .hs-reflector-value { font-size: 13px; font-family: var(--font-mono); color: var(--text); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         /* --- card drawer Settings block -- per-field instant save (POSTs
            on blur, no page-wide Save button), plus the Test buttons the
@@ -4621,6 +4644,49 @@ function renderCards(data) {
                          ? `<div>Brandmeister: <span class="stat-val">${hs.bm_status_text}</span></div>` : ''}
                    </div>`;
 
+        // Digital Voice Network Status (v4.57, mockup-approved -- see
+        // CLAUDE.md) -- one glance at what every enabled digital-voice
+        // mode is currently linked to, replacing the old standalone
+        // "BM static" line below (now just the DMR chip here) rather than
+        // showing the same info twice in two different visual styles.
+        // Every value already sits on `hs` from the existing slow-poll
+        // fields (Brandmeister/ircDDBGateway/YSF/P25/NXDN) -- no new
+        // fetch. Cyan dot + bright text = actually linked right now; dim
+        // grey = enabled but not linked (or no fresh evidence yet).
+        // Deliberately ONE color scheme across all modes, not a distinct
+        // hue per mode -- this app reserves --accent for brand identity
+        // only (never status), and there aren't enough status-appropriate
+        // tokens left for 5 more distinct per-mode colors; mode identity
+        // is carried by the text label instead, same split as
+        // .linked-item/.asl-ctrl-mode-badge elsewhere in this file
+        // (status = color, identity = text).
+        const dvChips = [];
+        if (hs.brandmeister_id) {
+            const tgs = hs.bm_static_tgs || [];
+            const dmrVal = tgs.length
+                ? tgs.map(t => t.talkgroup + (t.slot ? ` (TS${t.slot})` : '')).join(', ')
+                : 'not linked';
+            dvChips.push({ mode: 'DMR', val: dmrVal, linked: tgs.length > 0 });
+        }
+        if (hs.ircddb_enabled) {
+            dvChips.push({ mode: 'D-STAR', val: hs.ircddb_reflector || 'not linked', linked: !!hs.ircddb_reflector });
+        }
+        if (hs.ysf_status_enabled) {
+            dvChips.push({ mode: 'YSF', val: hs.ysf_reflector || 'not linked', linked: !!hs.ysf_reflector });
+        }
+        if (hs.p25_status_enabled) {
+            dvChips.push({ mode: 'P25', val: hs.p25_reflector ? `TG ${hs.p25_reflector}` : 'not linked', linked: !!hs.p25_reflector });
+        }
+        if (hs.nxdn_status_enabled) {
+            dvChips.push({ mode: 'NXDN', val: hs.nxdn_reflector ? `TG ${hs.nxdn_reflector}` : 'not linked', linked: !!hs.nxdn_reflector });
+        }
+        const dvStripHtml = dvChips.length
+            ? `<div class="dv-strip">${dvChips.map(c => `
+                <div class="dv-chip${c.linked ? ' linked' : ''}" title="${escapeHtml(c.mode)}: ${escapeHtml(c.val)}">
+                    <span class="dot"></span><span class="mode">${escapeHtml(c.mode)}</span><span class="val">${escapeHtml(c.val)}</span>
+                </div>`).join('')}</div>`
+            : '';
+
         // SA818 RF module frequency (ASL3 simplex nodes only) -- reuses
         // hs.frequency/hs.duplex, the same fields WPSD populates from
         // /etc/mmdvmhost (see monitor.py's _check_asl3_sa818). Row is
@@ -4732,9 +4798,7 @@ function renderCards(data) {
               ${isAway ? '' : vuMeterBlock}
               ${isAway ? '' : statsGrid}
               ${isAway ? '' : aslCardSplit}
-              ${!isAway && hs.bm_static_tgs && hs.bm_static_tgs.length
-                  ? `<div class="card-tg">BM static: <span>${hs.bm_static_tgs.map(t => t.talkgroup + (t.slot ? ` (TS${t.slot})` : '')).join(', ')}</span></div>`
-                  : ''}
+              ${isAway ? '' : dvStripHtml}
               ${isAway ? '' : recentBlock}
             </div>
           </div>
@@ -8852,6 +8916,51 @@ function openHotspotDrawer(hotspotId) {
     }
     const subLine = [hs.ip, ...identityBits].join(' · ');
 
+    // Digital Voice Network Status (v4.57, mockup-approved -- see
+    // CLAUDE.md) -- the same chip data the card strip computes
+    // (renderCards()' dvChips), rendered as full-width rows here since
+    // the drawer has room to spare. DMR/D-STAR rows get a "manage ↓"
+    // jump-link scrolling to their own existing interactive section
+    // further down (bm-section/ircddb-section) -- YSF/P25/NXDN have no
+    // write path yet (v4.56), so their rows deliberately have nowhere to
+    // jump to rather than pointing at a dead link for visual symmetry.
+    let dvNetworkHtml = '';
+    if (!isAsl && !isOpenSpot4) {
+        const dvRows = [];
+        if (hs.brandmeister_id) {
+            const tgs = hs.bm_static_tgs || [];
+            const dmrVal = tgs.length
+                ? tgs.map(t => t.talkgroup + (t.slot ? ` (TS${t.slot})` : '')).join(', ')
+                : 'Not linked';
+            dvRows.push({ mode: 'DMR', val: dmrVal, linked: tgs.length > 0, jumpTo: 'bm-section' });
+        }
+        if (hs.ircddb_enabled) {
+            dvRows.push({ mode: 'D-STAR', val: hs.ircddb_reflector || 'Not linked', linked: !!hs.ircddb_reflector, jumpTo: 'ircddb-section' });
+        }
+        if (hs.ysf_status_enabled) {
+            dvRows.push({ mode: 'YSF', val: hs.ysf_reflector || 'Not linked (yet)', linked: !!hs.ysf_reflector });
+        }
+        if (hs.p25_status_enabled) {
+            dvRows.push({ mode: 'P25', val: hs.p25_reflector ? `TG ${hs.p25_reflector}` : 'Not linked (yet)', linked: !!hs.p25_reflector });
+        }
+        if (hs.nxdn_status_enabled) {
+            dvRows.push({ mode: 'NXDN', val: hs.nxdn_reflector ? `TG ${hs.nxdn_reflector}` : 'Not linked (yet)', linked: !!hs.nxdn_reflector });
+        }
+        if (dvRows.length) {
+            dvNetworkHtml = `
+            <div class="hs-drawer-section" style="margin-top:10px">
+                <div class="hs-drawer-section-title">Digital Voice Network Status</div>
+                ${dvRows.map(r => `
+                    <div class="dvns-row${r.linked ? ' linked' : ''}">
+                        <span class="dvns-dot"></span>
+                        <span class="dvns-mode">${escapeHtml(r.mode)}</span>
+                        <span class="dvns-val">${escapeHtml(r.val)}</span>
+                        ${r.jumpTo ? `<a class="dvns-manage" href="#" onclick="event.preventDefault();document.getElementById('${r.jumpTo}').scrollIntoView({behavior:'smooth',block:'start'})">manage ↓</a>` : ''}
+                    </div>`).join('')}
+            </div>`;
+        }
+    }
+
     let talkersHtml = '';
     if (!isAsl && !isOpenSpot4) {
         const history = hs.history || [];
@@ -8942,7 +9051,7 @@ function openHotspotDrawer(hotspotId) {
         const bmTgs = hs.bm_static_tgs || [];
         if (!hs.bm_status_text && !bmTgs.length) {
             bmHtml = `
-            <div class="hs-drawer-section">
+            <div class="hs-drawer-section" id="bm-section">
                 <div class="hs-drawer-section-title">Brandmeister</div>
                 <div class="hs-empty-note">No Brandmeister ID configured for this hotspot.</div>
             </div>`;
@@ -8952,7 +9061,7 @@ function openHotspotDrawer(hotspotId) {
                 // Read-only fallback -- unchanged from before this feature,
                 // just with a nudge toward the setting that unlocks the rest.
                 bmHtml = `
-                <div class="hs-drawer-section">
+                <div class="hs-drawer-section" id="bm-section">
                     <div class="hs-drawer-section-title">Brandmeister</div>
                     ${statusLine}
                     ${bmTgs.length ? `<div class="hs-tg-chip-row">${bmTgs.map(t => `<span class="hs-tg-chip">TG ${escapeHtml(String(t.talkgroup))}${t.slot ? ' · TS' + escapeHtml(String(t.slot)) : ''}</span>`).join('')}</div>` : ''}
@@ -8978,7 +9087,7 @@ function openHotspotDrawer(hotspotId) {
                     return `<button class="hs-tg-chip-btn" data-tg="${escapeHtml(f.tg)}" data-slot="${escapeHtml(f.slot)}" ${already ? 'disabled' : ''} onclick="quickLinkTalkgroup(this)">${escapeHtml(f.label || ('TG ' + f.tg))} · ${escapeHtml(f.tg)}</button>`;
                 }).join('');
                 bmHtml = `
-                <div class="hs-drawer-section">
+                <div class="hs-drawer-section" id="bm-section">
                     <div class="hs-drawer-section-title">Brandmeister Talkgroups <span class="count">(${bmTgs.length})</span></div>
                     ${statusLine}
                     ${rows || '<div class="hs-empty-note">No static talkgroups — hotspot follows whatever TG was last heard.</div>'}
@@ -9000,31 +9109,13 @@ function openHotspotDrawer(hotspotId) {
     // round-trip (ircddbgateway.py), not part of this 3s-polled snapshot,
     // so this just renders a loading placeholder and kicks off
     // fetchIrcddbStatus() below once the drawer is actually in the DOM.
-    // YSF/P25/NXDN "currently linked reflector" -- WPSD-only, opt-in per
-    // mode, read-only (no link/unlink control, unlike Brandmeister/
-    // ircDDBGateway above). Unlike ircDDBGateway's live UDP status, this
-    // value is already sitting on `hs` (monitor.snapshot()'s wholesale
-    // HotspotStatus serialization) -- no separate fetch needed. `null`
-    // means "no link/unlink line seen yet this process's lifetime," not
-    // necessarily "definitely not linked" (see models.py's own comment on
-    // these fields) -- shown as a neutral "Not linked (yet)" rather than a
-    // confident "Not linked".
-    let reflectorHtml = '';
-    if (!isAsl && !isOpenSpot4 && (hs.ysf_status_enabled || hs.p25_status_enabled || hs.nxdn_status_enabled)) {
-        const reflectorRow = (label, value, unit) => `
-            <div class="hs-reflector-row">
-                <span class="hs-reflector-mode">${label}</span>
-                <span class="hs-reflector-value">${value ? escapeHtml(unit ? `${unit} ${value}` : value) : 'Not linked (yet)'}</span>
-            </div>`;
-        reflectorHtml = `
-        <div class="hs-drawer-section">
-            <div class="hs-drawer-section-title">Digital Voice Reflectors</div>
-            ${hs.ysf_status_enabled  ? reflectorRow('YSF',  hs.ysf_reflector) : ''}
-            ${hs.p25_status_enabled  ? reflectorRow('P25',  hs.p25_reflector, 'TG') : ''}
-            ${hs.nxdn_status_enabled ? reflectorRow('NXDN', hs.nxdn_reflector, 'TG') : ''}
-        </div>`;
-    }
-
+    // (v4.56 originally added a standalone "Digital Voice Reflectors"
+    // section here for YSF/P25/NXDN -- superseded in v4.57 by the unified
+    // Digital Voice Network Status summary at the top of this drawer,
+    // dvNetworkHtml above, which covers the exact same three rows plus
+    // DMR/D-STAR. Removed rather than kept alongside it, since showing
+    // the same three reflector values twice in one drawer would be
+    // actively confusing, not just redundant.)
     let ircddbHtml = '';
     if (!isAsl && !isOpenSpot4 && hs.ircddb_enabled) {
         ircddbHtml = `
@@ -9141,11 +9232,11 @@ function openHotspotDrawer(hotspotId) {
                 <a class="hs-settings-link" href="/setup#hotspots">Open in full Settings →</a>
             </div>
             <div class="hs-field-block" id="hs-settings-fields"><div class="hs-empty-note">Loading…</div></div>
+            ${dvNetworkHtml}
             ${talkersHtml}
             ${linkedHtml}
             ${sa818Html}
             ${bmHtml}
-            ${reflectorHtml}
             ${ircddbHtml}
             ${updateHtml}
             ${openspot4Html}

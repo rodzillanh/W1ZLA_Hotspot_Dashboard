@@ -129,6 +129,22 @@ class HotspotStatus:
     ysf_reflector: Optional[str] = None
     p25_reflector: Optional[str] = None
     nxdn_reflector: Optional[str] = None
+    # D-STAR (ircDDBGateway) -- same sticky treatment as the three above,
+    # but populated by a periodic UDP status() call on the SAME slow
+    # cadence (see monitor.py's check_one_slow), not the drawer's own
+    # separate lazy /api/ircddb_status fetch (which stays for the D-STAR
+    # drawer section itself, wanting a more up-to-the-second read when a
+    # user actually opens it). This field exists purely so the card-level
+    # Digital Voice Network Status strip and the drawer's own summary
+    # section have something to show without a live round-trip on every
+    # 3s poll. `None` here means either "no fresh evidence this poll" or
+    # genuinely "not linked" -- unlike ysf_reflector/p25_reflector/
+    # nxdn_reflector's log-tail ambiguity, ircDDBGateway's own status()
+    # call CAN authoritatively report "not linked" on a successful
+    # round-trip; monitor.py only treats a FAILED round-trip as
+    # no-fresh-evidence (carry forward), not a successful one reporting
+    # no reflector.
+    ircddb_reflector: Optional[str] = None
     # WPSD/Pi-Star dashboard update check (checked on a slow background
     # cadence, not every poll -- see config.VERSION_CHECK_INTERVAL).
     # Checks all three WPSD repos (WebCode/Scripts/Binaries); dashboard_version

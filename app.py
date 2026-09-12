@@ -369,6 +369,14 @@ def api_data():
         # live-polled HotspotStatus. None when unset -- renderCards()'s
         # cardNameHref falls back to the bare IP in that case.
         entry["card_url"] = hs.get("card_url")
+        # Static config passthrough for the Digital Voice Network Status
+        # strip's DMR chip -- distinguishes "Brandmeister not configured at
+        # all" (chip hidden) from "configured but no static TG right now"
+        # (chip shown as "not linked"), same reason card_url/type are here
+        # rather than part of the live-polled HotspotStatus. The live data
+        # itself (bm_status_text/bm_static_tgs) was already on the
+        # snapshot -- only this identifier was missing.
+        entry["brandmeister_id"] = hs.get("brandmeister_id")
         # DVSwitch card -- dvswitch_enabled/dvswitch_ports come straight from
         # hotspots.json (static config, same reason type/lat/lon do); the
         # sparkline is the one piece not already on the live snapshot, since

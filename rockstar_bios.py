@@ -441,6 +441,11 @@ BIOS = {
         "blurb": "Folk-rock singer-guitarist whose improvised, thunderous rhythm-guitar performance opened the Woodstock festival in 1969, becoming one of its defining moments.",
         "wiki": "Richie_Havens",
     },
+    "Clark": {
+        "name": "Gene Clark",
+        "blurb": "Founding singer-songwriter of The Byrds, whose jangling 12-string sound and Clark's own harmony-rich songwriting helped define folk rock in the mid-1960s.",
+        "wiki": "Gene_Clark",
+    },
 }
 
 
