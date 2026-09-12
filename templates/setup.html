@@ -1676,9 +1676,12 @@
                     <div><label>Remote control password</label>
                          <input type="text" id="hs-ircddb-password" placeholder="remotePassword from /etc/ircddbgateway"></div>
                     <div><label>Repeater callsign
-                             <span style="font-size:10px;color:var(--text-dim)">(repeaterCall1 — often the callsign plus a trailing module letter, e.g. "W1ZLA D")</span>
+                             <span style="font-size:10px;color:var(--text-dim)">(repeaterCall1 — your callsign plus its D-STAR module letter, often "D")</span>
                          </label>
-                         <input type="text" id="hs-ircddb-callsign" placeholder="e.g. W1ZLA D"></div>
+                         <div style="display:flex;gap:8px">
+                             <input type="text" id="hs-ircddb-callsign-name" placeholder="e.g. W1ZLA" style="flex:1;text-transform:uppercase">
+                             <input type="text" id="hs-ircddb-callsign-module" placeholder="Mod" maxlength="1" style="width:60px;flex:none;text-transform:uppercase">
+                         </div></div>
                 </div>
             </div>
         </div>
@@ -1946,9 +1949,12 @@
             {% for f in ircddb_favorites %}
             <div class="drag-row ddb-fav-row" style="align-items:center">
                 <span style="color:var(--amber);font-size:13px;flex-shrink:0">📡</span>
-                <input type="text" class="ddb-fav-reflector inp"
-                       value="{{ f.reflector }}" placeholder="e.g. REF030 C"
-                       style="width:110px;text-transform:uppercase" maxlength="8">
+                <input type="text" class="ddb-fav-name inp"
+                       value="{{ f.name }}" placeholder="REF030"
+                       style="width:76px;flex:none;text-transform:uppercase" maxlength="7">
+                <input type="text" class="ddb-fav-module inp"
+                       value="{{ f.module }}" placeholder="Mod"
+                       style="width:44px;flex:none;text-transform:uppercase" maxlength="1">
                 <input type="text" class="ddb-fav-label inp"
                        value="{{ f.label }}" placeholder="Label (optional)"
                        style="flex:1">
@@ -2579,6 +2585,25 @@ function saveCardOrder() {
     });
 }
 
+// Every ircDDBGateway address (reflector OR repeater callsign) is really a
+// name + a trailing module letter joined by a single space before being
+// wire-padded to 8 bytes -- see ircddbgateway.py's module docstring. The
+// daemon itself does zero reformatting of what it's sent, so two separate
+// inputs (assembled here) removes the "forgot the space" mistake class
+// entirely instead of trying to parse it back out of one free-text field.
+function buildDstarAddr(name, module) {
+    name = (name || '').trim().toUpperCase();
+    module = (module || '').trim().toUpperCase().slice(0, 1);
+    return module ? (name + ' ' + module) : name;
+}
+function splitDstarAddr(value) {
+    value = (value || '').trim();
+    const idx = value.lastIndexOf(' ');
+    return idx >= 0
+        ? {name: value.slice(0, idx).trim(), module: value.slice(idx + 1).trim()}
+        : {name: value, module: ''};
+}
+
 // --- hotspot form ---
 function submitHotspot(e) {
     document.getElementById('form-name').value    = document.getElementById('hs-name').value;
@@ -2602,7 +2627,10 @@ function submitHotspot(e) {
     document.getElementById('form-ircddb-enabled').checked = document.getElementById('hs-ircddb-enabled').checked;
     document.getElementById('form-ircddb-port').value = document.getElementById('hs-ircddb-port').value;
     document.getElementById('form-ircddb-password').value = document.getElementById('hs-ircddb-password').value;
-    document.getElementById('form-ircddb-callsign').value = document.getElementById('hs-ircddb-callsign').value;
+    document.getElementById('form-ircddb-callsign').value = buildDstarAddr(
+        document.getElementById('hs-ircddb-callsign-name').value,
+        document.getElementById('hs-ircddb-callsign-module').value
+    );
 }
 
 function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, cardUrl, sa818ConfPath, openspot4ExtraPass, enabled, portable, dvswitchEnabled, dvswitchPorts, audioMeterEnabled, ircddbEnabled, ircddbPort, ircddbPassword, ircddbCallsign) {
@@ -2627,7 +2655,9 @@ function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, ca
     document.getElementById('hs-ircddb-enabled').checked = ircddbEnabled === 'True';
     document.getElementById('hs-ircddb-port').value = (ircddbPort && ircddbPort !== 'None') ? ircddbPort : '';
     document.getElementById('hs-ircddb-password').value = (ircddbPassword && ircddbPassword !== 'None') ? ircddbPassword : '';
-    document.getElementById('hs-ircddb-callsign').value = (ircddbCallsign && ircddbCallsign !== 'None') ? ircddbCallsign : '';
+    const ircddbCallsignParts = splitDstarAddr((ircddbCallsign && ircddbCallsign !== 'None') ? ircddbCallsign : '');
+    document.getElementById('hs-ircddb-callsign-name').value   = ircddbCallsignParts.name;
+    document.getElementById('hs-ircddb-callsign-module').value = ircddbCallsignParts.module;
     onHotspotTypeChange();
     onDvswitchToggle();
     onIrcddbToggle();
@@ -2638,7 +2668,7 @@ function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, ca
 }
 
 function clearHotspotForm() {
-    ['hs-id','hs-name','hs-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-card-url','hs-sa818-conf-path','hs-openspot4-extra-pass','hs-dvswitch-ports','hs-ircddb-port','hs-ircddb-password','hs-ircddb-callsign'].forEach(id => document.getElementById(id).value = '');
+    ['hs-id','hs-name','hs-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-card-url','hs-sa818-conf-path','hs-openspot4-extra-pass','hs-dvswitch-ports','hs-ircddb-port','hs-ircddb-password','hs-ircddb-callsign-name','hs-ircddb-callsign-module'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('hs-type').value = 'wpsd';
     document.getElementById('hs-enabled-toggle').classList.add('on');
     document.getElementById('hs-portable-toggle').classList.remove('on');
@@ -2799,7 +2829,10 @@ async function testIrcddb() {
             ip:       document.getElementById('hs-ip').value,
             port:     document.getElementById('hs-ircddb-port').value,
             password: document.getElementById('hs-ircddb-password').value,
-            callsign: document.getElementById('hs-ircddb-callsign').value,
+            callsign: buildDstarAddr(
+                document.getElementById('hs-ircddb-callsign-name').value,
+                document.getElementById('hs-ircddb-callsign-module').value
+            ),
         })
     });
     const data = await r.json();
@@ -2964,8 +2997,10 @@ function addIrcddbFavorite() {
     row.className        = 'drag-row ddb-fav-row';
     row.style.alignItems = 'center';
     row.innerHTML = `<span style="color:var(--amber);font-size:13px;flex-shrink:0">📡</span>
-        <input type="text" class="ddb-fav-reflector inp" placeholder="e.g. REF030 C"
-               style="width:110px;text-transform:uppercase" maxlength="8">
+        <input type="text" class="ddb-fav-name inp" placeholder="REF030"
+               style="width:76px;flex:none;text-transform:uppercase" maxlength="7">
+        <input type="text" class="ddb-fav-module inp" placeholder="Mod"
+               style="width:44px;flex:none;text-transform:uppercase" maxlength="1">
         <input type="text" class="ddb-fav-label inp" placeholder="Label (optional)" style="flex:1">
         <button class="btn btn-danger btn-sm"
                 onclick="this.closest('.ddb-fav-row').remove()">✕</button>`;
@@ -2975,7 +3010,7 @@ function addIrcddbFavorite() {
 function saveIrcddbFavorites() {
     const rows = document.querySelectorAll('#ddb-fav-list .ddb-fav-row');
     const favs = Array.from(rows).map(r => ({
-        reflector: r.querySelector('.ddb-fav-reflector').value.trim().toUpperCase(),
+        reflector: buildDstarAddr(r.querySelector('.ddb-fav-name').value, r.querySelector('.ddb-fav-module').value),
         label:     r.querySelector('.ddb-fav-label').value.trim(),
     })).filter(f => f.reflector);
     fetch('/api/ircddb_favorites', {

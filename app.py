@@ -959,6 +959,26 @@ def api_bm_tg_favorites_post():
     save_bm_tg_favorites(cleaned)
     return jsonify({"ok": True})
 
+def _ircddb_favorites_for_display():
+    """Split each stored favorite's single 'reflector' string (e.g.
+    "REF030 C") into name/module for setup.html's two-input Reflector
+    Favorites rows -- see dashboard.html's buildDstarAddr()/splitDstarAddr()
+    for why every D-STAR address entry point is two fields, not one
+    free-text field (ircDDBGateway itself does zero reformatting of what
+    it's sent, so getting the single space in exactly the right spot was
+    previously entirely on whoever typed it). Storage/API shape stays the
+    single combined string; this split is purely for this one template."""
+    display = []
+    for f in load_ircddb_favorites():
+        reflector = f.get("reflector", "") or ""
+        idx = reflector.rfind(" ")
+        if idx >= 0:
+            name, module = reflector[:idx].strip(), reflector[idx + 1:].strip()
+        else:
+            name, module = reflector, ""
+        display.append({"name": name, "module": module, "label": f.get("label", "")})
+    return display
+
 @app.route("/api/ircddb_favorites", methods=["GET"])
 def api_ircddb_favorites_get():
     return jsonify(load_ircddb_favorites())
@@ -1234,7 +1254,7 @@ def setup():
                            settings=setup_settings, favorites=load_favorites(),
                            cameras=setup_cameras, asl_favorites=load_asl_favorites(),
                            bm_tg_favorites=load_bm_tg_favorites(),
-                           ircddb_favorites=load_ircddb_favorites(),
+                           ircddb_favorites=_ircddb_favorites_for_display(),
                            can_power_control=HOST_CAN_POWER_CONTROL,
                            host_is_standalone=HOST_IS_STANDALONE,
                            overflow_sentinels=_overflow_sentinels(setup_settings, setup_hotspots, setup_cameras),

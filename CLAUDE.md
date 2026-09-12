@@ -5815,6 +5815,101 @@ config for per-integration credentials; put it in
   afterward still correctly appends at the end rather than, say, always
   inserting at the front.
 
+- **D-STAR reflector link/unlink via ircDDBGateway (`ircddbgateway.py`,
+  v4.52-v4.54) -- a rare case in this project where the real protocol
+  source is public (GPLv2, github.com/g4klx/ircDDBGateway), so reading it
+  directly was treated as equivalent to this project's usual "verify
+  against the real thing" discipline, on top of (not instead of) live
+  config confirmation from the user's actual hotspot.** Confirmed live
+  over SSH before writing any code: `sudo grep -A2 -i remote
+  /etc/ircddbgateway` showed `remoteEnabled=1`/`remotePort=10022`/
+  `remotePassword=<password>`, and `sudo ss -ulnp | grep 10022` showed
+  `ircddbgatewayd` itself listening on `0.0.0.0` (LAN-reachable, no SSH
+  tunnel needed) -- confirming this is plain UDP, not the TCP-only shape
+  most of this app's other integrations use. Wire protocol read straight
+  from `Common/RemoteProtocolHandler.cpp`: `LIN` -> `RND`+4-byte random
+  -> `SHA`+SHA256(random+password) -> `ACK`/`NAK` -> then `GRP` (status),
+  `LNK` (link), `UNL` (unlink), or `LOG` (logout). Every callsign/
+  reflector field is a fixed 8-byte `LONG_CALLSIGN_LENGTH` (confirmed
+  against `DStarDefines.h` directly), space-padded, uppercase.
+  - **A WPSD hotspot with ircDDBGateway enabled gets a "D-STAR
+    (ircDDBGateway)" section in its card drawer** (right after
+    Brandmeister Talkgroups, same visual language) -- current reflector
+    link, secondary DExtra/DPlus/DCS/CCS clients, and Link/Unlink
+    actions. Per-hotspot opt-in (`ircddb_enabled`/`ircddb_port`/
+    `ircddb_password`/`ircddb_callsign`), same pattern as DVSwitch/SA818:
+    fields threaded through `/setup`'s POST handler AND
+    `/api/update_hotspot` (kept in sync manually, per this file's own
+    standing warning), a `GET /api/ircddb_status/<id>` fetched lazily
+    when the drawer opens (a live UDP round-trip, not part of the
+    3s-polled `/api/data`), and `POST /api/ircddb_link`/`/api/ircddb_unlink`.
+  - **A real, live-reported bug (v4.52 shipped, confirmed working by the
+    user against their real hotspot the same day): a genuine, confirmed-live
+    reflector link ("REF030 C") that Unlink correctly handled turned out
+    to hide a formatting trap for anyone TYPING a new address.** Fetched
+    `RemoteHandler.cpp`'s `link()` function directly and confirmed it does
+    **zero reformatting** of whatever string it's given -- it forwards the
+    caller's string straight to `repeater->link()`. So the single space
+    between a reflector's name and its module letter (`REF030 C` --
+    8 characters: `R-E-F-0-3-0-<space>-C`, standard across the whole
+    D-STAR ecosystem, not something specific to this daemon) is entirely
+    on whoever typed it; `REF030C` (no space) pads out to `REF030C `
+    (space at the END, wrong field layout) via this client's own `_pad()`
+    -- a real, easy-to-hit mistake with a single free-text field, not
+    hypothetical. **Fixed by not asking anyone to type the space at all**:
+    every D-STAR address entry point in this app (the Link form,
+    Reflector Favorites, and a hotspot's own repeater-callsign setting)
+    is two small fields -- name + module -- assembled into the correct
+    single-space 8-byte string by `buildDstarAddr()`/`splitDstarAddr()`
+    (duplicated once in `dashboard.html` and once in `setup.html`, same
+    "no shared JS between templates" convention as everywhere else in
+    this app). An auto-detecting single-field parser (guess where the
+    module letter starts) was considered and rejected -- reflector names
+    have a reliable shape (3 letters + 3 digits) but ham callsigns don't,
+    so a heuristic split would work for reflectors and silently mis-split
+    plenty of real callsigns; two explicit fields have no ambiguity to
+    guess at. Existing single-string values (`hotspots.json`'s
+    `ircddb_callsign`, `ircddb_favorites.json`'s `reflector`) are still
+    stored as ONE combined string -- only the INPUT UI changed to two
+    fields, splitting the stored value back out via
+    `value.lastIndexOf(' ')` (last space, not a fixed position, since a
+    short compact value like `"W1ZLA D"` is 7 chars, not padded to 8,
+    until `ircddbgateway.py`'s `_pad()` right-pads it at actual send
+    time) -- a malformed legacy value with no space at all just lands
+    entirely in the name field with an empty module field, prompting an
+    obvious fix rather than crashing or silently mis-splitting.
+  - **Reflector Favorites** (`ircddb_favorites.json`, `/api/ircddb_favorites`
+    GET/POST) is the exact same shape/pattern as the pre-existing
+    Brandmeister Talkgroup Favorites (`storage.py`'s `load_bm_tg_favorites`/
+    `save_bm_tg_favorites`) -- managed in Settings -> Favorites, rendered
+    as one-tap quick-link chips at the bottom of the D-STAR drawer
+    section, wired into `/api/export_backup`/`/api/import_backup`
+    (merge-by-reflector, replace mode) the same way. `app._ircddb_favorites_for_display()`
+    splits each stored favorite's single `reflector` string into
+    `name`/`module` purely for setup.html's two-field row template --
+    the storage/API shape itself stays one combined string.
+  - **The card drawer's ircDDBGateway Settings block (port/password/
+    callsign/Test button) collapses to a single "Show connection
+    details" link once all three are already filled in** (v4.53, a direct
+    user ask after confirming the feature worked live) -- the same block
+    that's ASL3's/openSPOT4's per-type settings never needed to collapse,
+    since this one is the first hotspot-settings sub-block with enough
+    fields to feel cluttered once configured. Defaults collapsed only
+    when `port && password && callsign` are ALL already truthy (fresh/
+    partial setup starts expanded, since there's something to actually
+    fill in); a manual toggle always overrides the smart default either
+    way. `setIrcddbDetailsCollapsed()` is the one function both the
+    smart-default logic and the manual toggle button call, so the two
+    can't drift out of sync with each other.
+  - **NOT yet independently verified**: whether ircDDBGateway's `LNK`
+    command needs the reconnect-timer argument to be a specific enum
+    value beyond the 12 `RECONNECT_NAMES` this module already lists (read
+    from the daemon's own source, not guessed) -- the user's live test
+    only exercised Link/Unlink/status with the default "Never" reconnect
+    value. If a non-default reconnect selection is ever reported not
+    working, re-check that argument against the source before assuming
+    the UI is wrong.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

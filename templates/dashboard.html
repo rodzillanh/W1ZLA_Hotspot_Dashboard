@@ -9282,11 +9282,14 @@ function renderHotspotSettingsFields(hs, cfg) {
                 </div>
                 <div class="hs-field">
                     <div class="hs-field-label-row"><label>Repeater callsign</label><span class="hs-field-status" id="hsf-status-ircddbcallsign">✓ Saved</span></div>
-                    <input type="text" id="hsf-ircddbcallsign" placeholder="e.g. W1ZLA D" onblur="saveHotspotField('ircddb_callsign', this.value)">
-                    <div class="hs-help">ircDDBGateway's own configured DV repeater callsign (repeaterCall1) -- often, but not always, the plain callsign plus a trailing module letter.</div>
+                    <div style="display:flex;gap:8px">
+                        <input type="text" id="hsf-ircddbcallsign-name" placeholder="e.g. W1ZLA" style="flex:1;text-transform:uppercase" onblur="saveIrcddbCallsign()">
+                        <input type="text" id="hsf-ircddbcallsign-module" placeholder="Mod" maxlength="1" style="width:50px;flex:none;text-transform:uppercase" onblur="saveIrcddbCallsign()">
+                    </div>
+                    <div class="hs-help">ircDDBGateway's own configured DV repeater callsign (repeaterCall1) -- your callsign plus its D-STAR module letter (repeaterCall1's own trailing letter, often "D").</div>
                 </div>
                 <div class="hs-test-row">
-                    <button class="hs-test-btn" onclick="runHotspotTest(this, 'hs-test-ircddb-result', '/api/test_ircddb', () => ({ip: getVal('hsf-ip'), port: getVal('hsf-ircddbport'), password: getVal('hsf-ircddbpassword'), callsign: getVal('hsf-ircddbcallsign')}))">Test connection</button>
+                    <button class="hs-test-btn" onclick="runHotspotTest(this, 'hs-test-ircddb-result', '/api/test_ircddb', () => ({ip: getVal('hsf-ip'), port: getVal('hsf-ircddbport'), password: getVal('hsf-ircddbpassword'), callsign: buildDstarAddr(getVal('hsf-ircddbcallsign-name'), getVal('hsf-ircddbcallsign-module'))}))">Test connection</button>
                     <span class="hs-test-result" id="hs-test-ircddb-result"></span>
                 </div>
             </div>
@@ -9331,7 +9334,9 @@ function renderHotspotSettingsFields(hs, cfg) {
         setVal('hsf-bmid', cfg.brandmeister_id);
         setVal('hsf-ircddbport', cfg.ircddb_port != null ? cfg.ircddb_port : '');
         setVal('hsf-ircddbpassword', cfg.ircddb_password);
-        setVal('hsf-ircddbcallsign', cfg.ircddb_callsign);
+        const ircddbCallsignParts = splitDstarAddr(cfg.ircddb_callsign);
+        setVal('hsf-ircddbcallsign-name', ircddbCallsignParts.name);
+        setVal('hsf-ircddbcallsign-module', ircddbCallsignParts.module);
         document.getElementById('hsf-ircddb-enabled').classList.toggle('on', !!cfg.ircddb_enabled);
         document.getElementById('hsf-ircddb-fields').style.display = cfg.ircddb_enabled ? '' : 'none';
         // Already has a port, password, and callsign saved -- nothing new
@@ -9392,6 +9397,13 @@ function setIrcddbDetailsCollapsed(collapsed) {
 function toggleIrcddbDetails() {
     const wrap = document.getElementById('hsf-ircddb-detail-fields');
     setIrcddbDetailsCollapsed(wrap.style.display !== 'none');
+}
+
+// The repeater-callsign field is two separate inputs (name + module) --
+// see buildDstarAddr()'s own comment for why -- so either one's blur
+// combines both into the one stored ircddb_callsign value.
+function saveIrcddbCallsign() {
+    saveHotspotField('ircddb_callsign', buildDstarAddr(getVal('hsf-ircddbcallsign-name'), getVal('hsf-ircddbcallsign-module')));
 }
 
 function hsToggleEnabled(el) {
@@ -9640,6 +9652,29 @@ function unlinkTalkgroup(btn) {
 // placeholder rather than read off lastApiData. ---
 const IRCDDB_RECONNECT_LABELS = ["Never", "Fixed", "5 min", "10 min", "15 min", "20 min", "25 min", "30 min", "60 min", "90 min", "120 min", "180 min"];
 
+// Every ircDDBGateway address (reflector OR repeater callsign) is really
+// TWO separate values -- a name and a trailing module letter -- joined by
+// a single space before being wire-padded to 8 bytes (see ircddbgateway.py's
+// module docstring). The daemon itself does zero reformatting of what it's
+// given (confirmed straight from its own source, RemoteHandler.cpp's
+// link()), so getting the space in exactly the right spot was previously
+// entirely on whoever typed it -- easy to get wrong ("REF030C" instead of
+// "REF030 C"). Splitting every entry point into a name field + a module
+// field and assembling the address here removes the mistake at the
+// source instead of trying to guess intent from one free-text field.
+function buildDstarAddr(name, module) {
+    name = (name || '').trim().toUpperCase();
+    module = (module || '').trim().toUpperCase().slice(0, 1);
+    return module ? (name + ' ' + module) : name;
+}
+function splitDstarAddr(value) {
+    value = (value || '').trim();
+    const idx = value.lastIndexOf(' ');
+    return idx >= 0
+        ? {name: value.slice(0, idx).trim(), module: value.slice(idx + 1).trim()}
+        : {name: value, module: ''};
+}
+
 function fetchIrcddbStatus(hotspotId) {
     fetch('/api/ircddb_status/' + encodeURIComponent(hotspotId))
         .then(r => r.json())
@@ -9684,7 +9719,8 @@ function renderIrcddbSection(info) {
         ${primary}
         ${rows || '<div class="hs-empty-note">No active reflector clients.</div>'}
         <div class="hs-tg-quicklink" style="margin-top:${rows ? '10' : '4'}px">
-            <input type="text" id="ddb-link-input" placeholder="Reflector, e.g. REF030 C" maxlength="8">
+            <input type="text" id="ddb-link-name" placeholder="REF030" maxlength="7" style="width:76px;flex:none;text-transform:uppercase">
+            <input type="text" id="ddb-link-module" placeholder="Mod" maxlength="1" style="width:38px;flex:none;text-transform:uppercase">
             <select id="ddb-link-reconnect">
                 ${IRCDDB_RECONNECT_LABELS.map((label, i) => `<option value="${i}"${i === 0 ? ' selected' : ''}>${label}</option>`).join('')}
             </select>
@@ -9695,20 +9731,23 @@ function renderIrcddbSection(info) {
 }
 
 function quickLinkReflector(chipBtn) {
-    document.getElementById('ddb-link-input').value = chipBtn.dataset.reflector;
+    const parts = splitDstarAddr(chipBtn.dataset.reflector);
+    document.getElementById('ddb-link-name').value   = parts.name;
+    document.getElementById('ddb-link-module').value = parts.module;
     linkReflector();
 }
 
 function linkReflector() {
     if (!currentDrawerId) return;
-    const input       = document.getElementById('ddb-link-input');
+    const nameEl      = document.getElementById('ddb-link-name');
+    const moduleEl    = document.getElementById('ddb-link-module');
     const reconnectEl = document.getElementById('ddb-link-reconnect');
     const result      = document.getElementById('ddb-link-result');
     const btn         = document.getElementById('ddb-link-btn');
-    const reflector   = input.value.trim();
-    if (!reflector) {
+    const reflector   = buildDstarAddr(nameEl.value, moduleEl.value);
+    if (!nameEl.value.trim() || !moduleEl.value.trim()) {
         result.className = 'hs-test-result fail';
-        result.textContent = '✕ Enter a reflector (e.g. REF030 C)';
+        result.textContent = '✕ Enter both a reflector (e.g. REF030) and a module (e.g. C)';
         return;
     }
     btn.disabled = true;

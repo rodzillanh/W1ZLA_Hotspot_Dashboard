@@ -426,6 +426,11 @@ BIOS = {
         "blurb": "New York Dolls and Heartbreakers guitarist whose sloppy, sneering riffs on \"Personality Crisis\" and \"Chinese Rocks\" made him a foundational figure of proto-punk.",
         "wiki": "Johnny_Thunders",
     },
+    "Chapin": {
+        "name": "Harry Chapin",
+        "blurb": "Storytelling singer-songwriter behind \"Cat's in the Cradle\" and \"Taxi\", killed in a highway collision in 1981 while driving to a benefit concert.",
+        "wiki": "Harry_Chapin",
+    },
 }
 
 

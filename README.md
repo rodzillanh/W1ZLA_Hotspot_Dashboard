@@ -606,9 +606,18 @@ To enable it for a hotspot:
 2. In this dashboard's Settings → Hotspots, edit that WPSD hotspot and
    check **"This node runs ircDDBGateway (D-Star)"**. Enter the port,
    password, and the repeater callsign ircDDBGateway is configured with
-   (its own `repeaterCall1` — often, but not always, your callsign plus
-   a trailing module letter, e.g. `W1ZLA D`).
+   (its own `repeaterCall1` — your callsign plus its D-STAR module
+   letter, entered as two separate boxes, e.g. `W1ZLA` + `D`).
 3. Click **Test connection** to confirm the dashboard can log in.
+
+Every reflector/callsign field in this feature (the Link form, Reflector
+Favorites, and this repeater-callsign setting) is entered as two small
+boxes — a name and a module letter — rather than one combined text field.
+That's deliberate: ircDDBGateway does no reformatting of what it's sent,
+so a reflector typed as `REF030C` instead of `REF030 C` (exactly one
+space before the module letter) fails silently. Splitting entry into two
+boxes removes that mistake entirely instead of asking you to remember
+the space.
 
 Once it's working, that Settings block collapses to a single "Show
 connection details" link so it doesn't clutter the drawer — click it any
