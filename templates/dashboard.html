@@ -2444,6 +2444,12 @@
             color: var(--text-dim); font-family: inherit; font-size: 11px; cursor: pointer;
         }
         .hs-collapse-toggle:hover { color: var(--text-muted); }
+        /* The drawer's own top-level "Settings" section title doubles as a
+           collapse toggle -- see toggleHsSettingsCollapsed(). Keeps the
+           section title's existing look (it's still a .hs-drawer-section-title
+           child), just clickable. */
+        .hs-settings-collapse-toggle { cursor: pointer; user-select: none; }
+        .hs-settings-collapse-toggle:hover { color: var(--text-muted); }
         .hs-test-row { display: flex; align-items: center; gap: 8px; margin: 2px 0 12px; }
         .hs-test-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; cursor: pointer; white-space: nowrap; }
         .hs-test-btn:hover { color: var(--text); border-color: var(--text-dim); }
@@ -9100,7 +9106,7 @@ function openHotspotDrawer(hotspotId) {
         </div>
         <div class="hs-drawer-body">
             <div class="hs-drawer-section-title" style="margin-top:2px;justify-content:space-between">
-                <span>Settings</span>
+                <span class="hs-settings-collapse-toggle" onclick="toggleHsSettingsCollapsed()"><span id="hs-settings-chevron">▾</span> Settings</span>
                 <a class="hs-settings-link" href="/setup#hotspots">Open in full Settings →</a>
             </div>
             <div class="hs-field-block" id="hs-settings-fields"><div class="hs-empty-note">Loading…</div></div>
@@ -9115,6 +9121,7 @@ function openHotspotDrawer(hotspotId) {
     closeAllDrawers();
     document.getElementById('hs-drawer').classList.add('open');
     document.getElementById('hs-drawer-backdrop').classList.add('open');
+    setHsSettingsCollapsed(loadHsSettingsCollapsed());
 
     fetch('/api/hotspot_config/' + encodeURIComponent(hotspotId))
         .then(r => r.json())
@@ -9131,6 +9138,38 @@ function openHotspotDrawer(hotspotId) {
     if (hs.ircddb_enabled) {
         fetchIrcddbStatus(hotspotId);
     }
+}
+
+// Collapses the hotspot drawer's whole Settings block (Name/IP/SSH/lat-lon/
+// per-type fields/Enabled/Portable) -- same instinct as the ircDDBGateway
+// connection-details sub-block collapsing once configured (see
+// setIrcddbDetailsCollapsed()), just for the drawer's own top-level
+// Settings section this time, and for every hotspot type, not one field
+// group. Persisted per-browser in localStorage (same "per-viewer
+// convenience, not synced app state" posture as the map style/grey line
+// toggles elsewhere) rather than reset every time the drawer reopens --
+// wrapped in try/catch since localStorage can throw in a private window
+// or with site data blocked, same defensive pattern used everywhere else
+// this app touches it.
+function loadHsSettingsCollapsed() {
+    try {
+        return localStorage.getItem('hsDrawerSettingsCollapsed') !== 'false';
+    } catch (e) {
+        return true;
+    }
+}
+function setHsSettingsCollapsed(collapsed) {
+    const block = document.getElementById('hs-settings-fields');
+    const chevron = document.getElementById('hs-settings-chevron');
+    if (!block || !chevron) return;
+    block.style.display = collapsed ? 'none' : '';
+    chevron.textContent = collapsed ? '▸' : '▾';
+    try {
+        localStorage.setItem('hsDrawerSettingsCollapsed', collapsed ? 'true' : 'false');
+    } catch (e) {}
+}
+function toggleHsSettingsCollapsed() {
+    setHsSettingsCollapsed(document.getElementById('hs-settings-fields').style.display !== 'none');
 }
 
 // Builds the type-specific Settings fields (WPSD / ASL3 / openSPOT4) into

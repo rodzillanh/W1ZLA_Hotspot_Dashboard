@@ -5910,6 +5910,36 @@ config for per-integration credentials; put it in
     working, re-check that argument against the source before assuming
     the UI is wrong.
 
+- **The hotspot card drawer's whole top-level Settings block (Name/IP/
+  SSH or device credentials/lat-lon/per-type fields/Enabled/Portable)
+  collapses too (v4.55) -- a direct follow-up ask right after the
+  ircDDBGateway connection-details sub-block got the same treatment
+  ("just as we added the functionality to collapse the ircddbgateway
+  settings... it would be nice to collapse the hotspot settings... for
+  all hotspot types").** Same shape as `setIrcddbDetailsCollapsed()`
+  (`toggleHsSettingsCollapsed()`/`setHsSettingsCollapsed()`/
+  `loadHsSettingsCollapsed()`), but ONE LEVEL UP -- the whole
+  `#hs-settings-fields` block, not one field sub-group -- and, unlike the
+  ircDDBGateway block's "smart default" (collapsed only once every field
+  is already filled in), this one is unconditionally collapsed by
+  default every time, since Name/IP/credentials are essentially always
+  already populated for an existing hotspot -- there's no meaningful
+  "still mid-setup, leave it open" case to detect the way there was for
+  a freshly-enabled optional integration. Persisted in `localStorage`
+  (`hsDrawerSettingsCollapsed`) rather than reset every time the drawer
+  reopens -- a single global preference across every hotspot's drawer
+  (not per-hotspot), same "per-viewer convenience" posture as the map
+  style/grey line toggles elsewhere in this app. The "Settings" title
+  itself is the click target (a `▸`/`▾` chevron prefix, toggled via
+  `.hs-settings-collapse-toggle`'s `onclick`) rather than a separate
+  button, to avoid crowding the title row that already has an "Open in
+  full Settings →" link on the right. Verified live with Playwright
+  across TWO different hotspot types (WPSD and ASL3) in one run: default
+  collapsed on first open, expands on click, the expanded choice survives
+  closing and reopening the SAME drawer, and survives switching to a
+  DIFFERENT hotspot's drawer too (confirming the preference is global,
+  not accidentally scoped to one hotspot id).
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

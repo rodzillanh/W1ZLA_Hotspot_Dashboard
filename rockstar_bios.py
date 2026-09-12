@@ -431,6 +431,11 @@ BIOS = {
         "blurb": "Storytelling singer-songwriter behind \"Cat's in the Cradle\" and \"Taxi\", killed in a highway collision in 1981 while driving to a benefit concert.",
         "wiki": "Harry_Chapin",
     },
+    "Vega": {
+        "name": "Alan Vega",
+        "blurb": "Frontman of Suicide, whose stripped-down synth-and-drum-machine sound and confrontational live shows made them a foundational, decade-ahead influence on punk and industrial music.",
+        "wiki": "Alan_Vega",
+    },
 }
 
 
