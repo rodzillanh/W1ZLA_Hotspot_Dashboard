@@ -2176,12 +2176,23 @@ def api_brandmeister_talkgroup():
         slot = int(data.get("slot"))
     except (TypeError, ValueError):
         return jsonify({"success": False, "message": "Invalid talkgroup number"}), 400
-    if slot not in (1, 2):
-        return jsonify({"success": False, "message": "Slot must be 1 or 2"}), 400
 
     if action == "link":
+        # Our own Link form only ever offers TS1/TS2 (see the drawer's
+        # <select>), so this is validating a malformed request, not
+        # something Brandmeister itself would reject.
+        if slot not in (1, 2):
+            return jsonify({"success": False, "message": "Slot must be 1 or 2"}), 400
         ok, message = bm_write_client.set_static_talkgroup(bm_id, tg, slot, api_key)
     elif action == "unlink":
+        # Deliberately NOT range-checked -- real, reported bug: Brandmeister
+        # itself reports slot 0 for some static talkgroups (e.g. ones
+        # configured through its own self-care portal rather than this
+        # app's Link button, or Wide/USA Bridge-style TGs), and rejecting
+        # that here made Unlink on those rows silently fail every time
+        # (the frontend didn't surface the message either -- fixed
+        # alongside this). Unlink must accept whatever slot value
+        # Brandmeister is already showing us for the entry.
         ok, message = bm_write_client.remove_static_talkgroup(bm_id, tg, slot, api_key)
     else:
         return jsonify({"success": False, "message": "Invalid action"}), 400

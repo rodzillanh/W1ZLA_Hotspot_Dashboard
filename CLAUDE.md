@@ -4154,6 +4154,35 @@ config for per-integration credentials; put it in
     actually wants fixed-channel remote retargeting AND is willing to
     configure Dynamic Rewrite Rules first -- don't build speculatively
     against a hotspot with none configured.
+- **A real, reported bug: the Brandmeister Talkgroups drawer's Unlink
+  button silently did nothing on some rows.** Root cause: Brandmeister's
+  `GET device/{id}/talkgroup` genuinely returns `slot: 0` for some static
+  talkgroups (confirmed live on a real account -- wide-area bridge TGs
+  like a "World Wide"/"USA Bridge" entry, evidently configured through
+  Brandmeister's own self-care portal rather than this app's Link button,
+  which only ever writes slot 1 or 2). `/api/brandmeister_talkgroup`
+  applied the SAME `slot not in (1, 2)` guard to both `link` and
+  `unlink`, so any Unlink on a slot-0 row got rejected with a 400 before
+  ever reaching `remove_static_talkgroup()` -- and `unlinkTalkgroup()` in
+  dashboard.html never surfaced `data.message` on failure (unlike
+  `linkTalkgroup()`, which does), so the button just silently reverted
+  to "Unlink" with zero indication anything went wrong. Compounding it:
+  `String(0)` is `"0"`, and `"0"` is truthy in JS, so the row's `TS0`
+  badge rendered fine (`${slot ? ... : ''}`) even though the underlying
+  value looked like it should be "falsy" at a glance -- don't assume a
+  displayed `TS0` badge means the slot value is anything other than a
+  real, meaningful `0`. Fixed by scoping the range check to `link` only
+  (the only action whose value originates from this app's own TS1/TS2
+  `<select>`) and letting `unlink` pass through whatever slot Brandmeister
+  already has on file for that exact entry -- plus fixing the silent
+  frontend failure so a future rejection (bad API key, Brandmeister
+  itself erroring) actually shows a message instead of just reverting.
+  Verified live with `test_client()` + a mocked Brandmeister write call:
+  unlink with `slot=0` now succeeds and calls
+  `remove_static_talkgroup(id, tg, 0, key)`; link with `slot=0` is still
+  correctly rejected (our own UI can never produce it); a forced unlink
+  failure now round-trips its real message to the response instead of a
+  bare `{success: false}`.
 
 - **The Awards / DXCC progress card (v3.78) was built, then removed
   outright in v3.80 -- a product/taste call, not a technical failure.**

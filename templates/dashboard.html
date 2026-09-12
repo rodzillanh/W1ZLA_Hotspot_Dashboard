@@ -9489,7 +9489,13 @@ function quickLinkTalkgroup(chipBtn) {
 function unlinkTalkgroup(btn) {
     if (!currentDrawerId) return;
     const tg   = btn.dataset.tg;
+    // "0" is a real, reported value here -- Brandmeister itself reports
+    // slot 0 for some static talkgroups (ones configured via its own
+    // self-care portal rather than this app's Link button), and "0" is
+    // truthy as a JS string, so don't second-guess it -- send exactly
+    // what the row was rendered with.
     const slot = btn.dataset.slot;
+    const result = document.getElementById('tg-link-result');
     btn.disabled = true;
     btn.textContent = 'Unlinking…';
     fetch('/api/brandmeister_talkgroup', {
@@ -9506,11 +9512,23 @@ function unlinkTalkgroup(btn) {
             } else {
                 btn.disabled = false;
                 btn.textContent = 'Unlink';
+                // Previously silent -- an unlink failure (e.g. a stale API
+                // key, or Brandmeister itself rejecting the request) gave
+                // no indication anything went wrong beyond the button
+                // reverting. Surface it the same way linkTalkgroup() does.
+                if (result) {
+                    result.className = 'hs-test-result fail';
+                    result.textContent = '✕ ' + (data.message || 'Unlink failed');
+                }
             }
         })
         .catch(() => {
             btn.disabled = false;
             btn.textContent = 'Unlink';
+            if (result) {
+                result.className = 'hs-test-result fail';
+                result.textContent = '✕ Request failed';
+            }
         });
 }
 
