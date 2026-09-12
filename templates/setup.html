@@ -1593,7 +1593,11 @@
                         data-dvswitch-enabled="{{ hs.get('dvswitch_enabled', False) }}"
                         data-dvswitch-ports="{{ hs.get('dvswitch_ports', '') }}"
                         data-audio-meter-enabled="{{ hs.get('audio_meter_enabled', False) }}"
-                        onclick="editHotspot(this.dataset.id, this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.cardUrl, this.dataset.sa818ConfPath, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.portable, this.dataset.dvswitchEnabled, this.dataset.dvswitchPorts, this.dataset.audioMeterEnabled)">
+                        data-ircddb-enabled="{{ hs.get('ircddb_enabled', False) }}"
+                        data-ircddb-port="{{ hs.get('ircddb_port', '') }}"
+                        data-ircddb-password="{{ hs.get('ircddb_password', '') }}"
+                        data-ircddb-callsign="{{ hs.get('ircddb_callsign', '') }}"
+                        onclick="editHotspot(this.dataset.id, this.dataset.name, this.dataset.ip, this.dataset.user, this.dataset.pass, this.dataset.lat, this.dataset.lon, this.dataset.bmid, this.dataset.type, this.dataset.aslNode, this.dataset.cardUrl, this.dataset.sa818ConfPath, this.dataset.openspot4ExtraPass, this.dataset.enabled, this.dataset.portable, this.dataset.dvswitchEnabled, this.dataset.dvswitchPorts, this.dataset.audioMeterEnabled, this.dataset.ircddbEnabled, this.dataset.ircddbPort, this.dataset.ircddbPassword, this.dataset.ircddbCallsign)">
                     Edit
                 </button>
                 <form action="/api/delete_hotspot/{{ hs.id }}" method="POST" style="margin:0">
@@ -1655,6 +1659,29 @@
                  </label>
                  <input type="text" id="hs-bmid" placeholder="e.g. 3101234"></div>
         </div>
+        <div class="form-grid" style="margin-bottom:10px" id="hs-ircddb-fields">
+            <div style="grid-column:1/-1;display:flex;align-items:center">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="hs-ircddb-enabled" onchange="onIrcddbToggle()">
+                    This node runs ircDDBGateway (D-STAR)
+                    <span style="font-size:10px;color:var(--text-dim)">(link/unlink D-STAR reflectors from this hotspot's own card drawer)</span>
+                </label>
+            </div>
+            <div style="grid-column:1/-1;display:none" id="hs-ircddb-detail-wrap">
+                <div class="form-grid" style="margin:0">
+                    <div><label>ircDDBGateway port
+                             <span style="font-size:10px;color:var(--text-dim)">(remotePort in /etc/ircddbgateway — defaults to 54321)</span>
+                         </label>
+                         <input type="text" id="hs-ircddb-port" placeholder="54321"></div>
+                    <div><label>Remote control password</label>
+                         <input type="text" id="hs-ircddb-password" placeholder="remotePassword from /etc/ircddbgateway"></div>
+                    <div><label>Repeater callsign
+                             <span style="font-size:10px;color:var(--text-dim)">(repeaterCall1 — often the callsign plus a trailing module letter, e.g. "W1ZLA D")</span>
+                         </label>
+                         <input type="text" id="hs-ircddb-callsign" placeholder="e.g. W1ZLA D"></div>
+                </div>
+            </div>
+        </div>
         <div class="form-grid" style="margin-bottom:10px;display:none" id="hs-asl-fields">
             <div><label>ASL node number
                      <span style="font-size:10px;color:var(--text-dim)">(this node's own AllStarLink node number)</span>
@@ -1711,6 +1738,7 @@
             <button class="btn btn-info" id="hs-test-bmid-btn" onclick="testBrandmeister()">Test Brandmeister ID</button>
             <button class="btn btn-info" id="hs-test-aslnode-btn" style="display:none" onclick="testAslNode()">Test ASL node</button>
             <button class="btn btn-info" id="hs-test-openspot4-btn" style="display:none" onclick="testOpenSpot4()">Test openSPOT4</button>
+            <button class="btn btn-info" id="hs-test-ircddb-btn" style="display:none" onclick="testIrcddb()">Test ircDDBGateway</button>
             <form method="POST" style="margin:0">
                 <input type="hidden" name="name" id="form-name">
                 <input type="hidden" name="ip"   id="form-ip">
@@ -1730,6 +1758,10 @@
                 <input type="checkbox" name="dvswitch_enabled" id="form-dvswitch-enabled" style="display:none">
                 <input type="hidden" name="dvswitch_ports" id="form-dvswitch-ports">
                 <input type="checkbox" name="audio_meter_enabled" id="form-audio-meter-enabled" style="display:none">
+                <input type="checkbox" name="ircddb_enabled" id="form-ircddb-enabled" style="display:none">
+                <input type="hidden" name="ircddb_port" id="form-ircddb-port">
+                <input type="hidden" name="ircddb_password" id="form-ircddb-password">
+                <input type="hidden" name="ircddb_callsign" id="form-ircddb-callsign">
                 <button class="btn btn-primary" onclick="submitHotspot(event)">Save hotspot</button>
             </form>
             <button class="btn btn-danger btn-sm" onclick="clearHotspotForm()" style="margin-left:auto">Clear</button>
@@ -2524,9 +2556,13 @@ function submitHotspot(e) {
     document.getElementById('form-dvswitch-enabled').checked = document.getElementById('hs-dvswitch-enabled').checked;
     document.getElementById('form-dvswitch-ports').value = document.getElementById('hs-dvswitch-ports').value;
     document.getElementById('form-audio-meter-enabled').checked = document.getElementById('hs-audio-meter-enabled').checked;
+    document.getElementById('form-ircddb-enabled').checked = document.getElementById('hs-ircddb-enabled').checked;
+    document.getElementById('form-ircddb-port').value = document.getElementById('hs-ircddb-port').value;
+    document.getElementById('form-ircddb-password').value = document.getElementById('hs-ircddb-password').value;
+    document.getElementById('form-ircddb-callsign').value = document.getElementById('hs-ircddb-callsign').value;
 }
 
-function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, cardUrl, sa818ConfPath, openspot4ExtraPass, enabled, portable, dvswitchEnabled, dvswitchPorts, audioMeterEnabled) {
+function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, cardUrl, sa818ConfPath, openspot4ExtraPass, enabled, portable, dvswitchEnabled, dvswitchPorts, audioMeterEnabled, ircddbEnabled, ircddbPort, ircddbPassword, ircddbCallsign) {
     document.getElementById('hs-id').value      = id;
     document.getElementById('hs-name').value    = name;
     document.getElementById('hs-ip').value      = ip;
@@ -2545,8 +2581,13 @@ function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, ca
     document.getElementById('hs-dvswitch-enabled').checked = dvswitchEnabled === 'True';
     document.getElementById('hs-dvswitch-ports').value = (dvswitchPorts && dvswitchPorts !== 'None') ? dvswitchPorts : '';
     document.getElementById('hs-audio-meter-enabled').checked = audioMeterEnabled === 'True';
+    document.getElementById('hs-ircddb-enabled').checked = ircddbEnabled === 'True';
+    document.getElementById('hs-ircddb-port').value = (ircddbPort && ircddbPort !== 'None') ? ircddbPort : '';
+    document.getElementById('hs-ircddb-password').value = (ircddbPassword && ircddbPassword !== 'None') ? ircddbPassword : '';
+    document.getElementById('hs-ircddb-callsign').value = (ircddbCallsign && ircddbCallsign !== 'None') ? ircddbCallsign : '';
     onHotspotTypeChange();
     onDvswitchToggle();
+    onIrcddbToggle();
     resetHsPasswordVisibility();
     document.getElementById('hotspot-form-title').textContent = 'Edit hotspot';
     document.getElementById('hs-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2554,14 +2595,16 @@ function editHotspot(id, name, ip, user, pass, lat, lon, bmid, type, aslNode, ca
 }
 
 function clearHotspotForm() {
-    ['hs-id','hs-name','hs-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-card-url','hs-sa818-conf-path','hs-openspot4-extra-pass','hs-dvswitch-ports'].forEach(id => document.getElementById(id).value = '');
+    ['hs-id','hs-name','hs-ip','hs-user','hs-pass','hs-lat','hs-lon','hs-bmid','hs-aslnode','hs-card-url','hs-sa818-conf-path','hs-openspot4-extra-pass','hs-dvswitch-ports','hs-ircddb-port','hs-ircddb-password','hs-ircddb-callsign'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('hs-type').value = 'wpsd';
     document.getElementById('hs-enabled-toggle').classList.add('on');
     document.getElementById('hs-portable-toggle').classList.remove('on');
     document.getElementById('hs-dvswitch-enabled').checked = false;
     document.getElementById('hs-audio-meter-enabled').checked = false;
+    document.getElementById('hs-ircddb-enabled').checked = false;
     onHotspotTypeChange();
     onDvswitchToggle();
+    onIrcddbToggle();
     resetHsPasswordVisibility();
     document.getElementById('hotspot-form-title').textContent = 'Add hotspot';
     document.getElementById('test-result').textContent = '';
@@ -2605,6 +2648,9 @@ function onHotspotTypeChange() {
     // Brandmeister ID is valid for wpsd AND openspot4 (both are DMR devices) --
     // only asl3 has no use for it.
     document.getElementById('hs-bmid-fields').style.display        = isAsl ? 'none' : '';
+    // ircDDBGateway is WPSD-only -- neither ASL3 (no D-STAR concept) nor
+    // openSPOT4 (its own, non-SSH remote control) run it.
+    document.getElementById('hs-ircddb-fields').style.display      = (isAsl || isOpenSpot4) ? 'none' : '';
     document.getElementById('hs-asl-fields').style.display         = isAsl ? '' : 'none';
     document.getElementById('hs-openspot4-fields').style.display   = isOpenSpot4 ? '' : 'none';
     document.getElementById('hs-user-wrap').style.display          = isOpenSpot4 ? 'none' : '';
@@ -2613,6 +2659,16 @@ function onHotspotTypeChange() {
     document.getElementById('hs-test-bmid-btn').style.display      = isAsl ? 'none' : '';
     document.getElementById('hs-test-aslnode-btn').style.display    = isAsl ? '' : 'none';
     document.getElementById('hs-test-openspot4-btn').style.display  = isOpenSpot4 ? '' : 'none';
+    document.getElementById('hs-test-ircddb-btn').style.display     = (!isAsl && !isOpenSpot4 && document.getElementById('hs-ircddb-enabled').checked) ? '' : 'none';
+}
+
+// Shows/hides the ircDDBGateway port/password/callsign fields alongside
+// the checkbox that gates them -- same nested-toggle shape as
+// onDvswitchToggle() above.
+function onIrcddbToggle() {
+    const on = document.getElementById('hs-ircddb-enabled').checked;
+    document.getElementById('hs-ircddb-detail-wrap').style.display = on ? '' : 'none';
+    onHotspotTypeChange();
 }
 
 // --- connection test ---
@@ -2682,6 +2738,25 @@ async function testAslNode() {
             user:     document.getElementById('hs-user').value,
             pass:     document.getElementById('hs-pass').value,
             asl_node: node,
+        })
+    });
+    const data = await r.json();
+    res.textContent = data.success ? '✓ ' + data.message : '✕ Failed: ' + data.message;
+    res.className   = data.success ? 'ok' : 'err';
+}
+
+async function testIrcddb() {
+    const res = document.getElementById('test-result');
+    res.textContent = 'Testing...';
+    res.className   = '';
+    const r = await fetch('/api/test_ircddb', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            ip:       document.getElementById('hs-ip').value,
+            port:     document.getElementById('hs-ircddb-port').value,
+            password: document.getElementById('hs-ircddb-password').value,
+            callsign: document.getElementById('hs-ircddb-callsign').value,
         })
     });
     const data = await r.json();

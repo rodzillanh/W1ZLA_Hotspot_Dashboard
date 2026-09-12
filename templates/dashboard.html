@@ -8973,6 +8973,21 @@ function openHotspotDrawer(hotspotId) {
         }
     }
 
+    // D-STAR reflector link/unlink via this hotspot's own ircDDBGateway --
+    // WPSD-only, opt-in (hs.ircddb_enabled is a static-config passthrough
+    // from /api/data, see app.py). The actual link state is a live UDP
+    // round-trip (ircddbgateway.py), not part of this 3s-polled snapshot,
+    // so this just renders a loading placeholder and kicks off
+    // fetchIrcddbStatus() below once the drawer is actually in the DOM.
+    let ircddbHtml = '';
+    if (!isAsl && !isOpenSpot4 && hs.ircddb_enabled) {
+        ircddbHtml = `
+        <div class="hs-drawer-section" id="ircddb-section">
+            <div class="hs-drawer-section-title">D-STAR (ircDDBGateway)</div>
+            <div class="hs-empty-note">Loading…</div>
+        </div>`;
+    }
+
     let updateHtml = '';
     if (!isAsl && !isOpenSpot4 && hs.dashboard_update_available !== null && hs.dashboard_update_available !== undefined) {
         updateHtml = `
@@ -9084,6 +9099,7 @@ function openHotspotDrawer(hotspotId) {
             ${linkedHtml}
             ${sa818Html}
             ${bmHtml}
+            ${ircddbHtml}
             ${updateHtml}
             ${openspot4Html}
         </div>`;
@@ -9102,6 +9118,10 @@ function openHotspotDrawer(hotspotId) {
             const el = document.getElementById('hs-settings-fields');
             if (el) el.innerHTML = '<div class="hs-empty-note">Couldn\'t load settings for this hotspot.</div>';
         });
+
+    if (hs.ircddb_enabled) {
+        fetchIrcddbStatus(hotspotId);
+    }
 }
 
 // Builds the type-specific Settings fields (WPSD / ASL3 / openSPOT4) into
@@ -9231,6 +9251,33 @@ function renderHotspotSettingsFields(hs, cfg) {
         <div class="hs-test-row">
             <button class="hs-test-btn" onclick="runHotspotTest(this, 'hs-test-bm-result', '/api/test_brandmeister', () => ({repeater_id: getVal('hsf-bmid')}))">Test Brandmeister ID</button>
             <span class="hs-test-result" id="hs-test-bm-result"></span>
+        </div>
+        <div class="hs-toggle-row">
+            <span class="hs-toggle-label">D-STAR link/unlink (ircDDBGateway)</span>
+            <div class="hs-switch" id="hsf-ircddb-enabled" onclick="hsToggleIrcddb(this)"></div>
+        </div>
+        <div id="hsf-ircddb-fields">
+            <div class="hs-field">
+                <div class="hs-field-label-row"><label>ircDDBGateway port</label><span class="hs-field-status" id="hsf-status-ircddbport">✓ Saved</span></div>
+                <input type="text" id="hsf-ircddbport" placeholder="defaults to 54321" onblur="saveHotspotField('ircddb_port', this.value)">
+            </div>
+            <div class="hs-field">
+                <div class="hs-field-label-row"><label>Remote control password</label><span class="hs-field-status" id="hsf-status-ircddbpassword">✓ Saved</span></div>
+                <div class="hs-pw-wrap">
+                    <input type="password" id="hsf-ircddbpassword" onblur="saveHotspotField('ircddb_password', this.value)">
+                    <button class="hs-pw-toggle" onclick="hsTogglePw('hsf-ircddbpassword')">👁</button>
+                </div>
+                <div class="hs-help">/etc/ircddbgateway's own remotePassword -- <code>sudo grep -A2 -i remote /etc/ircddbgateway</code> on this hotspot.</div>
+            </div>
+            <div class="hs-field">
+                <div class="hs-field-label-row"><label>Repeater callsign</label><span class="hs-field-status" id="hsf-status-ircddbcallsign">✓ Saved</span></div>
+                <input type="text" id="hsf-ircddbcallsign" placeholder="e.g. W1ZLA D" onblur="saveHotspotField('ircddb_callsign', this.value)">
+                <div class="hs-help">ircDDBGateway's own configured DV repeater callsign (repeaterCall1) -- often, but not always, the plain callsign plus a trailing module letter.</div>
+            </div>
+            <div class="hs-test-row">
+                <button class="hs-test-btn" onclick="runHotspotTest(this, 'hs-test-ircddb-result', '/api/test_ircddb', () => ({ip: getVal('hsf-ip'), port: getVal('hsf-ircddbport'), password: getVal('hsf-ircddbpassword'), callsign: getVal('hsf-ircddbcallsign')}))">Test connection</button>
+                <span class="hs-test-result" id="hs-test-ircddb-result"></span>
+            </div>
         </div>`;
     }
 
@@ -9270,6 +9317,11 @@ function renderHotspotSettingsFields(hs, cfg) {
         setVal('hsf-os4extra', cfg.openspot4_extra_pass);
     } else {
         setVal('hsf-bmid', cfg.brandmeister_id);
+        setVal('hsf-ircddbport', cfg.ircddb_port != null ? cfg.ircddb_port : '');
+        setVal('hsf-ircddbpassword', cfg.ircddb_password);
+        setVal('hsf-ircddbcallsign', cfg.ircddb_callsign);
+        document.getElementById('hsf-ircddb-enabled').classList.toggle('on', !!cfg.ircddb_enabled);
+        document.getElementById('hsf-ircddb-fields').style.display = cfg.ircddb_enabled ? '' : 'none';
     }
     document.getElementById('hsf-enabled').classList.toggle('on', cfg.enabled !== false);
     document.getElementById('hsf-portable').classList.toggle('on', !!cfg.portable);
@@ -9294,6 +9346,13 @@ function hsToggleDvswitch(el) {
     const on = el.classList.contains('on');
     document.getElementById('hsf-dvports-field').style.display = on ? '' : 'none';
     saveHotspotField('dvswitch_enabled', on);
+}
+
+function hsToggleIrcddb(el) {
+    el.classList.toggle('on');
+    const on = el.classList.contains('on');
+    document.getElementById('hsf-ircddb-fields').style.display = on ? '' : 'none';
+    saveHotspotField('ircddb_enabled', on);
 }
 
 function hsToggleEnabled(el) {
@@ -9344,6 +9403,9 @@ function flashFieldStatus(field, ok, message) {
         : field === 'asl_node' ? 'aslnode'
         : field === 'card_url' ? 'cardurl'
         : field === 'sa818_conf_path' ? 'sa818confpath'
+        : field === 'ircddb_port' ? 'ircddbport'
+        : field === 'ircddb_password' ? 'ircddbpassword'
+        : field === 'ircddb_callsign' ? 'ircddbcallsign'
         : field;
     const span = document.getElementById('hsf-status-' + key);
     if (!span) return;
@@ -9516,6 +9578,137 @@ function unlinkTalkgroup(btn) {
                 // key, or Brandmeister itself rejecting the request) gave
                 // no indication anything went wrong beyond the button
                 // reverting. Surface it the same way linkTalkgroup() does.
+                if (result) {
+                    result.className = 'hs-test-result fail';
+                    result.textContent = '✕ ' + (data.message || 'Unlink failed');
+                }
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.textContent = 'Unlink';
+            if (result) {
+                result.className = 'hs-test-result fail';
+                result.textContent = '✕ Request failed';
+            }
+        });
+}
+
+// --- D-STAR reflector link/unlink via ircDDBGateway (hotspot card
+// drawer) -- same shape as the Brandmeister talkgroup block above, but
+// the link state is a live UDP round-trip (ircddbgateway.py), not part
+// of the 3s-polled snapshot, so it's fetched into its own #ircddb-section
+// placeholder rather than read off lastApiData. ---
+const IRCDDB_RECONNECT_LABELS = ["Never", "Fixed", "5 min", "10 min", "15 min", "20 min", "25 min", "30 min", "60 min", "90 min", "120 min", "180 min"];
+
+function fetchIrcddbStatus(hotspotId) {
+    fetch('/api/ircddb_status/' + encodeURIComponent(hotspotId))
+        .then(r => r.json())
+        .then(info => {
+            if (currentDrawerId !== hotspotId) return; // drawer moved on / closed before this resolved
+            renderIrcddbSection(info);
+        })
+        .catch(() => {
+            if (currentDrawerId !== hotspotId) return;
+            renderIrcddbSection({connected: false});
+        });
+}
+
+function renderIrcddbSection(info) {
+    const el = document.getElementById('ircddb-section');
+    if (!el) return;
+    if (!info || !info.connected) {
+        el.innerHTML = `
+            <div class="hs-drawer-section-title">D-STAR (ircDDBGateway)</div>
+            <div class="hs-empty-note">Can't reach ircDDBGateway on this hotspot right now (check host/port/password/callsign in Settings).</div>
+            <div class="hs-test-row"><button class="hs-test-btn" onclick="fetchIrcddbStatus(currentDrawerId)">Retry</button></div>`;
+        return;
+    }
+    const links = info.links || [];
+    const rows = links.map(l => `
+        <div class="hs-tg-row">
+            <span class="hs-tg-dot" style="background:${l.linked ? 'var(--live)' : 'var(--text-dim)'}"></span>
+            <div class="hs-tg-body">
+                <div class="hs-tg-label">${escapeHtml(l.callsign)} <span style="color:var(--text-dim)">· ${escapeHtml(l.protocol)} · ${l.direction === 'outgoing' ? 'out' : 'in'}${l.dongle ? ' · dongle' : ''}</span></div>
+            </div>
+            <button class="hs-tg-unlink" data-reflector="${escapeHtml(l.callsign)}" data-protocol="${l.protocol_index}" onclick="unlinkReflector(this)">Unlink</button>
+        </div>`).join('');
+    const primary = info.reflector
+        ? `<div class="hs-bm-status">Linked to <b>${escapeHtml(info.reflector)}</b>${info.reconnect_label && info.reconnect_label !== 'Never' ? ` <span style="color:var(--text-dim)">(reconnect: ${escapeHtml(info.reconnect_label)})</span>` : ''}</div>`
+        : `<div class="hs-bm-status">Not linked</div>`;
+    el.innerHTML = `
+        <div class="hs-drawer-section-title">D-STAR (ircDDBGateway)</div>
+        ${primary}
+        ${rows || '<div class="hs-empty-note">No active reflector clients.</div>'}
+        <div class="hs-tg-quicklink" style="margin-top:${rows ? '10' : '4'}px">
+            <input type="text" id="ddb-link-input" placeholder="Reflector, e.g. REF030 C" maxlength="8">
+            <select id="ddb-link-reconnect">
+                ${IRCDDB_RECONNECT_LABELS.map((label, i) => `<option value="${i}"${i === 0 ? ' selected' : ''}>${label}</option>`).join('')}
+            </select>
+            <button id="ddb-link-btn" onclick="linkReflector()">Link</button>
+        </div>
+        <span class="hs-test-result" id="ddb-link-result" style="display:block;margin:-4px 0 0;"></span>`;
+}
+
+function linkReflector() {
+    if (!currentDrawerId) return;
+    const input       = document.getElementById('ddb-link-input');
+    const reconnectEl = document.getElementById('ddb-link-reconnect');
+    const result      = document.getElementById('ddb-link-result');
+    const btn         = document.getElementById('ddb-link-btn');
+    const reflector   = input.value.trim();
+    if (!reflector) {
+        result.className = 'hs-test-result fail';
+        result.textContent = '✕ Enter a reflector (e.g. REF030 C)';
+        return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Linking…';
+    result.className = 'hs-test-result';
+    result.textContent = 'Sending…';
+    fetch('/api/ircddb_link', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: currentDrawerId, reflector, reconnect: parseInt(reconnectEl.value, 10) || 0})
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                fetchIrcddbStatus(currentDrawerId);
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'Link';
+                result.className = 'hs-test-result fail';
+                result.textContent = '✕ ' + (data.message || 'Link failed');
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.textContent = 'Link';
+            result.className = 'hs-test-result fail';
+            result.textContent = '✕ Request failed';
+        });
+}
+
+function unlinkReflector(btn) {
+    if (!currentDrawerId) return;
+    const reflector = btn.dataset.reflector;
+    const protocol  = btn.dataset.protocol;
+    const result = document.getElementById('ddb-link-result');
+    btn.disabled = true;
+    btn.textContent = 'Unlinking…';
+    fetch('/api/ircddb_unlink', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: currentDrawerId, reflector, protocol})
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                fetchIrcddbStatus(currentDrawerId);
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'Unlink';
                 if (result) {
                     result.className = 'hs-test-result fail';
                     result.textContent = '✕ ' + (data.message || 'Unlink failed');

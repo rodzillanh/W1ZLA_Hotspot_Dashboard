@@ -60,6 +60,7 @@ from adsbdb import AdsbdbClient
 from aslstats import AslStatsClient
 from rockstar_bios import get_bio as get_codename_bio
 from push_notifications import PushClient, generate_vapid_keys
+from ircddbgateway import IrcddbGatewayClient
 
 import host_stats as host_stats_mod
 
@@ -107,6 +108,12 @@ openspot_manager.reconcile(load_hotspots())  # eager start at boot, mirrors mqtt
 # as openspot_manager -- see asl_audio.py's module docstring for why this
 # is its own subsystem rather than folded into monitor.py's poll loop.
 audio_manager = AslAudioManager()
+# Short-lived UDP client for a WPSD hotspot's own ircDDBGateway remote
+# control (D-STAR reflector link/unlink) -- no persistent connection, no
+# rebuild-on-settings-save, same "reads its target fresh from
+# hotspots.json on every call" shape as rig_client above. See
+# ircddbgateway.py's module docstring for the wire protocol.
+ircddb_client = IrcddbGatewayClient()
 audio_manager.reconcile(load_hotspots())
 wsjtx_listener  = WsjtxListener(monitor)
 qrz_logbook_client = QrzLogbookClient()
@@ -377,6 +384,13 @@ def api_data():
         # its own faster interval, only once it sees this flag.
         if hs.get("audio_meter_enabled"):
             entry["audio_meter_enabled"] = True
+        # ircDDBGateway (D-STAR reflector link/unlink) -- static config
+        # passthrough, same reason as card_url/audio_meter_enabled above.
+        # The actual link state is NOT included here -- it's a live UDP
+        # round-trip (see ircddbgateway.py), fetched lazily by the drawer
+        # via /api/ircddb_status, not part of this 3s poll.
+        if hs.get("ircddb_enabled"):
+            entry["ircddb_enabled"] = True
     ordered_ids = [h["id"] for h in hotspots]
     # Return as an ARRAY so the browser preserves order — JS objects keyed by
     # id strings get silently re-sorted by some engines (especially for
@@ -1158,6 +1172,25 @@ def setup():
             extra_pass = request.form.get("openspot4_extra_pass", "")
             if extra_pass.strip():
                 new_hotspot["openspot4_extra_pass"] = extra_pass
+        else:
+            # ircDDBGateway remote control (D-STAR reflector link/unlink) --
+            # WPSD-only, see ircddbgateway.py's module docstring for the
+            # wire protocol. Opt-in, same "absent means off" checkbox
+            # convention as dvswitch_enabled/audio_meter_enabled above.
+            new_hotspot["ircddb_enabled"] = "ircddb_enabled" in request.form
+            ircddb_port = request.form.get("ircddb_port", "").strip()
+            if ircddb_port.isdigit():
+                new_hotspot["ircddb_port"] = int(ircddb_port)
+            ircddb_password = request.form.get("ircddb_password", "")
+            if ircddb_password:
+                new_hotspot["ircddb_password"] = ircddb_password
+            # ircDDBGateway's own configured repeater callsign
+            # (repeaterCall1 in /etc/ircddbgateway) -- 8-char D-STAR
+            # format, often but not always the plain callsign, so this is
+            # per-hotspot rather than assumed.
+            ircddb_callsign = request.form.get("ircddb_callsign", "").strip().upper()
+            if ircddb_callsign:
+                new_hotspot["ircddb_callsign"] = ircddb_callsign
         # Replace in place at its EXISTING index when editing -- a plain
         # filter-out-then-append (the previous approach) always moved the
         # edited hotspot to the end of the list, which /api/data's own
@@ -1294,6 +1327,25 @@ def api_update_hotspot():
             hotspot["openspot4_extra_pass"] = extra_pass
         else:
             hotspot.pop("openspot4_extra_pass", None)
+    else:
+        # ircDDBGateway remote control -- WPSD-only, same validation rules
+        # as /setup's form handler above (kept in sync manually).
+        hotspot["ircddb_enabled"] = bool(data.get("ircddb_enabled", hotspot.get("ircddb_enabled", False)))
+        ircddb_port = str(data.get("ircddb_port", "")).strip()
+        if ircddb_port.isdigit():
+            hotspot["ircddb_port"] = int(ircddb_port)
+        else:
+            hotspot.pop("ircddb_port", None)
+        ircddb_password = data.get("ircddb_password", "")
+        if ircddb_password is not None and ircddb_password != "":
+            hotspot["ircddb_password"] = ircddb_password
+        else:
+            hotspot.pop("ircddb_password", None)
+        ircddb_callsign = (data.get("ircddb_callsign") or "").strip().upper()
+        if ircddb_callsign:
+            hotspot["ircddb_callsign"] = ircddb_callsign
+        else:
+            hotspot.pop("ircddb_callsign", None)
 
     # Replace in place at its EXISTING index -- this route only ever edits
     # an existing hotspot (see the docstring above), and every field
@@ -2206,6 +2258,106 @@ def api_brandmeister_talkgroup():
         info = bm_write_client.lookup(bm_id)
         if info is not None:
             monitor.apply_bm_static_tgs(hotspot_id, info["static_talkgroups"])
+    return jsonify({"success": ok, "message": message})
+
+
+def _ircddb_hotspot(hotspot_id):
+    hotspot = next((h for h in load_hotspots() if h.get("id") == hotspot_id), None)
+    if hotspot is None or not hotspot.get("ircddb_enabled"):
+        return None
+    return hotspot
+
+
+@app.route("/api/ircddb_status/<hotspot_id>")
+def api_ircddb_status(hotspot_id):
+    """Current D-STAR reflector link state for a WPSD hotspot's own
+    ircDDBGateway -- fetched lazily (a live UDP round-trip, not part of
+    the 3s-polled /api/data) when the hotspot card drawer's "D-STAR
+    (ircDDBGateway)" section opens, same lazy-fetch-on-open pattern as
+    /api/hotspot_config."""
+    hotspot = _ircddb_hotspot(hotspot_id)
+    if hotspot is None:
+        return jsonify({"connected": False, "error": "ircDDBGateway not configured for this hotspot"}), 404
+    info = ircddb_client.status(
+        hotspot["ip"],
+        hotspot.get("ircddb_port", config.IRCDDB_DEFAULT_PORT),
+        hotspot.get("ircddb_password", ""),
+        hotspot.get("ircddb_callsign", ""),
+    )
+    if info is None:
+        return jsonify({"connected": False})
+    info["connected"] = True
+    return jsonify(info)
+
+
+@app.route("/api/ircddb_link", methods=["POST"])
+def api_ircddb_link():
+    """Link a WPSD hotspot's own ircDDBGateway to a D-STAR reflector (the
+    drawer's Link form) -- see ircddbgateway.py's module docstring for
+    the wire protocol."""
+    data       = request.json or {}
+    hotspot_id = data.get("id", "").strip()
+    hotspot    = _ircddb_hotspot(hotspot_id)
+    if hotspot is None:
+        return jsonify({"success": False, "message": "ircDDBGateway not configured for this hotspot"}), 400
+    reflector = (data.get("reflector") or "").strip()
+    if not reflector:
+        return jsonify({"success": False, "message": "Reflector is required"}), 400
+    try:
+        reconnect = int(data.get("reconnect", 0))
+    except (TypeError, ValueError):
+        reconnect = 0
+    ok, message = ircddb_client.link(
+        hotspot["ip"],
+        hotspot.get("ircddb_port", config.IRCDDB_DEFAULT_PORT),
+        hotspot.get("ircddb_password", ""),
+        hotspot.get("ircddb_callsign", ""),
+        reflector, reconnect,
+    )
+    return jsonify({"success": ok, "message": message})
+
+
+@app.route("/api/ircddb_unlink", methods=["POST"])
+def api_ircddb_unlink():
+    """Unlink a WPSD hotspot's own ircDDBGateway from a D-STAR reflector
+    (one of the drawer's per-link Unlink buttons)."""
+    data       = request.json or {}
+    hotspot_id = data.get("id", "").strip()
+    hotspot    = _ircddb_hotspot(hotspot_id)
+    if hotspot is None:
+        return jsonify({"success": False, "message": "ircDDBGateway not configured for this hotspot"}), 400
+    reflector = (data.get("reflector") or "").strip()
+    if not reflector:
+        return jsonify({"success": False, "message": "Reflector is required"}), 400
+    try:
+        protocol = int(data.get("protocol", 0))
+    except (TypeError, ValueError):
+        protocol = 0
+    ok, message = ircddb_client.unlink(
+        hotspot["ip"],
+        hotspot.get("ircddb_port", config.IRCDDB_DEFAULT_PORT),
+        hotspot.get("ircddb_password", ""),
+        hotspot.get("ircddb_callsign", ""),
+        reflector, protocol,
+    )
+    return jsonify({"success": ok, "message": message})
+
+
+@app.route("/api/test_ircddb", methods=["POST"])
+def api_test_ircddb():
+    """Settings 'Test connection' button -- login + one status read,
+    using whatever's currently in the form (not necessarily saved yet),
+    same shape as test_openspot4/test_asl_node above."""
+    data     = request.json or {}
+    ip       = data.get("ip", "").strip()
+    port     = data.get("port") or config.IRCDDB_DEFAULT_PORT
+    password = data.get("password", "")
+    callsign = data.get("callsign", "").strip()
+    try:
+        port = int(port)
+    except (TypeError, ValueError):
+        port = config.IRCDDB_DEFAULT_PORT
+    ok, message = ircddb_client.test(ip, port, password, callsign)
     return jsonify({"success": ok, "message": message})
 
 

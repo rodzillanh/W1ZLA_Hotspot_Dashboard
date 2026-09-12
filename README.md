@@ -579,6 +579,41 @@ missing from your `/etc/mmdvmhost` (e.g. no `Location` set) just omits
 that piece rather than showing a placeholder.
 
 <!-- wiki-group: Hotspot Types -->
+## D-STAR reflector link/unlink (ircDDBGateway)
+
+If a WPSD hotspot runs **ircDDBGateway** (WPSD's D-STAR reflector
+daemon) with its remote-control interface enabled, its card drawer gets
+a "D-STAR (ircDDBGateway)" section: your current reflector link, any
+secondary DExtra/DPlus/DCS/CCS clients, and buttons to link a new
+reflector or unlink an existing one — right from the dashboard, no SSH
+involved.
+
+This talks to ircDDBGateway's own remote-control protocol directly over
+plain UDP (the same port/password ircDDBGateway itself uses for its
+Windows/Android remote-control apps) — not SSH, and not a new port you
+need to open anywhere, since it's a request this app makes outward to
+the hotspot.
+
+To enable it for a hotspot:
+
+1. On the hotspot, confirm ircDDBGateway's remote control is on and note
+   its port/password:
+   ```bash
+   sudo grep -A2 -i remote /etc/ircddbgateway
+   ```
+   This should show `remoteEnabled=1`, a `remotePort` (WPSD's own
+   default is `54321`), and a `remotePassword`.
+2. In this dashboard's Settings → Hotspots, edit that WPSD hotspot and
+   check **"This node runs ircDDBGateway (D-Star)"**. Enter the port,
+   password, and the repeater callsign ircDDBGateway is configured with
+   (its own `repeaterCall1` — often, but not always, your callsign plus
+   a trailing module letter, e.g. `W1ZLA D`).
+3. Click **Test connection** to confirm the dashboard can log in.
+
+Only available for WPSD hotspots — ASL3 has no D-STAR concept, and
+openSPOT 4 has its own separate remote control (no SSH access at all).
+
+<!-- wiki-group: Hotspot Types -->
 ## AllStarLink (ASL3) nodes
 <!-- wiki-image: hotspot-card-asl3.png -->
 

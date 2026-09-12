@@ -416,6 +416,11 @@ BIOS = {
         "blurb": "Teenage founder of Chicano rock — \"La Bamba\", \"Donna\", \"Come On, Let's Go\" — killed at 17 in the February 1959 plane crash alongside Buddy Holly and the Big Bopper.",
         "wiki": "Ritchie_Valens",
     },
+    "Strummer": {
+        "name": "Joe Strummer",
+        "blurb": "Frontman and rhythm guitarist of The Clash — \"London Calling\", \"Should I Stay or Should I Go\" — who fused punk with reggae, rockabilly, and politics. Died suddenly of an undiagnosed heart condition in 2002.",
+        "wiki": "Joe_Strummer",
+    },
 }
 
 

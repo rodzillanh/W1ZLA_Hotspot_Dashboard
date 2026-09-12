@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.51"
+APP_VERSION = "4.52"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -165,6 +165,9 @@ VERSION_CODENAMES = [
     "Valens",           # v4.51 -- Ritchie Valens, "La Bamba" / "Donna",
                         # a founding voice of Chicano rock, killed in the
                         # 1959 plane crash at 17 (1941-1959)
+    "Strummer",         # v4.52 -- Joe Strummer, The Clash's frontman,
+                        # "London Calling"/"Should I Stay or Should I Go"
+                        # (1952-2002)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1002,6 +1005,11 @@ RIG_RATED_WATTS           = int(os.environ.get("RIG_RATED_WATTS", "100"))       
 # TEMP_METER (0..1) and once on the way back down -- "surface a
 # transition, not a state", same rule as the fleet/solar alerts.
 RIG_PA_ALERT_SUSTAIN_SEC  = int(os.environ.get("RIG_PA_ALERT_SUSTAIN_SEC", "60"))
+
+# ircDDBGateway's own shipped template default (see ircddbgateway.py's
+# module docstring) -- used only when a hotspot's own ircddb_port isn't
+# set, same "blank means the default" convention as sa818_conf_path.
+IRCDDB_DEFAULT_PORT = int(os.environ.get("IRCDDB_DEFAULT_PORT", "54321"))
 
 DEFAULT_SETTINGS = {
     "dashboard_name": "W1ZLA Hotspot Dashboard",
