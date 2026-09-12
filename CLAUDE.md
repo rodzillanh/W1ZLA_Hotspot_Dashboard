@@ -6165,6 +6165,72 @@ config for per-integration credentials; put it in
     `#bm-section` into view, and the old standalone "Digital Voice
     Reflectors" section no longer exists in the DOM.
 
+- **YSF reflector link/unlink (remote control, not the read-only status
+  above) was investigated and deliberately NOT built -- same "real,
+  live-verified structural gap, not a skipped feature" treatment as the
+  TGIF investigation elsewhere in this file, not an oversight.**
+  - **The real mechanism exists and was mocked up first**: current
+    `YSFClients/YSFGateway/YSFGateway.cpp`'s `writeCommand()` accepts
+    three commands -- `LinkYSF <id-or-name>`, `LinkFCS <3-or-5-digit
+    id>`, `UnLink` -- confirmed by reading the actual parser body, not
+    guessed. But unlike every other write-capable integration in this
+    app (ircDDBGateway's UDP, DVSwitch's log/JSON files, ASL3's SSH
+    `rpt cmd`, Brandmeister's REST API), these commands only arrive over
+    an **MQTT subscribe** (`subscriptions.push_back(("command",
+    onCommand))`), gated by a `[Remote Commands]` -> `Enable=1` config
+    key that **defaults to `false`** (`Conf.cpp`:
+    `m_remoteCommandsEnabled(false)`), and MQTT's own `[MQTT]` section
+    defaults its broker address to `127.0.0.1:1883` -- loopback, not
+    something this dashboard (typically a different machine than the
+    hotspot) could reach even if the setting were flipped on.
+  - **Confirmed live on the user's real WPSD YSF hotspot, not just from
+    reading the default values**: `sudo grep -A3 -i "\[MQTT\]\|
+    RemoteCommand" /etc/ysfgateway` returned **nothing at all** -- both
+    sections are completely absent from the real file, not merely set to
+    their disabled defaults. A full follow-up sweep confirmed there's no
+    broker to route around either way: no `mosquitto` package installed,
+    no MQTT-named systemd unit, nothing listening on port 1883, no OTHER
+    MMDVM-family gateway (DMRGateway/NXDNGateway/P25Gateway/
+    ircDDBGateway) has its own `[MQTT]` section configured, and no
+    `mqtt`/`mosquitto` string appears anywhere under `/etc/` at all. This
+    isn't "reachable or not" the way ASL3's audio-meter SSH-tunnel
+    workaround solved a similar reachability gap -- there's no broker
+    running anywhere on this box to tunnel to in the first place.
+  - **`DGIdGateway` (a sibling subdirectory of `YSFGateway` under the
+    same `YSFClients` repo) was checked as a possible alternate control
+    path, prompted directly by the user asking about it -- and is a
+    fundamentally different tool, not a workaround for the MQTT gap.**
+    Its own README: "interfaces the MMDVM Host to the YSF/FCS/IMRS
+    networks using the DG-ID setting on your radio." Confirmed from its
+    real source: it holds a STATIC, admin-configured table (up to 100
+    entries in its own `.ini`) mapping each DG-ID number to a fixed
+    FCS room/YSF reflector/IMRS talkgroup; which entry is active for a
+    given transmission is decided by the DG-ID the RADIO itself sends
+    (a setting the operator picks on their handheld's own menu), not a
+    network request. Checked its source directly for a command-reception
+    path the way YSFGateway has one: it declares an MQTT `subscriptions`
+    vector but **never pushes anything onto it** -- confirmed via a
+    targeted grep for `onCommand`/`writeCommand`/`subscriptions.push_back`
+    that came back completely empty. It only ever *publishes* status to
+    MQTT (`writeJSONStatus`/`writeJSONLinking`/etc., same shape as
+    YSFGateway's own), never *listens* for anything. DGIdGateway solves
+    "let several pre-set rooms be reachable via a radio-side DG-ID
+    switch" -- a real, different feature -- not "remotely change which
+    reflector this hotspot is linked to right now," and doesn't offer
+    any control surface to route around the MQTT gap with.
+  - **Deliberately shelved, not built** -- the payoff (remotely switching
+    a YSF reflector) doesn't justify the cost of standing up NEW
+    infrastructure (a broker this app has never needed for anything
+    else) plus hand-editing a WPSD-admin-panel-managed config file that
+    risks silently getting overwritten the next time WPSD regenerates
+    it. If this is ever revisited, it needs either a real user willing to
+    install/maintain a reachable MQTT broker and accept the config-
+    survival risk, or a future WPSD version that ships one by default --
+    don't build speculatively against a hotspot with neither, the same
+    "needs a user who actually wants this AND is willing to do the setup
+    first" rule the TGIF entry already established for this class of
+    gap.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
