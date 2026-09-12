@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.52"
+APP_VERSION = "4.53"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -165,9 +165,17 @@ VERSION_CODENAMES = [
     "Valens",           # v4.51 -- Ritchie Valens, "La Bamba" / "Donna",
                         # a founding voice of Chicano rock, killed in the
                         # 1959 plane crash at 17 (1941-1959)
-    "Strummer",         # v4.52 -- Joe Strummer, The Clash's frontman,
-                        # "London Calling"/"Should I Stay or Should I Go"
-                        # (1952-2002)
+    "James",            # v4.52 -- Rick James, funk-rock pioneer, "Super
+                        # Freak" (1948-2004) -- NOT "Strummer": that name
+                        # was already used at v4.46 (Joe Strummer), a
+                        # duplicate caught here before it shipped further,
+                        # same class of mistake as the earlier "Cobain"
+                        # duplicate fixed via "Morrison" above -- corrected
+                        # forward with a new name, not by rewriting
+                        # already-pushed history
+    "Thunders",         # v4.53 -- Johnny Thunders, guitarist, New York
+                        # Dolls/The Heartbreakers, foundational proto-punk
+                        # figure (1952-1991)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -185,6 +193,7 @@ ASL_FAVORITES_FILE = os.path.join(CONFIG_DIR, "asl_favorites.json")
 # other client-side-mirrored constant in this project.
 ASL_FAV_CARD_CAP = 5
 BM_TG_FAVORITES_FILE = os.path.join(CONFIG_DIR, "bm_tg_favorites.json")
+IRCDDB_FAVORITES_FILE = os.path.join(CONFIG_DIR, "ircddb_favorites.json")
 CAMERAS_FILE = os.path.join(CONFIG_DIR, "cameras.json")
 QSOS_FILE    = os.path.join(CONFIG_DIR, "qsos.json")
 # HF Favorites card (v4.50) -- a flat list of tap-to-tune memory

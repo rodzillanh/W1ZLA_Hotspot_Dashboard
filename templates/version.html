@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.52 "Strummer"</span>
+                <span class="release-version">v4.53 "Thunders"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>D-STAR reflector favorites</span> — a short list of reflectors you link often (Settings → Favorites → "Reflector Favorites") now shows as one-tap quick-link chips at the bottom of the D-STAR (ircDDBGateway) drawer section, same shape as the existing Talkgroup Favorites chips. A chip already linked and active is greyed out</li>
+                <li><span>Collapsible ircDDBGateway settings</span> — once a hotspot's port/password/callsign are all filled in, that block in the card drawer's Settings section collapses to a single "Show connection details" link instead of staying expanded forever</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.52 "James"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>D-STAR reflector link/unlink (ircDDBGateway)</span> — a WPSD hotspot running ircDDBGateway (WPSD's own D-STAR reflector daemon) now gets a "D-STAR (ircDDBGateway)" section in its card drawer: current reflector link, any secondary DExtra/DPlus/DCS/CCS clients, and buttons to link a new reflector or unlink an existing one — all over ircDDBGateway's own remote-control UDP protocol, no SSH involved. Opt-in per hotspot (Settings → Hotspots → "This node runs ircDDBGateway (D-Star)"), needs the port/password already configured in that hotspot's own <code>/etc/ircddbgateway</code></li>

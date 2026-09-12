@@ -610,6 +610,15 @@ To enable it for a hotspot:
    a trailing module letter, e.g. `W1ZLA D`).
 3. Click **Test connection** to confirm the dashboard can log in.
 
+Once it's working, that Settings block collapses to a single "Show
+connection details" link so it doesn't clutter the drawer — click it any
+time to see or change the port/password/callsign again.
+
+A short list of reflectors you link often can be saved under Settings →
+Favorites → **Reflector Favorites**, and shows up as one-tap quick-link
+chips at the bottom of the D-STAR section — same idea as the Brandmeister
+Talkgroup Favorites chips.
+
 Only available for WPSD hotspots — ASL3 has no D-STAR concept, and
 openSPOT 4 has its own separate remote control (no SSH access at all).
 

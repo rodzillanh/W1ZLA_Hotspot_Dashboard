@@ -1930,6 +1930,41 @@
     </div>
 
     <div class="section">
+        <div class="section-title">Reflector Favorites
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                one-tap quick-link chips in each hotspot card's drawer
+            </span>
+        </div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+            A short list of D-STAR reflectors you link often — shown as one-tap
+            chips in the D-STAR (ircDDBGateway) section of a WPSD hotspot card's
+            drawer. Requires that hotspot to have ircDDBGateway configured
+            (Hotspots tab) to actually use; this list itself saves either way.
+        </p>
+        <div id="ddb-fav-list">
+            {% for f in ircddb_favorites %}
+            <div class="drag-row ddb-fav-row" style="align-items:center">
+                <span style="color:var(--amber);font-size:13px;flex-shrink:0">📡</span>
+                <input type="text" class="ddb-fav-reflector inp"
+                       value="{{ f.reflector }}" placeholder="e.g. REF030 C"
+                       style="width:110px;text-transform:uppercase" maxlength="8">
+                <input type="text" class="ddb-fav-label inp"
+                       value="{{ f.label }}" placeholder="Label (optional)"
+                       style="flex:1">
+                <button class="btn btn-danger btn-sm"
+                        onclick="this.closest('.ddb-fav-row').remove()">✕</button>
+            </div>
+            {% endfor %}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-info"    onclick="addIrcddbFavorite()">+ Add reflector</button>
+            <button class="btn btn-primary" onclick="saveIrcddbFavorites()">Save reflector favorites</button>
+            <span class="status-txt" id="ddb-fav-status"></span>
+        </div>
+    </div>
+
+    <div class="section">
         <div class="section-title">Browser alerts</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
             Get a browser notification when a favorite callsign comes on the air —
@@ -1991,6 +2026,14 @@
                 <div class="cat-body">
                     <div class="cat-name">Talkgroup Favorites</div>
                     <div class="cat-meta">{{ bm_tg_favorites|length }} quick-link talkgroups</div>
+                </div>
+            </label>
+            <label class="cat-row">
+                <input type="checkbox" id="export-cat-ircddb_favorites" checked>
+                <span class="cat-icon">📡</span>
+                <div class="cat-body">
+                    <div class="cat-name">Reflector Favorites</div>
+                    <div class="cat-meta">{{ ircddb_favorites|length }} quick-link reflectors</div>
                 </div>
             </label>
             <label class="cat-row">
@@ -2916,6 +2959,36 @@ function saveTgFavorites() {
     });
 }
 
+function addIrcddbFavorite() {
+    const row = document.createElement('div');
+    row.className        = 'drag-row ddb-fav-row';
+    row.style.alignItems = 'center';
+    row.innerHTML = `<span style="color:var(--amber);font-size:13px;flex-shrink:0">📡</span>
+        <input type="text" class="ddb-fav-reflector inp" placeholder="e.g. REF030 C"
+               style="width:110px;text-transform:uppercase" maxlength="8">
+        <input type="text" class="ddb-fav-label inp" placeholder="Label (optional)" style="flex:1">
+        <button class="btn btn-danger btn-sm"
+                onclick="this.closest('.ddb-fav-row').remove()">✕</button>`;
+    document.getElementById('ddb-fav-list').appendChild(row);
+}
+
+function saveIrcddbFavorites() {
+    const rows = document.querySelectorAll('#ddb-fav-list .ddb-fav-row');
+    const favs = Array.from(rows).map(r => ({
+        reflector: r.querySelector('.ddb-fav-reflector').value.trim().toUpperCase(),
+        label:     r.querySelector('.ddb-fav-label').value.trim(),
+    })).filter(f => f.reflector);
+    fetch('/api/ircddb_favorites', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(favs)
+    }).then(() => {
+        const el = document.getElementById('ddb-fav-status');
+        el.textContent = '✓ Saved';
+        setTimeout(() => el.textContent = '', 2000);
+    });
+}
+
 // --- notifications ---
 function requestNotifPermission() {
     const status = document.getElementById('notif-status');
@@ -2955,6 +3028,7 @@ const BACKUP_CATEGORY_META = {
     favorites:     { icon: '⭐', name: 'Favorites' },
     asl_favorites: { icon: '📻', name: 'ASL Favorites' },
     bm_tg_favorites: { icon: '📶', name: 'Talkgroup Favorites' },
+    ircddb_favorites: { icon: '📡', name: 'Reflector Favorites' },
     cameras:       { icon: '📷', name: 'Cameras' },
     settings:      { icon: '⚙️', name: 'Settings' },
 };

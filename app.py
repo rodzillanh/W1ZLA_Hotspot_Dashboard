@@ -23,6 +23,7 @@ from monitor import FleetMonitor
 from storage import load_hotspots, save_hotspots, load_settings, save_settings, \
                    load_favorites, save_favorites, load_asl_favorites, save_asl_favorites, \
                    load_bm_tg_favorites, save_bm_tg_favorites, \
+                   load_ircddb_favorites, save_ircddb_favorites, \
                    load_cameras, save_cameras, load_qsos, save_qsos, settings_transaction, \
                    load_hf_favorites, save_hf_favorites
 from weather import WeatherClient
@@ -958,6 +959,24 @@ def api_bm_tg_favorites_post():
     save_bm_tg_favorites(cleaned)
     return jsonify({"ok": True})
 
+@app.route("/api/ircddb_favorites", methods=["GET"])
+def api_ircddb_favorites_get():
+    return jsonify(load_ircddb_favorites())
+
+@app.route("/api/ircddb_favorites", methods=["POST"])
+def api_ircddb_favorites_post():
+    """Accept full list of D-STAR reflector quick-link favorites and
+    overwrite -- same shape/overwrite convention as the Brandmeister
+    talkgroup favorites above."""
+    data = request.json or []
+    cleaned = []
+    for f in data:
+        reflector = str(f.get("reflector", "")).strip().upper()
+        if reflector:
+            cleaned.append({"reflector": reflector, "label": f.get("label", "").strip()})
+    save_ircddb_favorites(cleaned)
+    return jsonify({"ok": True})
+
 # Canonical declaration order for every "extra card" sentinel -- must
 # match dashboard.html's renderCards() sentinels.push() order exactly
 # (cameras last in both places). Used only to compute overflow_sentinels
@@ -1215,6 +1234,7 @@ def setup():
                            settings=setup_settings, favorites=load_favorites(),
                            cameras=setup_cameras, asl_favorites=load_asl_favorites(),
                            bm_tg_favorites=load_bm_tg_favorites(),
+                           ircddb_favorites=load_ircddb_favorites(),
                            can_power_control=HOST_CAN_POWER_CONTROL,
                            host_is_standalone=HOST_IS_STANDALONE,
                            overflow_sentinels=_overflow_sentinels(setup_settings, setup_hotspots, setup_cameras),
@@ -2720,7 +2740,7 @@ def api_camera_status():
 def api_export_backup():
     requested = set(
         c.strip() for c in
-        (request.args.get("categories") or "hotspots,favorites,asl_favorites,bm_tg_favorites,cameras,settings").split(",")
+        (request.args.get("categories") or "hotspots,favorites,asl_favorites,bm_tg_favorites,ircddb_favorites,cameras,settings").split(",")
         if c.strip()
     )
     backup = {
@@ -2734,6 +2754,8 @@ def api_export_backup():
         backup["asl_favorites"] = load_asl_favorites()
     if "bm_tg_favorites" in requested:
         backup["bm_tg_favorites"] = load_bm_tg_favorites()
+    if "ircddb_favorites" in requested:
+        backup["ircddb_favorites"] = load_ircddb_favorites()
     if "cameras" in requested:
         backup["cameras"] = load_cameras()
     if "settings" in requested:
@@ -2874,6 +2896,22 @@ def api_import_backup():
             bm_tg_favorites = list(by_key.values())
         save_bm_tg_favorites(bm_tg_favorites)
         result["bm_tg_favorites"] = len(bm_tg_favorites)
+
+    if isinstance(data.get("ircddb_favorites"), list):
+        imported = [
+            {"reflector": str(f.get("reflector", "")).strip().upper(), "label": f.get("label", "").strip()}
+            for f in data["ircddb_favorites"]
+            if isinstance(f, dict) and str(f.get("reflector", "")).strip()
+        ]
+        if mode == "replace":
+            ircddb_favorites = imported
+        else:
+            by_reflector = {f["reflector"]: f for f in load_ircddb_favorites()}
+            for f in imported:
+                by_reflector[f["reflector"]] = f
+            ircddb_favorites = list(by_reflector.values())
+        save_ircddb_favorites(ircddb_favorites)
+        result["ircddb_favorites"] = len(ircddb_favorites)
 
     if isinstance(data.get("cameras"), list):
         imported = [

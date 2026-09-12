@@ -2435,6 +2435,15 @@
         .hs-pw-wrap { position: relative; }
         .hs-pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 12px; }
         .hs-help { font-size: 10.5px; color: var(--text-dim); margin: -6px 0 10px; line-height: 1.5; }
+        /* A field-group's own connection-details sub-block (e.g. ircDDBGateway's
+           port/password/callsign) collapses once already configured -- see
+           toggleIrcddbDetails(). Plain text-button styling, no background/border
+           of its own so it reads as a disclosure control, not another button. */
+        .hs-collapse-toggle {
+            background: none; border: none; padding: 0; margin: 2px 0 10px;
+            color: var(--text-dim); font-family: inherit; font-size: 11px; cursor: pointer;
+        }
+        .hs-collapse-toggle:hover { color: var(--text-muted); }
         .hs-test-row { display: flex; align-items: center; gap: 8px; margin: 2px 0 12px; }
         .hs-test-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; cursor: pointer; white-space: nowrap; }
         .hs-test-btn:hover { color: var(--text); border-color: var(--text-dim); }
@@ -9257,26 +9266,29 @@ function renderHotspotSettingsFields(hs, cfg) {
             <div class="hs-switch" id="hsf-ircddb-enabled" onclick="hsToggleIrcddb(this)"></div>
         </div>
         <div id="hsf-ircddb-fields">
-            <div class="hs-field">
-                <div class="hs-field-label-row"><label>ircDDBGateway port</label><span class="hs-field-status" id="hsf-status-ircddbport">✓ Saved</span></div>
-                <input type="text" id="hsf-ircddbport" placeholder="defaults to 54321" onblur="saveHotspotField('ircddb_port', this.value)">
-            </div>
-            <div class="hs-field">
-                <div class="hs-field-label-row"><label>Remote control password</label><span class="hs-field-status" id="hsf-status-ircddbpassword">✓ Saved</span></div>
-                <div class="hs-pw-wrap">
-                    <input type="password" id="hsf-ircddbpassword" onblur="saveHotspotField('ircddb_password', this.value)">
-                    <button class="hs-pw-toggle" onclick="hsTogglePw('hsf-ircddbpassword')">👁</button>
+            <button type="button" class="hs-collapse-toggle" id="hsf-ircddb-collapse-btn" onclick="toggleIrcddbDetails()">▾ Show connection details</button>
+            <div id="hsf-ircddb-detail-fields">
+                <div class="hs-field">
+                    <div class="hs-field-label-row"><label>ircDDBGateway port</label><span class="hs-field-status" id="hsf-status-ircddbport">✓ Saved</span></div>
+                    <input type="text" id="hsf-ircddbport" placeholder="defaults to 54321" onblur="saveHotspotField('ircddb_port', this.value)">
                 </div>
-                <div class="hs-help">/etc/ircddbgateway's own remotePassword -- <code>sudo grep -A2 -i remote /etc/ircddbgateway</code> on this hotspot.</div>
-            </div>
-            <div class="hs-field">
-                <div class="hs-field-label-row"><label>Repeater callsign</label><span class="hs-field-status" id="hsf-status-ircddbcallsign">✓ Saved</span></div>
-                <input type="text" id="hsf-ircddbcallsign" placeholder="e.g. W1ZLA D" onblur="saveHotspotField('ircddb_callsign', this.value)">
-                <div class="hs-help">ircDDBGateway's own configured DV repeater callsign (repeaterCall1) -- often, but not always, the plain callsign plus a trailing module letter.</div>
-            </div>
-            <div class="hs-test-row">
-                <button class="hs-test-btn" onclick="runHotspotTest(this, 'hs-test-ircddb-result', '/api/test_ircddb', () => ({ip: getVal('hsf-ip'), port: getVal('hsf-ircddbport'), password: getVal('hsf-ircddbpassword'), callsign: getVal('hsf-ircddbcallsign')}))">Test connection</button>
-                <span class="hs-test-result" id="hs-test-ircddb-result"></span>
+                <div class="hs-field">
+                    <div class="hs-field-label-row"><label>Remote control password</label><span class="hs-field-status" id="hsf-status-ircddbpassword">✓ Saved</span></div>
+                    <div class="hs-pw-wrap">
+                        <input type="password" id="hsf-ircddbpassword" onblur="saveHotspotField('ircddb_password', this.value)">
+                        <button class="hs-pw-toggle" onclick="hsTogglePw('hsf-ircddbpassword')">👁</button>
+                    </div>
+                    <div class="hs-help">/etc/ircddbgateway's own remotePassword -- <code>sudo grep -A2 -i remote /etc/ircddbgateway</code> on this hotspot.</div>
+                </div>
+                <div class="hs-field">
+                    <div class="hs-field-label-row"><label>Repeater callsign</label><span class="hs-field-status" id="hsf-status-ircddbcallsign">✓ Saved</span></div>
+                    <input type="text" id="hsf-ircddbcallsign" placeholder="e.g. W1ZLA D" onblur="saveHotspotField('ircddb_callsign', this.value)">
+                    <div class="hs-help">ircDDBGateway's own configured DV repeater callsign (repeaterCall1) -- often, but not always, the plain callsign plus a trailing module letter.</div>
+                </div>
+                <div class="hs-test-row">
+                    <button class="hs-test-btn" onclick="runHotspotTest(this, 'hs-test-ircddb-result', '/api/test_ircddb', () => ({ip: getVal('hsf-ip'), port: getVal('hsf-ircddbport'), password: getVal('hsf-ircddbpassword'), callsign: getVal('hsf-ircddbcallsign')}))">Test connection</button>
+                    <span class="hs-test-result" id="hs-test-ircddb-result"></span>
+                </div>
             </div>
         </div>`;
     }
@@ -9322,6 +9334,10 @@ function renderHotspotSettingsFields(hs, cfg) {
         setVal('hsf-ircddbcallsign', cfg.ircddb_callsign);
         document.getElementById('hsf-ircddb-enabled').classList.toggle('on', !!cfg.ircddb_enabled);
         document.getElementById('hsf-ircddb-fields').style.display = cfg.ircddb_enabled ? '' : 'none';
+        // Already has a port, password, and callsign saved -- nothing new
+        // to glance at, so start collapsed. Missing any of them (freshly
+        // enabled, mid-setup) starts expanded so there's something to fill in.
+        setIrcddbDetailsCollapsed(!!(cfg.ircddb_port && cfg.ircddb_password && cfg.ircddb_callsign));
     }
     document.getElementById('hsf-enabled').classList.toggle('on', cfg.enabled !== false);
     document.getElementById('hsf-portable').classList.toggle('on', !!cfg.portable);
@@ -9352,7 +9368,30 @@ function hsToggleIrcddb(el) {
     el.classList.toggle('on');
     const on = el.classList.contains('on');
     document.getElementById('hsf-ircddb-fields').style.display = on ? '' : 'none';
+    // Turning it on fresh (nothing saved yet) should show the fields to fill
+    // in, not a collapsed "Show connection details" link with nothing behind
+    // it -- setIrcddbDetailsCollapsed() below only auto-collapses on load,
+    // based on whether cfg already had every field filled in.
+    if (on) setIrcddbDetailsCollapsed(false);
     saveHotspotField('ircddb_enabled', on);
+}
+
+// Collapses the port/password/callsign/Test block once it's already fully
+// configured -- there's nothing left to glance at there day-to-day once
+// it's working, same instinct as this app's other "hide it once it's set
+// up" affordances. A manual toggle (the "Show/Hide connection details"
+// button) always overrides the smart default either way.
+function setIrcddbDetailsCollapsed(collapsed) {
+    const wrap = document.getElementById('hsf-ircddb-detail-fields');
+    const btn  = document.getElementById('hsf-ircddb-collapse-btn');
+    if (!wrap || !btn) return;
+    wrap.style.display = collapsed ? 'none' : '';
+    btn.textContent = collapsed ? '▸ Show connection details' : '▾ Hide connection details';
+}
+
+function toggleIrcddbDetails() {
+    const wrap = document.getElementById('hsf-ircddb-detail-fields');
+    setIrcddbDetailsCollapsed(wrap.style.display !== 'none');
 }
 
 function hsToggleEnabled(el) {
@@ -9636,6 +9675,10 @@ function renderIrcddbSection(info) {
     const primary = info.reflector
         ? `<div class="hs-bm-status">Linked to <b>${escapeHtml(info.reflector)}</b>${info.reconnect_label && info.reconnect_label !== 'Never' ? ` <span style="color:var(--text-dim)">(reconnect: ${escapeHtml(info.reconnect_label)})</span>` : ''}</div>`
         : `<div class="hs-bm-status">Not linked</div>`;
+    const chips = ircddbFavorites.map(f => {
+        const already = links.some(l => l.callsign === f.reflector && l.linked);
+        return `<button class="hs-tg-chip-btn" data-reflector="${escapeHtml(f.reflector)}" ${already ? 'disabled' : ''} onclick="quickLinkReflector(this)">${escapeHtml(f.label || f.reflector)}${f.label ? ' · ' + escapeHtml(f.reflector) : ''}</button>`;
+    }).join('');
     el.innerHTML = `
         <div class="hs-drawer-section-title">D-STAR (ircDDBGateway)</div>
         ${primary}
@@ -9647,7 +9690,13 @@ function renderIrcddbSection(info) {
             </select>
             <button id="ddb-link-btn" onclick="linkReflector()">Link</button>
         </div>
-        <span class="hs-test-result" id="ddb-link-result" style="display:block;margin:-4px 0 0;"></span>`;
+        <span class="hs-test-result" id="ddb-link-result" style="display:block;margin:-4px 0 0;"></span>
+        ${chips ? `<div class="hs-tg-chips" style="margin-top:8px">${chips}</div>` : ''}`;
+}
+
+function quickLinkReflector(chipBtn) {
+    document.getElementById('ddb-link-input').value = chipBtn.dataset.reflector;
+    linkReflector();
 }
 
 function linkReflector() {
@@ -10607,6 +10656,14 @@ function fetchBmTgFavorites() {
         .then(data => { bmTgFavorites = data; });
 }
 
+let ircddbFavorites = [];    // [{reflector, label}, ...] from /api/ircddb_favorites
+
+function fetchIrcddbFavorites() {
+    fetch('/api/ircddb_favorites')
+        .then(r => r.json())
+        .then(data => { ircddbFavorites = data; });
+}
+
 function renderAslFavorites() {
     const select  = document.getElementById('asl-fav-hotspot-select');
     const gridEl  = document.getElementById('asl-fav-tile-grid');
@@ -11451,6 +11508,12 @@ function importFavoritesIni() {
 
 if (SHOW_ASL_FAVORITES) fetchAslFavorites();
 if (BM_WRITE_ENABLED) fetchBmTgFavorites();
+// No per-hotspot flag available at page load the way BM_WRITE_ENABLED is
+// settings-derived -- ircddb_enabled lives per-hotspot in hotspots.json,
+// not exposed to this template at render time. Fetching this unconditionally
+// is cheap (a tiny local JSON read) and matches the cost of every other
+// favorites list here.
+fetchIrcddbFavorites();
 
 // --- main poll loop ---
 function refresh() {

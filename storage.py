@@ -251,6 +251,26 @@ def save_bm_tg_favorites(favorites: list) -> None:
         json.dump(favorites, f, indent=4)
 
 
+# --- ircDDBGateway reflector favorites (quick-link chips in the D-STAR
+# drawer section, same shape/purpose as the Brandmeister ones above) ---
+
+def load_ircddb_favorites() -> list:
+    """Return list of dicts: [{reflector, label}, ...]"""
+    if not os.path.exists(config.IRCDDB_FAVORITES_FILE):
+        return []
+    try:
+        with _file_lock, open(config.IRCDDB_FAVORITES_FILE, "r") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_ircddb_favorites(favorites: list) -> None:
+    os.makedirs(config.CONFIG_DIR, exist_ok=True)
+    with _file_lock, open(config.IRCDDB_FAVORITES_FILE, "w") as f:
+        json.dump(favorites, f, indent=4)
+
+
 # --- cameras (RTSP / Bambu Labs A1) ---
 
 def load_cameras() -> list:

@@ -416,10 +416,15 @@ BIOS = {
         "blurb": "Teenage founder of Chicano rock — \"La Bamba\", \"Donna\", \"Come On, Let's Go\" — killed at 17 in the February 1959 plane crash alongside Buddy Holly and the Big Bopper.",
         "wiki": "Ritchie_Valens",
     },
-    "Strummer": {
-        "name": "Joe Strummer",
-        "blurb": "Frontman and rhythm guitarist of The Clash — \"London Calling\", \"Should I Stay or Should I Go\" — who fused punk with reggae, rockabilly, and politics. Died suddenly of an undiagnosed heart condition in 2002.",
-        "wiki": "Joe_Strummer",
+    "James": {
+        "name": "Rick James",
+        "blurb": "Funk-rock pioneer whose \"Super Freak\" fused P-Funk grooves with a hard rock edge, later sampled wholesale for MC Hammer's \"U Can't Touch This\".",
+        "wiki": "Rick_James",
+    },
+    "Thunders": {
+        "name": "Johnny Thunders",
+        "blurb": "New York Dolls and Heartbreakers guitarist whose sloppy, sneering riffs on \"Personality Crisis\" and \"Chinese Rocks\" made him a foundational figure of proto-punk.",
+        "wiki": "Johnny_Thunders",
     },
 }
 
