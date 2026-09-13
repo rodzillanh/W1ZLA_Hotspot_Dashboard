@@ -7103,14 +7103,43 @@ config for per-integration credentials; put it in
     the first matching id in the document). Disclosed as an accepted
     staleness tradeoff for a secondary "glance at it from the other
     page" copy, not the primary interactive surface.
-  - **The duplicate's page-2 position is intentionally NOT drag-
-    orderable in the Cards board** -- `big_clock_position_p2`/
+  - **The duplicate's page-2 position was originally NOT drag-orderable
+    in the Cards board -- fixed in v4.71, the very next release, after
+    the user directly asked "should the duplicated cards appear in the
+    card order list after being enabled?"** `big_clock_position_p2`/
     `notifications_position_p2` (new, ordinary DEFAULT_SETTINGS keys,
-    default 0) always place it "at the end" of whichever page. Extending
-    the two-column drag board itself to show one card in BOTH columns
-    simultaneously (with two independently-draggable rows for the same
-    card) was scoped out as real, separate added complexity for the
-    drag board specifically -- not attempted here.
+    default 0) got a genuine SECOND, independently drag-orderable row in
+    column 2 specifically (`__big_clock_p2__`/`__notifications_p2__`),
+    handled by a new small helper, `_card_has_p2_duplicate(settings,
+    pos_key)` -- true only when the card is shown on page 2 AND its
+    primary is NOT already page 2 (the ordinary single-page case, which
+    already has its own row and must not get a second, redundant one
+    from this). Needed changes in three places kept in sync by hand, per
+    this file's own standing caution about `_SENTINEL_DEFS`-adjacent
+    code: `app.py`'s `_overflow_sentinels()` (the append-at-the-end
+    case), `setup.html`'s `card_order_column` macro (a new `{% set
+    big_clock_p2_pos = ... %}` pair mirroring the primary's own, for the
+    INTERLEAVED-among-hotspots case), and `saveCardOrder()`'s JS (a
+    small dedicated block, deliberately NOT folded into the generic
+    `SENTINEL_POSITION_FIELDS` loop, since that loop also derives and
+    writes a companion `*_page` field from the position field's name --
+    meaningless here, since a page-2 duplicate's page is always 2 by
+    construction, never something to derive from a drag). Also caught
+    and fixed in the same pass: `dashboard.html`'s
+    `SENTINEL_KEY_TO_DATA_IP` map was missing entries for
+    `bigclock_p2`/`notifications_p2`, which would have silently broken
+    ONLY the same-position tiebreak for these two rows specifically
+    (`sentinelDataIp()` falls back to returning the bare JS key
+    unchanged when a mapping is missing, so the tiebreak list lookup
+    would simply never match -- not a crash, just a quietly-ineffective
+    tiebreak). Verified live: the duplicate row renders in column 2 only
+    (never column 1), the primary's own row is unaffected and still
+    shows in its own column, dragging the duplicate to the top and
+    saving persists `big_clock_position_p2 == 0`, and the legacy
+    `big_clock_page == 2` (single-page, un-migrated) case correctly
+    shows NO duplicate row at all -- confirming the "already page 2 via
+    the primary" exclusion works, not just the straightforward
+    both-shown case.
   - **The new Settings checkboxes' initial checked state reads the
     EFFECTIVE (fallback-resolved) value, not the raw unset key** -- a
     naive `settings.get('big_clock_show_p1', False)` would show every

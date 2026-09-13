@@ -833,6 +833,16 @@ def api_settings_post():
         settings["notifications_show_p1"] = bool(data["notifications_show_p1"])
     if "notifications_show_p2" in data:
         settings["notifications_show_p2"] = bool(data["notifications_show_p2"])
+    if "big_clock_position_p2" in data:
+        try:
+            settings["big_clock_position_p2"] = max(0, int(data["big_clock_position_p2"]))
+        except (TypeError, ValueError):
+            pass
+    if "notifications_position_p2" in data:
+        try:
+            settings["notifications_position_p2"] = max(0, int(data["notifications_position_p2"]))
+        except (TypeError, ValueError):
+            pass
     if "push_vapid_contact" in data:
         contact = (data["push_vapid_contact"] or "").strip()
         if contact and not contact.lower().startswith(("mailto:", "http://", "https://")):
@@ -1253,6 +1263,17 @@ def _with_effective_pages(settings: dict) -> dict:
     return out
 
 
+def _card_has_p2_duplicate(settings: dict, pos_key: str) -> bool:
+    """Whether a duplicatable card's SECOND, distinct row (its page-2
+    copy) genuinely exists as its own separate entity -- true only when
+    it's shown on page 2 AND the primary itself is NOT already on page 2
+    (the ordinary single-page case already covers that with its own row,
+    via _card_primary_page -- this must not add a second, redundant
+    entry for the same card in that case)."""
+    return (_card_shown_on_page(settings, pos_key, 2)
+            and _card_primary_page(settings, pos_key) != 2)
+
+
 def _overflow_sentinels(settings: dict, hotspots: list, cameras: list, page: int = 1) -> list:
     """Enabled cards/cameras whose saved position is at or past the end
     of THIS PAGE's hotspot list, sorted by that position value with an
@@ -1339,6 +1360,34 @@ def _overflow_sentinels(settings: dict, hotspots: list, cameras: list, page: int
                 "data_ip": "__dvswitch__", "icon": "📻",
                 "name": "DVSwitch", "meta": "DVSwitch card", "pos": pos,
             })
+
+    # Big Ass Clock / Notifications page-2 DUPLICATE (v4.71) -- a second,
+    # independently drag-orderable row, distinct from the card's own
+    # normal row above. Only ever considered for page 2, and only when
+    # that page's copy is genuinely a duplicate (i.e. the primary itself
+    # lives on page 1) -- when the primary IS on page 2 already (the
+    # ordinary single-page case, including every pre-v4.70 install),
+    # its own row above already covers it and this must NOT add a
+    # second, redundant entry for the same card.
+    if page == 2:
+        if settings.get("show_big_clock", False) and _card_has_p2_duplicate(settings, "big_clock_position"):
+            pos = settings.get("big_clock_position_p2", 0)
+            if pos >= hotspot_count:
+                items.append({
+                    "data_ip": "__big_clock_p2__", "icon": "🕐",
+                    "name": "Big Ass Clock (2nd copy)", "meta": "clock card, page 2 duplicate", "pos": pos,
+                })
+        notif_enabled = any(settings.get(k, False) for k in (
+            "aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled",
+            "solar_alerts_enabled", "brandmeister_alerts_enabled",
+            "qrz_logbook_enabled", "rig_pa_alert_enabled"))
+        if notif_enabled and _card_has_p2_duplicate(settings, "notifications_position"):
+            pos = settings.get("notifications_position_p2", 0)
+            if pos >= hotspot_count:
+                items.append({
+                    "data_ip": "__notifications_p2__", "icon": "🔔",
+                    "name": "Notifications (2nd copy)", "meta": "notifications card, page 2 duplicate", "pos": pos,
+                })
 
     def sort_key(it):
         tb_rank = tiebreak.index(it["data_ip"]) if it["data_ip"] in tiebreak else len(tiebreak)
@@ -1521,6 +1570,8 @@ def setup():
                            big_clock_p2=_card_shown_on_page(setup_settings, "big_clock_position", 2),
                            notifications_p1=_card_shown_on_page(setup_settings, "notifications_position", 1),
                            notifications_p2=_card_shown_on_page(setup_settings, "notifications_position", 2),
+                           big_clock_has_p2_dup=_card_has_p2_duplicate(setup_settings, "big_clock_position"),
+                           notifications_has_p2_dup=_card_has_p2_duplicate(setup_settings, "notifications_position"),
                            cameras=setup_cameras, asl_favorites=load_asl_favorites(),
                            bm_tg_favorites=load_bm_tg_favorites(),
                            ircddb_favorites=_ircddb_favorites_for_display(),

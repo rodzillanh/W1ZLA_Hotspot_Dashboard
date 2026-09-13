@@ -916,7 +916,14 @@
             {% set wspr_activity_pos = settings.get('wspr_activity_position', 0) if (settings.get('show_wspr_activity', False) and settings.get('wspr_activity_page', 1) == page) else -1 %}
             {% set digipi_pos = settings.get('digipi_position', 0) if (settings.get('digipi_enabled', False) and settings.get('digipi_page', 1) == page) else -1 %}
             {% set big_clock_pos = settings.get('big_clock_position', 0) if (settings.get('show_big_clock', False) and settings.get('big_clock_page', 1) == page) else -1 %}
+            {# Page-2 DUPLICATE row (v4.71) -- a genuinely separate, independently
+               drag-orderable entry, only ever possible on page 2, and only when
+               big_clock_has_p2_dup is true (the primary itself isn't already on
+               page 2 -- that ordinary single-page case is fully covered by
+               big_clock_pos above and must not also get this second row). #}
+            {% set big_clock_p2_pos = settings.get('big_clock_position_p2', 0) if (page == 2 and big_clock_has_p2_dup) else -1 %}
             {% set notifications_pos = settings.get('notifications_position', 0) if ((settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False) or settings.get('qrz_logbook_enabled', False) or settings.get('rig_pa_alert_enabled', False)) and settings.get('notifications_page', 1) == page) else -1 %}
+            {% set notifications_p2_pos = settings.get('notifications_position_p2', 0) if (page == 2 and notifications_has_p2_dup) else -1 %}
             {% set satellites_pos = settings.get('satellites_position', 0) if (settings.get('show_satellites', False) and settings.get('satellites_page', 1) == page) else -1 %}
             {% set flights_overhead_pos = settings.get('flights_overhead_position', 0) if (settings.get('show_flights_overhead', False) and settings.get('flights_overhead_page', 1) == page) else -1 %}
             {% set recent_contacts_pos = settings.get('recent_contacts_position', 0) if (settings.get('show_recent_contacts', False) and settings.get('recent_contacts_page', 1) == page) else -1 %}
@@ -994,11 +1001,25 @@
                     <span class="node-meta">clock card</span>
                 </div>
                 {% endif %}
+                {% if loop.index0 == big_clock_p2_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__big_clock_p2__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🕐 Big Ass Clock (2nd copy)</span>
+                    <span class="node-meta">clock card, page 2 duplicate</span>
+                </div>
+                {% endif %}
                 {% if loop.index0 == notifications_pos %}
                 <div class="drag-row fleet-activity-row" draggable="true" data-ip="__notifications__">
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🔔 Notifications</span>
                     <span class="node-meta">APRS + HamAlert inbox card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == notifications_p2_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__notifications_p2__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🔔 Notifications (2nd copy)</span>
+                    <span class="node-meta">notifications card, page 2 duplicate</span>
                 </div>
                 {% endif %}
                 {% if loop.index0 == satellites_pos %}
@@ -1130,9 +1151,9 @@
         <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
             Every other card lives on exactly one page (drag it between the columns above).
             These two are the exception — each has its own independent switch per page, so you
-            can show it on one, both, or neither, without affecting the other page's copy. A
-            duplicated card's page-2 position isn't drag-orderable yet — it always lands at the
-            end of that page.
+            can show it on one, both, or neither, without affecting the other page's copy. Once
+            a duplicate is on, it shows up as its own row in the Dashboard 2 column above,
+            labeled "(2nd copy)" — drag it like any other card.
         </p>
         <div class="toggle-row">
             <span class="toggle-label">🕐 Big Ass Clock — Dashboard 1</span>
@@ -2678,6 +2699,17 @@ function saveCardOrder() {
                 settingsPatch[posField.replace('_position', '_page')] = page;
             }
         });
+        // Big Ass Clock / Notifications page-2 DUPLICATE rows (v4.71) --
+        // always page 2 by construction (they only ever render in this
+        // second column at all), so unlike every sentinel above there's
+        // no companion *_page field to derive and write.
+        if (page === 2) {
+            [['__big_clock_p2__', 'big_clock_position_p2'],
+             ['__notifications_p2__', 'notifications_position_p2']].forEach(([key, posField]) => {
+                const idx = sentinelIndex(key);
+                if (idx !== -1) settingsPatch[posField] = idx;
+            });
+        }
         allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
             const camId = key.slice('__camera__'.length);
             cameraPositions[camId] = sentinelIndex(key);

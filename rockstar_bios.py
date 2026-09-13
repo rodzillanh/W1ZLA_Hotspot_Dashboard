@@ -511,6 +511,11 @@ BIOS = {
         "blurb": "Co-founder, guitarist, and co-lead vocalist of the Eagles, and co-writer of many of their biggest hits.",
         "wiki": "Glenn_Frey",
     },
+    "Meisner": {
+        "name": "Randy Meisner",
+        "blurb": "Founding bassist of the Eagles, whose high tenor lent the band's harmonies their signature top end.",
+        "wiki": "Randy_Meisner",
+    },
 }
 
 
