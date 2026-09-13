@@ -158,6 +158,21 @@ sota.py            SotaClient: live Summits on the Air activator spots
                    indefinitely per summit code since a mountain doesn't
                    move, unlike the short-TTL spot list cache itself.
 
+rbn.py             RbnListener: persistent Telnet connection to the
+                   Reverse Beacon Network's live CW/RTTY skimmer feed
+                   (telnet.reversebeacon.net:7000, confirmed live, no
+                   auth -- any callsign logs in) for the Spots card's
+                   opt-in RBN filter. Same generation-counter reconfigure/
+                   reconnect-with-backoff shape as hamalert.py, but stores
+                   spots in a dict keyed by (call, frequency bucket)
+                   rather than a deque -- the same call reheard by another
+                   skimmer moments later replaces the entry and refreshes
+                   its age instead of piling up near-duplicates, and
+                   anything stale is pruned on every read. Off by default
+                   even once configured -- confirmed live this feed is a
+                   genuine multi-spot-per-second firehose, not just
+                   documented as one.
+
 brandmeister_lastheard.py
                    BrandmeisterLastHeardListener: persistent WebSocket to
                    Brandmeister's own public real-time "Last Heard"
@@ -6814,6 +6829,104 @@ config for per-integration credentials; put it in
     its `clientHeight` (189) so the scrollbar is real, not decorative,
     and confirmed the empty-logbook state clears the block's `innerHTML`
     entirely rather than leaving stale rows behind.
+
+- **The POTA card became a general "Spots" card (v4.68), merging POTA +
+  SOTA + an opt-in Reverse Beacon Network (RBN) feed -- prompted directly
+  by the user asking about `github.com/kd9taw/Nexus` (a Rust/Tauri ham
+  radio app) after this project's own separate VFO Control card
+  investigation was shelved.** Fetched Nexus's real source (`gh api` code
+  search, not a summary) rather than guessing at its approach: its
+  `crates/propagation/src/pota.rs` already normalizes POTA + SOTA into
+  one `OtaSpot` struct with program toggle chips, and its
+  `docs/guide/spots.md` documents a SEPARATE raw DX-cluster/RBN firehose
+  board specifically because mixing that volume with the small POTA/SOTA
+  list would drown it -- both facts directly shaped this app's own
+  design (merge POTA+SOTA freely, gate RBN behind its own opt-in filter
+  chip, not because it was assumed but because a comparable real app hit
+  the identical scale problem and solved it the same way).
+  - **RBN's live protocol was verified directly against the real feed
+    from this dev sandbox** (`telnet.reversebeacon.net:7000` -- fully
+    reachable, no allowlist issue here unlike some other integrations'
+    dev-sandbox experiences) before writing `rbn.py`: connecting and
+    sending a bare callsign (any callsign, no password at all) logs in
+    immediately; the login banner itself reports the live global spot
+    rate (captured as "6/s (20,498/h)"), confirming this is a genuine
+    firehose, not an assumption. A real captured sample settled the exact
+    line shape (`DX de <skimmer>-#:  <freq_khz>  <call>  <mode>  <n> dB
+    <n> WPM|BPS  <tag>  <hhmm>Z`) -- CW and RTTY were the only modes seen
+    in an 8-second capture, with WPM (CW) vs. BPS (RTTY) genuinely
+    different speed units, not normalized.
+  - **`RbnListener` (same "generation-counter reconfigure, reconnect
+    with backoff" shape as `hamalert.py`'s `HamAlertListener`, its
+    closest analog) stores spots in a dict keyed by `(call, freq bucketed
+    to 2 kHz)`, not a deque** -- the same call reheard by a different
+    skimmer moments later (extremely common in a pileup) overwrites the
+    existing entry and refreshes its age instead of piling up a
+    near-duplicate row, and anything not re-heard within `STALE_SECONDS`
+    (600) is pruned on every read. This is a deliberate departure from
+    every other deque-based listener in this file (`hamalert.py`'s
+    alert history, `aprs_inbox.py`'s messages) -- an RBN spot has no
+    "keep forever" value the way a HamAlert trigger match or an APRS
+    message does, it's purely "what's on the air right now."
+  - **`rbn_enabled` (Settings -> Integrations, off by default even after
+    a callsign is saved) gates the entire persistent connection, separate
+    from the per-view "RBN" filter chip on the card itself** -- the
+    chip only filters/displays what's already buffered server-side;
+    without the settings toggle there's no connection to buffer anything
+    from at all, so a user who's never touched this setting pays zero
+    background-thread/socket cost, same "don't run a persistent
+    connection nobody asked for" posture as every other opt-in listener
+    in this file.
+  - **SOTA rows gained real distance/bearing, correcting an assumption
+    made in the card's own approved mockup.** The mockup's side-note
+    claimed "SOTA rows never show distance" based on the RAW SOTAwatch
+    feed genuinely carrying no coordinates -- true of the feed, but
+    `sota.py` (already in this app, built earlier) does its own
+    per-summit position lookup and only ever returns spots it could
+    resolve a position for. Caught while implementing, not before --
+    the real building block was better than what the mockup assumed, so
+    the shipped card computes distance/bearing for SOTA client-side
+    (`haversineMiBearing()`, mirroring `app.py`'s own
+    `_haversine_bearing()` formula) exactly like POTA's server-side
+    version already does, rather than faithfully reproducing the
+    mockup's stated limitation.
+  - **SOTA reference/activator links go to `sotadata.org.uk`'s real
+    summit/activator pages** (`/en/summit/<ASSOC>/<CODE>`,
+    `/en/activator/<CALL>`) -- confirmed live with real summit/callsign
+    values before shipping (both returned 200), not guessed from a
+    plausible-looking URL pattern.
+  - **POTA/SOTA rows share the exact existing `potaScore()`/
+    `potaAgeMin()`/sort-dropdown logic unchanged** -- a SOTA spot is
+    normalized into the SAME shape `/api/pota`'s rows already have
+    (`sotaToPotaShape()`) purely at merge time, rather than teaching
+    those functions a second data shape. RBN rows are NOT merged into
+    that same list -- they get their own always-freshest-first sort, a
+    hard `RBN_MAX_ROWS` (25) cap, and swap the card's sort dropdown for
+    a band-filter `<select>` while the RBN chip is active, since "smart
+    rank"/"nearest"/"freshest" don't mean anything for a plain CW
+    skimmer spot with no park/summit/QSO-count concept.
+  - **Card identifiers were deliberately NOT renamed despite the visible
+    title changing from "POTA" to "Spots"** -- `show_pota`/
+    `pota_position`, the `pota-card` element id, `renderPotaCard()`/
+    `fetchPota()`/`potaData`/`openPotaDrawer()` all keep their original
+    names, same "display text only, identifiers kept in sync manually"
+    precedent as the "Fleet Activity" -> "Hotspot Activity" rename
+    elsewhere in this file -- renaming them would touch many call sites
+    for zero functional gain. The side drawer (`renderPotaDrawer()`) was
+    deliberately left POTA-only too -- SOTA/RBN have no "hunter stats"
+    concept to show there.
+  - **Verified live end-to-end with Playwright against the real running
+    app** (not just a template/route check): seeded fake POTA/SOTA data
+    plus directly-seeded RBN buffer entries, confirmed the merged card
+    renders both program tags correctly, confirmed toggling the RBN
+    filter chip swaps the band-filter/sort-dropdown visibility and pulls
+    in RBN rows, confirmed toggling POTA/SOTA off leaves only RBN rows.
+    A real, useful accident during this same test: a stale settings.json
+    from an earlier failed run had already persisted `rbn_enabled: true`
+    before the seeded fake data was applied, so `_rebuild_rbn()` (called
+    at app import time) opened a REAL live connection to RBN mid-test --
+    confirming the full real-network path works end-to-end, not just the
+    seeded-data rendering path, entirely by accident.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

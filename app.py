@@ -53,6 +53,7 @@ from asl_audio import AslAudioManager
 from wsjtx import WsjtxListener, freq_to_band
 from qrz_logbook import QrzLogbookClient
 from hamalert import HamAlertListener
+from rbn import RbnListener
 from brandmeister_lastheard import BrandmeisterLastHeardListener
 from satellites import SatelliteTracker
 from starlink_trains import StarlinkTrainClient
@@ -120,6 +121,7 @@ wsjtx_listener  = WsjtxListener(monitor)
 qrz_logbook_client = QrzLogbookClient()
 hamalert_listener = HamAlertListener()
 brandmeister_lh = BrandmeisterLastHeardListener()
+rbn_listener = RbnListener()
 
 # Gates the Settings "Host power control" buttons -- only true on a
 # standalone install running directly on real Raspberry Pi hardware (see
@@ -249,6 +251,17 @@ def _rebuild_hamalert() -> None:
     )
 
 _rebuild_hamalert()
+
+def _rebuild_rbn() -> None:
+    """configure() itself is a no-op unless enabled/callsign actually
+    changed -- same pattern as _rebuild_hamalert above."""
+    settings = load_settings()
+    rbn_listener.configure(
+        settings.get("rbn_enabled", False),
+        settings.get("rbn_callsign", ""),
+    )
+
+_rebuild_rbn()
 
 def _rebuild_brandmeister_lh() -> None:
     """configure() itself is a no-op unless enabled state actually
@@ -785,6 +798,10 @@ def api_settings_post():
         settings["qrz_logbook_enabled"] = bool(data["qrz_logbook_enabled"])
     if "qrz_logbook_api_key" in data:
         settings["qrz_logbook_api_key"] = data["qrz_logbook_api_key"].strip()
+    if "rbn_enabled" in data:
+        settings["rbn_enabled"] = bool(data["rbn_enabled"])
+    if "rbn_callsign" in data:
+        settings["rbn_callsign"] = data["rbn_callsign"].strip().upper()
     if "push_vapid_contact" in data:
         contact = (data["push_vapid_contact"] or "").strip()
         if contact and not contact.lower().startswith(("mailto:", "http://", "https://")):
@@ -819,6 +836,8 @@ def api_settings_post():
         _rebuild_brandmeister_lh()
     if any(k in data for k in ("qrz_logbook_enabled", "qrz_logbook_api_key")):
         _rebuild_qrz_logbook()
+    if any(k in data for k in ("rbn_enabled", "rbn_callsign")):
+        _rebuild_rbn()
     if "push_vapid_contact" in data:
         _rebuild_push_client()
     if any(k in data for k in ("rig_control_enabled", "rig_host", "rig_port",
@@ -2663,6 +2682,35 @@ def api_hamalert():
     return jsonify(status)
 
 
+@app.route("/api/test_rbn", methods=["POST"])
+def test_rbn():
+    """Test an RBN Telnet login for the Settings 'Test connection' button
+    -- see RbnListener.test_connection()."""
+    data = request.json or {}
+    ok, message = RbnListener.test_connection(data.get("callsign", ""))
+    return jsonify({"success": ok, "message": message})
+
+
+@app.route("/api/rbn_spots")
+def api_rbn_spots():
+    """Live Reverse Beacon Network CW/RTTY skimmer spots for the Spots
+    card's RBN filter -- see rbn.py. Each spot gets `freq_hz` (freq_khz
+    * 1000, for rigTune()) and `band` (via the same freq_to_band()/
+    _hf_band_of() helper the POTA/HF Favorites cards already use) added
+    server-side so the frontend never has to duplicate that mapping."""
+    status = rbn_listener.status()
+    spots = rbn_listener.recent()
+    out = []
+    for s in spots:
+        row = dict(s)
+        hz = int(round(s["freq_khz"] * 1000))
+        row["freq_hz"] = hz
+        row["band"] = _hf_band_of(hz)
+        out.append(row)
+    status["spots"] = out
+    return jsonify(status)
+
+
 @app.route("/api/digipi")
 def api_digipi():
     """DigiPi connection status + recent parsed Direwolf/APRS activity --
@@ -3169,6 +3217,7 @@ def api_import_backup():
         _rebuild_hamalert()
         _rebuild_brandmeister_lh()
         _rebuild_qrz_logbook()
+        _rebuild_rbn()
 
     return jsonify({"ok": True, "result": result})
 

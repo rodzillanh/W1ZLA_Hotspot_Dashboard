@@ -496,6 +496,11 @@ BIOS = {
         "blurb": "Foo Fighters' powerhouse drummer for over two decades, known for a hard-hitting, versatile style that anchored the band through its biggest records.",
         "wiki": "Taylor_Hawkins",
     },
+    "Crosby": {
+        "name": "David Crosby",
+        "blurb": "Founding member of The Byrds and Crosby, Stills & Nash, whose soaring vocal harmonies helped define folk rock across two influential bands.",
+        "wiki": "David_Crosby",
+    },
 }
 
 

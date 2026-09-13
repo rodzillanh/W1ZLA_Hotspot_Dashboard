@@ -117,9 +117,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.67 "Hawkins"</span>
+                <span class="release-version">v4.68 "Crosby"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>POTA card became the Spots card</span> — now merges POTA, SOTA, and (optional, off by default) live Reverse Beacon Network CW/RTTY spots into one card, with filter chips per program. Every spot keeps tap-to-tune via rigctld</li>
+                <li><span>RBN support (new, opt-in)</span> — a persistent connection to the Reverse Beacon Network's public feed (Settings → Integrations), band-filterable and deduped since it's a genuine firehose</li>
+                <li><span>SOTA spots now show real distance</span> — the Spots card resolves each summit's actual position and shows distance/bearing from your station, same as POTA</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.67 "Hawkins"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>QSO Stats: per-band mode breakdown</span> — every band you've worked, ranked by contacts, each with its own FT8/SSB/CW/etc. mode split underneath. Scrolls to reach every band, not just the busiest few</li>

@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.67"
+APP_VERSION = "4.68"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -207,6 +207,8 @@ VERSION_CODENAMES = [
                         # singer-songwriter (1940-1976)
     "Hawkins",          # v4.67 -- Taylor Hawkins, drummer, Foo Fighters
                         # (1972-2022)
+    "Crosby",           # v4.68 -- David Crosby, The Byrds / Crosby, Stills
+                        # & Nash, singer-songwriter/guitarist (1941-2023)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1398,6 +1400,16 @@ DEFAULT_SETTINGS = {
     "show_pota": False,
     "pota_position": 0,
     "pota_callsign": "",
+    # RBN filter on the (POTA-card-turned-)Spots card -- a persistent
+    # Telnet connection to the Reverse Beacon Network's live CW/RTTY
+    # skimmer feed (telnet.reversebeacon.net:7000, see rbn.py). Off by
+    # default and gated separately from show_pota/SOTA -- confirmed live
+    # this feed is a genuine firehose (~6 spots/sec city-wide), so it's
+    # opt-in rather than bundled into the card automatically. `rbn_callsign`
+    # is only ever used as this app's own login identity to RBN, not a
+    # credential -- RBN has no password, any typed callsign logs in.
+    "rbn_enabled": False,
+    "rbn_callsign": "",
     # Tap-to-tune from the POTA card via a Hamlib rigctld server -- see
     # rigctl.py. Off by default. `rig_host` is the machine running
     # WFView (Settings -> enable RigCtld) or a standalone `rigctld`;

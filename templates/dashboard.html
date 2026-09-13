@@ -1362,6 +1362,16 @@
             margin-top: 8px; cursor: pointer; }
         .pota-glance:hover { color: var(--text-dim); }
         .pota-glance b { color: var(--text-dim); font-weight: 600; }
+        .spots-filter-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+        .spots-filter-chip { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; padding: 3px 9px;
+            border-radius: 20px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text-muted);
+            cursor: pointer; user-select: none; }
+        .spots-filter-chip .n { color: var(--text-dim); margin-left: 3px; }
+        .spots-filter-chip.active { background: var(--live-dim); border-color: color-mix(in srgb, var(--live) 45%, var(--border)); color: var(--live); }
+        .spots-filter-chip.active .n { color: var(--live); }
+        .src-tag { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .04em;
+            color: var(--text-dim); background: var(--panel-2); border: 1px solid var(--border-soft);
+            border-radius: 4px; padding: 1px 5px; }
         .pota-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px;
             font-size: 10px; letter-spacing: .13em; text-transform: uppercase; color: var(--text-muted);
             padding-top: 8px; margin-top: 6px; border-top: 1px solid var(--border-soft); }
@@ -3211,7 +3221,7 @@
         <div class="metrics-card" id="pota-card"
              style="order:{{ settings.get('pota_position', 0) }}">
             <div class="metrics-header">
-                <div class="card-name">🏕️ POTA{% if settings.get('pota_callsign', '') %} <span class="pota-call-chip">{{ settings.get('pota_callsign', '') }}</span>{% endif %}</div>
+                <div class="card-name">📡 Spots{% if settings.get('pota_callsign', '') %} <span class="pota-call-chip">{{ settings.get('pota_callsign', '') }}</span>{% endif %}</div>
                 <div style="display:flex;align-items:center;gap:8px">
                     {% if settings.get('rig_control_enabled', False) %}
                     <span class="pota-rig-pill" id="pota-rig-pill" title="Rig control via rigctld"><span class="d"></span><span id="pota-rig-pill-txt">rig</span></span>
@@ -3221,6 +3231,13 @@
             </div>
             <div class="pota-glance" id="pota-glance" role="button" tabindex="0"
                  onclick="openPotaDrawer()">—</div>
+            <div class="spots-filter-row">
+                <span class="spots-filter-chip active" id="spots-chip-pota" onclick="toggleSpotsFilter('pota')">POTA<span class="n" id="spots-n-pota"></span></span>
+                <span class="spots-filter-chip active" id="spots-chip-sota" onclick="toggleSpotsFilter('sota')">SOTA<span class="n" id="spots-n-sota"></span></span>
+                {% if settings.get('rbn_enabled', False) %}
+                <span class="spots-filter-chip" id="spots-chip-rbn" onclick="toggleSpotsFilter('rbn')">RBN<span class="n" id="spots-n-rbn">off</span></span>
+                {% endif %}
+            </div>
             <div class="pota-controls">
                 <span class="pota-cnt">Spots <b id="pota-cnt">—</b><span id="pota-newcnt"></span></span>
                 <select id="pota-sort" onchange="renderPotaCard()">
@@ -3232,9 +3249,18 @@
                     <option value="SSB">SSB</option>
                     <option value="FT8">FT8 / FT4</option>
                 </select>
+                <select id="pota-band-filter" style="display:none" onchange="renderPotaCard()">
+                    <option value="">All bands</option>
+                    <option value="160m">160m</option><option value="80m">80m</option>
+                    <option value="60m">60m</option><option value="40m">40m</option>
+                    <option value="30m">30m</option><option value="20m">20m</option>
+                    <option value="17m">17m</option><option value="15m">15m</option>
+                    <option value="12m">12m</option><option value="10m">10m</option>
+                    <option value="6m">6m</option>
+                </select>
             </div>
             <div class="pota-spots" id="pota-spots"></div>
-            <div class="msg-empty" id="pota-empty" style="display:none">No POTA activator spots right now.</div>
+            <div class="msg-empty" id="pota-empty" style="display:none">No activator or DX spots right now.</div>
         </div>
         {% endif %}
         {% if settings.get('show_hf_favorites', False) %}
@@ -3877,6 +3903,10 @@ const SHOW_RIG_PANEL = {{ 'true' if settings.get('show_rig_panel', False) else '
 const RIG_PANEL_POSITION = {{ settings.get('rig_panel_position', 0) }};
 const RIG_PANEL_POLL_MS = 1000;
 const POTA_POLL_MS = 20000;  // matches pota.py's spot cache TTL
+const SOTA_CARD_POLL_MS = 120000;  // matches sota.py's CACHE_TTL, same as the map overlay's own interval
+const RBN_ENABLED = {{ 'true' if settings.get('rbn_enabled', False) else 'false' }};
+const RBN_POLL_MS = 15000;  // rbn.py's buffer updates continuously server-side; this is just how often the card re-reads it
+const RBN_MAX_ROWS = 25;    // shown after band filter -- RBN is a firehose, see the Spots card mockup discussion
 const RIG_CONTROL_ENABLED = {{ 'true' if settings.get('rig_control_enabled', False) else 'false' }};
 // DVSwitch card shows when SHOW_DVSWITCH is on AND at least one hotspot
 // has dvswitch_enabled (derived per-poll from data.some(...)). Default
@@ -8653,10 +8683,76 @@ if (SHOW_QSO_STATS) {
     setInterval(fetchQsoStats, QSO_STATS_POLL_MS);
 }
 
-// --- POTA card (hunter + spots) -- one /api/pota poll feeds both the
-// fixed-size card body (ranked spot list) and the side drawer (full
-// hunter stats + recent hunts). See pota.py / api_pota().
-let potaData = null;
+// --- Spots card (POTA + SOTA + RBN) -- three independent feeds merged
+// into one ranked/filtered list. POTA still drives the side drawer's
+// hunter stats (SOTA/RBN have no equivalent hunter concept). See
+// pota.py/api_pota(), sota.py/api_sota_spots(), rbn.py/api_rbn_spots().
+let potaData = null;      // /api/pota
+let sotaCardData = null;  // /api/sota_spots (reused verbatim from the map overlay's own endpoint)
+let rbnCardData = null;   // /api/rbn_spots
+
+const SPOTS_FILTER_KEY = 'w1zla_spots_filter';
+let spotsFilter = { pota: true, sota: true, rbn: false };
+try {
+    const _savedFilter = JSON.parse(localStorage.getItem(SPOTS_FILTER_KEY) || 'null');
+    if (_savedFilter && typeof _savedFilter === 'object') Object.assign(spotsFilter, _savedFilter);
+} catch (e) { /* ignore a corrupt/foreign value */ }
+
+function toggleSpotsFilter(program) {
+    spotsFilter[program] = !spotsFilter[program];
+    try { localStorage.setItem(SPOTS_FILTER_KEY, JSON.stringify(spotsFilter)); } catch (e) {}
+    renderPotaCard();
+}
+
+// Plain HF band-edge table for SOTA rows -- sota.py's own feed carries a
+// bare MHz frequency, not a band label the way rbn.py's route already
+// computes server-side (via the same freq_to_band() POTA/HF Favorites use).
+const SPOTS_BAND_EDGES_MHZ = [
+    [1.8, 2.0, '160m'], [3.5, 4.0, '80m'], [5.06, 5.45, '60m'], [7.0, 7.3, '40m'],
+    [10.1, 10.15, '30m'], [14.0, 14.35, '20m'], [18.068, 18.168, '17m'],
+    [21.0, 21.45, '15m'], [24.89, 24.99, '12m'], [28.0, 29.7, '10m'], [50.0, 54.0, '6m'],
+];
+function mhzToBand(mhz) {
+    for (const [lo, hi, name] of SPOTS_BAND_EDGES_MHZ) if (mhz >= lo && mhz <= hi) return name;
+    return '';
+}
+// Great-circle distance (miles) + initial bearing -- same formula as
+// app.py's own _haversine_bearing(), just needed client-side here since
+// SOTA rows aren't pre-enriched with distance/bearing the way /api/pota's
+// rows already are.
+function haversineMiBearing(lat1, lon1, lat2, lon2) {
+    const R = 3958.8, toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    const mi = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+    const brg = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    return { mi, brg };
+}
+// Normalizes one SOTA spot into the exact same shape /api/pota's rows
+// already have, so potaScore()/potaAgeMin() and the row template below
+// work unchanged for both programs. Confirmed live: sota.py's own summit
+// lookup already resolves lat/lon for every spot it returns (unlike the
+// raw SOTAwatch feed, which carries no coordinates at all) -- so, unlike
+// an earlier assumption, SOTA rows CAN show a real distance/bearing here.
+function sotaToPotaShape(s, qthLat, qthLon) {
+    const mhz = parseFloat(s.frequency);
+    const freqHz = isNaN(mhz) ? null : Math.round(mhz * 1e6);
+    let distMi = null, bearing = null;
+    if (qthLat != null && qthLon != null && s.lat != null && s.lon != null) {
+        const r = haversineMiBearing(qthLat, qthLon, s.lat, s.lon);
+        distMi = Math.round(r.mi); bearing = Math.round(r.brg);
+    }
+    return {
+        _program: 'SOTA', activator: s.callsign, reference: s.summit_code,
+        park_name: s.summit_name || '', band: isNaN(mhz) ? '' : mhzToBand(mhz),
+        mode: (s.mode || '').toUpperCase(), comments: s.comment || '',
+        spot_time: s.spotted_at ? new Date(s.spotted_at * 1000).toISOString() : null,
+        dist_mi: distMi, bearing: bearing, freq_hz: freqHz,
+        new_to_you: false, qso_count: null,
+    };
+}
 
 function potaAgeMin(iso) {
     if (!iso) return 999;
@@ -8673,44 +8769,157 @@ function potaScore(s) {
     const early = q < 10 ? (10 - q) : 0;
     return (s.new_to_you ? 100 : 0) + fresh + near + early;
 }
+function rbnAgeSec(epochSec) {
+    if (!epochSec) return 99999;
+    return Math.max(0, Math.round(Date.now() / 1000 - epochSec));
+}
+function rbnAgeStr(sec) {
+    if (sec < 60) return sec + 's';
+    const m = Math.round(sec / 60);
+    return m < 60 ? m + 'm' : Math.floor(m / 60) + 'h' + (m % 60) + 'm';
+}
+
+const DIR_NAME = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+
+function potaSpotHtml(s, rigOk) {
+    const age = potaAgeMin(s.spot_time);
+    const call = s.activator || '?';
+    const isSota = s._program === 'SOTA';
+    const lookupHref = QRZ_ENABLED
+        ? `https://www.qrz.com/db/${encodeURIComponent(call)}`
+        : (isSota ? `https://www.sotadata.org.uk/en/activator/${encodeURIComponent(call)}`
+                  : `https://pota.app/#/profile/${encodeURIComponent(call)}`);
+    const refHref = isSota
+        ? `https://www.sotadata.org.uk/en/summit/${(s.reference || '').split('/').map(encodeURIComponent).join('/')}`
+        : `https://pota.app/#/park/${encodeURIComponent(s.reference || '')}`;
+    const freqMhz = s.freq_hz ? (s.freq_hz / 1e6).toFixed(3) : '';
+    // sanitized to bare alphanumerics -- pota_mode_to_rig() only cares
+    // about tokens like SSB/CW/FT8 anyway, and this keeps the value safe
+    // to drop into the inline onclick string literal
+    const modeTok = (s.mode || '').replace(/[^A-Za-z0-9]/g, '');
+    const freqCell = (freqMhz && rigOk && s.freq_hz)
+        ? `<button class="pota-tune-chip" data-mhz="${freqMhz}" title="Tune the rig to ${freqMhz} MHz via rigctld"
+             onclick="rigTune(this, ${s.freq_hz}, '${modeTok}')"><span class="ic">▶</span>${freqMhz}</button> `
+        : (freqMhz ? freqMhz + ' ' : '');
+    const distBit = (s.dist_mi != null && s.bearing != null)
+        ? `${s.dist_mi} mi ${DIR_NAME[Math.round(((s.bearing % 360) + 360) % 360 / 22.5) % 16]}` : '';
+    const q = (typeof s.qso_count === 'number') ? s.qso_count : null;
+    return `
+    <div class="pota-spot${s.new_to_you ? ' isnew' : ''}">
+        <div class="pota-dot${age <= 5 ? ' fresh' : ''}"></div>
+        <div class="pota-spot-main">
+            <div class="pota-spot-top">
+                <span class="src-tag">${s._program}</span>
+                <a class="pota-spot-act" href="${lookupHref}" target="_blank" rel="noopener">${escapeHtml(call)}</a>
+                ${s.new_to_you ? '<span class="pota-newtag">🚩 NEW</span>' : ''}
+                <a class="pota-spot-ref" href="${refHref}" target="_blank" rel="noopener">${escapeHtml(s.reference || '')}</a>
+            </div>
+            <span class="pota-spot-park">${escapeHtml(s.park_name || '')}</span>
+            <div class="pota-spot-sub">${freqCell}${escapeHtml(s.band || '')} · ${escapeHtml(s.mode || '')}${distBit ? ' · <span class="pota-spot-dist">' + distBit + '</span>' : ''}${s.location_desc ? ' · ' + escapeHtml(s.location_desc) : ''}${s.comments ? ' · <span class="pota-spot-cmt">' + escapeHtml(s.comments) + '</span>' : ''}</div>
+        </div>
+        <div class="pota-spot-right"><span>${potaAgeStr(age)}</span>${q != null ? `<span class="pota-spot-q${q < 10 ? ' early' : ''}">${q} Q</span>` : ''}</div>
+    </div>`;
+}
+
+function rbnSpotHtml(s, rigOk) {
+    const age = rbnAgeSec(s.last_seen);
+    const call = s.call || '?';
+    const lookupHref = QRZ_ENABLED ? `https://www.qrz.com/db/${encodeURIComponent(call)}` : null;
+    const callHtml = lookupHref
+        ? `<a class="pota-spot-act" href="${lookupHref}" target="_blank" rel="noopener">${escapeHtml(call)}</a>`
+        : `<span class="pota-spot-act">${escapeHtml(call)}</span>`;
+    const freqMhz = s.freq_hz ? (s.freq_hz / 1e6).toFixed(3) : '';
+    const modeTok = (s.mode || '').replace(/[^A-Za-z0-9]/g, '');
+    const freqCell = (freqMhz && rigOk && s.freq_hz)
+        ? `<button class="pota-tune-chip" data-mhz="${freqMhz}" title="Tune the rig to ${freqMhz} MHz via rigctld"
+             onclick="rigTune(this, ${s.freq_hz}, '${modeTok}')"><span class="ic">▶</span>${freqMhz}</button> `
+        : (freqMhz ? freqMhz + ' ' : '');
+    return `
+    <div class="pota-spot">
+        <div class="pota-dot${age < 30 ? ' fresh' : ''}"></div>
+        <div class="pota-spot-main">
+            <div class="pota-spot-top"><span class="src-tag">RBN</span>${callHtml}</div>
+            <div class="pota-spot-sub">${freqCell}${escapeHtml(s.band || '')} · ${escapeHtml(s.mode || '')} · ${s.speed}${escapeHtml(s.speed_unit || '')} · ${s.snr_db} dB
+                <span class="pota-spot-cmt"> ${escapeHtml(s.tag || '')} · via ${escapeHtml(s.spotter || '?')}</span></div>
+        </div>
+        <div class="pota-spot-right"><span>${age < 5 ? 'now' : rbnAgeStr(age)}</span></div>
+    </div>`;
+}
 
 function renderPotaCard() {
     const listEl = document.getElementById('pota-spots');
-    if (!listEl || !potaData) return;
-    const spots = potaData.spots || [];
+    if (!listEl) return;
+
+    const rbnOn = RBN_ENABLED && spotsFilter.rbn;
+    const sortSel = document.getElementById('pota-sort');
+    const bandSel = document.getElementById('pota-band-filter');
+    if (sortSel) sortSel.style.display = rbnOn ? 'none' : '';
+    if (bandSel) bandSel.style.display = rbnOn ? '' : 'none';
+
+    ['pota', 'sota', 'rbn'].forEach(p => {
+        const chip = document.getElementById('spots-chip-' + p);
+        if (chip) chip.classList.toggle('active', !!spotsFilter[p]);
+    });
+
+    const potaSpots = (potaData && potaData.spots) || [];
+    const sotaRaw = (sotaCardData && sotaCardData.spots) || [];
+    const qthLat = potaData ? potaData.qth_lat : null;
+    const qthLon = potaData ? potaData.qth_lon : null;
+    const sotaSpots = sotaRaw.map(s => sotaToPotaShape(s, qthLat, qthLon));
+    const rbnSpots = (rbnCardData && rbnCardData.spots) || [];
+
+    const nPota = document.getElementById('spots-n-pota');
+    if (nPota) nPota.textContent = potaSpots.length ? String(potaSpots.length) : '';
+    const nSota = document.getElementById('spots-n-sota');
+    if (nSota) nSota.textContent = sotaSpots.length ? String(sotaSpots.length) : '';
+    const nRbn = document.getElementById('spots-n-rbn');
+    if (nRbn) nRbn.textContent = !RBN_ENABLED ? '' : (spotsFilter.rbn ? String(rbnSpots.length) : 'off');
+
+    // --- POTA + SOTA share the existing "hunter" sort/filter controls ---
     const v = (document.getElementById('pota-sort') || {}).value || 'smart';
+    let hunterList = [];
+    if (spotsFilter.pota) hunterList = hunterList.concat(potaSpots.map(s => Object.assign({ _program: 'POTA' }, s)));
+    if (spotsFilter.sota) hunterList = hunterList.concat(sotaSpots);
+    if (v === 'new')      hunterList = hunterList.filter(s => s.new_to_you);
+    else if (v === 'CW')  hunterList = hunterList.filter(s => s.mode === 'CW');
+    else if (v === 'SSB') hunterList = hunterList.filter(s => s.mode === 'SSB');
+    else if (v === 'FT8') hunterList = hunterList.filter(s => s.mode === 'FT8' || s.mode === 'FT4');
+    if (v === 'near')       hunterList.sort((a, b) => (a.dist_mi ?? 1e9) - (b.dist_mi ?? 1e9));
+    else if (v === 'fresh') hunterList.sort((a, b) => potaAgeMin(a.spot_time) - potaAgeMin(b.spot_time));
+    else                    hunterList.sort((a, b) => potaScore(b) - potaScore(a));
 
-    let list = spots.slice();
-    if (v === 'new')      list = list.filter(s => s.new_to_you);
-    else if (v === 'CW')  list = list.filter(s => s.mode === 'CW');
-    else if (v === 'SSB') list = list.filter(s => s.mode === 'SSB');
-    else if (v === 'FT8') list = list.filter(s => s.mode === 'FT8' || s.mode === 'FT4');
-    if (v === 'near')       list.sort((a, b) => (a.dist_mi ?? 1e9) - (b.dist_mi ?? 1e9));
-    else if (v === 'fresh') list.sort((a, b) => potaAgeMin(a.spot_time) - potaAgeMin(b.spot_time));
-    else                    list.sort((a, b) => potaScore(b) - potaScore(a));
+    // --- RBN: band-filtered, freshest first, capped -- see rbn.py's own
+    // module docstring for why this needs a hard cap and a filter at all ---
+    let rbnList = [];
+    if (rbnOn) {
+        const band = (bandSel && bandSel.value) || '';
+        rbnList = rbnSpots.filter(s => !band || s.band === band);
+        rbnList.sort((a, b) => (b.last_seen || 0) - (a.last_seen || 0));
+        rbnList = rbnList.slice(0, RBN_MAX_ROWS);
+    }
 
-    const newCount = spots.filter(s => s.new_to_you).length;
-    document.getElementById('pota-cnt').textContent = spots.length;
+    const newCount = potaSpots.filter(s => s.new_to_you).length;
+    document.getElementById('pota-cnt').textContent = hunterList.length + rbnList.length;
     document.getElementById('pota-newcnt').innerHTML = newCount
         ? ` <span class="pota-newn">· ${newCount} new</span>` : '';
 
-    const h = potaData.hunter;
+    const h = potaData ? potaData.hunter : null;
     const glance = document.getElementById('pota-glance');
     if (h) {
         const last = (h.recent_hunts && h.recent_hunts[0]) ? h.recent_hunts[0].reference : null;
         glance.innerHTML = `<b>${h.parks ?? '—'}</b> parks · <b>${h.qsos ?? '—'}</b> Q · <b>${h.awards ?? '—'}</b> awards`
             + (last ? ` · last ${escapeHtml(last)}` : '');
-    } else {
+    } else if (potaData) {
         glance.innerHTML = potaData.has_callsign
             ? 'Hunter stats unavailable right now'
             : 'Set your callsign in Settings → Integrations for hunter stats';
     }
 
     const emptyEl = document.getElementById('pota-empty');
-    if (emptyEl) emptyEl.style.display = list.length ? 'none' : 'block';
+    if (emptyEl) emptyEl.style.display = (hunterList.length + rbnList.length) ? 'none' : 'block';
 
     // rig-control pill + whether the tap-to-tune chips should render
-    const rig = potaData.rig;
+    const rig = potaData ? potaData.rig : null;
     const rigOk = RIG_CONTROL_ENABLED && !!(rig && rig.reachable);
     const rigPill = document.getElementById('pota-rig-pill');
     if (rigPill && rig) {
@@ -8722,40 +8931,8 @@ function renderPotaCard() {
             : (rig.error || 'Rig server not reachable');
     }
 
-    const dirName = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
-    listEl.innerHTML = list.map(s => {
-        const age = potaAgeMin(s.spot_time);
-        const call = s.activator || '?';
-        const lookupHref = QRZ_ENABLED
-            ? `https://www.qrz.com/db/${encodeURIComponent(call)}`
-            : `https://pota.app/#/profile/${encodeURIComponent(call)}`;
-        const freqMhz = s.freq_hz ? (s.freq_hz / 1e6).toFixed(3) : '';
-        // sanitized to bare alphanumerics -- pota_mode_to_rig() only
-        // cares about tokens like SSB/CW/FT8 anyway, and this keeps the
-        // value safe to drop into the inline onclick string literal
-        const modeTok = (s.mode || '').replace(/[^A-Za-z0-9]/g, '');
-        const freqCell = (freqMhz && rigOk && s.freq_hz)
-            ? `<button class="pota-tune-chip" data-mhz="${freqMhz}" title="Tune the rig to ${freqMhz} MHz via rigctld"
-                 onclick="rigTune(this, ${s.freq_hz}, '${modeTok}')"><span class="ic">▶</span>${freqMhz}</button> `
-            : (freqMhz ? freqMhz + ' ' : '');
-        const distBit = (s.dist_mi != null && s.bearing != null)
-            ? `${s.dist_mi} mi ${dirName[Math.round(((s.bearing % 360) + 360) % 360 / 22.5) % 16]}` : '';
-        const q = (typeof s.qso_count === 'number') ? s.qso_count : null;
-        return `
-        <div class="pota-spot${s.new_to_you ? ' isnew' : ''}">
-            <div class="pota-dot${age <= 5 ? ' fresh' : ''}"></div>
-            <div class="pota-spot-main">
-                <div class="pota-spot-top">
-                    <a class="pota-spot-act" href="${lookupHref}" target="_blank" rel="noopener">${escapeHtml(call)}</a>
-                    ${s.new_to_you ? '<span class="pota-newtag">🚩 NEW</span>' : ''}
-                    <a class="pota-spot-ref" href="https://pota.app/#/park/${encodeURIComponent(s.reference || '')}" target="_blank" rel="noopener">${escapeHtml(s.reference || '')}</a>
-                </div>
-                <span class="pota-spot-park">${escapeHtml(s.park_name || '')}</span>
-                <div class="pota-spot-sub">${freqCell}${escapeHtml(s.band || '')} · ${escapeHtml(s.mode || '')}${distBit ? ' · <span class="pota-spot-dist">' + distBit + '</span>' : ''}${s.location_desc ? ' · ' + escapeHtml(s.location_desc) : ''}${s.comments ? ' · <span class="pota-spot-cmt">' + escapeHtml(s.comments) + '</span>' : ''}</div>
-            </div>
-            <div class="pota-spot-right"><span>${potaAgeStr(age)}</span>${q != null ? `<span class="pota-spot-q${q < 10 ? ' early' : ''}">${q} Q</span>` : ''}</div>
-        </div>`;
-    }).join('');
+    listEl.innerHTML = hunterList.map(s => potaSpotHtml(s, rigOk)).join('')
+        + rbnList.map(s => rbnSpotHtml(s, rigOk)).join('');
 }
 
 let _rigToastT = null;
@@ -8877,9 +9054,31 @@ function fetchPota() {
         }
     }).catch(() => {});
 }
+function fetchSotaForCard() {
+    if (!SHOW_POTA) return;
+    fetch('/api/sota_spots').then(r => r.json()).then(data => {
+        if (data && !data.error) {
+            sotaCardData = data;
+            renderPotaCard();
+        }
+    }).catch(() => {});
+}
+function fetchRbnForCard() {
+    if (!SHOW_POTA || !RBN_ENABLED) return;
+    fetch('/api/rbn_spots').then(r => r.json()).then(data => {
+        rbnCardData = data;
+        renderPotaCard();
+    }).catch(() => {});
+}
 if (SHOW_POTA) {
     fetchPota();
     setInterval(fetchPota, POTA_POLL_MS);
+    fetchSotaForCard();
+    setInterval(fetchSotaForCard, SOTA_CARD_POLL_MS);
+    if (RBN_ENABLED) {
+        fetchRbnForCard();
+        setInterval(fetchRbnForCard, RBN_POLL_MS);
+    }
 }
 
 // --- HF Favorites card (v4.50): tap-to-tune memory bank -------------

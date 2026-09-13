@@ -1611,41 +1611,63 @@ favorite alerts above for the one place this dashboard *does* use a
 Brandmeister live connection, for a different, narrower purpose).
 
 <!-- wiki-group: Optional Cards -->
-## POTA card
+## Spots card
 <!-- wiki-image: pota-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show POTA card", off by
-default) for Parks on the Air hunters. It's a **fixed-size card** — a
-one-line stat glance, then a ranked activator-spot list at a fixed
+default) — despite the setting name, it's grown into a general **Spots**
+card merging three feeds: **POTA**, **SOTA**, and (opt-in) live **RBN**
+(Reverse Beacon Network) CW/RTTY spots. It's a **fixed-size card** — a
+one-line stat glance, filter chips, then a ranked spot list at a fixed
 height that scrolls — so it sits level with your other cards no matter
 what.
 
-The spot list is the same live `api.pota.app/spot/activator` feed the
-Live map's "POTA spots" overlay uses, but **ranked** rather than
-newest-first: "Smart rank" (the default) surfaces parks that are new to
-you, freshly spotted, close to you, and early in the activation (a
-low QSO count means you'll get through and the activator still needs
+**POTA** spots come from the same live `api.pota.app/spot/activator`
+feed the Live map's "POTA spots" overlay uses, but **ranked** rather
+than newest-first: "Smart rank" (the default) surfaces parks that are
+new to you, freshly spotted, close to you, and early in the activation
+(a low QSO count means you'll get through and the activator still needs
 contacts). Other views: **New parks only**, **Nearest**, **Freshest**,
-or by mode (CW / SSB / FT8·FT4). Each row shows the activator (linked to
-QRZ), park reference and name, frequency/band/mode, **distance and
-bearing from your grid**, location, spot comment, age, and QSO count.
+or by mode (CW / SSB / FT8·FT4). A **🚩 NEW** tag marks parks you
+haven't worked — checked against the POTA references in your logged
+QSOs (ADIF imports keep `POTA_REF` / `SIG_INFO`) plus your recent POTA
+hunts.
 
-A **🚩 NEW** tag marks parks you haven't worked — checked against the
-POTA references in your logged QSOs (ADIF imports now keep `POTA_REF` /
-`SIG_INFO`) plus your recent POTA hunts.
+**SOTA** spots share the same list and the same sort/filter controls,
+each with real distance/bearing from your station (SOTA's own feed
+carries no coordinates at all, so the app resolves each summit's
+position separately — same as the Live map's "SOTA spots" overlay).
+
+**RBN** is a different kind of feed entirely — a live worldwide firehose
+of CW/RTTY skimmer spots (several per second), so it's **off by
+default** even once configured, toggled per-view with its own filter
+chip. Turning it on swaps the sort dropdown for a **band filter** and
+caps the list to the most recent spots after deduping (the same call
+heard by several skimmers in one pileup collapses to a single row).
+Set it up under Settings → Integrations → Reverse Beacon Network — it's
+a single free public feed, no account needed; the callsign field is
+only used to log in to RBN's feed, not a credential.
+
+Every row (POTA, SOTA, or RBN) shows the callsign (linked to QRZ, or a
+program-appropriate profile page when QRZ isn't configured), a
+reference/park/summit where applicable, frequency/band/mode, age, and
+extra per-program detail (distance/bearing, QSO count, or CW
+speed/SNR/spotter).
 
 The **⚙ Stats** button (or the glance line) opens a side drawer with
 your POTA **hunter stats** — parks, QSOs, awards, endorsements — and
-your recent hunts. That needs your callsign under Settings →
+your recent hunts (SOTA/RBN have no equivalent hunter concept, so this
+stays POTA-specific). That needs your callsign under Settings →
 Integrations → Parks on the Air. It's a plain callsign, **not a login**:
 every `api.pota.app` endpoint used here is public, no account or key.
 Without a callsign the card still works — it just shows the spot list
 without stats.
 
 **Tap-to-tune:** with [Rig control](#rig-control-rigctld) configured,
-each spot's frequency becomes a button that tunes your radio to it (and
-sets the mode, optionally). A pill in the card header shows whether the
-rig server is reachable; when it isn't, the frequency is plain text.
+every spot's frequency — POTA, SOTA, or RBN — becomes a button that
+tunes your radio to it (and sets the mode, optionally). A pill in the
+card header shows whether the rig server is reachable; when it isn't,
+the frequency is plain text.
 
 <!-- wiki-group: Optional Cards -->
 ## HF Favorites card
