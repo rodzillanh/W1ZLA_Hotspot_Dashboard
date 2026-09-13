@@ -6714,6 +6714,37 @@ config for per-integration credentials; put it in
     own live capture to confirm, the same discipline as every other
     openSPOT4 finding in this file.
 
+- **Hotspot Status rows gained the same active/friend/offline/away
+  background tints as the full-size hotspot card (v4.65), plus a
+  scrollbar spacing fix -- both reported directly with a screenshot.**
+  Reused the exact same tokens and precedence order `renderCards()`
+  already computes for `.hotspot-card.active/.favorite/.offline/.away`
+  (`isFav = hs.is_favorite && hs.is_active`; away beats offline beats
+  active/favorite, since a stale `is_active`/`is_favorite` from before a
+  hotspot dropped shouldn't outrank the fact that it's not reachable
+  right now) -- no new color logic invented, just applied to
+  `.fs-entry` too. The tinted background uses the exact same negative-
+  margin "extend into the card's own padding" trick `.fs-entry:hover`
+  already had, so a colored row reads as a real highlighted row rather
+  than a color patch confined to the row's own narrow content bounds.
+  - **The scrollbar-crowding complaint was a real, missing gap, not a
+    perception issue**: `.fs-list` had zero right padding, so the
+    instant a scrollbar appeared (any fleet with more than ~7 hotspots),
+    right-aligned text (`.fs-activity`/`.fs-health`) sat flush against
+    the 6px thumb with no breathing room. Fixed with `padding-right: 8px`
+    on `.fs-list`, paired with `margin-right: -8px` so the list's overall
+    width is unaffected when there's NO scrollbar to make room for --
+    the padding only ever matters once content actually overflows.
+  - Verified live with Playwright: seeded one hotspot per state (active,
+    active+favorite, offline, away, three idle) and confirmed each row's
+    class list matches exactly (`fs-entry active`, `fs-entry favorite`,
+    `fs-entry offline`, `fs-entry away`), confirmed the rendered
+    background colors visually match their corresponding full-size cards
+    directly below them in the same screenshot, and confirmed (via a
+    forced-overflow 8-hotspot fleet) a real visible gap between the
+    right-aligned text and the scrollbar in a cropped close-up of the
+    card, not just a computed CSS value.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

@@ -481,6 +481,11 @@ BIOS = {
         "blurb": "Instrumental guitarist whose 1958 hit \"Rumble\" pioneered the power chord and distorted guitar tone, directly shaping punk and hard rock decades before either genre existed.",
         "wiki": "Link_Wray",
     },
+    "VanZant": {
+        "name": "Ronnie Van Zant",
+        "blurb": "Founding frontman of Lynyrd Skynyrd, whose gritty Southern-rock songwriting on tracks like \"Free Bird\" and \"Sweet Home Alabama\" defined the genre before his death in the band's 1977 plane crash.",
+        "wiki": "Ronnie_Van_Zant",
+    },
 }
 
 

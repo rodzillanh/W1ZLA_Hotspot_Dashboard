@@ -629,6 +629,13 @@
         .fs-count { font-size: 11px; font-family: var(--font-mono); color: var(--text-dim); font-weight: 400; }
         .fs-list {
             max-height: 340px; overflow-y: auto; overflow-x: hidden;
+            /* A little breathing room from the scrollbar itself -- with
+               zero right padding, a row's right-aligned text (fs-activity/
+               fs-health) sat flush against the thumb the instant a
+               scrollbar appeared, no gap at all. margin-right compensates
+               so the list's LEFT/overall width is unaffected when there's
+               no scrollbar to make room for. */
+            padding-right: 8px; margin-right: -8px;
             scrollbar-width: thin; scrollbar-color: var(--card-border) transparent;
         }
         .fs-list::-webkit-scrollbar { width: 6px; }
@@ -637,6 +644,19 @@
         .fs-entry { padding: 8px 0; border-bottom: 1px solid var(--border-soft); cursor: pointer; min-width: 0; }
         .fs-entry:last-child { border-bottom: none; }
         .fs-entry:hover { background: var(--panel-2); margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
+        /* Same background-tint language as the full-size hotspot card
+           (.hotspot-card.active/.favorite/.offline/.away) -- same tokens,
+           same negative-margin "extend into the card's own padding"
+           trick .fs-entry:hover above already uses, so a tinted row
+           reads as a proper highlighted row rather than a color patch
+           sitting inside the row's own narrow bounds. */
+        .fs-entry.active, .fs-entry.favorite, .fs-entry.offline, .fs-entry.away {
+            margin: 0 -8px; padding-left: 8px; padding-right: 8px;
+        }
+        .fs-entry.active   { background: var(--card-active-bg); }
+        .fs-entry.favorite { background: var(--fav-bg); }
+        .fs-entry.offline  { background: var(--danger-bg); opacity: .88; }
+        .fs-entry.away     { background: var(--panel-2); opacity: .75; }
         .fs-row1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
         .fs-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--text-dim); }
         .fs-dot.live { background: var(--live); animation: pulse 1.5s ease-in-out infinite; }
@@ -5226,6 +5246,13 @@ function renderFleetStatusCard(data) {
         const isAway = isOffline && !!hs.portable;
         const dotClass = isAway ? '' : isOffline ? 'off' : hs.is_active ? 'live' : 'on';
         const typeLabel = isAsl ? 'ASL3' : isOpenSpot4 ? 'openSPOT4' : 'WPSD';
+        // Same background-tint language as the full-size hotspot card
+        // (.hotspot-card.active/.favorite/.offline/.away), same
+        // precedence order too: an unreachable hotspot's stale
+        // is_active/is_favorite say nothing about its CURRENT state, so
+        // away/offline always win over active/favorite tinting.
+        const isFav = hs.is_favorite && hs.is_active;
+        const rowClass = isAway ? 'away' : (isOffline ? 'offline' : (hs.is_active ? (isFav ? 'favorite' : 'active') : ''));
 
         let activityHtml;
         if (isAway) {
@@ -5279,7 +5306,7 @@ function renderFleetStatusCard(data) {
         const updateFlag = hs.dashboard_update_available ? ' <span title="Update available">⬆</span>' : '';
 
         return `
-        <div class="fs-entry" onclick="openHotspotDrawer('${hs.id}')">
+        <div class="fs-entry ${rowClass}" onclick="openHotspotDrawer('${hs.id}')">
             <div class="fs-row1">
                 <span class="fs-dot ${dotClass}"></span>
                 <span class="fs-name" title="${escapeHtml(hs.name)}">${escapeHtml(hs.name)}</span>
