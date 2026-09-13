@@ -364,6 +364,11 @@ def api_data():
         # renderCards() uses this to show the neutral "away" card instead
         # of the red offline one when a portable hotspot can't be reached.
         entry["portable"] = bool(hs.get("portable", False))
+        # Second dashboard tab (v4.58) -- static config passthrough, same
+        # reason portable/type/lat/lon are here. Default 1 so an existing
+        # install (every hotspot missing this key) renders exactly as
+        # before on the one and only "Dashboard" tab.
+        entry["dashboard_page"] = hs.get("dashboard_page", 1)
         # Card title's link override -- static config, same reason type/
         # lat/lon are passed through here rather than being part of the
         # live-polled HotspotStatus. None when unset -- renderCards()'s
@@ -720,6 +725,27 @@ def api_settings_post():
         raw = data["card_order_tiebreak"]
         if isinstance(raw, list):
             settings["card_order_tiebreak"] = [str(x) for x in raw]
+    # Second dashboard tab (v4.58) -- one *_page key per sentinel, plus
+    # dvswitch_page and the editable tab label. See config.py's own
+    # DEFAULT_SETTINGS comment for why these are grouped as one block
+    # rather than interleaved next to each sibling *_position handler.
+    for _page_key in (
+        "fleet_activity_page", "asl_favorites_page", "hf_conditions_page",
+        "band_plan_page", "license_quiz_page", "wspr_activity_page",
+        "digipi_page", "big_clock_page", "notifications_page",
+        "satellites_page", "flights_overhead_page", "recent_contacts_page",
+        "qso_stats_page", "top_activity_page", "pota_page",
+        "hf_favorites_page", "rig_panel_page", "dvswitch_page",
+    ):
+        if _page_key in data:
+            try:
+                page_val = int(data[_page_key])
+                if page_val in (1, 2):
+                    settings[_page_key] = page_val
+            except (TypeError, ValueError):
+                pass
+    if "dashboard2_name" in data:
+        settings["dashboard2_name"] = str(data["dashboard2_name"]).strip() or "Dashboard 2"
     if "hamalert_enabled" in data:
         settings["hamalert_enabled"] = bool(data["hamalert_enabled"])
     if "hamalert_username" in data:
@@ -870,9 +896,34 @@ def api_notification_prefs_post():
 
 # --- pages ---
 
+def _has_dashboard2_content(settings: dict, hotspots: list, cameras: list) -> bool:
+    """Whether the "Dashboard 2" tab should even appear -- presence-
+    derived (something is actually assigned to page 2), same "no
+    separate on/off toggle" reasoning as show_dvswitch elsewhere in this
+    app. Checked at every render rather than cached, since it's a handful
+    of cheap dict lookups over lists this route already loads."""
+    if any(h.get("dashboard_page", 1) == 2 for h in hotspots):
+        return True
+    for _data_ip, enabled_key, pos_key, *_ in _SENTINEL_DEFS:
+        is_enabled = (any(settings.get(k, False) for k in enabled_key)
+                      if isinstance(enabled_key, tuple) else settings.get(enabled_key, False))
+        if is_enabled and settings.get(_sentinel_page_key(pos_key), 1) == 2:
+            return True
+    if settings.get("show_cameras", False) and any(c.get("page", 1) == 2 for c in cameras):
+        return True
+    if (settings.get("show_dvswitch", True) and any(h.get("dvswitch_enabled") for h in hotspots)
+            and settings.get("dvswitch_page", 1) == 2):
+        return True
+    return False
+
+
 @app.route("/")
 def dashboard():
-    return render_template("dashboard.html", settings=load_settings())
+    settings = load_settings()
+    hotspots = load_hotspots()
+    cameras  = load_cameras()
+    return render_template("dashboard.html", settings=settings,
+                            has_dashboard2=_has_dashboard2_content(settings, hotspots, cameras))
 
 @app.route("/mobile")
 def dashboard_mobile():
@@ -1045,11 +1096,33 @@ _SENTINEL_DEFS = [
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
 
 
-def _overflow_sentinels(settings: dict, hotspots: list, cameras: list) -> list:
+def _sentinel_page_key(pos_key: str) -> str:
+    """Derives a sentinel's *_page settings key from its existing
+    *_position key (e.g. "fleet_activity_position" ->
+    "fleet_activity_page") rather than adding a 7th field to every
+    _SENTINEL_DEFS tuple -- every pos_key in that list ends in
+    "_position" by construction, confirmed by inspection, so this is a
+    safe, mechanical derivation, not a guess."""
+    return pos_key[: -len("_position")] + "_page" if pos_key.endswith("_position") else pos_key + "_page"
+
+
+def _overflow_sentinels(settings: dict, hotspots: list, cameras: list, page: int = 1) -> list:
     """Enabled cards/cameras whose saved position is at or past the end
-    of the hotspot list, sorted by that position value with an explicit
-    tiebreak (settings.card_order_tiebreak, falling back to _SENTINEL_DEFS'
-    own declared order for anything not in that list).
+    of THIS PAGE's hotspot list, sorted by that position value with an
+    explicit tiebreak (settings.card_order_tiebreak, falling back to
+    _SENTINEL_DEFS' own declared order for anything not in that list).
+
+    Second dashboard tab (v4.58) -- every sentinel/camera has its own
+    *_page (default 1), so `page` filters BOTH which hotspots count
+    toward "the end of the list" (only same-page hotspots) AND which
+    sentinels/cameras are even considered. The *_position value and the
+    shared card_order_tiebreak list are reused UNCHANGED for whichever
+    page a card is on -- a page-2 card's tiebreak entry is simply never
+    compared against a page-1 card's, since this function only ever
+    sorts items that already passed the same page filter. Page 1's
+    behavior is byte-for-byte identical to before this feature existed
+    for any install where nothing has been moved to page 2 (every
+    *_page default is 1), by construction.
 
     A card's *_position field only ever records "how many hotspot rows
     precede this card" -- confirmed live that this is a genuine, deeper
@@ -1073,7 +1146,8 @@ def _overflow_sentinels(settings: dict, hotspots: list, cameras: list) -> list:
     today's exact _SENTINEL_DEFS-order fallback for anything the user
     hasn't explicitly reordered relative to a same-boundary sibling yet.
     """
-    hotspot_count = len(hotspots)
+    page_hotspots = [h for h in hotspots if h.get("dashboard_page", 1) == page]
+    hotspot_count = len(page_hotspots)
     tiebreak = settings.get("card_order_tiebreak", []) or []
     items = []
     for data_ip, enabled_key, pos_key, icon, name, meta in _SENTINEL_DEFS:
@@ -1086,11 +1160,15 @@ def _overflow_sentinels(settings: dict, hotspots: list, cameras: list) -> list:
             is_enabled = settings.get(enabled_key, False)
         if not is_enabled:
             continue
+        if settings.get(_sentinel_page_key(pos_key), 1) != page:
+            continue
         pos = settings.get(pos_key, 0)
         if pos >= hotspot_count:
             items.append({"data_ip": data_ip, "icon": icon, "name": name, "meta": meta, "pos": pos})
     if settings.get("show_cameras", False):
         for cam in cameras:
+            if cam.get("page", 1) != page:
+                continue
             pos = cam.get("position", 0)
             if pos >= hotspot_count:
                 type_label = _CAMERA_TYPE_LABELS.get(cam.get("type"), cam.get("type"))
@@ -1106,7 +1184,8 @@ def _overflow_sentinels(settings: dict, hotspots: list, cameras: list) -> list:
     # (show_dvswitch, default True so existing installs with a DVSwitch
     # hotspot are unaffected). The single position lives in settings.json
     # like every other single-instance card above, not per-hotspot.
-    if settings.get("show_dvswitch", True) and any(hs.get("dvswitch_enabled") for hs in hotspots):
+    if (settings.get("show_dvswitch", True) and any(hs.get("dvswitch_enabled") for hs in hotspots)
+            and settings.get("dvswitch_page", 1) == page):
         pos = settings.get("dvswitch_position", 0)
         if pos >= hotspot_count:
             items.append({
@@ -1266,6 +1345,17 @@ def setup():
         # a genuinely NEW hotspot (no existing index) goes at the end.
         existing_idx = next((i for i, h in enumerate(hotspots) if h.get("id") == hotspot_id), None)
         if existing_idx is not None:
+            # dashboard_page (v4.58) is only ever SET via the Cards tab's
+            # drag board, never a field on this form -- carry it forward
+            # from the existing stored entry so editing any OTHER field
+            # through this full-form POST doesn't silently reset which
+            # dashboard tab this hotspot is on. This is the same class of
+            # gap CLAUDE.md already documents for dvswitch_position on
+            # this exact route (a fresh rebuild drops anything not
+            # explicitly carried forward) -- fixed here rather than
+            # repeated, not left to accumulate a second instance of it.
+            if "dashboard_page" in hotspots[existing_idx]:
+                new_hotspot["dashboard_page"] = hotspots[existing_idx]["dashboard_page"]
             hotspots[existing_idx] = new_hotspot
         else:
             hotspots.append(new_hotspot)
@@ -1285,7 +1375,8 @@ def setup():
                            ircddb_favorites=_ircddb_favorites_for_display(),
                            can_power_control=HOST_CAN_POWER_CONTROL,
                            host_is_standalone=HOST_IS_STANDALONE,
-                           overflow_sentinels=_overflow_sentinels(setup_settings, setup_hotspots, setup_cameras),
+                           overflow_sentinels=_overflow_sentinels(setup_settings, setup_hotspots, setup_cameras, page=1),
+                           overflow_sentinels_page2=_overflow_sentinels(setup_settings, setup_hotspots, setup_cameras, page=2),
                            app_version=config.APP_VERSION, app_codename=config.APP_CODENAME)
 
 @app.route("/api/hotspot_config/<hotspot_id>")
@@ -2621,6 +2712,30 @@ def reorder_hotspots():
     save_hotspots(reordered)
     return jsonify({"ok": True})
 
+@app.route("/api/set_hotspot_pages", methods=["POST"])
+def api_set_hotspot_pages():
+    """Second dashboard tab (v4.58) -- bulk {hotspot_id: page} from the
+    Cards tab's two-column drag board, a sibling to /api/reorder_hotspots
+    (which only ever reorders the list, never touches which page a
+    hotspot is on). `page` isn't otherwise validated beyond int() -- the
+    frontend only ever sends 1 or 2 (the two columns that exist), and an
+    unrecognized value just means that hotspot never matches either
+    page's _overflow_sentinels()/renderCards() filter, degrading to
+    "shown on neither page" rather than erroring."""
+    pages     = request.json or {}
+    hotspots  = load_hotspots()
+    changed   = False
+    for hotspot in hotspots:
+        if hotspot["id"] in pages:
+            try:
+                hotspot["dashboard_page"] = int(pages[hotspot["id"]])
+                changed = True
+            except (TypeError, ValueError):
+                pass
+    if changed:
+        save_hotspots(hotspots)
+    return jsonify({"ok": True})
+
 @app.route("/api/delete_hotspot/<hotspot_id>", methods=["POST"])
 def delete_hotspot(hotspot_id):
     save_hotspots([h for h in load_hotspots() if h.get("id") != hotspot_id])
@@ -2730,6 +2845,24 @@ def api_reorder_cameras():
             except (TypeError, ValueError):
                 pass
     save_cameras(cameras)
+    return jsonify({"ok": True})
+
+@app.route("/api/set_camera_pages", methods=["POST"])
+def api_set_camera_pages():
+    """Second dashboard tab (v4.58) -- bulk {camera_id: page}, a sibling
+    to /api/reorder_cameras above (position only, never page)."""
+    pages   = request.json or {}
+    cameras = load_cameras()
+    changed = False
+    for camera in cameras:
+        if camera["id"] in pages:
+            try:
+                camera["page"] = int(pages[camera["id"]])
+                changed = True
+            except (TypeError, ValueError):
+                pass
+    if changed:
+        save_cameras(cameras)
     return jsonify({"ok": True})
 
 @app.route("/api/test_camera", methods=["POST"])

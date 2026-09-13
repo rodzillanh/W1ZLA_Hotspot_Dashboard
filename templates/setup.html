@@ -278,6 +278,23 @@
         .node-meta { font-size: 11px; color: var(--text-dim); }
         .fleet-activity-row { border-left: 2px solid var(--accent); }
 
+        /* Second dashboard tab (v4.58) -- two-column card-order board,
+           replacing the old single #card-order-list. Each column is
+           still just a plain drag list (same .drag-row items/initDrag()
+           mechanism) -- see saveCardOrder()'s own comment for why cross-
+           column dragging needed no new drag-and-drop code at all. */
+        .card-order-board { display: flex; gap: 16px; align-items: flex-start; }
+        .card-order-col { flex: 1; min-width: 0; }
+        .card-order-col-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .card-order-col-title { font-size: 13px; font-weight: 600; }
+        .card-order-col-rename { font-size: 10.5px; color: var(--text-dim); cursor: pointer; text-decoration: underline; }
+        .card-order-col-rename:hover { color: var(--text); }
+        .card-order-drop { min-height: 44px; }
+        .card-order-empty-note {
+            font-size: 12px; color: var(--text-dim); text-align: center; padding: 14px 8px;
+            border: 1px dashed var(--card-border); border-radius: 6px;
+        }
+
         /* --- backup / restore --- */
         .warn-box {
             display: flex; gap: 9px; background: var(--caution-dim);
@@ -867,34 +884,43 @@
     <div class="section">
         <div class="section-title">Card order — drag to reorder</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
-            Every card on the dashboard, hotspots included, in one drag list. To
-            add/edit/delete a hotspot itself, use the Hotspots tab; to add/edit/delete a
+            Every card on the dashboard, hotspots included, split across two columns
+            — one per dashboard tab. Drag a card into the other column to move it
+            there, or up/down within a column to reorder it. To add/edit/delete a
+            hotspot itself, use the Hotspots tab; to add/edit/delete a
             camera, use the Cameras tab — this list is just for arranging what's already there.
         </p>
-        <div id="card-order-list">
-            {% set fleet_pos = settings.get('fleet_activity_position', 0) if settings.get('show_fleet_activity', False) else -1 %}
-            {% set asl_fav_pos = settings.get('asl_favorites_position', 0) if settings.get('show_asl_favorites', False) else -1 %}
-            {% set hf_cond_pos = settings.get('hf_conditions_position', 0) if settings.get('show_hf_conditions', False) else -1 %}
-            {% set band_plan_pos = settings.get('band_plan_position', 0) if settings.get('show_band_plan', False) else -1 %}
-            {% set license_quiz_pos = settings.get('license_quiz_position', 0) if settings.get('show_license_quiz', False) else -1 %}
-            {% set wspr_activity_pos = settings.get('wspr_activity_position', 0) if settings.get('show_wspr_activity', False) else -1 %}
-            {% set digipi_pos = settings.get('digipi_position', 0) if settings.get('digipi_enabled', False) else -1 %}
-            {% set big_clock_pos = settings.get('big_clock_position', 0) if settings.get('show_big_clock', False) else -1 %}
-            {% set notifications_pos = settings.get('notifications_position', 0) if (settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False) or settings.get('qrz_logbook_enabled', False) or settings.get('rig_pa_alert_enabled', False)) else -1 %}
-            {% set satellites_pos = settings.get('satellites_position', 0) if settings.get('show_satellites', False) else -1 %}
-            {% set flights_overhead_pos = settings.get('flights_overhead_position', 0) if settings.get('show_flights_overhead', False) else -1 %}
-            {% set recent_contacts_pos = settings.get('recent_contacts_position', 0) if settings.get('show_recent_contacts', False) else -1 %}
-            {% set qso_stats_pos = settings.get('qso_stats_position', 0) if settings.get('show_qso_stats', False) else -1 %}
-            {% set top_activity_pos = settings.get('top_activity_position', 0) if settings.get('show_top_activity', False) else -1 %}
-            {% set pota_pos = settings.get('pota_position', 0) if settings.get('show_pota', False) else -1 %}
-            {% set hf_favorites_pos = settings.get('hf_favorites_position', 0) if settings.get('show_hf_favorites', False) else -1 %}
-            {% set rig_panel_pos = settings.get('rig_panel_position', 0) if settings.get('show_rig_panel', False) else -1 %}
+        {# Second dashboard tab (v4.58) -- one macro renders either column,
+           parameterized by page, rather than maintaining two copies of this
+           ~180-line block by hand. `page_hotspots`/`page_overflow` are
+           computed by the CALLER (below) since Jinja's `{% for x in list if
+           cond %}` filter-then-iterate shape is what gives loop.index0 its
+           "position within THIS page's hotspots" meaning -- the same
+           meaning app.py's _overflow_sentinels(page=N) already assumes. #}
+        {% macro card_order_column(overflow, page) %}
+            {% set fleet_pos = settings.get('fleet_activity_position', 0) if (settings.get('show_fleet_activity', False) and settings.get('fleet_activity_page', 1) == page) else -1 %}
+            {% set asl_fav_pos = settings.get('asl_favorites_position', 0) if (settings.get('show_asl_favorites', False) and settings.get('asl_favorites_page', 1) == page) else -1 %}
+            {% set hf_cond_pos = settings.get('hf_conditions_position', 0) if (settings.get('show_hf_conditions', False) and settings.get('hf_conditions_page', 1) == page) else -1 %}
+            {% set band_plan_pos = settings.get('band_plan_position', 0) if (settings.get('show_band_plan', False) and settings.get('band_plan_page', 1) == page) else -1 %}
+            {% set license_quiz_pos = settings.get('license_quiz_position', 0) if (settings.get('show_license_quiz', False) and settings.get('license_quiz_page', 1) == page) else -1 %}
+            {% set wspr_activity_pos = settings.get('wspr_activity_position', 0) if (settings.get('show_wspr_activity', False) and settings.get('wspr_activity_page', 1) == page) else -1 %}
+            {% set digipi_pos = settings.get('digipi_position', 0) if (settings.get('digipi_enabled', False) and settings.get('digipi_page', 1) == page) else -1 %}
+            {% set big_clock_pos = settings.get('big_clock_position', 0) if (settings.get('show_big_clock', False) and settings.get('big_clock_page', 1) == page) else -1 %}
+            {% set notifications_pos = settings.get('notifications_position', 0) if ((settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False) or settings.get('qrz_logbook_enabled', False) or settings.get('rig_pa_alert_enabled', False)) and settings.get('notifications_page', 1) == page) else -1 %}
+            {% set satellites_pos = settings.get('satellites_position', 0) if (settings.get('show_satellites', False) and settings.get('satellites_page', 1) == page) else -1 %}
+            {% set flights_overhead_pos = settings.get('flights_overhead_position', 0) if (settings.get('show_flights_overhead', False) and settings.get('flights_overhead_page', 1) == page) else -1 %}
+            {% set recent_contacts_pos = settings.get('recent_contacts_position', 0) if (settings.get('show_recent_contacts', False) and settings.get('recent_contacts_page', 1) == page) else -1 %}
+            {% set qso_stats_pos = settings.get('qso_stats_position', 0) if (settings.get('show_qso_stats', False) and settings.get('qso_stats_page', 1) == page) else -1 %}
+            {% set top_activity_pos = settings.get('top_activity_position', 0) if (settings.get('show_top_activity', False) and settings.get('top_activity_page', 1) == page) else -1 %}
+            {% set pota_pos = settings.get('pota_position', 0) if (settings.get('show_pota', False) and settings.get('pota_page', 1) == page) else -1 %}
+            {% set hf_favorites_pos = settings.get('hf_favorites_position', 0) if (settings.get('show_hf_favorites', False) and settings.get('hf_favorites_page', 1) == page) else -1 %}
+            {% set rig_panel_pos = settings.get('rig_panel_position', 0) if (settings.get('show_rig_panel', False) and settings.get('rig_panel_page', 1) == page) else -1 %}
             {# DVSwitch (v3.99) -- one consolidated card, shown when the
                "Show DVSwitch card" toggle (show_dvswitch, default on) is
                on AND any hotspot has dvswitch_enabled set. #}
-            {% set dvswitch_pos = settings.get('dvswitch_position', 0) if (settings.get('show_dvswitch', True) and hotspots | selectattr('dvswitch_enabled') | list | length > 0) else -1 %}
+            {% set dvswitch_pos = settings.get('dvswitch_position', 0) if (settings.get('show_dvswitch', True) and hotspots | selectattr('dvswitch_enabled') | list | length > 0 and settings.get('dvswitch_page', 1) == page) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
-            {% for hs in hotspots %}
+            {% for hs in hotspots if hs.get('dashboard_page', 1) == page %}
                 {% if loop.index0 == fleet_pos %}
                 <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
                     <span class="drag-handle">⠿</span>
@@ -1015,7 +1041,7 @@
                 </div>
                 {% endif %}
                 {% if show_cams %}
-                    {% for cam in cameras if cam.get('position', 0) == loop.index0 %}
+                    {% for cam in cameras if cam.get('position', 0) == loop.index0 and cam.get('page', 1) == page %}
                     <div class="drag-row fleet-activity-row" draggable="true" data-ip="__camera__{{ cam.id }}">
                         <span class="drag-handle">⠿</span>
                         <span class="node-name">📷 {{ cam.name }}</span>
@@ -1037,19 +1063,39 @@
             </div>
             {% endfor %}
             {# Every enabled card/camera whose saved position is at or past
-               the end of the hotspot list, sorted by that REAL position
-               value (computed once in app.py's _overflow_sentinels(), not
-               here) -- NOT the old fixed-template-declaration-order
-               behavior, which silently ignored the actual saved position
-               for every overflowing card. See _overflow_sentinels()'s
-               docstring for the exact reported bug this fixed. #}
-            {% for s in overflow_sentinels %}
+               the end of THIS PAGE's hotspot list, sorted by that REAL
+               position value (computed once in app.py's
+               _overflow_sentinels(page=N), not here) -- see that
+               function's docstring for the exact reported bug this fixed. #}
+            {% for s in overflow %}
             <div class="drag-row fleet-activity-row" draggable="true" data-ip="{{ s.data_ip }}">
                 <span class="drag-handle">⠿</span>
                 <span class="node-name">{{ s.icon }} {{ s.name }}</span>
                 <span class="node-meta">{{ s.meta }}</span>
             </div>
             {% endfor %}
+        {% endmacro %}
+        <div class="card-order-board">
+            <div class="card-order-col">
+                <div class="card-order-col-head">
+                    <span class="card-order-col-title">Dashboard</span>
+                </div>
+                <div id="card-order-list" class="card-order-drop">
+                    {{ card_order_column(overflow_sentinels, 1) }}
+                </div>
+            </div>
+            <div class="card-order-col">
+                <div class="card-order-col-head">
+                    <span class="card-order-col-title" id="card-order-col2-title">{{ settings.get('dashboard2_name', 'Dashboard 2') }}</span>
+                    <span class="card-order-col-rename" onclick="renameDashboard2()">rename ✎</span>
+                </div>
+                <div id="card-order-list-2" class="card-order-drop">
+                    {{ card_order_column(overflow_sentinels_page2, 2) }}
+                    {% if not (hotspots | selectattr('dashboard_page', 'defined') | selectattr('dashboard_page', 'eq', 2) | list) and not overflow_sentinels_page2 %}
+                    <div class="card-order-empty-note">Drag a card here to add it to {{ settings.get('dashboard2_name', 'Dashboard 2') }}.</div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
         <div style="margin-top:10px">
             <button class="btn btn-primary" onclick="saveCardOrder()">Save card order</button>
@@ -2423,180 +2469,126 @@ function saveSatellites() {
 }
 
 // --- card order ---
+// Second dashboard tab (v4.58) -- every sentinel's *_position field
+// paired with the *_page field to save alongside it. Rewritten from a
+// single-list function into a per-column loop (below) rather than two
+// full copies of this logic -- each column computes its own sentinel
+// indices exactly the way the old single-list version did, just scoped
+// to that column's own rows. Also fixes a real, pre-existing gap this
+// rewrite happened to surface: POTA/HF Favorites/Rig Panel were never in
+// this list at all, so dragging any of those three and clicking Save
+// silently never persisted their new position -- every other sentinel
+// saved correctly, these three didn't. Fixed here, not left in place,
+// since this function is being reconstructed anyway.
+const SENTINEL_POSITION_FIELDS = [
+    ['__fleet_activity__', 'fleet_activity_position'],
+    ['__asl_favorites__', 'asl_favorites_position'],
+    ['__hf_conditions__', 'hf_conditions_position'],
+    ['__band_plan__', 'band_plan_position'],
+    ['__license_quiz__', 'license_quiz_position'],
+    ['__wspr_activity__', 'wspr_activity_position'],
+    ['__digipi__', 'digipi_position'],
+    ['__big_clock__', 'big_clock_position'],
+    ['__notifications__', 'notifications_position'],
+    ['__satellites__', 'satellites_position'],
+    ['__flights_overhead__', 'flights_overhead_position'],
+    ['__recent_contacts__', 'recent_contacts_position'],
+    ['__qso_stats__', 'qso_stats_position'],
+    ['__top_activity__', 'top_activity_position'],
+    ['__pota__', 'pota_position'],
+    ['__hf_favorites__', 'hf_favorites_position'],
+    ['__rig_panel__', 'rig_panel_position'],
+    ['__dvswitch__', 'dvswitch_position'],
+];
+
 function saveCardOrder() {
-    const rows   = document.querySelectorAll('#card-order-list .drag-row[data-ip]');
-    const allIds = Array.from(rows).map(r => r.dataset.ip);
-    // Every sentinel (fleet activity, ASL favorites, one per camera) uses a
-    // "__"-prefixed data-ip -- real hotspot IPs never start with that, so
-    // this single check covers all of them, including an arbitrary number
-    // of camera rows, without listing each key by name.
     const isSentinel = id => id.startsWith('__');
-    const ips = allIds.filter(id => !isSentinel(id));
-
-    // Each sentinel's position is "how many hotspot rows precede it" --
-    // filter out every OTHER sentinel first so a second special card
-    // elsewhere in the list doesn't throw off this one's count.
-    function sentinelIndex(key) {
-        const filtered = allIds.filter(id => id === key || !isSentinel(id));
-        return filtered.indexOf(key);
-    }
-    const fleetIdx     = sentinelIndex('__fleet_activity__');
-    const aslFavIdx    = sentinelIndex('__asl_favorites__');
-    const hfCondIdx    = sentinelIndex('__hf_conditions__');
-    const bandPlanIdx    = sentinelIndex('__band_plan__');
-    const licenseQuizIdx = sentinelIndex('__license_quiz__');
-    const wsprActivityIdx = sentinelIndex('__wspr_activity__');
-    const digipiIdx = sentinelIndex('__digipi__');
-    const bigClockIdx = sentinelIndex('__big_clock__');
-    const notificationsIdx = sentinelIndex('__notifications__');
-    const satellitesIdx = sentinelIndex('__satellites__');
-    const flightsOverheadIdx = sentinelIndex('__flights_overhead__');
-    const recentContactsIdx = sentinelIndex('__recent_contacts__');
-    const qsoStatsIdx = sentinelIndex('__qso_stats__');
-    const topActivityIdx = sentinelIndex('__top_activity__');
-    const dvswitchIdx = sentinelIndex('__dvswitch__');
+    const settingsPatch = {};
     const cameraPositions = {};
-    allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
-        cameraPositions[key.slice('__camera__'.length)] = sentinelIndex(key);
-    });
-
+    const cameraPages = {};
+    const hotspotPages = {};
+    let allIps = [];
     // Explicit relative-order tiebreak -- *_position only ever records
-    // "how many hotspot rows precede this card", so two+ cards dragged to
-    // sit on the SAME side of every hotspot (e.g. all after the last one,
-    // extremely common with few hotspots) save the IDENTICAL position no
-    // matter their actual drag order; that number genuinely can't carry
-    // any more information than that. This is the full sentinel-only
-    // sub-order (in current DOM order) saved alongside the positions
-    // above, used purely to break same-position ties on the server side
-    // (see app.py's _overflow_sentinels) -- fixes a real, reported bug
-    // ("APRS Messages always renders first no matter how it's dragged").
-    const cardOrderTiebreak = allIds.filter(isSentinel);
+    // "how many hotspot rows precede this card, on ITS OWN page", so
+    // two+ cards dragged to sit on the SAME side of every hotspot save
+    // the IDENTICAL position no matter their actual drag order; that
+    // number genuinely can't carry any more information than that. This
+    // is the full sentinel-only sub-order (in current DOM order, BOTH
+    // columns concatenated) saved as one list, used purely to break
+    // same-position ties on the server side (see app.py's
+    // _overflow_sentinels) -- fixes a real, reported bug ("APRS Messages
+    // always renders first no matter how it's dragged"). A page-2
+    // entry's rank in this shared list is never actually compared
+    // against a page-1 one, since _overflow_sentinels(page=N) only ever
+    // sorts items that already passed that same page filter.
+    let cardOrderTiebreak = [];
+
+    ['card-order-list', 'card-order-list-2'].forEach((listId, colIdx) => {
+        const page = colIdx + 1;
+        const list = document.getElementById(listId);
+        if (!list) return;
+        const rows   = list.querySelectorAll('.drag-row[data-ip]');
+        const allIds = Array.from(rows).map(r => r.dataset.ip);
+        const ips = allIds.filter(id => !isSentinel(id));
+        allIps = allIps.concat(ips);
+        ips.forEach(id => { hotspotPages[id] = page; });
+
+        // Each sentinel's position is "how many hotspot rows precede it,
+        // within THIS column" -- filter out every OTHER sentinel first
+        // so a second special card elsewhere in the SAME column doesn't
+        // throw off this one's count.
+        function sentinelIndex(key) {
+            const filtered = allIds.filter(id => id === key || !isSentinel(id));
+            return filtered.indexOf(key);
+        }
+        SENTINEL_POSITION_FIELDS.forEach(([key, posField]) => {
+            const idx = sentinelIndex(key);
+            // Only present (and only saved) when that card's drag row
+            // actually rendered in THIS column -- a -1 here just means
+            // "not in this column", not "move it to position -1".
+            if (idx !== -1) {
+                settingsPatch[posField] = idx;
+                settingsPatch[posField.replace('_position', '_page')] = page;
+            }
+        });
+        allIds.filter(id => id.startsWith('__camera__')).forEach(key => {
+            const camId = key.slice('__camera__'.length);
+            cameraPositions[camId] = sentinelIndex(key);
+            cameraPages[camId] = page;
+        });
+        cardOrderTiebreak = cardOrderTiebreak.concat(allIds.filter(isSentinel));
+    });
+    settingsPatch.card_order_tiebreak = cardOrderTiebreak;
 
     const saves = [
         fetch('/api/reorder_hotspots', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(ips)
+            body: JSON.stringify(allIps)
         }),
         fetch('/api/settings', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ card_order_tiebreak: cardOrderTiebreak })
+            body: JSON.stringify(settingsPatch)
         }),
     ];
-    // Only present (and only saved) when the respective card is enabled --
-    // its drag row only renders in that case, so a -1 here just means "not
-    // on this page", not "move it to position -1".
-    if (fleetIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ fleet_activity_position: fleetIdx })
-        }));
-    }
-    if (aslFavIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ asl_favorites_position: aslFavIdx })
-        }));
-    }
-    if (hfCondIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ hf_conditions_position: hfCondIdx })
-        }));
-    }
-    if (bandPlanIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ band_plan_position: bandPlanIdx })
-        }));
-    }
-    if (licenseQuizIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ license_quiz_position: licenseQuizIdx })
-        }));
-    }
-    if (wsprActivityIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ wspr_activity_position: wsprActivityIdx })
-        }));
-    }
-    if (digipiIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ digipi_position: digipiIdx })
-        }));
-    }
-    if (bigClockIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ big_clock_position: bigClockIdx })
-        }));
-    }
-    if (notificationsIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ notifications_position: notificationsIdx })
-        }));
-    }
-    if (satellitesIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ satellites_position: satellitesIdx })
-        }));
-    }
-    if (flightsOverheadIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ flights_overhead_position: flightsOverheadIdx })
-        }));
-    }
-    if (recentContactsIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ recent_contacts_position: recentContactsIdx })
-        }));
-    }
-    if (qsoStatsIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ qso_stats_position: qsoStatsIdx })
-        }));
-    }
-    if (topActivityIdx !== -1) {
-        saves.push(fetch('/api/settings', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ top_activity_position: topActivityIdx })
-        }));
-    }
     if (Object.keys(cameraPositions).length > 0) {
         saves.push(fetch('/api/reorder_cameras', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(cameraPositions)
         }));
-    }
-    if (dvswitchIdx !== -1) {
-        saves.push(fetch('/api/settings', {
+        saves.push(fetch('/api/set_camera_pages', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ dvswitch_position: dvswitchIdx })
+            body: JSON.stringify(cameraPages)
+        }));
+    }
+    if (Object.keys(hotspotPages).length > 0) {
+        saves.push(fetch('/api/set_hotspot_pages', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(hotspotPages)
         }));
     }
     Promise.all(saves).then(() => {
@@ -3807,6 +3799,43 @@ function initDrag(el) {
     el.addEventListener('drop',      e  => { e.preventDefault(); el.classList.remove('drag-over'); });
 }
 document.querySelectorAll('.drag-row').forEach(initDrag);
+
+// Second dashboard tab (v4.58) -- initDrag() above already handles
+// cross-column dragging for free (dragover's `list = el.parentNode`
+// naturally picks up whichever column the hovered ROW is in), but a
+// column with ZERO rows (the common starting state for a freshly-
+// created "Dashboard 2") has no .drag-row to hover onto at all -- these
+// two listeners on the column DIVS themselves are the fallback so a
+// card can still be dropped into an empty column, not just onto an
+// existing sibling row.
+document.querySelectorAll('.card-order-drop').forEach(dropZone => {
+    dropZone.addEventListener('dragover', e => {
+        if (dropZone.querySelector('.drag-row')) return;  // initDrag()'s own per-row handler already covers a non-empty column
+        e.preventDefault();
+    });
+    dropZone.addEventListener('drop', e => {
+        const dragging = document.querySelector('.dragging');
+        if (!dragging || dropZone.querySelector('.drag-row')) return;
+        e.preventDefault();
+        dropZone.appendChild(dragging);
+    });
+});
+
+// Editable "Dashboard 2" tab label -- a plain prompt() rather than an
+// inline-edit field, since this is a rarely-touched admin action, not
+// something worth its own text input + save button for.
+function renameDashboard2() {
+    const current = document.getElementById('card-order-col2-title').textContent;
+    const name = prompt('Name for the second dashboard tab:', current);
+    if (name === null) return;  // cancelled
+    const trimmed = name.trim() || 'Dashboard 2';
+    document.getElementById('card-order-col2-title').textContent = trimmed;
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ dashboard2_name: trimmed })
+    }).catch(() => {});
+}
 
 // --- changelog / README modal ---
 // Loads the existing standalone /version or /readme page inside an iframe

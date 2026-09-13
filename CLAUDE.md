@@ -6231,6 +6231,145 @@ config for per-integration credentials; put it in
     first" rule the TGIF entry already established for this class of
     gap.
 
+- **Second dashboard tab (v4.58, mockup-approved -- see CLAUDE.md) -- a
+  second "Dashboard 2" tab any card (hotspot, sentinel, camera, or
+  DVSwitch) can be assigned to, so a crowded fleet can be split across
+  two screens instead of one long scroll. Built carefully given this
+  exact subsystem's own documented history of subtle bugs (see the
+  "card position doesn't save" saga elsewhere in this file) -- every
+  design choice below was made specifically to avoid reintroducing that
+  class of bug, not just to make the feature work once.**
+  - **A real decorator-loss bug, caught and fixed WHILE building this,
+    not after** -- exactly the `str_replace`/`Edit`-tool trap this file's
+    own first gotcha entry warns about. Inserting a new
+    `_has_dashboard2_content()` helper function directly above
+    `def dashboard():` silently left `@app.route("/")` decorating the
+    NEW function instead, un-registering the real dashboard route
+    entirely. Caught immediately by this file's own prescribed check
+    (`len(list(app.app.url_map.iter_rules()))`, before vs. after) rather
+    than assumed fine from a green `py_compile` -- fixed by moving the
+    helper above the decorator, not by patching around it.
+  - **Design: reuse the EXISTING single-page position/tiebreak system
+    twice (once per page), rather than inventing a parallel one.** Every
+    sentinel already has a `*_position` field meaning "how many hotspot
+    rows precede this card"; the only genuinely new piece of state needed
+    was a `*_page` field (default 1) recording WHICH page's hotspot count
+    that position is relative to. `app.py`'s `_overflow_sentinels()`
+    gained a `page` parameter that filters hotspots to that page BEFORE
+    computing `hotspot_count`, and filters sentinels/cameras/DVSwitch by
+    their own `*_page`/`page`/`dvswitch_page` setting before sorting --
+    the sort/tiebreak logic inside it is completely unchanged. The SAME
+    shared `card_order_tiebreak` list is reused across both pages
+    unmodified (not doubled into two lists) -- a page-2 card's tiebreak
+    rank is simply never compared against a page-1 card's, since this
+    function only ever sorts items that already passed the same page
+    filter, so there's no cross-page collision risk despite sharing one
+    list. `computeCardOrders()` (dashboard.html's client-side mirror)
+    needed ZERO changes at all -- it was already a pure `(hotspotCount,
+    sentinels) -> orders` function with no knowledge of "page", so calling
+    it twice with independently page-filtered inputs was sufficient.
+  - **Cards are MOVED between pages via DOM reparenting
+    (`el.parentNode !== targetContainer -> targetContainer.appendChild(el)`),
+    not duplicated markup.** The 17 `_SENTINEL_DEFS` cards are each a
+    SINGLE static Jinja-rendered element (Fleet Activity, Big Ass Clock,
+    etc.) -- CSS `order` alone only reorders siblings WITHIN one shared
+    grid container, it can't move an element INTO a different page's
+    independent `.cards-grid`. A first instinct to give every sentinel a
+    literal second copy of its markup (one per page, Jinja-gated) was
+    rejected before writing any of it -- that would mean maintaining
+    every future change to e.g. the Big Ass Clock's HTML in two places
+    forever. `moveIfNeeded()` reparents the ONE existing element into
+    whichever page's `cardsOuter` it currently belongs to, right where
+    `renderCards()` already sets that element's `.style.order` -- one
+    extra line per sentinel, not a duplicated card.
+  - **`renderCards(data)` kept its exact original one-argument call shape
+    for every EXISTING call site** -- `page`/`container`/`cardsOuter` are
+    optional parameters defaulting to page 1's real elements
+    (`document.getElementById('cards')`/`'cards-outer'`), so the single
+    pre-existing `renderCards(data);` call in `refresh()` behaves
+    byte-for-byte as before. Only ONE new call site was added
+    (`renderCards(data, 2, ...)`, gated behind `HAS_DASHBOARD2`) rather
+    than touching the original. `renderDvswitchCards()` similarly
+    defaults its new `page` parameter to `DVSWITCH_PAGE` (DVSwitch is
+    ONE consolidated card that only ever lives on one page, so unlike
+    hotspot rendering it never needs a second explicit call -- the
+    default IS the only call that ever matters).
+  - **Two things that must NOT be page-scoped, and were deliberately kept
+    reading the FULL unfiltered `data`**: the toolbar's fleet status pill
+    (X/Y online, Z active) is fleet-wide by design, guarded to update
+    only once per poll (`if (page === 1)`, since it's a DOM singleton,
+    not `if (page === 1)` because it's somehow page-1-specific data) --
+    running it a second time from the page-2 call would just be wasted,
+    idempotent work, not wrong, but the guard avoids that waste. Spotlight
+    dimming (`cardsOuter.classList.toggle('spotlight', ...)`), by
+    contrast, DOES run on every `renderCards()` call, once per page's own
+    `cardsOuter` -- a page-2 grid's idle cards should dim too while
+    anything ANYWHERE in the fleet is active, so this one is intentionally
+    NOT page-1-gated despite sitting right next to code that is.
+  - **A real, pre-existing bug (not introduced by this feature) was found
+    and fixed while rewriting `saveCardOrder()`**: POTA, HF Favorites, and
+    Rig Panel were completely ABSENT from that function's sentinel list --
+    dragging any of those three cards and clicking "Save card order"
+    silently never persisted their new position, while every other
+    sentinel saved correctly. Found by inspection while reconstructing
+    this function for the two-column case (their Jinja `*_pos` template
+    variables existed and rendered correctly; the JS side that reads them
+    back on save just never included them), fixed in the same rewrite
+    rather than left in place, since the function was being rebuilt from
+    scratch anyway. Confirmed via a real end-to-end test that all three
+    now round-trip correctly.
+  - **Cross-column drag-and-drop needed NO new drag-and-drop code** --
+    `initDrag()`'s existing `dragover` handler already computes
+    `list = el.parentNode` fresh on every hover (never hardcoded to one
+    container), so dragging a row from column 1 onto a row already in
+    column 2 already worked for free once both columns' rows shared the
+    same `initDrag()` call (`document.querySelectorAll('.drag-row')`,
+    unscoped, unchanged). The only genuinely new code needed was for
+    dropping into a column with ZERO rows (no `.drag-row` to hover onto
+    at all) -- two small listeners on the `.card-order-drop` column DIVS
+    themselves, which only engage when that specific column is currently
+    empty (checked via `dropZone.querySelector('.drag-row')`), so they
+    never fight with `initDrag()`'s own per-row handling of a non-empty
+    column.
+  - **The two-column Jinja block uses ONE macro (`card_order_column`)
+    parameterized by `page`, not two copies of the ~180-line hotspot-
+    plus-17-sentinel-insertion-points template** -- keeps future card
+    additions to a single place. `{% for hs in hotspots if
+    hs.get('dashboard_page', 1) == page %}` (a native Jinja filtering
+    for-loop) is what gives `loop.index0` inside the macro its "position
+    within THIS page's hotspots" meaning, exactly matching
+    `_overflow_sentinels(page=N)`'s own hotspot-count semantics on the
+    Python side -- first attempt tried pre-computing a filtered hotspot
+    list via `selectattr`/`rejectattr` chains before calling the macro,
+    which was needlessly convoluted (and had to handle "no dashboard_page
+    key at all" as a THIRD case alongside 1 and 2) -- simplified by moving
+    the filter inside the macro itself, using the plain dict `.get()`
+    fallback Jinja already supports.
+  - **The "Dashboard 2" tab itself is presence-derived, not a separate
+    on/off toggle** -- `app.py`'s `_has_dashboard2_content()` checks
+    whether ANY hotspot/sentinel/camera/DVSwitch is actually assigned to
+    page 2 before the tab (or `#panel-dashboard2`'s markup at all) is
+    rendered, same "no separate switch" reasoning as `show_dvswitch`'s own
+    default-on-presence-derived behavior. The Settings -> Cards board's
+    SECOND column, by contrast, is always rendered regardless -- a user
+    has to be able to drag something into it for the very first time to
+    create the tab, so gating the SETTINGS UI the same way as the
+    DASHBOARD tab would be a chicken-and-egg deadlock.
+  - **Renaming "Dashboard 2" is a plain `prompt()`, not an inline-edit
+    field** -- a deliberately minimal-effort choice for a rarely-touched
+    admin action, not worth its own text input + save button.
+  - Verified live end-to-end with a real Playwright browser against the
+    real app (not just template/route checks): seeded a 3-hotspot fleet
+    with one hotspot pre-assigned to page 2, confirmed the "Dashboard 2"
+    tab appears and shows ONLY that hotspot's card (fully absent from
+    page 1's DOM, not just hidden), confirmed the Settings -> Cards board
+    correctly splits hotspots AND a page-1 sentinel (Fleet Activity) into
+    the right columns, and confirmed dragging a THIRD hotspot's row into
+    column 2 via real DOM manipulation + clicking the real "Save card
+    order" button persisted `dashboard_page: 2` to `hotspots.json` through
+    the actual `/api/set_hotspot_pages` route -- not simulated at the
+    fetch level, the real button click end to end.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

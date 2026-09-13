@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.57"
+APP_VERSION = "4.58"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -184,6 +184,9 @@ VERSION_CODENAMES = [
                         # guitarist, opened Woodstock (1941-2013)
     "Clark",            # v4.57 -- Gene Clark, founding singer-songwriter
                         # of The Byrds (1944-1991)
+    "Sylvain",          # v4.58 -- Sylvain Sylvain, guitarist of the New
+                        # York Dolls, foundational proto-punk figure
+                        # (1951-2021)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1446,6 +1449,44 @@ DEFAULT_SETTINGS = {
     # for any card never yet explicitly reordered relative to a sibling,
     # so this is purely additive and never surprises an existing install.
     "card_order_tiebreak": [],
+    # Second dashboard tab (v4.58, mockup-approved -- see CLAUDE.md) --
+    # every sentinel card can be assigned to either dashboard page (1 or
+    # 2, default 1 so an existing install's layout is completely
+    # unaffected until something is actually dragged to page 2).
+    # Deliberately reuses the EXISTING <key>_position value for whichever
+    # page a card is on (position always means "position among THIS
+    # PAGE's hotspots", not a page-specific position field) and the SAME
+    # card_order_tiebreak list above (a page-2 card's tiebreak entry is
+    # simply never compared against a page-1 card's, since
+    # app.py's _overflow_sentinels() filters to one page before sorting)
+    # -- only a new *_page key per sentinel was needed, not doubled
+    # position/tiebreak storage. Grouped here as one block, rather than
+    # interleaved next to each sibling *_position key above, purely so
+    # this whole additive feature is easy to find/remove as a unit.
+    "fleet_activity_page": 1,
+    "asl_favorites_page": 1,
+    "hf_conditions_page": 1,
+    "band_plan_page": 1,
+    "license_quiz_page": 1,
+    "wspr_activity_page": 1,
+    "digipi_page": 1,
+    "big_clock_page": 1,
+    "notifications_page": 1,
+    "satellites_page": 1,
+    "flights_overhead_page": 1,
+    "recent_contacts_page": 1,
+    "qso_stats_page": 1,
+    "top_activity_page": 1,
+    "pota_page": 1,
+    "hf_favorites_page": 1,
+    "rig_panel_page": 1,
+    "dvswitch_page": 1,
+    # Editable tab label for the second dashboard page -- shown in the
+    # tab bar only once something is actually assigned to page 2 (a
+    # hotspot, a sentinel card, or a camera), same "presence-derived, no
+    # separate on/off toggle" reasoning as the DVSwitch card's own
+    # show_dvswitch default.
+    "dashboard2_name": "Dashboard 2",
     # HamAlert notification card -- off by default. Persistent Telnet
     # connection to hamalert.org:7300 (a personal DXCC-needed/callsign/
     # band alert service), needs its own account credentials since this

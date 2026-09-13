@@ -446,6 +446,11 @@ BIOS = {
         "blurb": "Founding singer-songwriter of The Byrds, whose jangling 12-string sound and Clark's own harmony-rich songwriting helped define folk rock in the mid-1960s.",
         "wiki": "Gene_Clark",
     },
+    "Sylvain": {
+        "name": "Sylvain Sylvain",
+        "blurb": "Guitarist and co-founder of the New York Dolls, whose glam-trash swagger a few years before the fact made them one of punk rock's most direct forerunners.",
+        "wiki": "Sylvain_Sylvain",
+    },
 }
 
 

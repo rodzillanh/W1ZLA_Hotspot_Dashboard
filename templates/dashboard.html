@@ -2809,6 +2809,9 @@
 
 <div class="tab-bar">
     <div class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard', this)">Dashboard</div>
+    {% if has_dashboard2 %}
+    <div class="tab-btn" data-tab="dashboard2" onclick="switchTab('dashboard2', this)">{{ settings.get('dashboard2_name', 'Dashboard 2') }}</div>
+    {% endif %}
     <div class="tab-btn"       data-tab="map"       onclick="switchTab('map', this)">Live map</div>
 </div>
 
@@ -3352,6 +3355,21 @@
     </div>
 </div>
 
+<!-- Second dashboard tab (v4.58) -- an independent grid, its own hotspot/
+     sentinel/camera/DVSwitch subset (see renderCards()'s page param).
+     Only rendered into the DOM at all when has_dashboard2 is true, same
+     "don't reserve dead markup for a feature nobody's used yet" instinct
+     as every other conditional card block in this file. -->
+{% if has_dashboard2 %}
+<div id="panel-dashboard2" class="tab-panel">
+    <div class="cards-grid" id="cards-outer-2">
+        <div id="cards-2" style="display:contents"></div>
+        <div id="camera-cards-2" style="display:contents"></div>
+        <div id="dvswitch-cards-2" style="display:contents"></div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Live map tab -->
 <div id="panel-map" class="tab-panel">
     <div class="map-legend">
@@ -3597,6 +3615,37 @@ const BM_WRITE_ENABLED = {{ 'true' if settings.get('brandmeister_api_key') else 
 // alone can't distinguish relative order among cards sharing the same
 // hotspot boundary.
 const CARD_ORDER_TIEBREAK = {{ settings.get('card_order_tiebreak', []) | tojson }};
+// Second dashboard tab (v4.58) -- one *_PAGE const per sentinel (1 or 2,
+// default 1), read by renderCards()/renderDvswitchCards()/
+// renderCameraCards() to decide which page's grid a card belongs in.
+// Grouped here as one block rather than interleaved next to each
+// sibling *_POSITION const above, same reasoning as config.py's own
+// DEFAULT_SETTINGS grouping for these keys.
+const FLEET_ACTIVITY_PAGE    = {{ settings.get('fleet_activity_page', 1) }};
+const ASL_FAVORITES_PAGE     = {{ settings.get('asl_favorites_page', 1) }};
+const HF_CONDITIONS_PAGE     = {{ settings.get('hf_conditions_page', 1) }};
+const BAND_PLAN_PAGE         = {{ settings.get('band_plan_page', 1) }};
+const LICENSE_QUIZ_PAGE      = {{ settings.get('license_quiz_page', 1) }};
+const WSPR_ACTIVITY_PAGE     = {{ settings.get('wspr_activity_page', 1) }};
+const DIGIPI_PAGE            = {{ settings.get('digipi_page', 1) }};
+const BIG_CLOCK_PAGE         = {{ settings.get('big_clock_page', 1) }};
+const NOTIFICATIONS_PAGE     = {{ settings.get('notifications_page', 1) }};
+const SATELLITES_PAGE        = {{ settings.get('satellites_page', 1) }};
+const FLIGHTS_OVERHEAD_PAGE  = {{ settings.get('flights_overhead_page', 1) }};
+const RECENT_CONTACTS_PAGE   = {{ settings.get('recent_contacts_page', 1) }};
+const QSO_STATS_PAGE         = {{ settings.get('qso_stats_page', 1) }};
+const TOP_ACTIVITY_PAGE      = {{ settings.get('top_activity_page', 1) }};
+const POTA_PAGE              = {{ settings.get('pota_page', 1) }};
+const HF_FAVORITES_PAGE      = {{ settings.get('hf_favorites_page', 1) }};
+const RIG_PANEL_PAGE         = {{ settings.get('rig_panel_page', 1) }};
+const DVSWITCH_PAGE          = {{ settings.get('dvswitch_page', 1) }};
+const DASHBOARD2_NAME        = {{ settings.get('dashboard2_name', 'Dashboard 2') | tojson }};
+// Whether the "Dashboard 2" tab even appears -- presence-derived (any
+// hotspot, sentinel, or camera actually assigned to page 2), same "no
+// separate on/off toggle" reasoning as show_dvswitch elsewhere in this
+// app. Computed server-side since it needs the full hotspot/camera list,
+// not just settings.
+const HAS_DASHBOARD2 = {{ 'true' if has_dashboard2 else 'false' }};
 const SHOW_FLEET_ACTIVITY    = {{ 'true' if settings.get('show_fleet_activity', False) else 'false' }};
 const FLEET_ACTIVITY_POSITION = {{ settings.get('fleet_activity_position', 0) }};
 const FLEET_ACTIVITY_HOURS    = {{ settings.get('fleet_activity_hours', 12) }};
@@ -4335,9 +4384,22 @@ function dismissOnboardingTour() {
 }
 
 // --- render cards ---
-function renderCards(data) {
-    checkOnboarding(data.length);
-    const container = document.getElementById('cards');
+// Second dashboard tab (v4.58): `page`/`container`/`cardsOuter` default to
+// page 1's existing elements, so the ORIGINAL single-arg call shape
+// (`renderCards(data)`, still used everywhere except the one new page-2
+// call site in refresh()) behaves identically to before this feature
+// existed. `moveIfNeeded` reparents a STATIC sentinel/camera/DVSwitch
+// element into whichever page's grid it currently belongs to -- these
+// elements are Jinja-rendered once, not recreated per poll, so "does it
+// already live in the target container" is the only thing that needs
+// checking; CSS `order` alone can't move a card between two independent
+// grid containers, only within one.
+function moveIfNeeded(el, targetContainer) {
+    if (el && targetContainer && el.parentNode !== targetContainer) targetContainer.appendChild(el);
+}
+function renderCards(data, page = 1, container = document.getElementById('cards'), cardsOuter = document.getElementById('cards-outer')) {
+    const pageData = data.filter(hs => (hs.dashboard_page || 1) === page);
+    if (page === 1) checkOnboarding(data.length);
     // Position is only floored at 0 here -- NOT also capped at
     // data.length. computeCardOrders() needs each sentinel's real saved
     // value to sort overflowing ones (position >= hotspotCount) relative
@@ -4346,55 +4408,55 @@ function renderCards(data) {
     // reaches the sort, collapsing them into a single indistinguishable
     // tie (this was a real, reported bug -- see computeCardOrders()).
     const sentinels = [];
-    if (SHOW_FLEET_ACTIVITY) {
+    if (SHOW_FLEET_ACTIVITY && FLEET_ACTIVITY_PAGE === page) {
         sentinels.push({ key: 'fleet', pos: Math.max(0, FLEET_ACTIVITY_POSITION) });
     }
-    if (SHOW_ASL_FAVORITES) {
+    if (SHOW_ASL_FAVORITES && ASL_FAVORITES_PAGE === page) {
         sentinels.push({ key: 'aslfav', pos: Math.max(0, ASL_FAVORITES_POSITION) });
     }
-    if (SHOW_HF_CONDITIONS) {
+    if (SHOW_HF_CONDITIONS && HF_CONDITIONS_PAGE === page) {
         sentinels.push({ key: 'hfcond', pos: Math.max(0, HF_CONDITIONS_POSITION) });
     }
-    if (SHOW_BAND_PLAN) {
+    if (SHOW_BAND_PLAN && BAND_PLAN_PAGE === page) {
         sentinels.push({ key: 'bandplan', pos: Math.max(0, BAND_PLAN_POSITION) });
     }
-    if (SHOW_LICENSE_QUIZ) {
+    if (SHOW_LICENSE_QUIZ && LICENSE_QUIZ_PAGE === page) {
         sentinels.push({ key: 'licensequiz', pos: Math.max(0, LICENSE_QUIZ_POSITION) });
     }
-    if (SHOW_WSPR_ACTIVITY) {
+    if (SHOW_WSPR_ACTIVITY && WSPR_ACTIVITY_PAGE === page) {
         sentinels.push({ key: 'wspractivity', pos: Math.max(0, WSPR_ACTIVITY_POSITION) });
     }
-    if (SHOW_DIGIPI) {
+    if (SHOW_DIGIPI && DIGIPI_PAGE === page) {
         sentinels.push({ key: 'digipi', pos: Math.max(0, DIGIPI_POSITION) });
     }
-    if (SHOW_BIG_CLOCK) {
+    if (SHOW_BIG_CLOCK && BIG_CLOCK_PAGE === page) {
         sentinels.push({ key: 'bigclock', pos: Math.max(0, BIG_CLOCK_POSITION) });
     }
-    if (SHOW_NOTIFICATIONS) {
+    if (SHOW_NOTIFICATIONS && NOTIFICATIONS_PAGE === page) {
         sentinels.push({ key: 'notifications', pos: Math.max(0, NOTIFICATIONS_POSITION) });
     }
-    if (SHOW_SATELLITES) {
+    if (SHOW_SATELLITES && SATELLITES_PAGE === page) {
         sentinels.push({ key: 'satellites', pos: Math.max(0, SATELLITES_POSITION) });
     }
-    if (SHOW_FLIGHTS_OVERHEAD) {
+    if (SHOW_FLIGHTS_OVERHEAD && FLIGHTS_OVERHEAD_PAGE === page) {
         sentinels.push({ key: 'flightsoverhead', pos: Math.max(0, FLIGHTS_OVERHEAD_POSITION) });
     }
-    if (SHOW_RECENT_CONTACTS) {
+    if (SHOW_RECENT_CONTACTS && RECENT_CONTACTS_PAGE === page) {
         sentinels.push({ key: 'recentcontacts', pos: Math.max(0, RECENT_CONTACTS_POSITION) });
     }
-    if (SHOW_QSO_STATS) {
+    if (SHOW_QSO_STATS && QSO_STATS_PAGE === page) {
         sentinels.push({ key: 'qsostats', pos: Math.max(0, QSO_STATS_POSITION) });
     }
-    if (SHOW_TOP_ACTIVITY) {
+    if (SHOW_TOP_ACTIVITY && TOP_ACTIVITY_PAGE === page) {
         sentinels.push({ key: 'topactivity', pos: Math.max(0, TOP_ACTIVITY_POSITION) });
     }
-    if (SHOW_POTA) {
+    if (SHOW_POTA && POTA_PAGE === page) {
         sentinels.push({ key: 'pota', pos: Math.max(0, POTA_POSITION) });
     }
-    if (SHOW_HF_FAVORITES) {
+    if (SHOW_HF_FAVORITES && HF_FAVORITES_PAGE === page) {
         sentinels.push({ key: 'hffav', pos: Math.max(0, HF_FAVORITES_POSITION) });
     }
-    if (SHOW_RIG_PANEL) {
+    if (SHOW_RIG_PANEL && RIG_PANEL_PAGE === page) {
         sentinels.push({ key: 'rigpanel', pos: Math.max(0, RIG_PANEL_POSITION) });
     }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
@@ -4411,57 +4473,60 @@ function renderCards(data) {
     // order isn't saving" even though the position value saved correctly.
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
-            sentinels.push({ key: 'cam-' + cam.id, pos: Math.max(0, cam.position || 0) });
+            if ((cam.page || 1) === page) sentinels.push({ key: 'cam-' + cam.id, pos: Math.max(0, cam.position || 0) });
         });
     }
     // DVSwitch -- ONE consolidated card (v3.99) covering every
     // DVSwitch-enabled hotspot via its own "Show:" picker, not one
     // sentinel per hotspot -- enabled if ANY hotspot has dvswitch_enabled
-    // set, sourced from the SAME `data` array already in hand, not a
+    // set, sourced from the SAME `data` array already in hand (the FULL,
+    // unfiltered one -- a DVSwitch-enabled hotspot can sit on either
+    // page, this only decides whether the card exists at all), not a
     // separate async fetch.
-    if (SHOW_DVSWITCH && data.some(hs => hs.dvswitch_enabled)) {
+    if (SHOW_DVSWITCH && data.some(hs => hs.dvswitch_enabled) && DVSWITCH_PAGE === page) {
         sentinels.push({ key: 'dvswitch', pos: Math.max(0, DVSWITCH_POSITION) });
     }
-    const { sentinelOrders, hotspotOrders } = computeCardOrders(data.length, sentinels);
+    const { sentinelOrders, hotspotOrders } = computeCardOrders(pageData.length, sentinels);
     // renderDvswitchCards() (called separately, right after renderCards()
     // in refresh()) needs this same DVSwitch entry's resolved order --
     // stashed here since its card doesn't exist as a DOM node yet at
     // this point for a direct .style.order assignment the way the fixed
-    // sentinels/cameras get below.
-    lastSentinelOrders = sentinelOrders;
+    // sentinels/cameras get below. Keyed by page (v4.58) since renderCards()
+    // now runs once per page and DVSwitch only ever belongs to one of them.
+    lastSentinelOrdersByPage[page] = sentinelOrders;
 
     const fleetCard = document.getElementById('fleet-activity-card');
-    if (fleetCard && 'fleet' in sentinelOrders) fleetCard.style.order = sentinelOrders.fleet;
+    if (fleetCard && 'fleet' in sentinelOrders) { moveIfNeeded(fleetCard, cardsOuter); fleetCard.style.order = sentinelOrders.fleet; }
     const aslFavCard = document.getElementById('asl-favorites-card');
-    if (aslFavCard && 'aslfav' in sentinelOrders) aslFavCard.style.order = sentinelOrders.aslfav;
+    if (aslFavCard && 'aslfav' in sentinelOrders) { moveIfNeeded(aslFavCard, cardsOuter); aslFavCard.style.order = sentinelOrders.aslfav; }
     const hfCondCard = document.getElementById('hf-conditions-card');
-    if (hfCondCard && 'hfcond' in sentinelOrders) hfCondCard.style.order = sentinelOrders.hfcond;
+    if (hfCondCard && 'hfcond' in sentinelOrders) { moveIfNeeded(hfCondCard, cardsOuter); hfCondCard.style.order = sentinelOrders.hfcond; }
     const bandPlanCard = document.getElementById('band-plan-card');
-    if (bandPlanCard && 'bandplan' in sentinelOrders) bandPlanCard.style.order = sentinelOrders.bandplan;
+    if (bandPlanCard && 'bandplan' in sentinelOrders) { moveIfNeeded(bandPlanCard, cardsOuter); bandPlanCard.style.order = sentinelOrders.bandplan; }
     const licenseQuizCard = document.getElementById('license-quiz-card');
-    if (licenseQuizCard && 'licensequiz' in sentinelOrders) licenseQuizCard.style.order = sentinelOrders.licensequiz;
+    if (licenseQuizCard && 'licensequiz' in sentinelOrders) { moveIfNeeded(licenseQuizCard, cardsOuter); licenseQuizCard.style.order = sentinelOrders.licensequiz; }
     const wsprActivityCard = document.getElementById('wspr-activity-card');
-    if (wsprActivityCard && 'wspractivity' in sentinelOrders) wsprActivityCard.style.order = sentinelOrders.wspractivity;
+    if (wsprActivityCard && 'wspractivity' in sentinelOrders) { moveIfNeeded(wsprActivityCard, cardsOuter); wsprActivityCard.style.order = sentinelOrders.wspractivity; }
     const digipiCard = document.getElementById('digipi-card');
-    if (digipiCard && 'digipi' in sentinelOrders) digipiCard.style.order = sentinelOrders.digipi;
+    if (digipiCard && 'digipi' in sentinelOrders) { moveIfNeeded(digipiCard, cardsOuter); digipiCard.style.order = sentinelOrders.digipi; }
     const bigClockCard = document.getElementById('big-clock-card');
-    if (bigClockCard && 'bigclock' in sentinelOrders) bigClockCard.style.order = sentinelOrders.bigclock;
+    if (bigClockCard && 'bigclock' in sentinelOrders) { moveIfNeeded(bigClockCard, cardsOuter); bigClockCard.style.order = sentinelOrders.bigclock; }
     const notificationsCard = document.getElementById('notifications-card');
-    if (notificationsCard && 'notifications' in sentinelOrders) notificationsCard.style.order = sentinelOrders.notifications;
+    if (notificationsCard && 'notifications' in sentinelOrders) { moveIfNeeded(notificationsCard, cardsOuter); notificationsCard.style.order = sentinelOrders.notifications; }
     const satellitesCard = document.getElementById('satellites-card');
-    if (satellitesCard && 'satellites' in sentinelOrders) satellitesCard.style.order = sentinelOrders.satellites;
+    if (satellitesCard && 'satellites' in sentinelOrders) { moveIfNeeded(satellitesCard, cardsOuter); satellitesCard.style.order = sentinelOrders.satellites; }
     const recentContactsCard = document.getElementById('recent-contacts-card');
-    if (recentContactsCard && 'recentcontacts' in sentinelOrders) recentContactsCard.style.order = sentinelOrders.recentcontacts;
+    if (recentContactsCard && 'recentcontacts' in sentinelOrders) { moveIfNeeded(recentContactsCard, cardsOuter); recentContactsCard.style.order = sentinelOrders.recentcontacts; }
     const qsoStatsCard = document.getElementById('qso-stats-card');
-    if (qsoStatsCard && 'qsostats' in sentinelOrders) qsoStatsCard.style.order = sentinelOrders.qsostats;
+    if (qsoStatsCard && 'qsostats' in sentinelOrders) { moveIfNeeded(qsoStatsCard, cardsOuter); qsoStatsCard.style.order = sentinelOrders.qsostats; }
     const topActivityCard = document.getElementById('top-activity-card');
-    if (topActivityCard && 'topactivity' in sentinelOrders) topActivityCard.style.order = sentinelOrders.topactivity;
+    if (topActivityCard && 'topactivity' in sentinelOrders) { moveIfNeeded(topActivityCard, cardsOuter); topActivityCard.style.order = sentinelOrders.topactivity; }
     const potaCard = document.getElementById('pota-card');
-    if (potaCard && 'pota' in sentinelOrders) potaCard.style.order = sentinelOrders.pota;
+    if (potaCard && 'pota' in sentinelOrders) { moveIfNeeded(potaCard, cardsOuter); potaCard.style.order = sentinelOrders.pota; }
     const hfFavCard = document.getElementById('hf-favorites-card');
-    if (hfFavCard && 'hffav' in sentinelOrders) hfFavCard.style.order = sentinelOrders.hffav;
+    if (hfFavCard && 'hffav' in sentinelOrders) { moveIfNeeded(hfFavCard, cardsOuter); hfFavCard.style.order = sentinelOrders.hffav; }
     const rigPanelCard = document.getElementById('rig-panel-card');
-    if (rigPanelCard && 'rigpanel' in sentinelOrders) rigPanelCard.style.order = sentinelOrders.rigpanel;
+    if (rigPanelCard && 'rigpanel' in sentinelOrders) { moveIfNeeded(rigPanelCard, cardsOuter); rigPanelCard.style.order = sentinelOrders.rigpanel; }
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -4470,8 +4535,8 @@ function renderCards(data) {
         });
     }
 
-    // data is an array — order guaranteed, no Object.values() needed
-    container.innerHTML = data.map((hs, i) => {
+    // pageData is an array — order guaranteed, no Object.values() needed
+    container.innerHTML = pageData.map((hs, i) => {
         const cardOrder  = hotspotOrders[i];
         const isAsl        = hs.type === 'asl3';
         const isOpenSpot4  = hs.type === 'openspot4';
@@ -4805,20 +4870,26 @@ function renderCards(data) {
         </div>`;
     }).join('');
 
-    // Fleet status pill (toolbar) + spotlight dimming -- both derived from
-    // this same poll's data, no separate fetch needed.
-    const onlineCount = data.filter(hs => hs.status !== 'Offline').length;
+    // Fleet status pill (toolbar) -- a page-independent singleton, only
+    // updated on the page-1 call (still derived from the FULL, unfiltered
+    // `data` -- fleet-wide, not "hotspots on this page"). Spotlight
+    // dimming below, by contrast, applies to THIS call's own cardsOuter
+    // (the `page` parameter's container) every time renderCards() runs,
+    // so a page-2 grid dims its own idle cards too while anything
+    // anywhere in the fleet is active -- not gated to page === 1.
     const activeCount = data.filter(hs => hs.is_active).length;
-    const fleetStatusEl = document.getElementById('fleet-status');
-    if (fleetStatusEl) {
-        fleetStatusEl.style.display = data.length ? 'flex' : 'none';
-        fleetStatusEl.classList.toggle('has-active', activeCount > 0);
-        const textEl = document.getElementById('fleet-status-text');
-        if (textEl) {
-            textEl.innerHTML = `<b>${onlineCount}</b>/${data.length} online <span class="sep">·</span> <b>${activeCount}</b> active now`;
+    if (page === 1) {
+        const onlineCount = data.filter(hs => hs.status !== 'Offline').length;
+        const fleetStatusEl = document.getElementById('fleet-status');
+        if (fleetStatusEl) {
+            fleetStatusEl.style.display = data.length ? 'flex' : 'none';
+            fleetStatusEl.classList.toggle('has-active', activeCount > 0);
+            const textEl = document.getElementById('fleet-status-text');
+            if (textEl) {
+                textEl.innerHTML = `<b>${onlineCount}</b>/${data.length} online <span class="sep">·</span> <b>${activeCount}</b> active now`;
+            }
         }
     }
-    const cardsOuter = document.getElementById('cards-outer');
     if (cardsOuter) cardsOuter.classList.toggle('spotlight', SPOTLIGHT_DIMMING_ENABLED && activeCount > 0);
 
     // VU meter tracking (v4.30: ALWAYS tracked now, not just while active --
@@ -4843,7 +4914,7 @@ function renderCards(data) {
     // just created -- without this the browser could paint one blank frame
     // before the next requestAnimationFrame tick, showing as a flicker
     // synced to every 3s poll.
-    data.forEach(hs => {
+    pageData.forEach(hs => {
         if (hs.type === 'asl3') {
             // ASL3 has no RSSI/BER/dejitter data at all to drive this
             // block's usual pct tracking -- when audio_meter_enabled, the
@@ -4892,7 +4963,7 @@ function renderCards(data) {
     // Update browser-local timer state — only reset browserStart when the
     // server reports a genuinely new event (tx_start or last_heard changed).
     // This keeps each card's timer running smoothly across render cycles.
-    data.forEach(hs => {
+    pageData.forEach(hs => {
         // Despite the name (kept for a smaller diff below), this is the
         // hotspot's stable id, not a literal IP -- matches the id-based
         // DOM element ids (off-/tx-/lh-) rendered above. Two hotspots can
@@ -4973,12 +5044,18 @@ function renderCards(data) {
 // entry). Only the select's own <option>s and the body's innerHTML are
 // touched on later polls, mirroring renderAslFavorites()'s own
 // preserve-the-selection-across-rebuilds handling of its select.
-let lastSentinelOrders = {};
+// Second dashboard tab (v4.58): keyed by page since renderCards() now
+// computes one sentinelOrders result per page, and DVSwitch's single
+// card only ever belongs to whichever page DVSWITCH_PAGE says.
+let lastSentinelOrdersByPage = { 1: {}, 2: {} };
 let dvsSelectedHotspotId = null;
 
-function renderDvswitchCards(data) {
-    const container = document.getElementById('dvswitch-cards');
-    const dvsHotspots = SHOW_DVSWITCH ? data.filter(hs => hs.dvswitch_enabled) : [];
+function renderDvswitchCards(data, page = DVSWITCH_PAGE) {
+    const container = document.getElementById(page === 2 ? 'dvswitch-cards-2' : 'dvswitch-cards');
+    const dvsHotspots = (SHOW_DVSWITCH && DVSWITCH_PAGE === page) ? data.filter(hs => hs.dvswitch_enabled) : [];
+    // Page 2's container doesn't exist at all when has_dashboard2 is
+    // false -- see the Jinja gate around #panel-dashboard2.
+    if (!container) return;
     if (!dvsHotspots.length) {
         container.innerHTML = '';
         dvsSelectedHotspotId = null;
@@ -4987,6 +5064,7 @@ function renderDvswitchCards(data) {
 
     if (!document.getElementById('dvswitch-card')) {
         const sentinelKey = 'dvswitch';
+        const lastSentinelOrders = lastSentinelOrdersByPage[page] || {};
         const orderStyle = sentinelKey in lastSentinelOrders ? ` style="order:${lastSentinelOrders[sentinelKey]}"` : '';
         container.innerHTML = `
             <div class="metrics-card dvs-card" id="dvswitch-card"${orderStyle}>
@@ -11747,6 +11825,9 @@ function refresh() {
         .then(r => r.json())
         .then(data => {
             renderCards(data);
+            if (HAS_DASHBOARD2) {
+                renderCards(data, 2, document.getElementById('cards-2'), document.getElementById('cards-outer-2'));
+            }
             renderDvswitchCards(data);
             refreshMap();
             // lastApiData is used by renderAslFavorites() below,
