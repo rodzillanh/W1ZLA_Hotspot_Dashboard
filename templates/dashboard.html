@@ -1310,10 +1310,15 @@
         .msg-empty { color: var(--text-dim); font-size: 12.5px; padding: 16px 0; text-align: center; display: none; }
         /* Recent Contacts' rows are more compact than APRS/Notifications'
            .msg-row, so the shared .msg-scroll's 220px cap left this card
-           looking mostly-empty next to a taller row neighbor (e.g. Fleet
-           Status) -- id selector overrides the shared class for this one
-           card only, without touching Notifications/APRS's own sizing. */
-        #rc-scroll { max-height: 400px; }
+           looking mostly-empty next to a taller row neighbor (e.g.
+           Hotspot Status) -- id selector overrides the shared class for
+           this one card only, without touching Notifications/APRS's own
+           sizing. 400px (a first attempt) overshot and made this the
+           SINGLE TALLEST card on the whole dashboard -- 300px matches
+           this app's actual established "fixed-size list card" standard
+           (POTA/HF Favorites both use this same height), not a
+           one-off guess. */
+        #rc-scroll { max-height: 300px; }
 
         /* --- Recent Contacts card -- dedicated row layout (not a reuse
            of .msg-row, which is shaped for message threads), matching
@@ -8288,7 +8293,7 @@ function togglePsk() {
 // guessed -- reproduce by grepping for a second `function fmtAgo(` in this
 // script block before ever reintroducing that name here.
 function fmtAgoCompact(secs) {
-    if (secs < 60) return secs + 's';
+    if (secs < 60) return Math.round(secs) + 's';
     if (secs < 3600) return Math.round(secs / 60) + 'm';
     return Math.round(secs / 3600) + 'h';
 }

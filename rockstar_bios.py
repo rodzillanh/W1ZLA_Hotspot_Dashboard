@@ -486,6 +486,11 @@ BIOS = {
         "blurb": "Founding frontman of Lynyrd Skynyrd, whose gritty Southern-rock songwriting on tracks like \"Free Bird\" and \"Sweet Home Alabama\" defined the genre before his death in the band's 1977 plane crash.",
         "wiki": "Ronnie_Van_Zant",
     },
+    "Ochs": {
+        "name": "Phil Ochs",
+        "blurb": "Sharp-tongued protest-folk singer-songwriter of the 1960s whose politically charged records influenced the folk-rock movement, before his death by suicide in 1976.",
+        "wiki": "Phil_Ochs",
+    },
 }
 
 

@@ -6745,6 +6745,42 @@ config for per-integration credentials; put it in
     right-aligned text and the scrollbar in a cropped close-up of the
     card, not just a computed CSS value.
 
+- **`#rc-scroll`'s 400px height (the fix two entries above) overshot --
+  reported directly ("is the Recent Contacts card exceeding the
+  standard card sizes of all the other dashboard cards?") and confirmed
+  by actually enumerating every fixed-height scroll region in this file:
+  130px (DigiPi packets), 220px (Notifications, Flights Overhead), 300px
+  (POTA, HF Favorites -- this app's real, already-established "fixed-
+  size list card" standard, not a guess), 340px (Hotspot Status). 400px
+  made Recent Contacts the single tallest card on the entire dashboard,
+  taller even than Hotspot Status, the specific neighbor the original
+  220px->400px fix was reacting to. Brought down to 300px to match the
+  actual existing convention (POTA/HF Favorites) rather than picking a
+  number that merely beat one specific neighbor's height -- which
+  hotspot cards happen to share a grid row with Recent Contacts depends
+  entirely on what's enabled/ordered, so sizing to the app's own
+  standard is the only choice that stays correct regardless of layout.
+  **A stretched-taller neighbor can still leave a modest gap below the
+  300px list** (CSS Grid's `align-items: stretch` matches every card in
+  a row to the tallest one, e.g. up to Hotspot Status's own ~340px+
+  header+padding) -- confirmed via live `getBoundingClientRect()`
+  measurement, not assumed, and accepted as normal grid behavior rather
+  than something to chase by inflating one card's fixed height to match
+  whichever taller card happens to be in its row on a given install.
+- **A real, unrelated bug found while eyeballing that same verification
+  screenshot, fixed in passing: `fmtAgoCompact()`'s under-60-second
+  branch never rounded its input**, unlike its own other two branches
+  (both wrap in `Math.round()`). A QSO logged via live WSJT-X within the
+  last minute produces a genuinely fractional elapsed-seconds value
+  (`Date.now()/1000 - q.logged_at`, both floats), so the "just now"
+  case could print something like "3.057649612426756s ago" instead of a
+  clean "3s ago" -- reproduced live with a QSO logged 0 seconds ago
+  before fixing. This function is shared by four call sites (Recent
+  Contacts, the DVSwitch "last heard" list, the PSK Reporter map
+  tooltip, and the hotspot drawer's "last SSH check" line), all of which
+  can hit a genuinely sub-60-second, non-integer value the same way --
+  fixed once at the shared function, not patched per call site.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
