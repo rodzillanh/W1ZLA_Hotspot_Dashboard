@@ -841,7 +841,10 @@ A third node type alongside WPSD/Pi-Star and ASL3, added in v3.38 —
 Settings → Hotspots → **Node type** → "openSPOT 4 (SharkRF)". Unlike the
 other two types, an openSPOT4 is a closed embedded device with no SSH
 access at all — there's no user field to fill in, just the device's own
-admin password (the same field WPSD/ASL3 use for the SSH password).
+admin password (the same field WPSD/ASL3 use for the SSH password). If
+your device is configured with **no admin password at all** (openSPOT4
+supports this), just leave the password field blank — it's tried as a
+genuine login attempt, not skipped.
 
 Monitored over the device's own HTTP + WebSocket API rather than SSH:
 logging in gets a JWT, then a persistent WebSocket connection

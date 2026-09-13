@@ -476,6 +476,11 @@ BIOS = {
         "blurb": "Half of Delaney & Bonnie, whose blues-and-gospel-rooted roadshow backed and influenced Eric Clapton, George Harrison, and Duane Allman on their way to defining a whole strand of swampy '70s rock.",
         "wiki": "Delaney_Bramlett",
     },
+    "Wray": {
+        "name": "Link Wray",
+        "blurb": "Instrumental guitarist whose 1958 hit \"Rumble\" pioneered the power chord and distorted guitar tone, directly shaping punk and hard rock decades before either genre existed.",
+        "wiki": "Link_Wray",
+    },
 }
 
 

@@ -6672,6 +6672,48 @@ config for per-integration credentials; put it in
     than an empty/broken chart, and compared the rendered screenshot
     directly against the approved mockup before considering this done.
 
+- **openSPOT4 support without any admin password (v4.64) -- confirmed
+  directly by a real user before touching any code: "it can operate and
+  be accessible without a password."** Before this, `_collect_passwords()`
+  filtered out any falsy/empty-string password, so a hotspot saved with a
+  blank password field (the Settings form itself never required one --
+  no `required` attribute, no JS validation) would end up with an EMPTY
+  candidate list, and `_login_any()` would immediately raise "no password
+  configured" without ever attempting a connection at all. This wasn't a
+  device-reachability problem, it was this app's own code refusing to try.
+  - **Fixed by always including the primary `"pass"` field as a
+    candidate, even when blank** (`hotspot.get("pass") or ""`), while
+    still dropping blank lines from the "Additional profile passwords"
+    textarea specifically -- a stray empty line there is far more likely
+    a copy/paste artifact than a deliberate "this OTHER profile has no
+    password" statement, and unlike the primary field there's no single
+    unambiguous slot for it to occupy. `_login()`'s existing digest math
+    (`sha256(token + password)`) needed zero changes -- an empty-string
+    password is just a valid input to that same formula, matching
+    whatever a real no-password-configured openSPOT4 profile computes on
+    its own side.
+  - **Verified end-to-end against a real mock HTTP server** (not just
+    unit-testing `_collect_passwords()` in isolation) implementing
+    `/gettok`+`/login`+`/checktok` and requiring the empty-password
+    digest to authenticate -- confirmed `test_connection('', '')`
+    succeeds with a clear "Login succeeded with no password (device has
+    none configured)" message (distinguished from the generic "using the
+    primary password" wording, so a successful blank-password login
+    doesn't read as if a real password value were somehow used), and
+    confirmed the real-password and multi-profile-extras-fallback paths
+    are both completely unaffected by the change (regression-tested
+    against the same mock, different expected digests).
+  - **Not yet confirmed against this exact user's real device** -- the
+    fix is verified against a synthetic server that implements the
+    documented challenge-response scheme with an empty password, which
+    should be exactly what a real no-password openSPOT4 profile does
+    (same endpoints/digest formula this whole integration was already
+    built from, per openspot.py's own module docstring), but if a real
+    device ever behaves differently (e.g. skips the digest step
+    entirely, or expects a different sentinel value) that would need its
+    own live capture to confirm, the same discipline as every other
+    openSPOT4 finding in this file.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

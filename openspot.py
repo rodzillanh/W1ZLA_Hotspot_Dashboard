@@ -267,16 +267,27 @@ def _collect_passwords(hotspot: dict) -> list:
     collect every password the user has told us about for this device --
     the primary "pass" field plus any extras stored for other profiles --
     and try them all at login time; whichever one matches the currently
-    active profile succeeds. Blank/duplicate entries are dropped, order
+    active profile succeeds. Duplicate entries are dropped, order
     preserved (primary first) so the common single-profile case tries
-    its one password first, not last."""
-    candidates = [hotspot.get("pass", "")]
+    its one password first, not last.
+
+    A profile can ALSO be configured with no admin password at all
+    (confirmed live by a real user) -- the primary "pass" field is
+    therefore always included as a candidate, even blank/absent, so an
+    empty string is genuinely attempted rather than the whole login
+    being skipped. Only the EXTRA (other-profile) passwords are still
+    dropped when blank, since a stray empty line in that textarea is far
+    more likely a copy/paste artifact than a deliberate "this profile
+    has no password" statement -- there's no equivalent primary-field
+    slot for those to occupy unambiguously the way the main "pass" field
+    does."""
+    candidates = [hotspot.get("pass") or ""]
     extra = hotspot.get("openspot4_extra_pass", "") or ""
-    candidates += [line.strip() for line in extra.splitlines()]
+    candidates += [line.strip() for line in extra.splitlines() if line.strip()]
     seen = set()
     result = []
     for pw in candidates:
-        if pw and pw not in seen:
+        if pw not in seen:
             seen.add(pw)
             result.append(pw)
     return result
@@ -1020,5 +1031,7 @@ class OpenSpot4Manager:
             _check_token(ip, jwt)
         except Exception as e:
             return False, f"Token check (checktok) failed: {e}"
+        if passwords[idx] == "":
+            return True, "Login succeeded with no password (device has none configured)"
         which = "primary password" if idx == 0 else f"additional password #{idx}"
         return True, f"Login succeeded using the {which}"
