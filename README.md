@@ -14,7 +14,7 @@ app.py          Flask routes only
 config.py       all the tunables (timeouts, thresholds, regex patterns)
 models.py       HotspotStatus dataclass — the shape of each dashboard card
 storage.py      load/save hotspots.json and settings.json
-storage_activity.py  SQLite log for the optional Fleet activity card
+storage_activity.py  SQLite log for the optional Hotspot Activity card
 monitor.py      FleetMonitor: SSH polling + MMDVM log parsing (WPSD) / rpt xnode parsing (ASL3)
 openspot.py     openSPOT4 (SharkRF): persistent WebSocket client, one per configured device
 qrz.py          optional QRZ.com lookup for the active caller's name/city/state/photo/coords
@@ -345,7 +345,7 @@ and **Version info**.
   (General tab) hides the whole row if you'd rather not show it; the ⚙
   Settings link itself always stays visible either way.
 - **Card order** — drag hotspot cards into whatever order you want them
-  to appear on the dashboard (Cards tab). If the Fleet activity, ASL
+  to appear on the dashboard (Cards tab). If the Hotspot Activity, ASL
   Favorites & Control, HF Conditions, Band Plan, License Quiz, Band
   Activity, Big Ass Clock, Notifications (APRS Messages + HamAlert),
   Satellites, or Flights Overhead card is enabled, it appears in the same drag list and can be moved to
@@ -357,8 +357,8 @@ and **Version info**.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.
-- **Fleet activity card** — off by default (General tab toggle). Adds a
-  small SQLite-backed log of completed transmissions; see "Fleet activity"
+- **Hotspot Activity card** — off by default (General tab toggle). Adds a
+  small SQLite-backed log of completed transmissions; see "Hotspot activity"
   below.
 - **Per-hotspot latitude/longitude** — optional, set on the Hotspots tab's
   add/edit form. Plots that hotspot on the Live map (see "Live map" below).
@@ -730,11 +730,11 @@ via SSH; a protocol ceiling, not a bug.
 
 One optional card, shared by every ASL3 node that also runs a DVSwitch
 (Analog_Bridge) audio bridge — distinct from the DVSwitch mode on the
-**Fleet Activity** card above; that's just an activity count, this is a
+**Hotspot Activity** card above; that's just an activity count, this is a
 full status card. A **"Show:" picker** in the header switches between
 nodes if you have more than one — enabling DVSwitch on a second node adds
 it to that list, not a second card. Turn it on per node the same place as
-the Fleet Activity mode (Settings → Hotspots → edit the ASL3 node →
+the Hotspot Activity mode (Settings → Hotspots → edit the ASL3 node →
 "This node also runs DVSwitch (Analog_Bridge)"), then list one or more
 **bridge ports** (comma or newline separated — Analog_Bridge supports
 running multiple instances on one node, each identified by its own port).
@@ -766,7 +766,7 @@ Otherwise it shows:
   one-time log line from Analog_Bridge's own startup only if that live
   data isn't available.
 - **Sparkline** — a small recent-activity trend, reusing the same logged
-  data the Fleet Activity card's DVSwitch mode already writes.
+  data the Hotspot Activity card's DVSwitch mode already writes.
 - **Live RX/TX row** — a pulsing "W1ZLA → TG 603" style indicator for a
   transmission that's actually in progress right now, plus DMR master /
   D-Star link status. Unlike everything else on this card, this is
@@ -790,7 +790,7 @@ rather than guess.
 
 Its position is part of the same drag-and-drop **Card order** list as
 everything else (Settings → Hotspots) — one position for the whole card,
-same as Fleet Activity/ASL Favorites, not one per node.
+same as Hotspot Activity/ASL Favorites, not one per node.
 
 <!-- wiki-group: Hotspot Types -->
 ## ASL3 live audio-level VU meter
@@ -1230,7 +1230,7 @@ Optional dashboard card (Settings → Cards) that merges up to six
 independent message/alert sources into one scrollable, time-sorted list —
 appears as soon as *any* is enabled, and each remains its own separate
 on/off toggle underneath. Position it anywhere in the same drag-and-drop
-**Card order** list (Settings → Hotspots), same as Fleet Activity/ASL
+**Card order** list (Settings → Hotspots), same as Hotspot Activity/ASL
 Favorites/Camera cards. Each enabled source shows as one pill in the card
 header (with a connection dot for sources that have a real connection to
 show) — click a pill to isolate that source's rows, click it again to go
@@ -1545,6 +1545,28 @@ badge marks the ones QRZ has confirmed — the detail drawer shows the
 confirmation date.
 
 <!-- wiki-group: Optional Cards -->
+## Hotspot Status card
+<!-- wiki-image: hotspot-status-card.png -->
+
+Optional dashboard card (Settings → Cards → "Show Hotspot Status card",
+off by default) — a compact, one-card-width list showing every hotspot
+in your fleet, two lines each: a status dot, name, type badge (WPSD/
+ASL3/openSPOT4), and current activity on top; digital-voice mode chips
+(or an ASL-specific linked-node/DVSwitch summary) and a temperature/
+uptime/update readout below. It's deliberately fleet-wide regardless of
+which dashboard tab a hotspot lives on (see "Second dashboard tab"
+below) — the whole point is one glance at everything, even if some of
+those hotspots are actually parked on your second tab. Clicking a row
+opens that hotspot's own settings/detail drawer, same as its full-size
+card.
+
+A **⚙ button** on the card opens its own drawer for customizing this
+card's list specifically — check a hotspot off to hide it from just this
+card (its full-size card elsewhere on the dashboard is unaffected), or
+use the ▲/▼ buttons to reorder rows within the list. This is entirely
+separate from the main dashboard's own hotspot order/visibility.
+
+<!-- wiki-group: Optional Cards -->
 ## QSO Stats card
 <!-- wiki-image: qso-stats-card.png -->
 
@@ -1553,9 +1575,11 @@ by default) — a quick summary over the same logged QSOs Recent Contacts
 shows: total contacts, unique countries worked, unique grid squares
 worked (at 4-character Maidenhead precision — e.g. "FN42" — the
 standard grid-square-award granularity, not the finer 6-character
-precision some logs store), unique bands worked, and a small breakdown
-of your most-used bands. Pure client-side aggregation, no new data
-source or backend query.
+precision some logs store), unique bands worked, a small breakdown of
+your most-used bands, a breakdown of your most-used modes (FT8/SSB/CW/
+etc.), and a 14-day sparkline of logging activity with today's bar
+highlighted. Pure client-side aggregation, no new data source or backend
+query.
 
 <!-- wiki-group: Optional Cards -->
 ## Top 5 Activity card
@@ -1568,7 +1592,7 @@ linking to QRZ (or RadioID.net if QRZ isn't configured) same as the
 Recent Contacts card. WPSD entries also show the talkgroup that callsign
 was most recently heard on (e.g. "TG 3172"); AllStarLink has no separate
 concept here, since the linked node is already baked into the callsign
-itself. Needs "Show fleet activity card" enabled too — it reads the same
+itself. Needs "Show hotspot activity card" enabled too — it reads the same
 activity log that card's chart is built from, just a different aggregate
 query (ranked totals instead of a time series).
 
@@ -1915,13 +1939,13 @@ appear as pins — the QRZ subscription caveat above applies here too.
   polling, so this is cached 10 minutes server-side regardless of how
   long the checkbox has been on.
 <!-- wiki-group: Dashboard and Live Map -->
-## Fleet activity
+## Hotspot activity
 <!-- wiki-image: fleet-activity-card.png -->
 
-Optional — off by default (Settings → Cards → "Show fleet activity
+Optional — off by default (Settings → Cards → "Show hotspot activity
 card"), since it adds a small SQLite log (`activity.db` in the appdata
 folder alongside `hotspots.json`) and a write on every completed
-transmission. Once enabled, a "Fleet activity" card appears on the
+transmission. Once enabled, a "Hotspot Activity" card appears on the
 dashboard showing:
 
 - **Online** — hotspots currently online vs. total configured.
@@ -1939,7 +1963,7 @@ By default the card appears first, before any hotspot cards. Its position
 is part of the same drag-and-drop **Card order** list as the hotspot cards
 (Settings → Hotspots) — drag it anywhere in that list to move it.
 
-**Time span** — Settings → Cards → "Fleet activity time span" — 3, 6, 12
+**Time span** — Settings → Cards → "Hotspot activity time span" — 3, 6, 12
 (default), 24, or 48 hours. The chart's bucket width scales with the
 selected span (5 to 60 minutes) so it always renders roughly the same
 number of points rather than getting denser or sparser as the span changes.

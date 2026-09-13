@@ -101,6 +101,7 @@ SETTINGS = {
     "weather_unit": "F",
     "show_host_stats": True,
     "show_toolbar": True,
+    "show_fleet_status": True,
     "show_fleet_activity": True,
     "show_asl_favorites": True,
     "show_hf_conditions": True,
@@ -172,6 +173,24 @@ QSOS = [
         "logged_at": time.time() - 90000,
     },
 ]
+
+# Spread a handful more QSOs across the last two weeks -- QSO Stats' own
+# 14-day sparkline (v4.63) needs more than "everything logged in the last
+# day" to actually show a real-looking trend rather than one tall bar and
+# 13 empty days. Bare-minimum fields only (call/band/mode/grid/country/
+# logged_at) since these exist purely to fill out the sparkline/mode/band
+# breakdowns, not to demonstrate Recent Contacts' richer per-row detail --
+# the three QSOs above already do that job.
+_SPARK_DAYS = [1, 1, 2, 3, 4, 4, 6, 8, 9, 11, 13]
+_SPARK_MODES = ["FT8", "FT8", "SSB", "FT8", "CW", "FT8", "SSB", "FT8", "FT4", "FT8", "SSB"]
+_SPARK_BANDS = ["20m", "15m", "40m", "20m", "20m", "17m", "40m", "20m", "20m", "15m", "80m"]
+for _i, (_d, _mode, _band) in enumerate(zip(_SPARK_DAYS, _SPARK_MODES, _SPARK_BANDS)):
+    QSOS.append({
+        "call": f"N1SPK{_i}", "band": _band, "mode": _mode,
+        "grid": "EN91qh" if _i % 2 else "DM79",
+        "country": "UNITED STATES", "frequency_hz": 14074000,
+        "logged_at": time.time() - _d * 86400 - _i * 60, "source": "wsjtx",
+    })
 
 
 def _write_json(path, data):
@@ -366,6 +385,7 @@ CARD_SHOTS = [
     (f"card-{_ip_to_id[HOTSPOT_WPSD_IDLE['ip']]}", "hotspot-card-wpsd-idle.png"),
     (f"card-{_ip_to_id[HOTSPOT_ASL3['ip']]}", "hotspot-card-asl3.png"),
     ("dvswitch-card", "dvswitch-card.png"),  # one consolidated card since v3.99, not one per node
+    ("fleet-status-card", "hotspot-status-card.png"),
     ("fleet-activity-card", "fleet-activity-card.png"),
     ("asl-favorites-card", "asl-favorites-card.png"),
     ("satellites-card", "satellites-card.png"),
