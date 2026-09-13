@@ -9849,6 +9849,16 @@ function qlFindSpotMatch(freqHz, mode) {
 // -- clearing an auto-filled field (typing in it) drops its "auto" flag
 // so a later render never overwrites the manual edit.
 let qlAuto = { call: false, comment: false };
+// Rig Panel only ever reads TX power meters while actually keyed
+// (rig_panel.py's _poll_once gates them behind `if ptt:`) -- power_w
+// reverts to null within one poll (RIG_PANEL_POLL_MS, ~1s) of unkeying.
+// The normal Quick Log workflow is "finish the QSO, THEN click Log", so
+// by submit time the live reading is already gone. Remember the last
+// real reading here so both the chip and the actual submit still carry
+// it -- reset only when the rig itself goes unreachable, or right after
+// a successful submit (so a stale power figure from THIS contact never
+// silently attaches itself to a later one logged without re-keying).
+let qlLastPowerW = null;
 function qlClearAuto(id) {
     const key = id === 'ql-call' ? 'call' : 'comment';
     qlAuto[key] = false;
@@ -9875,16 +9885,21 @@ function renderQuickLogCard() {
         metaEl.innerHTML = '';
         slot.innerHTML = '<div class="ql-nomatch">Waiting for the rig…</div>';
         submitBtn.disabled = true;
+        qlLastPowerW = null;  // rig's gone -- don't carry a stale reading into whenever it comes back
         return;
     }
 
+    if (r.power_w != null) qlLastPowerW = r.power_w;
     const mhzStr = (r.freq_hz / 1e6).toFixed(6);
     const dotIdx = mhzStr.indexOf('.');
     freqEl.innerHTML = `${mhzStr.slice(0, dotIdx + 4)}<small>${mhzStr.slice(dotIdx + 4)}</small>`;
     let metaHtml = '';
     if (r.band) metaHtml += `<span class="ql-chip">${escapeHtml(r.band)}</span>`;
     if (r.mode) metaHtml += `<span class="ql-chip">${escapeHtml(r.mode)}</span>`;
-    if (r.power_w != null) metaHtml += `<span class="ql-chip">${Math.round(r.power_w)}W</span>`;
+    if (qlLastPowerW != null) {
+        const liveTitle = r.power_w != null ? '' : ' title="Last measured power -- the rig only reports this while actually keyed"';
+        metaHtml += `<span class="ql-chip"${liveTitle}>${Math.round(qlLastPowerW)}W</span>`;
+    }
     metaEl.innerHTML = metaHtml;
 
     const match = qlFindSpotMatch(r.freq_hz, r.mode);
@@ -9937,7 +9952,7 @@ function qlSubmit() {
         band: r.band || '',
         mode: r.mode || '',
         freq_hz: r.freq_hz || null,
-        power_w: r.power_w != null ? r.power_w : null,
+        power_w: r.power_w != null ? r.power_w : qlLastPowerW,
         rst_sent: (document.getElementById('ql-rst-sent').value || '').trim(),
         rst_rcvd: (document.getElementById('ql-rst-rcvd').value || '').trim(),
         comment: (document.getElementById('ql-comment').value || '').trim(),
@@ -9960,6 +9975,7 @@ function qlSubmit() {
             document.getElementById('ql-rst-rcvd').value = '';
             document.getElementById('ql-comment').value = '';
             qlAuto = { call: false, comment: false };
+            qlLastPowerW = null;
             fetchQsos();
             setTimeout(() => { btn.classList.remove('ok'); btn.textContent = '📤 Log to QRZ'; }, 2500);
         } else {

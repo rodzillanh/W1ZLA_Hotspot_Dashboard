@@ -60,11 +60,13 @@ not a state -- same rule as monitor.py's fleet events /
 hf_conditions.py's solar alerts).
 
 insert_qso() (v4.74, QRZ Quick Log card) is the write-side counterpart --
-KEY=<key>&ACTION=INSERT&ADIF=<record>&OPTION=REPLACE. UNLIKE the read
-side above, this has NOT been verified against a real logbook -- built
-from QRZ's documented API only. Re-verify with one real submit against
-a live account before trusting it in production, same "verify against
-the real thing" discipline as everywhere else in this project.
+KEY=<key>&ACTION=INSERT&ADIF=<record>&OPTION=REPLACE. Built from QRZ's
+documented API (not reverse-engineered like the read side originally
+was), and CONFIRMED WORKING against a real logbook (W1ZLA, 2026-09) --
+the user reported real submits landing correctly. If this ever starts
+rejecting real submits, re-check the ADIF field set in
+_ADIF_INSERT_FIELDS against QRZ's current INSERT docs before assuming
+the request-building code regressed.
 """
 import datetime
 import html
@@ -267,11 +269,11 @@ class QrzLogbookClient:
     def insert_qso(self, fields: dict) -> dict:
         """Submits one new QSO via QRZ's ACTION=INSERT -- the write-side
         counterpart of this module's read-only sync, added for the QRZ
-        Quick Log card. UNLIKE every other method in this class, this is
-        NOT verified against a real logbook -- the read side (STATUS/
-        FETCH) was confirmed live 2026-09 (see this module's own
-        docstring), but INSERT was built from QRZ's documented API only.
-        Uses the SAME qrz_logbook_api_key as the read-side sync (QRZ's
+        Quick Log card. Built from QRZ's documented API and CONFIRMED
+        WORKING live against a real logbook (W1ZLA, 2026-09) -- same tier
+        of confidence as the read side (STATUS/FETCH), also confirmed
+        live 2026-09 (see this module's own docstring). Uses the SAME
+        qrz_logbook_api_key as the read-side sync (QRZ's
         Logbook API key is per-logbook, not per-action) -- gated on the
         key being present, deliberately NOT on qrz_logbook_enabled (the
         background-sync toggle), since submitting one QSO by hand is a

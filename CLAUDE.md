@@ -7318,12 +7318,10 @@ config for per-integration credentials; put it in
 - **The QRZ Quick Log card (v4.74) is the first thing in this app that
   WRITES a QSO to QRZ, not just reads from it** -- `qrz_logbook.py`'s
   `insert_qso()` (`KEY=<key>&ACTION=INSERT&ADIF=<record>&OPTION=REPLACE`)
-  is QRZ's own documented API, built from that documentation alone --
-  UNLIKE the read side (STATUS/FETCH), it has **not** been verified
-  against a real logbook (this module's own docstring flags this
-  explicitly). Do one real test submit against a live account before
-  trusting the submit button in production, same "verify against the
-  real thing" discipline as every other integration in this project.
+  was built from QRZ's own documented API (not reverse-engineered) and
+  is now **confirmed working live** against the user's real logbook
+  (W1ZLA, 2026-09) -- same tier of confidence as the read side (STATUS/
+  FETCH), which was already confirmed live earlier the same month.
   Reuses the SAME `qrz_logbook_api_key` as the read-side sync (QRZ's
   Logbook API key is per-logbook, not per-action) -- gated on the key
   being present, deliberately NOT on `qrz_logbook_enabled` (the
@@ -7423,6 +7421,42 @@ config for per-integration credentials; put it in
     submit failure (no QRZ key configured) surfacing QRZ's own error
     text via the existing `rigToast()` mechanism rather than failing
     silently.
+  - **The one gap that verification pass couldn't close -- a real
+    `insert_qso()` submit against a live account -- was confirmed
+    working by the user shortly after shipping (2026-09).** Both
+    `qrz_logbook.py`'s module docstring and `insert_qso()`'s own
+    docstring were updated to drop the "not verified" language now that
+    this has actually happened; don't reintroduce it without a real
+    reason (e.g. a future report that submits are failing again).
+  - **A real, reported bug found on that same first real use: "my radio
+    power level wasnt sent."** Root cause: `rig_panel.py`'s
+    `_poll_once()` only reads the TX power meters (`RFPOWER_METER_WATTS`/
+    `RFPOWER_METER`) `if ptt:` (line ~165) -- the instant you unkey,
+    `power_w` reverts to `None` on the very next poll (`RIG_PANEL_POLL_MS`,
+    ~1s). The Quick Log workflow is inherently "finish the QSO, THEN
+    click Log" -- by the time anyone actually submits, the live reading
+    is already gone, so `power_w: null` silently omitted `TX_PWR` from
+    every real submit. Fixed with a client-side sticky value,
+    `qlLastPowerW` (`dashboard.html`) -- updated whenever
+    `renderQuickLogCard()` sees a fresh non-null `r.power_w`, used for
+    both the power chip and the actual submit body whenever the LIVE
+    value is null, reset only when the rig goes unreachable (don't carry
+    a reading across a rig reboot/reconnect) or right after a successful
+    submit (so a stale power figure from one contact can't silently
+    attach itself to a later one logged without re-keying). Deliberately
+    NOT fixed in `rig_panel.py` itself -- the Rig Panel card's own
+    dash-when-not-transmitting behavior for SWR/ALC/comp/power is
+    correct for a LIVE front panel (showing a stale TX meter while
+    receiving would be actively misleading there); this is a Quick-Log-
+    specific need, so the stickiness lives in that card's own render
+    function, not the shared poller. The chip gets a `title` tooltip
+    ("Last measured power...") only while showing the carried-forward
+    value, not while a live reading is actually current, so someone
+    still mid-QSO can tell the two apart. Verified live with Playwright:
+    keyed at 85.3W, unkeyed (confirmed `power_w` really does revert to
+    `None` server-side, not just assumed), confirmed the chip still
+    reads "85W" with the fallback tooltip, and confirmed a real submit
+    (mocked `insert_qso`) carries `TX_PWR: 85.3` through end to end.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
