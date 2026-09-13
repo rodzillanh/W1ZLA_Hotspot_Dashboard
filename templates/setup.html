@@ -588,7 +588,7 @@
         <div class="toggle-group">
             <div class="toggle-subhead">Dashboard cards</div>
             <div class="toggle-row">
-                <span class="toggle-label">Show Fleet Status card
+                <span class="toggle-label">Show Hotspot Status card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (one line per hotspot -- status, activity, digital-voice mode at a glance)
                     </span>
@@ -597,7 +597,7 @@
                      id="fleet-status-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
-                <span class="toggle-label">Show fleet activity card
+                <span class="toggle-label">Show hotspot activity card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (adds a small SQLite log of completed transmissions)
                     </span>
@@ -606,7 +606,7 @@
                      id="fleet-activity-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
-                <span class="toggle-label">Fleet activity time span</span>
+                <span class="toggle-label">Hotspot activity time span</span>
                 <select id="fleet-activity-hours">
                     {% set current_hours = settings.get('fleet_activity_hours', 12) %}
                     <option value="3"  {{ 'selected' if current_hours == 3  else '' }}>Last 3 hours</option>
@@ -745,7 +745,7 @@
             <div class="toggle-row">
                 <span class="toggle-label">Show Top 5 Activity card
                     <span style="font-size:10px;color:var(--text-dim)">
-                        (your fleet's own most active callsigns, last 24h -- needs "Show fleet activity card" on too)
+                        (your fleet's own most active callsigns, last 24h -- needs "Show hotspot activity card" on too)
                     </span>
                 </span>
                 <div class="toggle {{ 'on' if settings.get('show_top_activity', False) else '' }}"
@@ -934,14 +934,14 @@
                 {% if loop.index0 == fleet_status_pos %}
                 <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_status__">
                     <span class="drag-handle">⠿</span>
-                    <span class="node-name">📋 Fleet Status</span>
+                    <span class="node-name">📋 Hotspot Status</span>
                     <span class="node-meta">one-line-per-hotspot status list</span>
                 </div>
                 {% endif %}
                 {% if loop.index0 == fleet_pos %}
                 <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
                     <span class="drag-handle">⠿</span>
-                    <span class="node-name">📊 Fleet activity</span>
+                    <span class="node-name">📊 Hotspot Activity</span>
                     <span class="node-meta">metrics card</span>
                 </div>
                 {% endif %}
@@ -1774,7 +1774,7 @@
                 <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
                     <input type="checkbox" id="hs-dvswitch-enabled" onchange="onDvswitchToggle()">
                     This node also runs DVSwitch (Analog_Bridge)
-                    <span style="font-size:10px;color:var(--text-dim)">(adds a 6th "DVSwitch" mode to the Fleet Activity card)</span>
+                    <span style="font-size:10px;color:var(--text-dim)">(adds a 6th "DVSwitch" mode to the Hotspot Activity card)</span>
                 </label>
             </div>
             <div style="grid-column:1/-1;display:none" id="hs-dvswitch-ports-wrap">

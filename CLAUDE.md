@@ -6436,6 +6436,125 @@ config for per-integration credentials; put it in
     `fleet_status_page`/the tiebreak entry and that it round-trips to
     `settings.json` through the real `/api/settings` route.
 
+- **A real, reported bug: `.fs-list`'s horizontal scrollbar showed cut-off
+  text even though no CSS ever set `overflow-x`.** Root cause is a CSS
+  spec rule, not a layout bug: setting `overflow-y: auto` alone on an
+  element computes `overflow-x` to `auto` too (a browser never lets one
+  axis stay `visible` while the other scrolls) -- confirmed live via
+  `getComputedStyle(list).overflowX` returning `"auto"` with only
+  `overflow-y: auto` in the stylesheet. Combined with `.fs-name` being
+  `flex-shrink: 0` (a fixed-up-to-130px name that never yielded space
+  under pressure -- the one element in the row that COULD force the
+  whole row wider than its container, since every other flex-shrink:0
+  item was small and `.fs-activity`'s `flex:1; min-width:0` already
+  shrinks to 0 correctly), a narrow real-world card could show a genuine
+  horizontal overflow instead of the intended ellipsis clip. Fixed by
+  adding `overflow-x: hidden` to `.fs-list` explicitly (guarantees
+  clipping regardless of any remaining edge case) and changing
+  `.fs-name` to `flex-shrink: 1` (so it participates in shrinking
+  alongside `.fs-activity` instead of being the one non-negotiable width
+  in the row) -- plus the standard thin `scrollbar-width`/
+  `::-webkit-scrollbar` styling this card was missing entirely (every
+  other scrolling card in this file -- `.msg-scroll`/`.pota-spots`/
+  `.flight-scroll`/`.dp-packets` -- already has it), which is why the
+  vertical scrollbar rendered as the bulky OS-default with arrow buttons
+  instead of the app's usual thin bar. Verified live: zero overflow at
+  the dashboard's real grid width AND at an artificially forced 260px
+  card (well under the grid's own `minmax(420px)` floor) -- `overflowX`
+  computes as `"hidden"` and `scrollWidth === clientWidth` in both cases.
+  If a similar bulky/mis-scrolling list ever shows up on a new card,
+  check for this exact pattern first (a lone `overflow-y` with no
+  `overflow-x`, and a `flex-shrink: 0` item with a fixed max-width sized
+  by content) before assuming it needs a bigger redesign.
+- **The Recent Contacts card's `.msg-scroll` reuse (v3.57) capped its
+  list at 220px -- fine for that card's original taller `.msg-row`
+  layout, but Recent Contacts' own dedicated `.qso-row` rows are more
+  compact, so 4-5 rows filled barely half the 220px while the CARD
+  itself (a CSS Grid item, default `align-items: stretch`) got stretched
+  to match a taller neighbor in the same row (e.g. Hotspot Status),
+  leaving a large blank gap below the scroll area.** Fixed with a scoped
+  id-selector override, `#rc-scroll { max-height: 400px; }` (ids beat
+  the shared `.msg-scroll` class without touching Notifications/APRS's
+  own sizing) -- a fixed, generous cap, consistent with this app's own
+  established "fixed-size card + scroll" convention (see the POTA card's
+  own gotcha entry above) rather than switching to a fully dynamic
+  flex-fill-the-row height, which would risk a different problem: a
+  card alone in its own grid row (no tall neighbor to stretch against)
+  collapsing to near-zero height with no natural size to fall back on.
+- **"Fleet Status"/"Fleet Activity" renamed to "Hotspot Status"/"Hotspot
+  Activity" (display text only) -- internal identifiers were deliberately
+  left untouched.** Settings keys (`show_fleet_status`/
+  `fleet_status_position`/etc., `show_fleet_activity`/
+  `fleet_activity_position`/etc.), the `__fleet_status__`/
+  `__fleet_activity__` sentinel data-ip strings, function names
+  (`renderFleetStatusCard`, `fleet-activity-card` element id, etc.), and
+  every code comment referencing "Fleet Activity"/"Fleet Status" all stay
+  as-is -- same "kept in sync manually, display text only" precedent as
+  the "APRS messages in Notifications"/"HamAlert alerts in Notifications"
+  relabel entry above. Renaming the identifiers too would have touched
+  `_SENTINEL_DEFS`, every `/api/settings` handler branch, both files'
+  drag-row `data-ip` attributes, and `storage_activity.py`'s own table
+  columns for zero functional gain. **This also disambiguates a real,
+  pre-existing naming collision**: the toolbar's own `.fleet-status`/
+  `#fleet-status` pill (X/Y online, Z active now -- a completely
+  different, older feature, updated inline inside `renderCards()`) and
+  the Notifications card's "fleet online/offline" event source (tooltip
+  literally reads "Fleet status", `item.source === 'fleet'` inside
+  `renderNotifRow()`) both already used "fleet status" language before
+  the CARD of the same working name ever existed -- neither of those was
+  touched by this rename, only the CARD's own visible title and its
+  Settings-tab toggle/drag-row labels were.
+  Every occurrence was found and fixed by grepping user-visible template
+  strings specifically (`card-name`, `toggle-label`, `tour-item-name`,
+  `node-name`, `msg-empty` text) -- NOT a blanket text-replace across the
+  file, which would have silently renamed the unrelated toolbar pill/
+  notification-source references too.
+- **Hotspot Status card gained its own gear-icon drawer (`.fs-gear-btn` ->
+  `openFleetStatusDrawer()`) for a per-card show/hide + reorder override,
+  independent of the hotspot's real dashboard visibility/order
+  elsewhere.** Two new settings, `fleet_status_hidden` (excluded hotspot
+  ids) and `fleet_status_order` (explicit id order, any hotspot not
+  listed falling back to its natural `/api/data` order appended after
+  the listed ones) -- purely a DISPLAY-TIME filter/sort computed client-
+  side (`fleetStatusOrderedIds()`/`fleetStatusVisibleSorted()`) over the
+  same `/api/data` snapshot every other card already has, no new backend
+  route or server-side filtering needed (`/api/settings`'s existing
+  generic list-of-strings acceptance pattern, same shape as
+  `card_order_tiebreak`, covers persistence). `FLEET_STATUS_HIDDEN`/
+  `FLEET_STATUS_ORDER` are `let`, not `const` -- the drawer mutates them
+  client-side immediately on toggle/move (optimistic update, matching
+  what the POST actually persists) rather than waiting for a page reload
+  or the next 3s poll to reflect the change, same "needs live client-
+  side mutation" exception as `SPOTLIGHT_DIMMING_ENABLED`/
+  `COURTESY_TONE_ENABLED` elsewhere in this file.
+  - **Plain ▲/▼ move buttons, not drag-and-drop** -- a deliberate choice,
+    not a missing feature. This list is at most one row per configured
+    hotspot (a handful in practice), and `setup.html`'s own drag-and-drop
+    Card Order list has a long, explicitly documented history of subtle
+    position-saving bugs in this very file (tie-break disagreement,
+    overflow collapse, the `sentinelIndex()` same-boundary bug, a real
+    concurrent-write race in `/api/settings` itself) -- reproducing that
+    whole mechanism for a short, single-purpose list wasn't worth the
+    risk. Moving a row recomputes and re-persists the FULL id order every
+    time (via `fleetStatusOrderedIds()`), which also "materializes" a
+    still-implicit natural order into an explicit one the first time
+    anyone reorders -- same pattern `card_order_tiebreak` already uses
+    elsewhere, not a new technique.
+  - **The drawer lists EVERY configured hotspot, hidden ones included
+    (dimmed via `.hidden-row`), not just the currently-visible ones** --
+    it's the only place a hidden hotspot can be found again and re-shown,
+    so hiding one must never make it disappear from the one UI that can
+    un-hide it.
+  - Verified live end-to-end with a real Playwright browser (not just a
+    template/route check): seeded 3 hotspots (2 WPSD, 1 disabled/offline
+    openSPOT4), confirmed hiding the openSPOT4 row removes it from the
+    card AND updates the count pill, confirmed moving a row persists
+    through two separate `/api/settings` POSTs with the correct hidden-
+    list/order-list bodies, confirmed a full page reload preserves both
+    the hide and the reorder, and confirmed re-checking the box in the
+    drawer correctly reinserts the hotspot at its saved position rather
+    than appending it at the end.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

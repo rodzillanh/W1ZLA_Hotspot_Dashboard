@@ -456,6 +456,11 @@ BIOS = {
         "blurb": "Guitarist, bassist, and songwriter for the Patti Smith Group who helped shape the CBGB-era punk sound from just off the frontline, co-writing several of the band's best-known songs.",
         "wiki": "Ivan_Kral",
     },
+    "Cipollina": {
+        "name": "John Cipollina",
+        "blurb": "Lead guitarist of Quicksilver Messenger Service, a defining voice of the San Francisco psychedelic scene known for a fluid, effects-laden style built on a wall of custom amplifiers.",
+        "wiki": "John_Cipollina",
+    },
 }
 
 

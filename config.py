@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.59"
+APP_VERSION = "4.60"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -189,6 +189,8 @@ VERSION_CODENAMES = [
                         # (1951-2021)
     "Kral",             # v4.59 -- Ivan Kral, guitarist/multi-instrumentalist,
                         # Patti Smith Group, punk-era CBGB scene (1948-2020)
+    "Cipollina",        # v4.60 -- John Cipollina, guitarist, Quicksilver
+                        # Messenger Service (1943-1989)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1179,6 +1181,14 @@ DEFAULT_SETTINGS = {
     "show_fleet_status": False,
     "fleet_status_position": 0,
     "fleet_status_page": 1,
+    # Per-hotspot visibility/order override scoped to THIS card only --
+    # independent of the main dashboard's own hotspot visibility/order.
+    # fleet_status_hidden: hotspot ids excluded from this card's list.
+    # fleet_status_order: explicit hotspot-id order for this card; any
+    # hotspot id not in the list falls back to its natural /api/data
+    # order, appended after the explicitly-ordered ones.
+    "fleet_status_hidden": [],
+    "fleet_status_order": [],
     # Fleet activity metrics card — off by default since it adds a new SQLite
     # table and a background write on every completed transmission.
     "show_fleet_activity": False,

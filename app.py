@@ -489,6 +489,10 @@ def api_settings_post():
             settings["fleet_status_position"] = max(0, int(data["fleet_status_position"]))
         except (TypeError, ValueError):
             pass
+    if "fleet_status_hidden" in data and isinstance(data["fleet_status_hidden"], list):
+        settings["fleet_status_hidden"] = [str(x) for x in data["fleet_status_hidden"]]
+    if "fleet_status_order" in data and isinstance(data["fleet_status_order"], list):
+        settings["fleet_status_order"] = [str(x) for x in data["fleet_status_order"]]
     if "show_fleet_activity" in data:
         settings["show_fleet_activity"] = bool(data["show_fleet_activity"])
     if "fleet_activity_position" in data:
@@ -1081,8 +1085,8 @@ def api_ircddb_favorites_post():
 # below; the inline (interleaved-with-hotspots) rendering in setup.html
 # still reads settings directly and isn't affected by this list.
 _SENTINEL_DEFS = [
-    ("__fleet_status__", "show_fleet_status", "fleet_status_position", "📋", "Fleet Status", "one-line-per-hotspot status list"),
-    ("__fleet_activity__", "show_fleet_activity", "fleet_activity_position", "📊", "Fleet activity", "metrics card"),
+    ("__fleet_status__", "show_fleet_status", "fleet_status_position", "📋", "Hotspot Status", "one-line-per-hotspot status list"),
+    ("__fleet_activity__", "show_fleet_activity", "fleet_activity_position", "📊", "Hotspot Activity", "metrics card"),
     ("__asl_favorites__", "show_asl_favorites", "asl_favorites_position", "📻", "ASL Favorites", "control card"),
     ("__hf_conditions__", "show_hf_conditions", "hf_conditions_position", "☀️", "HF Conditions", "propagation card"),
     ("__band_plan__", "show_band_plan", "band_plan_position", "📻", "Band Plan", "reference card"),
