@@ -7458,6 +7458,103 @@ config for per-integration credentials; put it in
     reads "85W" with the fallback tooltip, and confirmed a real submit
     (mocked `insert_qso`) carries `TX_PWR: 85.3` through end to end.
 
+- **QRZ Quick Log came to Pocket Dash (mobile) as a full-screen sub-screen
+  (v4.75), mockup-approved (three phone-frame states: the Activity-tab
+  entry point, spot-matched, no-match) before any real code changed --
+  the matching/submit LOGIC is a straight port of the desktop card's JS
+  (same `qlFindSpotMatch()` shape, same `/api/qrz_quick_log` route), the
+  only genuinely new work is the mobile-shaped presentation.**
+  - **Reuses `dashboard-mobile.html`'s existing full-screen sub-screen
+    pattern** (`#asl-screen`/`#prefs-screen`'s `.prefs-hdr` back-button
+    header + a scrollable body) rather than inventing a new screen shell
+    -- `#ql-screen` is styled and structured identically to those two.
+    The entry point lives on the Activity tab, right above Recent
+    Contacts, rather than getting its own 5th tab -- one more tab felt
+    like more chrome than the feature earns, same reasoning the mockup's
+    own closing note gave.
+  - **A real bug, caught immediately by the live Playwright verification
+    pass, not by inspection: `fetchQlRig()` was declared as a plain
+    `function fetchQlRig() { ... }` INSIDE the `if (qlEntryBtn) { ... }`
+    block, but this file runs in `"use strict";`.** Strict mode scopes a
+    `function` DECLARATION (not a `var`-assigned function EXPRESSION) to
+    the block it's written in -- unlike non-strict mode's "Annex B"
+    behavior, which hoists it to the enclosing function/script scope.
+    `fetchQlRig` needed to be callable from the tab-switch handler
+    (`if (currentTab === "activity") { ...; fetchQlRig(); }`), a
+    completely different top-level statement earlier in the same
+    `<script>` block, OUTSIDE the `if (qlEntryBtn)` block -- so the
+    declaration was invisible there, and the very first tab switch to
+    Activity would have thrown `ReferenceError: fetchQlRig is not
+    defined`. Fixed by declaring `var fetchQlRig = function () {};` at
+    the SCRIPT's own top level (right after `"use strict";`, a genuine
+    no-op default) and reassigning it (`fetchQlRig = function () {
+    ... };`, a plain assignment, not a second declaration) inside the
+    `if (qlEntryBtn)` block where the real implementation lives -- `var`
+    is always function/script-scoped regardless of strict mode, so this
+    sidesteps the block-scoping rule entirely rather than fighting it.
+    Every OTHER function added for this feature (`qlAllSpots`,
+    `renderQlScreen`, `qlSubmit`, etc.) stayed as ordinary block-scoped
+    `function` declarations, since each is both DEFINED and CALLED
+    entirely within that same `if (qlEntryBtn)` block -- only the one
+    function actually called from a sibling scope needed this treatment.
+    **If another cross-scope call is ever added into/out of a
+    conditionally-built block like this one, check for exactly this
+    pattern** -- it's a real, silent trap specific to strict-mode files
+    (this one, unlike `dashboard.html`'s own big script block, opts into
+    `"use strict";` explicitly) that a plain `py_compile`-style read-
+    through won't catch, only a live click-through will.
+  - **The whole feature (`#ql-entry-btn` markup, `#ql-screen` markup, and
+    all of its JS) is gated behind ONE Jinja check,
+    `settings.get('show_qrz_quick_log', False)`** -- same setting the
+    desktop card itself uses, so enabling/disabling the card affects
+    both surfaces identically with no separate mobile toggle. The JS
+    block is `if (document.getElementById("ql-entry-btn")) { ... }`
+    wrapped (not itself inside a Jinja conditional) -- when the feature
+    is off, that lookup returns `null`, the whole block is skipped, and
+    only harmless comment/identifier TEXT naming `ql-entry-btn` remains
+    in the page source (inside the `<script>` tag) -- confirmed live
+    with `test_client()` that no actual `id="ql-entry-btn"`/`id="ql-
+    screen"` MARKUP renders when the setting is off, and with Playwright
+    that zero console errors occur either way.
+  - **Rig Panel polling is intentionally NOT continuous in the
+    background on mobile, unlike the desktop card.** `fetchQlRig()`
+    reschedules itself (the same self-rescheduling `.finally()` idiom
+    `fetchQsos()` already uses for the Activity tab) only while
+    `#ql-screen` actually has the `.open` class -- opening the screen
+    starts a 2s poll, closing it stops the poll outright. The Activity
+    tab's entry-row subtitle (freq/mode preview) instead gets exactly
+    ONE fetch when the tab is switched to, via the same function --
+    calling it without the screen being open just does a single fetch
+    and never reschedules, since its own `.finally()` checks the
+    screen's open state before arming the next timeout. A phone
+    shouldn't be quietly polling rigctld every 2 seconds in the
+    background just to keep one subtitle line fresh.
+  - **The spot feeds (`/api/pota`/`/api/sota_spots`/`/api/rbn_spots`/
+    `/api/dxcluster_spots`) are fetched unconditionally whenever the
+    screen opens, with no settings gate of their own** -- unlike the
+    desktop Spots card, Pocket Dash has no equivalent card/settings
+    toggle for POTA/SOTA/RBN/DX visibility at all, so there's no
+    existing on/off signal to check. All four routes already degrade
+    gracefully with no configuration (empty `spots: []`, confirmed by
+    reading their own implementations) -- a `.catch(() => {})` per fetch
+    is enough, same "never let one feed's failure block the others"
+    contract as the desktop card's `qlAllSpots()`. Refetched every 20s
+    while the screen stays open (spot data changes far slower than a
+    live rig reading, and RBN/DX are already capped/deduped server-side)
+    -- a separate, slower interval from the rig's own 2s poll.
+  - Verified live end-to-end with Playwright at real mobile viewport
+    dimensions (390×844, `is_mobile`/`has_touch`): switched to the
+    Activity tab and confirmed the entry row's subtitle shows the live
+    freq/mode ("14.074 MHz · FT8"); opened the screen and confirmed a
+    real seeded POTA spot auto-fills callsign + comment exactly like the
+    desktop card; forced the rig's `power_w` to `None` mid-session
+    (simulating an unkey) and confirmed the power chip still reads
+    correctly via the same sticky-value fix documented above, ported
+    here too; submitted (with `insert_qso` mocked) and confirmed the
+    real POST body carries the right `TX_PWR`/`CALL`; confirmed the
+    screen closes cleanly; and confirmed zero console errors in BOTH the
+    feature-on and feature-off configurations, not just the happy path.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

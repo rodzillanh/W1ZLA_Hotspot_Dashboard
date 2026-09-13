@@ -490,6 +490,23 @@ with sync_playwright() as p:
     mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-status.png"), full_page=True)
     print("wrote mobile-status.png")
 
+    # Activity tab + the QRZ Quick Log entry point/screen (v4.75) -- reads
+    # the same monkeypatched rig_panel_poller.snapshot() already seeded
+    # for the desktop Rig Panel/Quick Log screenshots above.
+    mob.click('.tabbar button[data-go="activity"]')
+    mob.wait_for_timeout(1200)
+    mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-activity.png"), full_page=True)
+    print("wrote mobile-activity.png")
+
+    ql_entry = mob.query_selector('[id="ql-entry-btn"]')
+    if ql_entry:
+        ql_entry.click()
+        mob.wait_for_timeout(1500)
+        mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-quick-log.png"))
+        print("wrote mobile-quick-log.png")
+        mob.click('[id="ql-close"]')
+        mob.wait_for_timeout(300)
+
     mob.click('.tabbar button[data-go="map"]')
     mob.wait_for_timeout(3500)  # lazy Leaflet init + tile load
     mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-map.png"))

@@ -2202,11 +2202,17 @@ untouched. It's a single-column layout with a bottom tab bar:
   pulsing = a call in progress, grey = idle, red = offline). Tap a pin for a
   popup, then "Open details" to jump to that hotspot on the Status tab.
 - **Activity** — recent logged contacts (the same `qsos.json` the Live map
-  and Recent Contacts card read), newest first.
+  and Recent Contacts card read), newest first. If the
+  [QRZ Quick Log card](#qrz-quick-log-card) is enabled, a "Log a QSO" row
+  opens the same freq/mode/power auto-fill and spot-matching in a
+  full-screen mobile view — same one-tap submit to QRZ, same rig-network
+  requirement as the desktop card.
 - **More** — links back to the full dashboard, Settings, changelog and
   README, plus the notification controls below.
 
 <!-- wiki-image: mobile-map.png -->
+<!-- wiki-image: mobile-activity.png -->
+<!-- wiki-image: mobile-quick-log.png -->
 
 ### Installing it as an app
 

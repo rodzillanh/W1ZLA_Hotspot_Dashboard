@@ -531,6 +531,11 @@ BIOS = {
         "blurb": "Powerhouse vocalist who fronted Rainbow, Black Sabbath, and his own band Dio, and is widely credited with popularizing the metal 'devil horns' hand gesture.",
         "wiki": "Ronnie_James_Dio",
     },
+    "Cornick": {
+        "name": "Glenn Cornick",
+        "blurb": "Founding bassist of Jethro Tull, anchoring the band's early progressive-blues sound before leaving to form Wild Turkey.",
+        "wiki": "Glenn_Cornick",
+    },
 }
 
 

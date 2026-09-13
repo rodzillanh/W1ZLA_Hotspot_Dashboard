@@ -117,9 +117,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.74 "Dio"</span>
+                <span class="release-version">v4.75 "Cornick"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>QRZ Quick Log came to Pocket Dash (mobile)</span> — a "Log a QSO" entry on the Activity tab opens a full-screen version of the desktop card, same live rig freq/mode/power, same best-effort spot matching and auto-fill, same one-tap submit to QRZ. Needs the same Rig control setup as the desktop card</li>
+                <li><span>Spots card grew back by one row</span> (200px → 260px list, ~367px total) — the v4.73 trim went a little tight; each spot row measures 60px, so this restores roughly a row's worth of breathing room</li>
+                <li><span>Fixed: QRZ Quick Log's power reading wasn't always making it into the logged QSO</span> — the rig only reports transmit power while actually keyed, so it had usually reverted to nothing by the time you clicked Log after finishing a contact. The card now remembers the last real reading</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.74 "Dio"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>New: QRZ Quick Log card</span> — reads live frequency/mode/power straight from the Rig Panel poller, cross-references the Spots card's already-merged POTA/SOTA/RBN/DX cluster feeds for a best-effort callsign match (auto-filling the callsign and, for a POTA/SOTA match, a comment with the park/summit reference), and logs the QSO to QRZ with one click — it's also added to Recent Contacts immediately. Needs Rig control (Integrations) and a QRZ Logbook API key. The callsign match is a best-effort heuristic, not a precise ID — FT8/FT4 share one dial frequency for every QSO on a channel, so it can only narrow things down, not uniquely identify a station; every auto-filled field stays editable before you submit</li>

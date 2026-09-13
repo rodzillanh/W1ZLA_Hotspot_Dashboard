@@ -353,6 +353,73 @@
     }
     .asl-empty { font-size:12px; color:var(--text-dim); padding:4px 2px; }
 
+    /* ---------------- Quick Log screen (Activity tab entry point) ----------------
+     * Same matching/submit logic as the desktop QRZ Quick Log card
+     * (qrz_logbook.py's insert_qso(), the same /api/qrz_quick_log route) --
+     * this is purely a mobile-shaped presentation layer, full-screen like
+     * #asl-screen/#prefs-screen rather than a fixed-size grid card. */
+    .ql-entry {
+        display:flex; align-items:center; gap:11px; width:100%;
+        border:1px solid color-mix(in srgb, var(--live) 45%, var(--border));
+        background:color-mix(in srgb, var(--live) 9%, var(--panel));
+        border-radius:13px; padding:13px 14px; margin-bottom:16px; text-align:left;
+        font-family:var(--font-ui); cursor:pointer;
+    }
+    .ql-entry .ic { font-size:20px; flex:0 0 auto; }
+    .ql-entry .tt { font-weight:700; font-size:14px; color:var(--text); }
+    .ql-entry .sub { font-size:11.5px; color:var(--text-muted); font-family:var(--font-mono); margin-top:2px; }
+    .ql-entry .go { margin-left:auto; color:var(--live); font-size:16px; }
+
+    #ql-screen { position:fixed; inset:0; z-index:36; background:var(--bg); display:none; flex-direction:column; }
+    #ql-screen.open { display:flex; }
+    .ql-body { flex:1 1 auto; overflow-y:auto; padding:16px 14px calc(env(safe-area-inset-bottom) + 30px); }
+
+    .rp-pill { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:11.5px;
+        padding:4px 10px; border-radius:20px; background:var(--panel-2); border:1px solid var(--border); color:var(--text-muted); margin-bottom:16px; }
+    .rp-pill .d { width:6px; height:6px; border-radius:50%; background:var(--text-muted); }
+    .rp-pill.live { color:var(--good); border-color:color-mix(in srgb, var(--good) 45%, var(--border)); }
+    .rp-pill.live .d { background:var(--good); box-shadow:0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+
+    .ql-freq-row { display:flex; align-items:baseline; justify-content:space-between; padding-bottom:12px; margin-bottom:14px; border-bottom:1px solid var(--border); }
+    .ql-freq { font-family:var(--font-mono); font-size:30px; font-weight:600; color:var(--text); }
+    .ql-freq small { font-size:16px; color:var(--text-dim); }
+    .ql-meta { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+    .ql-chip { font-family:var(--font-mono); font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; background:var(--panel-2); border:1px solid var(--border); color:var(--text-muted); }
+
+    .ql-match { display:flex; align-items:flex-start; gap:9px; padding:11px 13px; border-radius:11px;
+        background:color-mix(in srgb, var(--live) 9%, transparent); border:1px solid color-mix(in srgb, var(--live) 40%, var(--border));
+        margin-bottom:18px; font-size:13px; line-height:1.45; }
+    .ql-match .ic { color:var(--live); font-size:16px; line-height:1.2; flex:0 0 auto; }
+    .ql-match b { font-family:var(--font-mono); color:var(--text); }
+    .ql-match .src-tag { font-family:var(--font-mono); font-size:9.5px; font-weight:700; color:var(--text-dim);
+        background:var(--panel-2); border:1px solid var(--border-soft); border-radius:4px; padding:1px 6px; margin-right:5px; }
+    .ql-match .dim { color:var(--text-muted); display:block; margin-top:2px; }
+
+    .ql-nomatch { display:flex; align-items:center; gap:9px; padding:12px 13px; border-radius:11px;
+        background:var(--panel-2); border:1px dashed var(--border); margin-bottom:18px; font-size:12.5px; color:var(--text-muted); line-height:1.45; }
+
+    .ql-field { margin-bottom:14px; }
+    .ql-field label { display:block; font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--text-muted); margin-bottom:5px; }
+    .ql-field input {
+        width:100%; background:var(--panel-2); border:1px solid var(--border); border-radius:10px;
+        color:var(--text); font-family:var(--font-mono); font-size:16px; padding:12px 13px;
+    }
+    .ql-field input::placeholder { color:var(--text-dim); font-family:var(--font-ui); font-size:14px; }
+    .ql-field input.auto { border-color:color-mix(in srgb, var(--live) 45%, var(--border)); color:var(--live); background:color-mix(in srgb, var(--live) 6%, var(--panel-2)); }
+    .ql-row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+    .ql-submit {
+        width:100%; appearance:none; font:inherit; font-weight:700; font-size:15px;
+        padding:15px 0; border-radius:12px; cursor:pointer; margin-top:6px;
+        border:1px solid color-mix(in srgb, var(--live) 45%, var(--border)); color:var(--live);
+        background:color-mix(in srgb, var(--live) 10%, transparent);
+    }
+    .ql-submit:disabled { opacity:.55; }
+    .ql-submit.pending { color:var(--caution); border-color:color-mix(in srgb, var(--caution) 45%, var(--border)); }
+    .ql-submit.ok { color:var(--good); border-color:color-mix(in srgb, var(--good) 45%, var(--border)); }
+    .ql-submit.err { color:var(--danger); border-color:color-mix(in srgb, var(--danger) 45%, var(--border)); }
+    .ql-hint { text-align:center; font-size:10.5px; color:var(--text-dim); margin-top:9px; }
+
     /* PIN modal */
     #pin-modal { position:fixed; inset:0; z-index:60; background:rgba(4,6,10,.6);
         display:none; align-items:center; justify-content:center; padding:24px; }
@@ -530,6 +597,17 @@
         </section>
 
         <section data-tab="activity">
+            {% if settings.get('show_qrz_quick_log', False) %}
+            <div class="sec-label">Quick log</div>
+            <button class="ql-entry" id="ql-entry-btn" type="button">
+                <span class="ic">📝</span>
+                <span>
+                    <div class="tt">Log a QSO</div>
+                    <div class="sub" id="ql-entry-sub">Checking rig…</div>
+                </span>
+                <span class="go">›</span>
+            </button>
+            {% endif %}
             <div class="sec-label">Recent contacts</div>
             <div id="qsos"><div class="empty"><p>Loading…</p></div></div>
         </section>
@@ -573,6 +651,37 @@
         </div>
         <div class="asl-body" id="asl-body"></div>
     </div>
+
+    {% if settings.get('show_qrz_quick_log', False) %}
+    <div id="ql-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="ql-close">‹ Back</button>
+            <span class="ttl">Quick Log</span>
+        </div>
+        <div class="ql-body">
+            <span class="rp-pill" id="ql-pill"><span class="d"></span><span id="ql-pill-txt">rig</span></span>
+            <div class="ql-freq-row">
+                <div class="ql-freq" id="ql-freq">—</div>
+                <div class="ql-meta" id="ql-meta"></div>
+            </div>
+            <div id="ql-match-slot"></div>
+            <div class="ql-field">
+                <label>Callsign</label>
+                <input id="ql-call" autocomplete="off" autocapitalize="characters" placeholder="type callsign">
+            </div>
+            <div class="ql-row2">
+                <div class="ql-field"><label>RST sent</label><input id="ql-rst-sent" autocomplete="off"></div>
+                <div class="ql-field"><label>RST rcvd</label><input id="ql-rst-rcvd" autocomplete="off"></div>
+            </div>
+            <div class="ql-field">
+                <label>Comment</label>
+                <input id="ql-comment" autocomplete="off" placeholder="optional">
+            </div>
+            <button class="ql-submit" id="ql-submit-btn" type="button" disabled>📤 Log to QRZ</button>
+            <div class="ql-hint">Logs to QRZ, then adds it to Recent Contacts too</div>
+        </div>
+    </div>
+    {% endif %}
 
     <div id="pin-modal" aria-hidden="true">
         <div class="pin-box">
@@ -625,6 +734,13 @@
     <script>
     "use strict";
     var POLL_MS = 3000, QSO_POLL_MS = 20000;
+    // Declared at top-level scope (not inside the `if (qlEntryBtn)` block
+    // below, where it's actually assigned) so strict mode's per-block
+    // function scoping doesn't hide it from the tab-switch handler, which
+    // calls it from a different top-level statement earlier in this
+    // script -- a plain `function fetchQlRig(){}` declared inside that
+    // block would only be visible inside it.
+    var fetchQlRig = function () {};
 
     function esc(s) {
         return String(s == null ? "" : s)
@@ -670,7 +786,7 @@
                 p.classList.toggle("active", p.getAttribute("data-tab") === currentTab);
             });
             window.scrollTo(0, 0);
-            if (currentTab === "activity") fetchQsos();
+            if (currentTab === "activity") { fetchQsos(); if (document.getElementById("ql-entry-btn")) fetchQlRig(); }
             if (currentTab === "more") refreshNotifState();
             if (currentTab === "map") showMap();
         });
@@ -893,6 +1009,225 @@
                    '<span class="ago">' + esc(when) + "</span>" +
                    "</div>";
         }).join("");
+    }
+
+    /* ---- Quick Log (Activity tab sub-screen) ----
+     * Same matching/submit logic as the desktop QRZ Quick Log card
+     * (dashboard.html's qlFindSpotMatch()/qlSubmit(), the same
+     * /api/qrz_quick_log route) -- reshaped for a full-screen sub-screen
+     * instead of a fixed-size grid card. Only rendered/wired at all when
+     * settings.show_qrz_quick_log is on (see the Jinja guard around
+     * #ql-entry-btn/#ql-screen above), so every function here can assume
+     * those elements exist once called. */
+    var qlEntryBtn = document.getElementById("ql-entry-btn");
+    if (qlEntryBtn) {
+        var qlPollTimer = null, qlSpotsTimer = null;
+        var qlRigData = null;
+        var qlSpots = { pota: [], sota: [], rbn: [], dx: [] };
+        var qlAuto = { call: false, comment: false };
+        var qlLastPowerW = null;
+
+        // FT8/FT4/JS8's dial frequency is shared by every simultaneous QSO
+        // on that channel -- see the desktop card's own comment on this,
+        // same mode-dependent tolerance ported verbatim.
+        var QL_TOLERANCE_HZ = { FT8: 100, FT4: 100, JS8: 100, MSK144: 200 };
+        var QL_TOLERANCE_DEFAULT_HZ = 1500;
+
+        function qlAllSpots() {
+            var list = [];
+            qlSpots.pota.forEach(function (s) {
+                list.push({ call: s.activator, freq_hz: s.freq_hz, source: "POTA", reference: s.reference, park_name: s.park_name });
+            });
+            qlSpots.sota.forEach(function (s) {
+                var mhz = parseFloat(s.frequency);
+                var freqHz = isNaN(mhz) ? null : Math.round(mhz * 1e6);
+                list.push({ call: s.callsign, freq_hz: freqHz, source: "SOTA", reference: s.summit_code, park_name: s.summit_name || "" });
+            });
+            qlSpots.rbn.forEach(function (s) { list.push({ call: s.call, freq_hz: s.freq_hz, source: "RBN" }); });
+            qlSpots.dx.forEach(function (s) { list.push({ call: s.call, freq_hz: s.freq_hz, source: "DX" }); });
+            return list.filter(function (s) { return s.call && s.freq_hz; });
+        }
+        function qlFindSpotMatch(freqHz, mode) {
+            if (!freqHz) return null;
+            var tol = QL_TOLERANCE_HZ[(mode || "").toUpperCase()] || QL_TOLERANCE_DEFAULT_HZ;
+            var best = null, bestDelta = Infinity;
+            qlAllSpots().forEach(function (s) {
+                var delta = Math.abs(s.freq_hz - freqHz);
+                if (delta <= tol && delta < bestDelta) { best = s; bestDelta = delta; }
+            });
+            return best;
+        }
+        function qlClearAuto(id) {
+            var key = id === "ql-call" ? "call" : "comment";
+            qlAuto[key] = false;
+            var el = document.getElementById(id);
+            if (el) el.classList.remove("auto");
+        }
+
+        function qlEntrySub() {
+            var el = document.getElementById("ql-entry-sub");
+            if (!el) return;
+            if (!qlRigData || !qlRigData.reachable || !qlRigData.freq_hz) { el.textContent = "Rig offline"; return; }
+            var bits = [(qlRigData.freq_hz / 1e6).toFixed(3) + " MHz"];
+            if (qlRigData.mode) bits.push(qlRigData.mode);
+            el.textContent = bits.join(" · ");
+        }
+
+        function renderQlScreen() {
+            var r = qlRigData;
+            var pill = document.getElementById("ql-pill"), pillTxt = document.getElementById("ql-pill-txt");
+            var freqEl = document.getElementById("ql-freq"), metaEl = document.getElementById("ql-meta");
+            var slot = document.getElementById("ql-match-slot");
+            var callInput = document.getElementById("ql-call"), commentInput = document.getElementById("ql-comment");
+            var submitBtn = document.getElementById("ql-submit-btn");
+            if (!r) return;
+
+            if (!r.reachable || !r.freq_hz) {
+                pill.classList.remove("live"); pillTxt.textContent = "rig offline";
+                freqEl.textContent = "—"; metaEl.innerHTML = "";
+                slot.innerHTML = '<div class="ql-nomatch">Waiting for the rig…</div>';
+                submitBtn.disabled = true;
+                qlLastPowerW = null;  // rig's gone -- don't carry a stale reading forward
+                return;
+            }
+            pill.classList.add("live"); pillTxt.textContent = "rig ready";
+
+            // Rig Panel only reads the TX power meter while actually keyed
+            // (rig_panel.py gates it behind `if ptt:`) -- carry the last
+            // real reading forward the same way the desktop card does, or
+            // it silently vanishes from the submit the instant you unkey.
+            if (r.power_w != null) qlLastPowerW = r.power_w;
+
+            var mhzStr = (r.freq_hz / 1e6).toFixed(6);
+            var dotIdx = mhzStr.indexOf(".");
+            freqEl.innerHTML = mhzStr.slice(0, dotIdx + 4) + "<small>" + mhzStr.slice(dotIdx + 4) + "</small>";
+            var metaHtml = "";
+            if (r.band) metaHtml += '<span class="ql-chip">' + esc(r.band) + "</span>";
+            if (r.mode) metaHtml += '<span class="ql-chip">' + esc(r.mode) + "</span>";
+            if (qlLastPowerW != null) metaHtml += '<span class="ql-chip">' + Math.round(qlLastPowerW) + "W</span>";
+            metaEl.innerHTML = metaHtml;
+
+            var match = qlFindSpotMatch(r.freq_hz, r.mode);
+            if (match) {
+                var isPark = match.source === "POTA" || match.source === "SOTA";
+                var detail = isPark ? (match.reference || "") + (match.park_name ? ", " + match.park_name : "") : "";
+                slot.innerHTML = '<div class="ql-match"><span class="ic">🎯</span><span><span class="src-tag">' + esc(match.source) +
+                    "</span><b>" + esc(match.call) + "</b>" + (detail ? '<span class="dim">' + esc(detail) + "</span>" : "") + "</span></div>";
+                if (qlAuto.call || !callInput.value) { callInput.value = match.call; callInput.classList.add("auto"); qlAuto.call = true; }
+                if (isPark && (qlAuto.comment || !commentInput.value)) {
+                    commentInput.value = (match.source + " " + (match.reference || "") + (match.park_name ? " " + match.park_name : "")).trim();
+                    commentInput.classList.add("auto"); qlAuto.comment = true;
+                }
+            } else {
+                slot.innerHTML = '<div class="ql-nomatch">No spot matches this frequency — enter the callsign manually.</div>';
+                if (qlAuto.call) { callInput.value = ""; callInput.classList.remove("auto"); qlAuto.call = false; }
+                if (qlAuto.comment) { commentInput.value = ""; commentInput.classList.remove("auto"); qlAuto.comment = false; }
+            }
+
+            var isDigital = /^(FT8|FT4|JS8|MSK144|JT65|JT9|FST4)/i.test(r.mode || "");
+            document.getElementById("ql-rst-sent").placeholder = isDigital ? "-12" : "599";
+            document.getElementById("ql-rst-rcvd").placeholder = isDigital ? "-08" : "599";
+            submitBtn.disabled = false;
+        }
+
+        // Continues rescheduling itself only while the screen is actually
+        // open (same self-rescheduling .finally() shape fetchQsos() uses
+        // for the Activity tab) -- also called ONCE, standalone, whenever
+        // the Activity tab is opened, just to freshen the entry row's
+        // subtitle without starting a background poll loop for it.
+        fetchQlRig = function () {
+            fetch("/api/rig_panel").then(function (r) { return r.json(); })
+                .then(function (data) {
+                    qlRigData = data;
+                    qlEntrySub();
+                    if (document.getElementById("ql-screen").classList.contains("open")) renderQlScreen();
+                })
+                .catch(function () {})
+                .finally(function () {
+                    clearTimeout(qlPollTimer);
+                    if (document.getElementById("ql-screen").classList.contains("open")) qlPollTimer = setTimeout(fetchQlRig, 2000);
+                });
+        };
+        // The spot feeds change far slower than a live rig reading and
+        // RBN/DX are already capped/deduped server-side -- refetched every
+        // 20s while the screen is open, not on the same 2s cadence as the
+        // rig poll.
+        function fetchQlSpots() {
+            fetch("/api/pota").then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) { qlSpots.pota = (d && d.spots) || []; }).catch(function () {});
+            fetch("/api/sota_spots").then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) { qlSpots.sota = (d && d.spots) || []; }).catch(function () {});
+            fetch("/api/rbn_spots").then(function (r) { return r.json(); })
+                .then(function (d) { qlSpots.rbn = (d && d.spots) || []; }).catch(function () {});
+            fetch("/api/dxcluster_spots").then(function (r) { return r.json(); })
+                .then(function (d) { qlSpots.dx = (d && d.spots) || []; }).catch(function () {});
+        }
+
+        function openQlScreen() {
+            document.getElementById("ql-screen").classList.add("open");
+            fetchQlSpots();
+            clearInterval(qlSpotsTimer);
+            qlSpotsTimer = setInterval(function () {
+                if (document.getElementById("ql-screen").classList.contains("open")) fetchQlSpots();
+                else clearInterval(qlSpotsTimer);
+            }, 20000);
+            fetchQlRig();  // its own .finally() sees the screen is now open and keeps polling
+        }
+        function closeQlScreen() {
+            document.getElementById("ql-screen").classList.remove("open");
+            clearTimeout(qlPollTimer);
+            clearInterval(qlSpotsTimer);
+        }
+
+        function qlSubmit() {
+            var btn = document.getElementById("ql-submit-btn");
+            if (!btn || btn.classList.contains("pending")) return;
+            var callInput = document.getElementById("ql-call");
+            var call = (callInput.value || "").trim().toUpperCase();
+            if (!call) { toast("Enter a callsign first"); return; }
+            var r = qlRigData || {};
+            var body = {
+                call: call, band: r.band || "", mode: r.mode || "", freq_hz: r.freq_hz || null,
+                power_w: r.power_w != null ? r.power_w : qlLastPowerW,
+                rst_sent: (document.getElementById("ql-rst-sent").value || "").trim(),
+                rst_rcvd: (document.getElementById("ql-rst-rcvd").value || "").trim(),
+                comment: (document.getElementById("ql-comment").value || "").trim(),
+            };
+            btn.classList.remove("ok", "err"); btn.classList.add("pending"); btn.disabled = true;
+            btn.textContent = "📤 Logging…";
+            fetch("/api/qrz_quick_log", {
+                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+            }).then(function (r) { return r.json(); }).then(function (data) {
+                btn.classList.remove("pending"); btn.disabled = false;
+                if (data.success) {
+                    btn.classList.add("ok"); btn.textContent = "✓ Logged";
+                    toast("Logged " + call + " to QRZ");
+                    callInput.value = "";
+                    document.getElementById("ql-rst-sent").value = "";
+                    document.getElementById("ql-rst-rcvd").value = "";
+                    document.getElementById("ql-comment").value = "";
+                    qlAuto = { call: false, comment: false };
+                    qlLastPowerW = null;
+                    if (currentTab === "activity") fetchQsos();
+                    setTimeout(function () { btn.classList.remove("ok"); btn.textContent = "📤 Log to QRZ"; }, 2200);
+                } else {
+                    btn.classList.add("err"); btn.textContent = "⚠ Failed";
+                    toast(data.message || "QRZ logging failed");
+                    setTimeout(function () { btn.classList.remove("err"); btn.textContent = "📤 Log to QRZ"; }, 3000);
+                }
+            }).catch(function () {
+                btn.classList.remove("pending"); btn.disabled = false;
+                btn.classList.add("err"); btn.textContent = "⚠ Failed";
+                toast("Network error");
+                setTimeout(function () { btn.classList.remove("err"); btn.textContent = "📤 Log to QRZ"; }, 3000);
+            });
+        }
+
+        qlEntryBtn.onclick = openQlScreen;
+        document.getElementById("ql-close").onclick = closeQlScreen;
+        document.getElementById("ql-call").addEventListener("input", function () { qlClearAuto("ql-call"); });
+        document.getElementById("ql-comment").addEventListener("input", function () { qlClearAuto("ql-comment"); });
+        document.getElementById("ql-submit-btn").onclick = qlSubmit;
     }
 
     fetchData();
