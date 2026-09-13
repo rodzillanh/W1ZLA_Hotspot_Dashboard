@@ -119,6 +119,12 @@ SETTINGS = {
     "pota_callsign": "W1ZLA",
     "show_hf_favorites": True,
     "show_rig_panel": True,
+    # QRZ Quick Log card (v4.74) -- reads the same monkeypatched
+    # rig_panel_poller.snapshot() below (freq/mode already set for the
+    # Rig Panel screenshot), and cross-references whatever real live
+    # POTA/SOTA spots the Spots card itself pulls in for its own
+    # screenshot -- no separate fake data needed.
+    "show_qrz_quick_log": True,
     # Rig control on so the POTA card screenshot shows the tap-to-tune
     # frequency chips + the reachability pill -- the actual rigctld
     # probe is monkeypatched to a fixed "reachable" reply below (there's
@@ -401,6 +407,7 @@ CARD_SHOTS = [
     ("pota-card", "pota-card.png"),
     ("hf-favorites-card", "hf-favorites-card.png"),
     ("rig-panel-card", "rig-panel-card.png"),
+    ("qrz-quick-log-card", "qrz-quick-log-card.png"),
 ]
 
 with sync_playwright() as p:
