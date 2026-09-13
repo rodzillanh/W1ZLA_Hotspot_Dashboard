@@ -1578,11 +1578,13 @@ by default) — a quick summary over the same logged QSOs Recent Contacts
 shows: total contacts, unique countries worked, unique grid squares
 worked (at 4-character Maidenhead precision — e.g. "FN42" — the
 standard grid-square-award granularity, not the finer 6-character
-precision some logs store), unique bands worked, a small breakdown of
-your most-used bands, a breakdown of your most-used modes (FT8/SSB/CW/
-etc.), and a 14-day sparkline of logging activity with today's bar
-highlighted. Pure client-side aggregation, no new data source or backend
-query.
+precision some logs store), unique bands worked, and a per-band mode
+breakdown — every band you've worked, ranked by contact count, each with
+its own mode split underneath (e.g. "20m — 484 total" then "FT8 411 ·
+SSB 46 · CW 27"). Scrolls if you've worked more bands than fit at once,
+so nothing's hidden. Below that, a 14-day sparkline of logging activity
+with today's bar highlighted. Pure client-side aggregation, no new data
+source or backend query.
 
 <!-- wiki-group: Optional Cards -->
 ## Top 5 Activity card

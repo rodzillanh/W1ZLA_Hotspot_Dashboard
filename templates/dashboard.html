@@ -1698,13 +1698,30 @@
         .hf-footer { display: flex; gap: 14px; font-size: 11.5px; color: var(--text-muted); flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--card-border); }
         .hf-footer b { color: var(--text); font-weight: 500; }
         .hf-source { font-size: 10px; color: var(--text-dim); margin-top: 8px; text-align: right; }
-        /* QSO Stats card (v4.63, mockup-approved -- see CLAUDE.md): a mode
-           breakdown as a SECOND plain-text footer row (not a status-style
-           dot+chip -- a mode count is a static breakdown, same kind of
-           data as the bands row right above it, not a live "linked now"
-           state the way this app's other chip components mean), plus a
-           14-day activity sparkline below both. */
-        .hf-footer.second { border-top: none; padding-top: 0; margin-top: 7px; }
+        /* QSO Stats card -- per-band mode breakdown (v4.67, mockup-
+           approved -- see CLAUDE.md), plain text throughout (not a
+           status-style dot+chip -- a mode/band count is a static
+           breakdown, not a live "linked now" state the way this app's
+           other chip components mean). Scrollable, not capped to a top
+           N, so every band worked stays reachable -- same thin-
+           scrollbar/padding-right+margin-right-compensation treatment
+           already used on .fs-list/#rc-scroll elsewhere in this file. */
+        .qs-bb-wrap {
+            padding-top: 10px; border-top: 1px solid var(--card-border);
+            max-height: 190px; overflow-y: auto; overflow-x: hidden;
+            padding-right: 8px; margin-right: -8px;
+            scrollbar-width: thin; scrollbar-color: var(--card-border) transparent;
+            display: flex; flex-direction: column; gap: 9px;
+        }
+        .qs-bb-wrap::-webkit-scrollbar { width: 6px; }
+        .qs-bb-wrap::-webkit-scrollbar-track { background: transparent; }
+        .qs-bb-wrap::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 4px; }
+        .qs-bb-row { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+        .qs-bb-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; }
+        .qs-bb-band { font-weight: 600; color: var(--text); font-family: var(--font-mono); }
+        .qs-bb-total { color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; }
+        .qs-bb-modes { font-size: 11px; color: var(--text-muted); padding-left: 2px; }
+        .qs-bb-modes b { color: var(--text); font-weight: 500; }
         .qs-spark-wrap { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-border); }
         .qs-spark-head {
             display: flex; justify-content: space-between; align-items: baseline;
@@ -3165,8 +3182,7 @@
                 <div class="hf-stat"><div class="hf-stat-label">Grids</div><div class="hf-stat-val" id="qs-grids">—</div></div>
                 <div class="hf-stat"><div class="hf-stat-label">Bands</div><div class="hf-stat-val" id="qs-bands">—</div></div>
             </div>
-            <div class="hf-footer" id="qs-topbands"></div>
-            <div class="hf-footer second" id="qs-topmodes"></div>
+            <div class="qs-bb-wrap" id="qs-bandmode"></div>
             <div class="qs-spark-wrap" id="qs-spark-wrap" style="display:none">
                 <div class="qs-spark-head"><span>Last 14 days</span><span id="qs-spark-today">—</span></div>
                 <div class="qs-spark-bars" id="qs-spark-bars"></div>
@@ -8547,8 +8563,7 @@ function renderQsoStatsCard(qsos) {
     const countriesEl = document.getElementById('qs-countries');
     const gridsEl = document.getElementById('qs-grids');
     const bandsEl = document.getElementById('qs-bands');
-    const topBandsEl = document.getElementById('qs-topbands');
-    const topModesEl = document.getElementById('qs-topmodes');
+    const bandModeEl = document.getElementById('qs-bandmode');
     const sparkWrapEl = document.getElementById('qs-spark-wrap');
     const sparkBarsEl = document.getElementById('qs-spark-bars');
     const sparkTodayEl = document.getElementById('qs-spark-today');
@@ -8559,8 +8574,7 @@ function renderQsoStatsCard(qsos) {
         if (subEl) subEl.textContent = '';
         if (emptyEl) emptyEl.style.display = 'block';
         totalEl.textContent = countriesEl.textContent = gridsEl.textContent = bandsEl.textContent = '—';
-        if (topBandsEl) topBandsEl.innerHTML = '';
-        if (topModesEl) topModesEl.innerHTML = '';
+        if (bandModeEl) bandModeEl.innerHTML = '';
         if (sparkWrapEl) sparkWrapEl.style.display = 'none';
         return;
     }
@@ -8568,23 +8582,40 @@ function renderQsoStatsCard(qsos) {
 
     const countries = new Set(list.map(q => q.country).filter(Boolean));
     const grids4 = new Set(list.map(q => (q.grid || '').toUpperCase().slice(0, 4)).filter(g => g.length === 4));
-    const bandCounts = {};
-    list.forEach(q => { if (q.band) bandCounts[q.band] = (bandCounts[q.band] || 0) + 1; });
-    const modeCounts = {};
-    list.forEach(q => { if (q.mode) modeCounts[q.mode] = (modeCounts[q.mode] || 0) + 1; });
+
+    // Mockup-approved (v4.67): every band worked, ranked by total
+    // contacts descending, each with its OWN mode breakdown underneath
+    // (also ranked by count, not alphabetical) -- replaces the old flat
+    // "top 4 bands" row + separate flat "top 4 modes across the WHOLE
+    // logbook" row, which could hide a real but small mode entirely.
+    // Scrollable (not capped) so every band stays reachable, matching
+    // what the "Bands" stat tile above already promises.
+    const bandModeCounts = {};
+    list.forEach(q => {
+        if (!q.band) return;
+        const modes = bandModeCounts[q.band] || (bandModeCounts[q.band] = {});
+        if (q.mode) modes[q.mode] = (modes[q.mode] || 0) + 1;
+    });
+    const bandTotals = Object.fromEntries(
+        Object.entries(bandModeCounts).map(([band, modes]) => [band, Object.values(modes).reduce((a, b) => a + b, 0)])
+    );
 
     totalEl.textContent = list.length;
     countriesEl.textContent = countries.size || '—';
     gridsEl.textContent = grids4.size || '—';
-    bandsEl.textContent = Object.keys(bandCounts).length || '—';
+    bandsEl.textContent = Object.keys(bandModeCounts).length || '—';
 
-    const topBands = Object.entries(bandCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
-    if (topBandsEl) {
-        topBandsEl.innerHTML = topBands.map(([band, n]) => `<span><b>${escapeHtml(band)}</b> ${n}</span>`).join('');
-    }
-    const topModes = Object.entries(modeCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
-    if (topModesEl) {
-        topModesEl.innerHTML = topModes.map(([mode, n]) => `<span><b>${escapeHtml(mode)}</b> ${n}</span>`).join('');
+    if (bandModeEl) {
+        const rankedBands = Object.entries(bandTotals).sort((a, b) => b[1] - a[1]);
+        bandModeEl.innerHTML = rankedBands.map(([band, total]) => {
+            const modes = Object.entries(bandModeCounts[band]).sort((a, b) => b[1] - a[1]);
+            const modesHtml = modes.map(([mode, n]) => `<b>${escapeHtml(mode)}</b> ${n}`).join(' · ');
+            return `
+            <div class="qs-bb-row">
+                <div class="qs-bb-top"><span class="qs-bb-band">${escapeHtml(band)}</span><span class="qs-bb-total">${total} total</span></div>
+                <div class="qs-bb-modes">${modesHtml}</div>
+            </div>`;
+        }).join('');
     }
 
     // 14-day sparkline -- a plain UTC day-bucket count, no smoothing/

@@ -491,6 +491,11 @@ BIOS = {
         "blurb": "Sharp-tongued protest-folk singer-songwriter of the 1960s whose politically charged records influenced the folk-rock movement, before his death by suicide in 1976.",
         "wiki": "Phil_Ochs",
     },
+    "Hawkins": {
+        "name": "Taylor Hawkins",
+        "blurb": "Foo Fighters' powerhouse drummer for over two decades, known for a hard-hitting, versatile style that anchored the band through its biggest records.",
+        "wiki": "Taylor_Hawkins",
+    },
 }
 
 

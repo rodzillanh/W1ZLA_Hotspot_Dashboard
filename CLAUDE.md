@@ -6781,6 +6781,40 @@ config for per-integration credentials; put it in
   can hit a genuinely sub-60-second, non-integer value the same way --
   fixed once at the shared function, not patched per call site.
 
+- **QSO Stats' flat "top bands" + "top modes" rows (v4.63) were replaced
+  with one per-band mode breakdown (v4.67) -- a direct user request,
+  mockup-first, that went through a real design correction mid-round.**
+  The user's own described shape ("10m band with total contacts, then
+  under it SSB 5 FT8 20 CW 27") replaced the two separate flat rows with
+  nested per-band blocks: `bandModeCounts[band][mode]` collected in one
+  pass, bands ranked by total descending, modes within each band ranked
+  by their own count descending (not alphabetical) -- `qs-bb-row`/
+  `qs-bb-top`/`qs-bb-band`/`qs-bb-total`/`qs-bb-modes`, replacing
+  `qs-topbands`/`qs-topmodes` and the now-dead `.hf-footer.second`
+  modifier entirely.
+  - **The first mockup round hard-capped at the top 4 bands (matching
+    the OLD flat row's own cap) -- caught by the user asking directly
+    "will this have a scrollbar to see the other bands?"** A real,
+    correct catch: the old flat row's top-4 cap was a reasonable trade
+    for a SINGLE line of text, but once each band takes two lines, a
+    9-band logbook (this session's own real example) would silently
+    drop 5 of the 9 bands the "Bands: 9" stat tile right above it
+    already promises exist. Fixed by making the whole block scrollable
+    (`max-height: 190px; overflow-y: auto`) instead of capping the DATA
+    -- every band stays reachable, same "fixed footprint, scroll inside
+    for more" trade-off this app already makes on POTA/HF Favorites/
+    Recent Contacts, not a new pattern. Uses the identical scrollbar-
+    crowding fix (`padding-right: 8px; margin-right: -8px`, thin
+    scrollbar styling) already applied to `.fs-list`/`#rc-scroll`
+    elsewhere in this file -- copied deliberately, not reinvented.
+  - Verified live against the EXACT 9-band/1217-contact dataset used in
+    the approved mockup (not just a small synthetic set) -- confirmed
+    every band's total and mode ranking matches the mockup's own numbers
+    exactly, confirmed the block's `scrollHeight` (370) genuinely exceeds
+    its `clientHeight` (189) so the scrollbar is real, not decorative,
+    and confirmed the empty-logbook state clears the block's `innerHTML`
+    entirely rather than leaving stale rows behind.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
