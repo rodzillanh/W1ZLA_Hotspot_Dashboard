@@ -337,13 +337,17 @@ across tabs: **General** (name, theme, toolbar links), **Weather**,
 and **Version info**.
 
 - **Dashboard name** — shown in the title bar and browser tab.
-- **Light/dark mode** — a toggle switch; the whole UI (dashboard, setup
-  page, map) reflows to the new theme.
-- **Toolbar links** — a row of buttons under the title (e.g. links to
-  Brandmeister, QRZ, your reflector dashboard, APRS.fi). Add, remove, and
-  drag to reorder from the Settings page. A "Show toolbar links" toggle
-  (General tab) hides the whole row if you'd rather not show it; the ⚙
-  Settings link itself always stays visible either way.
+- **Light/dark mode** — a toggle button on the tab row (Dashboard / Live
+  map), top right; the whole UI (dashboard, setup page, map) reflows to
+  the new theme.
+- **⚙ Settings** — also lives on that same tab row, top right, next to
+  the theme toggle.
+- **Toolbar links** — an optional row of buttons under the title (e.g.
+  links to Brandmeister, QRZ, your reflector dashboard, APRS.fi). Add,
+  remove, and drag to reorder from the Settings page. This row only
+  appears at all once you have at least one link configured — a "Show
+  toolbar links" toggle (General tab) hides it even with links
+  configured, if you'd rather not show it.
 - **Card order** — drag hotspot cards into whatever order you want them
   to appear on the dashboard (Cards tab). If the Hotspot Activity, ASL
   Favorites & Control, HF Conditions, Band Plan, License Quiz, Band

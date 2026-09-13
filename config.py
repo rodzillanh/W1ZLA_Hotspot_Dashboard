@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.71"
+APP_VERSION = "4.72"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -215,6 +215,8 @@ VERSION_CODENAMES = [
                         # vocalist, Eagles (1948-2016)
     "Meisner",          # v4.71 -- Randy Meisner, founding bassist/
                         # co-vocalist, Eagles (1946-2023)
+    "Wetton",           # v4.72 -- John Wetton, bassist/vocalist, Asia /
+                        # King Crimson / UK (1949-2017)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 

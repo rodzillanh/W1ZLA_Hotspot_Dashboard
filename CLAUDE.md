@@ -7166,6 +7166,52 @@ config for per-integration credentials; put it in
     else remained assigned there -- confirming the toggles are genuinely
     independent, not a single combined on/off.
 
+- **The standalone `.toolbar` bar was retired (v4.72) -- a real, reported
+  "wasted screen space" complaint against a full-width strip that
+  rendered even with zero custom links configured, just to hold the
+  dark-mode toggle and the ⚙ Settings link.** Root cause: those two
+  controls (plus the update-available indicator) lived INSIDE `.toolbar`
+  alongside the optional custom-links loop, so the bar always rendered
+  regardless of whether `settings.links` had anything in it -- the
+  `{% if settings.get('show_toolbar', True) %}` guard only wrapped the
+  LINKS loop, never the enclosing div.
+  Fixed by moving the theme toggle, update indicator, and Settings link
+  into `.tab-bar`'s own right-hand side (a new `.tab-bar-right` div,
+  paired with `.tab-bar-tabs` wrapping the existing Dashboard/Dashboard
+  2/Live map buttons, `.tab-bar` itself gaining
+  `justify-content: space-between`) -- that row already exists on every
+  page load regardless of settings, so this costs zero additional
+  vertical space. `.toolbar` itself is now wrapped in `{% if
+  settings.get('show_toolbar', True) and settings.links %}` around the
+  WHOLE div, not just its contents, so it's completely absent from the
+  DOM (not just visually empty) whenever there's nothing to show --
+  same "don't render dead markup" posture as `#sysbar` elsewhere in this
+  file, except `#sysbar` stays in the DOM and is JS-toggled instead
+  (correct for it, since host-stats visibility depends on a live poll
+  result; wrong for toolbar links, which are fully known at Jinja-render
+  time, so a plain template conditional is simpler and sufficient here).
+  `.toolbar-sep` (a `flex:1` spacer that used to push the theme/settings
+  controls to the right within the old shared row) became dead code once
+  those controls moved to their own container and was deleted, not left
+  orphaned.
+  **A real, easy-to-miss trap when testing this kind of change**: this
+  app's own `config.DEFAULT_SETTINGS["links"]` is NOT an empty list --
+  it ships 4 real default links (Brandmeister/QRZ/DMR-MARC/APRS.fi), so
+  a naive throwaway test config (a fresh `CONFIG_DIR` with no explicit
+  `links` override) will ALWAYS show the toolbar bar and never exercises
+  the "genuinely empty" case the fix was actually for. Caught before
+  trusting the fix -- a first verification pass concluded the toolbar
+  div was "always present" and treated that as a bug, when the real gap
+  was in the test itself; re-ran with `settings["links"] = []` explicitly
+  set to reproduce the actual reported scenario (a live screenshot of a
+  bar with nothing on the left, moon icon + Settings alone on the
+  right), confirmed the div is completely absent in that case, still
+  renders correctly when links ARE configured, and still hides
+  correctly when `show_toolbar` is off regardless of links. Also
+  confirmed live via Playwright that both moved controls still work
+  correctly from their new location (theme toggle actually flips
+  `data-theme`, Settings link still opens the Quick Settings drawer).
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

@@ -516,6 +516,11 @@ BIOS = {
         "blurb": "Founding bassist of the Eagles, whose high tenor lent the band's harmonies their signature top end.",
         "wiki": "Randy_Meisner",
     },
+    "Wetton": {
+        "name": "John Wetton",
+        "blurb": "Bassist and vocalist across King Crimson, UK, and Asia, known for a powerful voice atop intricate progressive rock.",
+        "wiki": "John_Wetton",
+    },
 }
 
 

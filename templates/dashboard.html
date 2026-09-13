@@ -137,6 +137,7 @@
             .top-bar > div:first-child { flex-wrap: wrap; row-gap: 8px; }
             .top-bar > div:last-child { width: 100%; justify-content: space-between; }
             .dashboard-title { font-size: 18px; }
+            .tab-bar { flex-wrap: wrap; row-gap: 6px; padding-top: 6px; padding-bottom: 6px; }
         }
 
         /* --- fleet status pill (toolbar) --- */
@@ -211,7 +212,6 @@
             transition: background .15s;
         }
         .toolbar-btn:hover { background: var(--card-bg); }
-        .toolbar-sep { flex: 1; }
         .settings-link {
             font-size: 11px;
             color: var(--text-muted);
@@ -223,7 +223,6 @@
             display: none;
             align-self: center;
             text-decoration: none;
-            margin-right: 6px;
             animation: update-flash 1.4s infinite;
         }
         /* Inline SVG, not the ⚡ emoji character -- the emoji's yellow/black
@@ -245,7 +244,6 @@
             width: 26px;
             height: 26px;
             padding: 0;
-            margin-right: 8px;
             background: var(--toolbar-btn);
             border: 1px solid var(--toolbar-border);
             border-radius: 6px;
@@ -295,10 +293,21 @@
         /* --- tabs --- */
         .tab-bar {
             display: flex;
-            gap: 2px;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
             padding: 0 18px;
             border-bottom: 1px solid var(--card-border);
         }
+        .tab-bar-tabs { display: flex; gap: 2px; min-width: 0; }
+        /* Dark-mode toggle + update indicator + Settings link (moved here
+           from the old standalone .toolbar bar, which otherwise rendered
+           as a mostly-empty full-width strip whenever there were no
+           custom toolbar links configured -- a real, reported "wasted
+           space" complaint. This row already exists on every page load
+           regardless, so folding these three controls into its own
+           right-hand side costs zero extra vertical space. */
+        .tab-bar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
         .tab-btn {
             padding: 8px 16px;
             font-size: 13px;
@@ -2894,38 +2903,26 @@
     </div>
 </div>
 
+<!-- Custom toolbar links (Settings -> General) -- its own bar, only in
+     the DOM at all when there's actually something to show, same
+     "don't render an empty strip" posture as #sysbar below (which
+     instead stays in the DOM and is JS-toggled, since host-stats
+     visibility depends on a live poll result, not just a static
+     Jinja-time setting the way these links are). The dark-mode toggle/
+     update indicator/Settings link used to live in THIS bar, which
+     meant it rendered full-width with nothing else in it whenever no
+     links were configured -- a real, reported "wasted space" complaint.
+     They've moved into .tab-bar's own right-hand side below, since that
+     row already exists on every page load regardless. -->
+{% if settings.get('show_toolbar', True) and settings.links %}
 <div class="toolbar">
-    {% if settings.get('show_toolbar', True) %}
     {% for link in settings.links %}
     <a class="toolbar-btn" href="{{ link.url }}" target="_blank" rel="noopener">
         {{ link.label }}
     </a>
     {% endfor %}
-    {% endif %}
-    <span class="toolbar-sep"></span>
-    <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleDashboardTheme()"
-            title="Toggle light/dark mode" aria-label="Toggle light/dark mode">
-        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="4"/>
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
-        </svg>
-        <svg class="icon-moon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 1020.354 15.354z"/>
-        </svg>
-    </button>
-    <a class="update-indicator" id="update-indicator" href="/setup#version" title="Update available">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M13 2 3 14h7l-1 8 11-14h-7l1-8z" fill="#FFCC4D" stroke="#664500" stroke-width="1" stroke-linejoin="round"/>
-        </svg>
-    </a>
-    <!-- Opens Quick Settings first (the common toggles), not straight to
-         /setup -- avoids two separate "settings" entry points sitting
-         next to each other (a real, reported point of confusion: a
-         gear icon here AND a gear icon for Quick Settings). The drawer's
-         own "More settings →" link is the way down to the full page.
-         href stays a real fallback for no-JS/failure cases. -->
-    <a class="settings-link" href="/setup" onclick="event.preventDefault(); openSettingsDrawer();">⚙ Settings</a>
 </div>
+{% endif %}
 
 <div class="sysbar" id="sysbar" style="display:none">
     <div class="sysbar-item">
@@ -2947,11 +2944,37 @@
 </div>
 
 <div class="tab-bar">
-    <div class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard', this)">Dashboard</div>
-    {% if has_dashboard2 %}
-    <div class="tab-btn" data-tab="dashboard2" onclick="switchTab('dashboard2', this)">{{ settings.get('dashboard2_name', 'Dashboard 2') }}</div>
-    {% endif %}
-    <div class="tab-btn"       data-tab="map"       onclick="switchTab('map', this)">Live map</div>
+    <div class="tab-bar-tabs">
+        <div class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard', this)">Dashboard</div>
+        {% if has_dashboard2 %}
+        <div class="tab-btn" data-tab="dashboard2" onclick="switchTab('dashboard2', this)">{{ settings.get('dashboard2_name', 'Dashboard 2') }}</div>
+        {% endif %}
+        <div class="tab-btn"       data-tab="map"       onclick="switchTab('map', this)">Live map</div>
+    </div>
+    <div class="tab-bar-right">
+        <button class="theme-toggle-btn" id="theme-toggle-btn" onclick="toggleDashboardTheme()"
+                title="Toggle light/dark mode" aria-label="Toggle light/dark mode">
+            <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+            </svg>
+            <svg class="icon-moon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 1020.354 15.354z"/>
+            </svg>
+        </button>
+        <a class="update-indicator" id="update-indicator" href="/setup#version" title="Update available">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M13 2 3 14h7l-1 8 11-14h-7l1-8z" fill="#FFCC4D" stroke="#664500" stroke-width="1" stroke-linejoin="round"/>
+            </svg>
+        </a>
+        <!-- Opens Quick Settings first (the common toggles), not straight to
+             /setup -- avoids two separate "settings" entry points sitting
+             next to each other (a real, reported point of confusion: a
+             gear icon here AND a gear icon for Quick Settings). The drawer's
+             own "More settings →" link is the way down to the full page.
+             href stays a real fallback for no-JS/failure cases. -->
+        <a class="settings-link" href="/setup" onclick="event.preventDefault(); openSettingsDrawer();">⚙ Settings</a>
+    </div>
 </div>
 
 <!-- Dashboard tab -->
