@@ -6370,6 +6370,72 @@ config for per-integration credentials; put it in
     the actual `/api/set_hotspot_pages` route -- not simulated at the
     fetch level, the real button click end to end.
 
+- **Fleet Status card (v4.59) -- a mockup-driven design decision, not the
+  first shape considered.** The user asked for "a combo card list view"
+  showing every hotspot's name/mode/DMR/ASL/D-STAR/etc. in one row each.
+  The first mockup was a full-width table spanning the whole grid; the
+  user found the spacing "slightly crazy" for a realistic fleet size (8-10
+  hotspots) and asked for two slimmer alternatives: a 2-column-span table
+  ("Option A") and a single-standard-card-width 2-line list ("Option B").
+  Option B was explicitly approved ("option B looks fabulous") over
+  Option A -- worth remembering if this card is ever revisited, since a
+  wider table-shaped layout was a real, considered, and REJECTED
+  alternative, not an oversight.
+  - **`computeDvChips(hs)` was extracted out of `renderCards()` specifically
+    so this card could reuse it** -- it used to be inline logic building
+    the Digital Voice Network Status chip row (v4.57) for a single hotspot
+    card; Fleet Status calls the exact same function per row for every
+    WPSD hotspot, so the two chip rows can never drift out of sync with
+    each other the way two independently-written near-duplicates would.
+  - **ASL3 rows do NOT call `computeDvChips()`** -- that function's chip
+    set (DMR/D-STAR/YSF/P25/NXDN) is WPSD-gateway-specific and has no ASL3
+    equivalent. ASL3 rows instead get their own inline chip build: an
+    "ASL" chip summarizing `asl_linked_nodes` (`"N keyed"` if any linked
+    node is keyed, else `"N linked"`, else `"no links"`) plus an optional
+    "DVSw" chip when `dvswitch_enabled` (`"active"`/`"idle"` from
+    `dvswitch_live`). openSPOT4 rows get no chips at all -- that type has
+    no per-mode static-config concept the way WPSD's Brandmeister/
+    ircDDBGateway/YSF/P25/NXDN toggles do, and no linked-node concept the
+    way ASL3 does.
+  - **The card is deliberately fleet-wide, ignoring `dashboard_page`
+    entirely** -- unlike every other sentinel, `renderFleetStatusCard(data)`
+    is called once from `refresh()` with the FULL, unfiltered `/api/data`
+    array, not `pageData` (the per-page-filtered array `renderCards()`
+    itself uses). The whole point of a "see everything at a glance" card
+    would be defeated if it only showed whichever page it happened to be
+    parked on -- a hotspot moved to Dashboard 2 should still show up here.
+    The card's OWN position (`fleet_status_position`/`fleet_status_page`)
+    still fully participates in the normal page-aware sentinel-ordering
+    system though -- only its CONTENT ignores paging, not its placement.
+  - **Reuses `fmtOfflineDuration`/`fmtUptime`/`fmtAgoShort`/`escapeHtml`/
+    `openHotspotDrawer` verbatim** -- no new formatting helpers were
+    written for this card; clicking a row opens the exact same drawer the
+    gear-icon entry point on the full-size card does (`onclick="openHotspotDrawer('${hs.id}')"`),
+    so there's exactly one drawer implementation regardless of which
+    surface launched it.
+  - **The "away" (portable, offline) state (v4.40) and the offline/active/
+    last-heard precedence order are duplicated here, not shared with
+    `renderCards()`'s equivalent branching** -- a deliberate, small amount
+    of duplication rather than trying to generalize both functions' very
+    differently-shaped output (a full card's DOM vs. one compact list row)
+    behind one shared helper. If the away/offline logic is ever extended
+    with a new state, update both `renderCards()` and
+    `renderFleetStatusCard()` together, the same "kept in sync manually"
+    caution already documented elsewhere in this file for other
+    intentionally-duplicated pairs (e.g. `buildDstarAddr()`/
+    `splitDstarAddr()` across dashboard.html/setup.html).
+  - Verified live end-to-end with a real Playwright browser: seeded one
+    hotspot of each type (WPSD active-DMR-call, ASL3 keyed-link +
+    DVSwitch-active, openSPOT4 offline) with `show_fleet_status: True`,
+    confirmed all three rows render the correct dot color/activity text/
+    chip set/health line for their type (including openSPOT4 correctly
+    showing zero chips and the offline "away"-style duration), confirmed
+    the card's own drag row appears correctly in Settings -> Cards' two-
+    column board with the right label/icon, and confirmed
+    `saveCardOrder()`'s real POST body includes `fleet_status_position`/
+    `fleet_status_page`/the tiebreak entry and that it round-trips to
+    `settings.json` through the real `/api/settings` route.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

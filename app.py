@@ -482,6 +482,13 @@ def api_settings_post():
         settings["beta_courtesy_tone"] = bool(data["beta_courtesy_tone"])
     if "beta_spotlight_dimming" in data:
         settings["beta_spotlight_dimming"] = bool(data["beta_spotlight_dimming"])
+    if "show_fleet_status" in data:
+        settings["show_fleet_status"] = bool(data["show_fleet_status"])
+    if "fleet_status_position" in data:
+        try:
+            settings["fleet_status_position"] = max(0, int(data["fleet_status_position"]))
+        except (TypeError, ValueError):
+            pass
     if "show_fleet_activity" in data:
         settings["show_fleet_activity"] = bool(data["show_fleet_activity"])
     if "fleet_activity_position" in data:
@@ -730,7 +737,7 @@ def api_settings_post():
     # DEFAULT_SETTINGS comment for why these are grouped as one block
     # rather than interleaved next to each sibling *_position handler.
     for _page_key in (
-        "fleet_activity_page", "asl_favorites_page", "hf_conditions_page",
+        "fleet_status_page", "fleet_activity_page", "asl_favorites_page", "hf_conditions_page",
         "band_plan_page", "license_quiz_page", "wspr_activity_page",
         "digipi_page", "big_clock_page", "notifications_page",
         "satellites_page", "flights_overhead_page", "recent_contacts_page",
@@ -1074,6 +1081,7 @@ def api_ircddb_favorites_post():
 # below; the inline (interleaved-with-hotspots) rendering in setup.html
 # still reads settings directly and isn't affected by this list.
 _SENTINEL_DEFS = [
+    ("__fleet_status__", "show_fleet_status", "fleet_status_position", "📋", "Fleet Status", "one-line-per-hotspot status list"),
     ("__fleet_activity__", "show_fleet_activity", "fleet_activity_position", "📊", "Fleet activity", "metrics card"),
     ("__asl_favorites__", "show_asl_favorites", "asl_favorites_position", "📻", "ASL Favorites", "control card"),
     ("__hf_conditions__", "show_hf_conditions", "hf_conditions_position", "☀️", "HF Conditions", "propagation card"),

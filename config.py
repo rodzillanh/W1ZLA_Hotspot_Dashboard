@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.58"
+APP_VERSION = "4.59"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -187,6 +187,8 @@ VERSION_CODENAMES = [
     "Sylvain",          # v4.58 -- Sylvain Sylvain, guitarist of the New
                         # York Dolls, foundational proto-punk figure
                         # (1951-2021)
+    "Kral",             # v4.59 -- Ivan Kral, guitarist/multi-instrumentalist,
+                        # Patti Smith Group, punk-era CBGB scene (1948-2020)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1167,6 +1169,16 @@ DEFAULT_SETTINGS = {
     "weather_unit": "F",      # "F" or "C"
     "show_host_stats": True,  # show host CPU + memory bar on dashboard
     "show_toolbar": True,     # show the row of custom toolbar links on the dashboard
+    # Fleet Status card (v4.59, mockup-approved) -- a one-line-per-hotspot
+    # status list ("combo card list view"), off by default same as every
+    # other optional card. Purely client-side over /api/data already in
+    # hand -- no new backend module, unlike Fleet Activity below. Shows
+    # ALL hotspots regardless of which dashboard page they're on (the
+    # whole point is a fleet-wide glance), independent of which page the
+    # CARD ITSELF is placed on via fleet_status_page.
+    "show_fleet_status": False,
+    "fleet_status_position": 0,
+    "fleet_status_page": 1,
     # Fleet activity metrics card — off by default since it adds a new SQLite
     # table and a background write on every completed transmission.
     "show_fleet_activity": False,

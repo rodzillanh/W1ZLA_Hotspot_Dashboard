@@ -620,6 +620,37 @@
         .dv-chip .val { font-family: var(--font-mono); color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .dv-chip.linked .val { color: var(--text-muted); }
 
+        /* Fleet Status card (v4.59, mockup-approved: standard single-card
+           width, two lines per hotspot -- "Option B", chosen over a wide
+           table since at a realistic 8-10 hotspots a table's own overhead
+           (header/borders/gutters) doesn't earn its keep, and this needs
+           zero special-width grid CSS. POTA's card is the closest existing
+           precedent for a scrolling fixed-size list like this one. */
+        .fs-count { font-size: 11px; font-family: var(--font-mono); color: var(--text-dim); font-weight: 400; }
+        .fs-list { max-height: 340px; overflow-y: auto; }
+        .fs-entry { padding: 8px 0; border-bottom: 1px solid var(--border-soft); cursor: pointer; }
+        .fs-entry:last-child { border-bottom: none; }
+        .fs-entry:hover { background: var(--panel-2); margin: 0 -8px; padding-left: 8px; padding-right: 8px; }
+        .fs-row1 { display: flex; align-items: center; gap: 7px; }
+        .fs-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--text-dim); }
+        .fs-dot.live { background: var(--live); animation: pulse 1.5s ease-in-out infinite; }
+        .fs-dot.on { background: var(--good); }
+        .fs-dot.off { background: var(--danger); }
+        .fs-name { font-weight: 600; font-size: 13px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+        .fs-type { font-size: 8.5px; font-family: var(--font-mono); font-weight: 700; padding: 1px 5px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text-dim); flex-shrink: 0; }
+        .fs-activity { flex: 1; min-width: 0; text-align: right; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fs-activity .live-txt { color: var(--live); font-weight: 600; }
+        .fs-activity .dim-txt { color: var(--text-dim); }
+        .fs-activity .off-txt { color: var(--danger); }
+        .fs-row2 { display: flex; align-items: center; gap: 6px; margin-top: 4px; padding-left: 14px; }
+        .fs-chips { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; min-width: 0; }
+        .fs-chip { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px 1px 5px; border-radius: 20px; font-size: 9.5px; background: var(--panel-2); border: 1px solid var(--border); }
+        .fs-chip .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+        .fs-chip.linked .dot { background: var(--live); }
+        .fs-chip .mode { font-family: var(--font-mono); font-weight: 700; color: var(--text-muted); }
+        .fs-chip.linked .mode { color: var(--text); }
+        .fs-health { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); flex-shrink: 0; white-space: nowrap; }
+
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
         .active-label {
             color: var(--live);
@@ -2828,6 +2859,15 @@
                 Migrating from another install? <a href="/setup#backup">Restore from a backup file</a> instead.
             </div>
         </div>
+        {% if settings.get('show_fleet_status', False) %}
+        <div class="metrics-card" id="fleet-status-card"
+             style="order:{{ settings.get('fleet_status_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">📋 Fleet Status <span class="fs-count" id="fs-count"></span></div>
+            </div>
+            <div class="fs-list" id="fs-list"><div class="hs-empty-note">Loading…</div></div>
+        </div>
+        {% endif %}
         {% if settings.get('show_fleet_activity', False) %}
         <div class="metrics-card" id="fleet-activity-card"
              style="order:{{ settings.get('fleet_activity_position', 0) }}">
@@ -3621,6 +3661,7 @@ const CARD_ORDER_TIEBREAK = {{ settings.get('card_order_tiebreak', []) | tojson 
 // Grouped here as one block rather than interleaved next to each
 // sibling *_POSITION const above, same reasoning as config.py's own
 // DEFAULT_SETTINGS grouping for these keys.
+const FLEET_STATUS_PAGE      = {{ settings.get('fleet_status_page', 1) }};
 const FLEET_ACTIVITY_PAGE    = {{ settings.get('fleet_activity_page', 1) }};
 const ASL_FAVORITES_PAGE     = {{ settings.get('asl_favorites_page', 1) }};
 const HF_CONDITIONS_PAGE     = {{ settings.get('hf_conditions_page', 1) }};
@@ -3646,6 +3687,8 @@ const DASHBOARD2_NAME        = {{ settings.get('dashboard2_name', 'Dashboard 2')
 // app. Computed server-side since it needs the full hotspot/camera list,
 // not just settings.
 const HAS_DASHBOARD2 = {{ 'true' if has_dashboard2 else 'false' }};
+const SHOW_FLEET_STATUS      = {{ 'true' if settings.get('show_fleet_status', False) else 'false' }};
+const FLEET_STATUS_POSITION  = {{ settings.get('fleet_status_position', 0) }};
 const SHOW_FLEET_ACTIVITY    = {{ 'true' if settings.get('show_fleet_activity', False) else 'false' }};
 const FLEET_ACTIVITY_POSITION = {{ settings.get('fleet_activity_position', 0) }};
 const FLEET_ACTIVITY_HOURS    = {{ settings.get('fleet_activity_hours', 12) }};
@@ -4286,7 +4329,7 @@ function clearStaleNotifs(data) {
 // this codebase (short keys are only ever used internally by this JS
 // file; the long "__key__" form is what's stored/dragged in Settings).
 const SENTINEL_KEY_TO_DATA_IP = {
-    fleet: '__fleet_activity__', aslfav: '__asl_favorites__',
+    fleetstatus: '__fleet_status__', fleet: '__fleet_activity__', aslfav: '__asl_favorites__',
     hfcond: '__hf_conditions__', bandplan: '__band_plan__', licensequiz: '__license_quiz__',
     wspractivity: '__wspr_activity__', digipi: '__digipi__', bigclock: '__big_clock__',
     notifications: '__notifications__', satellites: '__satellites__',
@@ -4394,6 +4437,35 @@ function dismissOnboardingTour() {
 // already live in the target container" is the only thing that needs
 // checking; CSS `order` alone can't move a card between two independent
 // grid containers, only within one.
+// Digital-voice mode chips for one hotspot -- factored out of renderCards()
+// (v4.59) so the Fleet Status card can show the IDENTICAL chips per row
+// instead of a second, potentially-drifting copy of this logic. Only
+// covers DMR/D-STAR/YSF/P25/NXDN (the modes a WPSD hotspot can report) --
+// ASL3's own "linked nodes" concept is a different thing computed
+// separately by whichever caller needs it (see renderFleetStatusCard()).
+function computeDvChips(hs) {
+    const dvChips = [];
+    if (hs.brandmeister_id) {
+        const tgs = hs.bm_static_tgs || [];
+        const dmrVal = tgs.length
+            ? tgs.map(t => t.talkgroup + (t.slot ? ` (TS${t.slot})` : '')).join(', ')
+            : 'not linked';
+        dvChips.push({ mode: 'DMR', val: dmrVal, linked: tgs.length > 0 });
+    }
+    if (hs.ircddb_enabled) {
+        dvChips.push({ mode: 'D-STAR', val: hs.ircddb_reflector || 'not linked', linked: !!hs.ircddb_reflector });
+    }
+    if (hs.ysf_status_enabled) {
+        dvChips.push({ mode: 'YSF', val: hs.ysf_reflector || 'not linked', linked: !!hs.ysf_reflector });
+    }
+    if (hs.p25_status_enabled) {
+        dvChips.push({ mode: 'P25', val: hs.p25_reflector ? `TG ${hs.p25_reflector}` : 'not linked', linked: !!hs.p25_reflector });
+    }
+    if (hs.nxdn_status_enabled) {
+        dvChips.push({ mode: 'NXDN', val: hs.nxdn_reflector ? `TG ${hs.nxdn_reflector}` : 'not linked', linked: !!hs.nxdn_reflector });
+    }
+    return dvChips;
+}
 function moveIfNeeded(el, targetContainer) {
     if (el && targetContainer && el.parentNode !== targetContainer) targetContainer.appendChild(el);
 }
@@ -4408,6 +4480,9 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     // reaches the sort, collapsing them into a single indistinguishable
     // tie (this was a real, reported bug -- see computeCardOrders()).
     const sentinels = [];
+    if (SHOW_FLEET_STATUS && FLEET_STATUS_PAGE === page) {
+        sentinels.push({ key: 'fleetstatus', pos: Math.max(0, FLEET_STATUS_POSITION) });
+    }
     if (SHOW_FLEET_ACTIVITY && FLEET_ACTIVITY_PAGE === page) {
         sentinels.push({ key: 'fleet', pos: Math.max(0, FLEET_ACTIVITY_POSITION) });
     }
@@ -4495,6 +4570,8 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     // now runs once per page and DVSwitch only ever belongs to one of them.
     lastSentinelOrdersByPage[page] = sentinelOrders;
 
+    const fleetStatusCard = document.getElementById('fleet-status-card');
+    if (fleetStatusCard && 'fleetstatus' in sentinelOrders) { moveIfNeeded(fleetStatusCard, cardsOuter); fleetStatusCard.style.order = sentinelOrders.fleetstatus; }
     const fleetCard = document.getElementById('fleet-activity-card');
     if (fleetCard && 'fleet' in sentinelOrders) { moveIfNeeded(fleetCard, cardsOuter); fleetCard.style.order = sentinelOrders.fleet; }
     const aslFavCard = document.getElementById('asl-favorites-card');
@@ -4725,26 +4802,7 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
         // is carried by the text label instead, same split as
         // .linked-item/.asl-ctrl-mode-badge elsewhere in this file
         // (status = color, identity = text).
-        const dvChips = [];
-        if (hs.brandmeister_id) {
-            const tgs = hs.bm_static_tgs || [];
-            const dmrVal = tgs.length
-                ? tgs.map(t => t.talkgroup + (t.slot ? ` (TS${t.slot})` : '')).join(', ')
-                : 'not linked';
-            dvChips.push({ mode: 'DMR', val: dmrVal, linked: tgs.length > 0 });
-        }
-        if (hs.ircddb_enabled) {
-            dvChips.push({ mode: 'D-STAR', val: hs.ircddb_reflector || 'not linked', linked: !!hs.ircddb_reflector });
-        }
-        if (hs.ysf_status_enabled) {
-            dvChips.push({ mode: 'YSF', val: hs.ysf_reflector || 'not linked', linked: !!hs.ysf_reflector });
-        }
-        if (hs.p25_status_enabled) {
-            dvChips.push({ mode: 'P25', val: hs.p25_reflector ? `TG ${hs.p25_reflector}` : 'not linked', linked: !!hs.p25_reflector });
-        }
-        if (hs.nxdn_status_enabled) {
-            dvChips.push({ mode: 'NXDN', val: hs.nxdn_reflector ? `TG ${hs.nxdn_reflector}` : 'not linked', linked: !!hs.nxdn_reflector });
-        }
+        const dvChips = computeDvChips(hs);
         const dvStripHtml = dvChips.length
             ? `<div class="dv-strip">${dvChips.map(c => `
                 <div class="dv-chip${c.linked ? ' linked' : ''}" title="${escapeHtml(c.mode)}: ${escapeHtml(c.val)}">
@@ -5049,6 +5107,98 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
 // card only ever belongs to whichever page DVSWITCH_PAGE says.
 let lastSentinelOrdersByPage = { 1: {}, 2: {} };
 let dvsSelectedHotspotId = null;
+
+// Fleet Status card (v4.59, mockup-approved -- see CLAUDE.md) -- one
+// two-line entry per hotspot, deliberately showing EVERY hotspot
+// regardless of which dashboard page it's on (the whole point is a
+// fleet-wide glance), independent of which page the card ITSELF sits
+// on. Purely derived from the same /api/data snapshot renderCards()
+// already has -- no new fetch, no new backend module. Clicking a row
+// opens the same drawer the card grid's own gear icon does.
+function renderFleetStatusCard(data) {
+    const list = document.getElementById('fs-list');
+    if (!list) return;
+    const countEl = document.getElementById('fs-count');
+    if (countEl) countEl.textContent = `(${data.length})`;
+    if (!data.length) {
+        list.innerHTML = '<div class="hs-empty-note">No hotspots configured yet.</div>';
+        return;
+    }
+
+    list.innerHTML = data.map(hs => {
+        const isAsl = hs.type === 'asl3';
+        const isOpenSpot4 = hs.type === 'openspot4';
+        const isOffline = hs.status === 'Offline';
+        const isAway = isOffline && !!hs.portable;
+        const dotClass = isAway ? '' : isOffline ? 'off' : hs.is_active ? 'live' : 'on';
+        const typeLabel = isAsl ? 'ASL3' : isOpenSpot4 ? 'openSPOT4' : 'WPSD';
+
+        let activityHtml;
+        if (isAway) {
+            activityHtml = `<span class="dim-txt">💤 Away · ${escapeHtml(fmtOfflineDuration(hs.offline_since))}</span>`;
+        } else if (isOffline) {
+            activityHtml = `<span class="off-txt">⚠ Offline · ${escapeHtml(fmtOfflineDuration(hs.offline_since))}</span>`;
+        } else if (hs.is_active) {
+            const who = escapeHtml(hs.active_call || '?');
+            const what = isAsl ? 'keyed' : (hs.talkgroup ? `→ TG ${escapeHtml(String(hs.talkgroup))}` : '');
+            activityHtml = `<span class="live-txt">🔴 ${who}</span>${what ? ` <span class="dim-txt">${what}</span>` : ''}`;
+        } else if (hs.last_heard) {
+            activityHtml = `<span class="dim-txt">${escapeHtml(fmtAgoShort(hs.last_heard))}</span>`;
+        } else {
+            activityHtml = '<span class="dim-txt">Listening…</span>';
+        }
+
+        // WPSD gets the exact same digital-voice chips the card grid's own
+        // strip shows (computeDvChips(), shared -- see its own comment);
+        // ASL3 has no DMR/D-STAR/YSF/P25/NXDN concept, so it gets its own
+        // link-count chip instead (+ a DVSwitch chip if enabled).
+        // openSPOT4 has no structured chip source built yet -- shows a
+        // plain dash rather than guessing at one.
+        let chips;
+        if (isAsl) {
+            const links = hs.asl_linked_nodes || [];
+            const keyedCount = links.filter(l => l.keyed).length;
+            chips = [{
+                mode: 'ASL',
+                val: links.length ? (keyedCount ? `${keyedCount} keyed` : `${links.length} linked`) : 'no links',
+                linked: links.length > 0,
+            }];
+            if (hs.dvswitch_enabled) {
+                chips.push({ mode: 'DVSw', val: hs.dvswitch_live ? 'active' : 'idle', linked: !!hs.dvswitch_live });
+            }
+        } else if (isOpenSpot4) {
+            chips = [];
+        } else {
+            chips = computeDvChips(hs);
+        }
+        const chipsHtml = chips.length
+            ? chips.map(c => `
+                <span class="fs-chip${c.linked ? ' linked' : ''}" title="${escapeHtml(c.mode)}${c.val ? ': ' + escapeHtml(c.val) : ''}">
+                    <span class="dot"></span><span class="mode">${escapeHtml(c.mode)}</span>
+                </span>`).join('')
+            : '';
+
+        const healthBits = [];
+        if (hs.temperature && hs.temperature !== 'N/A') healthBits.push(escapeHtml(hs.temperature));
+        if (hs.uptime && hs.uptime !== 'Unknown') healthBits.push(escapeHtml(fmtUptime(hs.uptime)));
+        const healthText = healthBits.length ? healthBits.join(' · ') : '—';
+        const updateFlag = hs.dashboard_update_available ? ' <span title="Update available">⬆</span>' : '';
+
+        return `
+        <div class="fs-entry" onclick="openHotspotDrawer('${hs.id}')">
+            <div class="fs-row1">
+                <span class="fs-dot ${dotClass}"></span>
+                <span class="fs-name" title="${escapeHtml(hs.name)}">${escapeHtml(hs.name)}</span>
+                <span class="fs-type">${typeLabel}</span>
+                <span class="fs-activity">${activityHtml}</span>
+            </div>
+            <div class="fs-row2">
+                <div class="fs-chips">${chipsHtml}</div>
+                <span class="fs-health">${healthText}${updateFlag}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
 
 function renderDvswitchCards(data, page = DVSWITCH_PAGE) {
     const container = document.getElementById(page === 2 ? 'dvswitch-cards-2' : 'dvswitch-cards');
@@ -11829,6 +11979,7 @@ function refresh() {
                 renderCards(data, 2, document.getElementById('cards-2'), document.getElementById('cards-outer-2'));
             }
             renderDvswitchCards(data);
+            if (SHOW_FLEET_STATUS) renderFleetStatusCard(data);
             refreshMap();
             // lastApiData is used by renderAslFavorites() below,
             // openHotspotDrawer() (card click -> detail drawer), and the

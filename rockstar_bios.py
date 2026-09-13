@@ -451,6 +451,11 @@ BIOS = {
         "blurb": "Guitarist and co-founder of the New York Dolls, whose glam-trash swagger a few years before the fact made them one of punk rock's most direct forerunners.",
         "wiki": "Sylvain_Sylvain",
     },
+    "Kral": {
+        "name": "Ivan Kral",
+        "blurb": "Guitarist, bassist, and songwriter for the Patti Smith Group who helped shape the CBGB-era punk sound from just off the frontline, co-writing several of the band's best-known songs.",
+        "wiki": "Ivan_Kral",
+    },
 }
 
 

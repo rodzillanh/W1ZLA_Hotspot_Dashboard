@@ -588,6 +588,15 @@
         <div class="toggle-group">
             <div class="toggle-subhead">Dashboard cards</div>
             <div class="toggle-row">
+                <span class="toggle-label">Show Fleet Status card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (one line per hotspot -- status, activity, digital-voice mode at a glance)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_fleet_status', False) else '' }}"
+                     id="fleet-status-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show fleet activity card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (adds a small SQLite log of completed transmissions)
@@ -898,6 +907,7 @@
            "position within THIS page's hotspots" meaning -- the same
            meaning app.py's _overflow_sentinels(page=N) already assumes. #}
         {% macro card_order_column(overflow, page) %}
+            {% set fleet_status_pos = settings.get('fleet_status_position', 0) if (settings.get('show_fleet_status', False) and settings.get('fleet_status_page', 1) == page) else -1 %}
             {% set fleet_pos = settings.get('fleet_activity_position', 0) if (settings.get('show_fleet_activity', False) and settings.get('fleet_activity_page', 1) == page) else -1 %}
             {% set asl_fav_pos = settings.get('asl_favorites_position', 0) if (settings.get('show_asl_favorites', False) and settings.get('asl_favorites_page', 1) == page) else -1 %}
             {% set hf_cond_pos = settings.get('hf_conditions_position', 0) if (settings.get('show_hf_conditions', False) and settings.get('hf_conditions_page', 1) == page) else -1 %}
@@ -921,6 +931,13 @@
             {% set dvswitch_pos = settings.get('dvswitch_position', 0) if (settings.get('show_dvswitch', True) and hotspots | selectattr('dvswitch_enabled') | list | length > 0 and settings.get('dvswitch_page', 1) == page) else -1 %}
             {% set show_cams = settings.get('show_cameras', False) %}
             {% for hs in hotspots if hs.get('dashboard_page', 1) == page %}
+                {% if loop.index0 == fleet_status_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_status__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📋 Fleet Status</span>
+                    <span class="node-meta">one-line-per-hotspot status list</span>
+                </div>
+                {% endif %}
                 {% if loop.index0 == fleet_pos %}
                 <div class="drag-row fleet-activity-row" draggable="true" data-ip="__fleet_activity__">
                     <span class="drag-handle">⠿</span>
@@ -2306,6 +2323,7 @@ function saveCards() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
+            show_fleet_status: document.getElementById('fleet-status-toggle').classList.contains('on'),
             show_fleet_activity: document.getElementById('fleet-activity-toggle').classList.contains('on'),
             fleet_activity_hours: parseInt(document.getElementById('fleet-activity-hours').value, 10),
             show_asl_favorites: document.getElementById('asl-favorites-toggle').classList.contains('on'),
@@ -2481,6 +2499,7 @@ function saveSatellites() {
 // saved correctly, these three didn't. Fixed here, not left in place,
 // since this function is being reconstructed anyway.
 const SENTINEL_POSITION_FIELDS = [
+    ['__fleet_status__', 'fleet_status_position'],
     ['__fleet_activity__', 'fleet_activity_position'],
     ['__asl_favorites__', 'asl_favorites_position'],
     ['__hf_conditions__', 'hf_conditions_position'],
