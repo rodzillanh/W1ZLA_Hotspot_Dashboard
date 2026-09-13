@@ -461,6 +461,11 @@ BIOS = {
         "blurb": "Lead guitarist of Quicksilver Messenger Service, a defining voice of the San Francisco psychedelic scene known for a fluid, effects-laden style built on a wall of custom amplifiers.",
         "wiki": "John_Cipollina",
     },
+    "Gaye": {
+        "name": "Marvin Gaye",
+        "blurb": "Motown singer-songwriter whose \"What's Going On\" reshaped soul music into a vehicle for social commentary, influencing generations of rock and R&B artists alike.",
+        "wiki": "Marvin_Gaye",
+    },
 }
 
 

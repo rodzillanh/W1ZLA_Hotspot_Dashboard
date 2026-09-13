@@ -25,7 +25,7 @@ from storage import load_hotspots, save_hotspots, load_settings, save_settings, 
                    load_bm_tg_favorites, save_bm_tg_favorites, \
                    load_ircddb_favorites, save_ircddb_favorites, \
                    load_cameras, save_cameras, load_qsos, save_qsos, settings_transaction, \
-                   load_hf_favorites, save_hf_favorites
+                   hotspots_transaction, load_hf_favorites, save_hf_favorites
 from weather import WeatherClient
 from qrz import QrzClient
 from aprs import AprsClient
@@ -2713,15 +2713,23 @@ def test_brandmeister():
 
 @app.route("/api/reorder_hotspots", methods=["POST"])
 def reorder_hotspots():
-    """Accept an ordered list of hotspot ids and persist that order."""
+    """Accept an ordered list of hotspot ids and persist that order.
+
+    Wrapped in hotspots_transaction() -- setup.html's saveCardOrder()
+    fires this AND /api/set_hotspot_pages concurrently (one Promise.all),
+    and without a lock spanning the whole load-modify-save sequence one
+    of the two can silently clobber the other's write. See
+    storage.hotspots_transaction()'s own docstring for the real, reported
+    bug this fixes."""
     ordered_ids = request.json or []
-    hotspots    = load_hotspots()
-    by_id       = {h["id"]: h for h in hotspots}
-    reordered   = [by_id[key] for key in ordered_ids if key in by_id]
-    # Append any hotspots not mentioned in the payload (safety net)
-    mentioned = set(ordered_ids)
-    reordered += [h for h in hotspots if h["id"] not in mentioned]
-    save_hotspots(reordered)
+    with hotspots_transaction():
+        hotspots    = load_hotspots()
+        by_id       = {h["id"]: h for h in hotspots}
+        reordered   = [by_id[key] for key in ordered_ids if key in by_id]
+        # Append any hotspots not mentioned in the payload (safety net)
+        mentioned = set(ordered_ids)
+        reordered += [h for h in hotspots if h["id"] not in mentioned]
+        save_hotspots(reordered)
     return jsonify({"ok": True})
 
 @app.route("/api/set_hotspot_pages", methods=["POST"])
@@ -2733,19 +2741,26 @@ def api_set_hotspot_pages():
     frontend only ever sends 1 or 2 (the two columns that exist), and an
     unrecognized value just means that hotspot never matches either
     page's _overflow_sentinels()/renderCards() filter, degrading to
-    "shown on neither page" rather than erroring."""
-    pages     = request.json or {}
-    hotspots  = load_hotspots()
-    changed   = False
-    for hotspot in hotspots:
-        if hotspot["id"] in pages:
-            try:
-                hotspot["dashboard_page"] = int(pages[hotspot["id"]])
-                changed = True
-            except (TypeError, ValueError):
-                pass
-    if changed:
-        save_hotspots(hotspots)
+    "shown on neither page" rather than erroring.
+
+    Wrapped in hotspots_transaction() -- see /api/reorder_hotspots above
+    and storage.hotspots_transaction()'s docstring for why: this route
+    fires CONCURRENTLY with that one from the same saveCardOrder() call,
+    and an unprotected load-modify-save here was silently clobbering
+    that route's reordered list."""
+    pages = request.json or {}
+    with hotspots_transaction():
+        hotspots  = load_hotspots()
+        changed   = False
+        for hotspot in hotspots:
+            if hotspot["id"] in pages:
+                try:
+                    hotspot["dashboard_page"] = int(pages[hotspot["id"]])
+                    changed = True
+                except (TypeError, ValueError):
+                    pass
+        if changed:
+            save_hotspots(hotspots)
     return jsonify({"ok": True})
 
 @app.route("/api/delete_hotspot/<hotspot_id>", methods=["POST"])

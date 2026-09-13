@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.60 "Cipollina"</span>
+                <span class="release-version">v4.61 "Gaye"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fixed: hotspot card order not saving</span> — dragging a hotspot's position in Settings → Cards could silently fail to persist (a concurrent-write race between two settings calls fired by the same save). Reordering hotspots now always sticks</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.60 "Cipollina"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Hotspot Status card renamed</span> — "Fleet Status"/"Fleet Activity" are now "Hotspot Status"/"Hotspot Activity" on the dashboard and in Settings → Cards</li>

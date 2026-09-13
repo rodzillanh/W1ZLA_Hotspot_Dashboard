@@ -118,6 +118,36 @@ def settings_transaction():
         yield
 
 
+@contextlib.contextmanager
+def hotspots_transaction():
+    """The exact same race as settings_transaction() above, for
+    hotspots.json instead of settings.json -- confirmed live as a real,
+    reported bug ("the YSF hotspot's card order can't be changed on the
+    dashboard"): setup.html's saveCardOrder() fires /api/reorder_hotspots
+    and /api/set_hotspot_pages CONCURRENTLY (one Promise.all(), added in
+    v4.58 for the second dashboard tab) -- both routes did their own
+    unprotected load_hotspots()/save_hotspots() sequence, so either could
+    read hotspots.json before the other had written back, then overwrite
+    the other's change wholesale when it saved. Reproduced live: a
+    simulated drag-reorder's /api/reorder_hotspots call carried the
+    correct new order, but hotspots.json on disk still showed the OLD
+    order afterward -- /api/set_hotspot_pages had read the stale file
+    and clobbered it on save. Uses the SAME `_file_lock` as
+    settings_transaction() (one RLock guards every flat-JSON-file
+    read/write in this module already) -- reentrant, so
+    load_hotspots()/save_hotspots() called from inside this block don't
+    deadlock, while a different thread's transaction blocks until this
+    one exits. Same usage shape as settings_transaction():
+
+        with hotspots_transaction():
+            hotspots = load_hotspots()
+            ...
+            save_hotspots(hotspots)
+    """
+    with _file_lock:
+        yield
+
+
 # --- favorites ---
 
 def load_favorites() -> list:

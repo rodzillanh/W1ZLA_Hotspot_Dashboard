@@ -6555,6 +6555,46 @@ config for per-integration credentials; put it in
     drawer correctly reinserts the hotspot at its saved position rather
     than appending it at the end.
 
+- **A real, reported bug: "the YSF hotspot's card order can't be changed
+  on the dashboard" -- a concurrent-write race on `hotspots.json`,
+  structurally identical to the `settings.json` race documented above
+  (the `card_order_tiebreak`/`_file_lock` saga) but never fixed for
+  hotspots when the Second Dashboard Tab (v4.58) introduced a second
+  concurrent writer.** `setup.html`'s `saveCardOrder()` fires
+  `/api/reorder_hotspots` and `/api/set_hotspot_pages` in the SAME
+  `Promise.all()` -- genuinely concurrent from the server's point of
+  view. Both routes did their own unprotected `load_hotspots()` /
+  `save_hotspots()` sequence with no lock spanning the whole thing (only
+  each individual read and each individual write were locked, same gap
+  the settings.json fix already found and closed for that file). Two
+  concurrent requests could each read the same stale hotspots.json
+  before either wrote back; whichever wrote LAST won and silently
+  discarded the other's change wholesale -- not just conflicting fields.
+  **Confirmed by directly reproducing it, not by inspection**: a live
+  Playwright test simulated dragging a hotspot's row in the Cards tab
+  (DOM reorder + `saveCardOrder()`), confirmed `/api/reorder_hotspots`
+  carried the correct new order, then reloaded the real dashboard and
+  found the OLD order still on disk -- `/api/set_hotspot_pages` (which
+  `saveCardOrder()` fires unconditionally for every hotspot, whether or
+  not its page actually changed) had read the stale file first and
+  clobbered the reorder on save. This affected reordering ANY hotspot,
+  not something specific to YSF -- the user just happened to notice it on
+  their YSF-enabled hotspot first. Fixed with `storage.hotspots_transaction()`
+  (an exact copy of `settings_transaction()`'s shape, reusing the SAME
+  `_file_lock` RLock -- one lock already guards every flat-JSON-file
+  read/write in `storage.py`), wrapping both routes' full load-modify-save
+  sequence. Verified two ways: re-ran the exact reproduction scenario and
+  confirmed the dashboard now shows the reordered list; then a dedicated
+  10-trial stress test firing both routes concurrently via real threads
+  against a live `test_client()` confirmed both the reorder AND the page
+  assignment survive every single trial (0/10 lost writes, matching the
+  10/10 success rate the original settings.json fix achieved). **If
+  another route is ever added that writes `hotspots.json` and could fire
+  concurrently with either of these two** (from the same user action,
+  the way `saveCardOrder()` fires both), wrap it in
+  `hotspots_transaction()` too -- this fix only covers the two routes
+  known to race today, not every possible future writer.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
