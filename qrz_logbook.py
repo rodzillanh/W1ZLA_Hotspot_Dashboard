@@ -58,6 +58,13 @@ Notifications event ("confirmed contact") fires per QSO that actually
 flips, never for one pulled in already-confirmed (surface a transition,
 not a state -- same rule as monitor.py's fleet events /
 hf_conditions.py's solar alerts).
+
+insert_qso() (v4.74, QRZ Quick Log card) is the write-side counterpart --
+KEY=<key>&ACTION=INSERT&ADIF=<record>&OPTION=REPLACE. UNLIKE the read
+side above, this has NOT been verified against a real logbook -- built
+from QRZ's documented API only. Re-verify with one real submit against
+a live account before trusting it in production, same "verify against
+the real thing" discipline as everywhere else in this project.
 """
 import datetime
 import html
@@ -257,6 +264,45 @@ class QrzLogbookClient:
         finally:
             self._sync_lock.release()
 
+    def insert_qso(self, fields: dict) -> dict:
+        """Submits one new QSO via QRZ's ACTION=INSERT -- the write-side
+        counterpart of this module's read-only sync, added for the QRZ
+        Quick Log card. UNLIKE every other method in this class, this is
+        NOT verified against a real logbook -- the read side (STATUS/
+        FETCH) was confirmed live 2026-09 (see this module's own
+        docstring), but INSERT was built from QRZ's documented API only.
+        Uses the SAME qrz_logbook_api_key as the read-side sync (QRZ's
+        Logbook API key is per-logbook, not per-action) -- gated on the
+        key being present, deliberately NOT on qrz_logbook_enabled (the
+        background-sync toggle), since submitting one QSO by hand is a
+        distinct user action from opting into historical sync.
+
+        `fields` is ADIF tag -> value (see _ADIF_INSERT_FIELDS) --
+        CALL/QSO_DATE/TIME_ON/BAND/MODE are the ones QRZ actually
+        requires; the caller (app.py's /api/qrz_quick_log) is responsible
+        for filling in date/time and validating CALL is non-blank.
+        `OPTION=REPLACE` tells QRZ to overwrite rather than reject an
+        exact duplicate (same station/band/mode/date/time) instead of
+        erroring -- harmless for a genuinely new QSO, and avoids a
+        confusing "duplicate" failure if the same submit is retried after
+        a network hiccup that actually succeeded server-side.
+
+        Raises RuntimeError on any QRZ-reported failure -- this is a
+        direct, interactive user action (not the background sync loop),
+        so the caller is expected to catch it and show the message,
+        rather than have it swallowed the way sync() swallows its own."""
+        with self._lock:
+            key = self._api_key
+        if not key:
+            raise RuntimeError("No QRZ Logbook API key configured (Settings -> Integrations)")
+        adif = _build_adif_record(fields)
+        body = urllib.parse.urlencode({
+            "KEY": key, "ACTION": "INSERT", "ADIF": adif, "OPTION": "REPLACE",
+        })
+        data = _parse_response(_post(body))
+        self._raise_for_result(data)
+        return {"logid": _int_or_none(data.get("LOGID")), "count": _int_or_none(data.get("COUNT"))}
+
     # --- internals ---
 
     def _fetch_status(self, key: str) -> dict:
@@ -423,6 +469,33 @@ class QrzLogbookClient:
             data["ADIF"] = data.get("ADIF", "")
             return
         raise RuntimeError(f"QRZ Logbook error: {result or 'no RESULT'} -- {reason}")
+
+
+# ADIF fields the QRZ Quick Log card can supply for an INSERT, in the
+# order written to the record. Not exhaustive of ADIF -- just what the
+# card's own form collects. TX_PWR is ADIF's own tag name for transmit
+# power in watts (confirmed against the ADIF spec, not guessed).
+_ADIF_INSERT_FIELDS = (
+    "CALL", "QSO_DATE", "TIME_ON", "BAND", "MODE",
+    "RST_SENT", "RST_RCVD", "FREQ", "TX_PWR", "COMMENT",
+    "STATION_CALLSIGN", "GRIDSQUARE",
+)
+
+
+def _build_adif_record(fields: dict) -> str:
+    """<TAG:LEN>VALUE ... <EOR> -- plain ADIF encoding, no escaping needed
+    since every value here is a short operator-typed field, not free text
+    containing '<'/'>' (which is the one thing that would need escaping
+    in real ADIF)."""
+    parts = []
+    for tag in _ADIF_INSERT_FIELDS:
+        val = fields.get(tag)
+        if val in (None, ""):
+            continue
+        val = str(val)
+        parts.append(f"<{tag}:{len(val)}>{val}")
+    parts.append("<EOR>")
+    return " ".join(parts)
 
 
 def _int_or_none(v):

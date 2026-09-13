@@ -637,7 +637,7 @@
            precedent for a scrolling fixed-size list like this one. */
         .fs-count { font-size: 11px; font-family: var(--font-mono); color: var(--text-dim); font-weight: 400; }
         .fs-list {
-            max-height: 340px; overflow-y: auto; overflow-x: hidden;
+            max-height: 292px; overflow-y: auto; overflow-x: hidden;
             /* A little breathing room from the scrollbar itself -- with
                zero right padding, a row's right-aligned text (fs-activity/
                fs-health) sat flush against the thumb the instant a
@@ -1366,18 +1366,27 @@
             border-radius: 7px; color: var(--text-dim); font: inherit; font-size: 11px; padding: 3px 9px;
             cursor: pointer; }
         .pota-gear:hover { color: var(--text); border-color: var(--text-muted); }
-        .pota-glance { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted);
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .02em;
-            margin-top: 8px; cursor: pointer; }
-        .pota-glance:hover { color: var(--text-dim); }
-        .pota-glance b { color: var(--text-dim); font-weight: 600; }
-        .spots-filter-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+        /* .pota-glance (the old always-visible hunter-stats line) was
+           retired in v4.73 -- that summary now lives in the ⚙ Stats
+           button's title tooltip instead (see the gearBtn.title logic
+           in renderPotaCard()), saving a full row's height on a card
+           that was getting noticeably taller than this app's other
+           list cards. */
+        .spots-filter-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
         .spots-filter-chip { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; padding: 3px 9px;
             border-radius: 20px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text-muted);
             cursor: pointer; user-select: none; }
         .spots-filter-chip .n { color: var(--text-dim); margin-left: 3px; }
         .spots-filter-chip.active { background: var(--live-dim); border-color: color-mix(in srgb, var(--live) 45%, var(--border)); color: var(--live); }
         .spots-filter-chip.active .n { color: var(--live); }
+        /* The sort/band-filter <select> used to live in the separate
+           .pota-controls row (a shared class also used by HF Favorites --
+           left untouched there) -- merged onto this same filter-chip row
+           for Spots specifically (v4.73), so it needs its own matching
+           select styling here instead. */
+        .spots-filter-row select { background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border);
+            border-radius: 6px; font: inherit; font-size: 10.5px; padding: 2px 6px; letter-spacing: 0;
+            text-transform: none; cursor: pointer; margin-left: auto; }
         .src-tag { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .04em;
             color: var(--text-dim); background: var(--panel-2); border: 1px solid var(--border-soft);
             border-radius: 4px; padding: 1px 5px; }
@@ -1389,7 +1398,7 @@
         .pota-controls select { background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border);
             border-radius: 6px; font: inherit; font-size: 10.5px; padding: 2px 6px; letter-spacing: 0;
             text-transform: none; cursor: pointer; }
-        .pota-spots { display: flex; flex-direction: column; height: 300px; overflow-y: auto;
+        .pota-spots { display: flex; flex-direction: column; height: 200px; overflow-y: auto;
             margin: 8px -4px 0; padding: 0 4px; scrollbar-width: thin;
             scrollbar-color: var(--border) transparent; }
         .pota-spots::-webkit-scrollbar { width: 8px; }
@@ -1487,7 +1496,11 @@
         .hf-rig-pill.live { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); }
         .hf-rig-pill.live .d { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
         .hf-rig-pill b { color: var(--live); font-weight: 600; }
-        .hf-fav-list { display: flex; flex-direction: column; height: 300px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+        /* Trimmed from 300px (v4.74, mockup-approved height pass) --
+           confirmed live: still shows 3 full band groups plus the
+           start of a 4th before scrolling, down from ~427px total to
+           ~367px for the card as a whole. */
+        .hf-fav-list { display: flex; flex-direction: column; height: 240px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
         .hf-fav-list::-webkit-scrollbar { width: 8px; }
         .hf-fav-list::-webkit-scrollbar-track { background: transparent; }
         .hf-fav-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
@@ -1634,6 +1647,55 @@
         .rp-raw-row .rk { color: var(--text-muted); }
         .rp-raw-row .rv { color: var(--text-dim); word-break: break-all; }
 
+        /* --- QRZ Quick Log card --- these two overrides + every .ql-*
+           spacing value below are the exact mockup-approved trim
+           (Mockups/qrz-quick-log-card.html, measured live at 307px/306px)
+           -- scoped to this card's own id rather than changing
+           .metrics-card/.metrics-header globally. */
+        #qrz-quick-log-card { padding: 16px 20px; }
+        #qrz-quick-log-card .metrics-header { margin-bottom: 6px; }
+        .ql-freq-row { display: flex; align-items: baseline; justify-content: space-between;
+            padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--card-border); }
+        .ql-freq { font-family: var(--font-mono); font-size: 20px; font-weight: 600; color: var(--text); }
+        .ql-freq small { font-size: 12px; color: var(--text-dim); }
+        .ql-meta { display: flex; gap: 6px; align-items: center; }
+        .ql-chip { font-family: var(--font-mono); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px;
+            background: var(--panel-2); border: 1px solid var(--border); color: var(--text-muted); }
+        .ql-match {
+            display: flex; align-items: center; gap: 7px; padding: 5px 9px; border-radius: 7px;
+            background: color-mix(in srgb, var(--live) 9%, transparent); border: 1px solid color-mix(in srgb, var(--live) 40%, var(--border));
+            margin-bottom: 6px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .ql-match .ic { color: var(--live); font-size: 13px; line-height: 1; flex-shrink: 0; }
+        .ql-match b { font-family: var(--font-mono); color: var(--text); }
+        .ql-match .src-tag { font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--text-dim);
+            background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 4px; padding: 1px 5px; flex-shrink: 0; }
+        .ql-match .dim { color: var(--text-muted); }
+        .ql-nomatch {
+            display: flex; align-items: center; gap: 8px; padding: 5px 9px; border-radius: 7px;
+            background: var(--panel-2); border: 1px dashed var(--border); margin-bottom: 6px;
+            font-size: 11px; color: var(--text-muted);
+        }
+        .ql-field { margin-bottom: 5px; }
+        .ql-field label { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 2px; }
+        .ql-field input {
+            width: 100%; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+            color: var(--text); font-family: var(--font-mono); font-size: 12.5px; padding: 5px 8px;
+        }
+        .ql-field input.auto { border-color: color-mix(in srgb, var(--live) 40%, var(--border)); color: var(--live); }
+        .ql-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .ql-submit {
+            width: 100%; appearance: none; font: inherit; font-weight: 600; font-size: 13px;
+            padding: 7px; border-radius: 8px; cursor: pointer; margin-top: 3px;
+            border: 1px solid color-mix(in srgb, var(--live) 45%, var(--border)); color: var(--live);
+            background: color-mix(in srgb, var(--live) 10%, transparent);
+        }
+        .ql-submit:hover { background: color-mix(in srgb, var(--live) 20%, transparent); border-color: var(--live); }
+        .ql-submit:disabled { opacity: .55; cursor: default; }
+        .ql-submit.pending { color: var(--caution); border-color: color-mix(in srgb, var(--caution) 45%, var(--border)); background: color-mix(in srgb, var(--caution) 10%, transparent); }
+        .ql-submit.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); background: color-mix(in srgb, var(--good) 10%, transparent); }
+        .ql-submit.err { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+
         /* --- HamAlert card --- */
         .ha-badge {
             font-size: 10px; font-weight: 600; letter-spacing: .3px; padding: 1px 7px; border-radius: 9px;
@@ -1727,7 +1789,11 @@
            already used on .fs-list/#rc-scroll elsewhere in this file. */
         .qs-bb-wrap {
             padding-top: 10px; border-top: 1px solid var(--card-border);
-            max-height: 190px; overflow-y: auto; overflow-x: hidden;
+            /* Trimmed from 190px (v4.73, mockup-approved height pass) --
+               shows ~3 bands before scrolling instead of ~5. Still every
+               band you've worked, just more of them live below the fold
+               of this scroll region than before. */
+            max-height: 130px; overflow-y: auto; overflow-x: hidden;
             padding-right: 8px; margin-right: -8px;
             scrollbar-width: thin; scrollbar-color: var(--card-border) transparent;
             display: flex; flex-direction: column; gap: 9px;
@@ -1741,13 +1807,17 @@
         .qs-bb-total { color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; }
         .qs-bb-modes { font-size: 11px; color: var(--text-muted); padding-left: 2px; }
         .qs-bb-modes b { color: var(--text); font-weight: 500; }
-        .qs-spark-wrap { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-border); }
+        /* Sparkline block tightened in the same v4.73 height pass:
+           46px bars -> 26px, margins/padding 12px -> 8px, head's own
+           margin-bottom 8px -> 5px. Still shows the full 14-day trend,
+           just less dominant relative to the per-band breakdown above it. */
+        .qs-spark-wrap { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--card-border); }
         .qs-spark-head {
             display: flex; justify-content: space-between; align-items: baseline;
-            font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 8px;
+            font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 5px;
         }
         .qs-spark-head span:last-child { text-transform: none; color: var(--text-dim); font-size: 11px; letter-spacing: 0; }
-        .qs-spark-bars { display: flex; align-items: flex-end; gap: 3px; height: 46px; }
+        .qs-spark-bars { display: flex; align-items: flex-end; gap: 3px; height: 26px; }
         .qs-spark-bar { flex: 1; background: var(--live-dim); border-radius: 2px 2px 0 0; min-height: 1px; }
         .qs-spark-bar.today { background: var(--live); }
         .hf-source a { color: var(--text-dim); }
@@ -3251,11 +3321,15 @@
                     {% if settings.get('rig_control_enabled', False) %}
                     <span class="pota-rig-pill" id="pota-rig-pill" title="Rig control via rigctld"><span class="d"></span><span id="pota-rig-pill-txt">rig</span></span>
                     {% endif %}
-                    <button class="pota-gear" type="button" onclick="openPotaDrawer()">⚙ Stats</button>
+                    <!-- Hunter glance stats (parks/QSOs/awards) used to be
+                         their own always-visible row -- moved to this
+                         button's title tooltip (v4.73, mockup-approved
+                         height trim) so the info isn't lost, just not
+                         spending vertical space when you're not looking
+                         at it. See fillPotaGlanceTooltip() in JS. -->
+                    <button class="pota-gear" type="button" id="pota-gear-btn" onclick="openPotaDrawer()">⚙ Stats</button>
                 </div>
             </div>
-            <div class="pota-glance" id="pota-glance" role="button" tabindex="0"
-                 onclick="openPotaDrawer()">—</div>
             <div class="spots-filter-row">
                 <span class="spots-filter-chip active" id="spots-chip-pota" onclick="toggleSpotsFilter('pota')">POTA<span class="n" id="spots-n-pota"></span></span>
                 <span class="spots-filter-chip active" id="spots-chip-sota" onclick="toggleSpotsFilter('sota')">SOTA<span class="n" id="spots-n-sota"></span></span>
@@ -3265,9 +3339,6 @@
                 {% if settings.get('dxcluster_enabled', False) %}
                 <span class="spots-filter-chip" id="spots-chip-dx" onclick="toggleSpotsFilter('dx')">DX<span class="n" id="spots-n-dx">off</span></span>
                 {% endif %}
-            </div>
-            <div class="pota-controls">
-                <span class="pota-cnt">Spots <b id="pota-cnt">—</b><span id="pota-newcnt"></span></span>
                 <select id="pota-sort" onchange="renderPotaCard()">
                     <option value="smart">Smart rank</option>
                     <option value="new">New parks only</option>
@@ -3329,6 +3400,40 @@
             <div class="rp-body" id="rp-body">
                 <div class="rp-empty" id="rp-empty">Waiting for the rig…</div>
             </div>
+        </div>
+        {% endif %}
+        {% if settings.get('show_qrz_quick_log', False) %}
+        <div class="metrics-card" id="qrz-quick-log-card"
+             style="order:{{ settings.get('qrz_quick_log_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">📝 Quick Log</div>
+                <span class="rp-pill" id="ql-pill"><span class="d"></span>QRZ</span>
+            </div>
+            <div class="ql-freq-row">
+                <div class="ql-freq" id="ql-freq">—</div>
+                <div class="ql-meta" id="ql-meta"></div>
+            </div>
+            <div id="ql-match-slot"></div>
+            <div class="ql-field">
+                <label>Callsign</label>
+                <input id="ql-call" autocomplete="off" placeholder="type callsign" oninput="qlClearAuto('ql-call')">
+            </div>
+            <div class="ql-row2">
+                <div class="ql-field">
+                    <label>RST sent</label>
+                    <input id="ql-rst-sent" autocomplete="off">
+                </div>
+                <div class="ql-field">
+                    <label>RST rcvd</label>
+                    <input id="ql-rst-rcvd" autocomplete="off">
+                </div>
+            </div>
+            <div class="ql-field">
+                <label>Comment</label>
+                <input id="ql-comment" autocomplete="off" placeholder="optional" oninput="qlClearAuto('ql-comment')">
+            </div>
+            <button class="ql-submit" id="ql-submit-btn" type="button" onclick="qlSubmit()" disabled
+                    title="Logs to QRZ, then adds it to Recent Contacts too">📤 Log to QRZ</button>
         </div>
         {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
@@ -3879,6 +3984,7 @@ const TOP_ACTIVITY_PAGE      = {{ settings.get('top_activity_page', 1) }};
 const POTA_PAGE              = {{ settings.get('pota_page', 1) }};
 const HF_FAVORITES_PAGE      = {{ settings.get('hf_favorites_page', 1) }};
 const RIG_PANEL_PAGE         = {{ settings.get('rig_panel_page', 1) }};
+const QRZ_QUICK_LOG_PAGE     = {{ settings.get('qrz_quick_log_page', 1) }};
 const DVSWITCH_PAGE          = {{ settings.get('dvswitch_page', 1) }};
 const DASHBOARD2_NAME        = {{ settings.get('dashboard2_name', 'Dashboard 2') | tojson }};
 // Whether the "Dashboard 2" tab even appears -- presence-derived (any
@@ -3976,6 +4082,8 @@ const HF_FAV_FILTER_KEY = 'w1zla_hf_fav_filter';
 const SHOW_RIG_PANEL = {{ 'true' if settings.get('show_rig_panel', False) else 'false' }};
 const RIG_PANEL_POSITION = {{ settings.get('rig_panel_position', 0) }};
 const RIG_PANEL_POLL_MS = 1000;
+const SHOW_QRZ_QUICK_LOG = {{ 'true' if settings.get('show_qrz_quick_log', False) else 'false' }};
+const QRZ_QUICK_LOG_POSITION = {{ settings.get('qrz_quick_log_position', 0) }};
 const POTA_POLL_MS = 20000;  // matches pota.py's spot cache TTL
 const SOTA_CARD_POLL_MS = 120000;  // matches sota.py's CACHE_TTL, same as the map overlay's own interval
 const RBN_ENABLED = {{ 'true' if settings.get('rbn_enabled', False) else 'false' }};
@@ -4554,7 +4662,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     flightsoverhead: '__flights_overhead__',
     recentcontacts: '__recent_contacts__', qsostats: '__qso_stats__',
     topactivity: '__top_activity__', pota: '__pota__', dvswitch: '__dvswitch__',
-    hffav: '__hf_favorites__', rigpanel: '__rig_panel__',
+    hffav: '__hf_favorites__', rigpanel: '__rig_panel__', qrzquicklog: '__qrz_quick_log__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -4758,10 +4866,13 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (SHOW_RIG_PANEL && RIG_PANEL_PAGE === page) {
         sentinels.push({ key: 'rigpanel', pos: Math.max(0, RIG_PANEL_POSITION) });
     }
+    if (SHOW_QRZ_QUICK_LOG && QRZ_QUICK_LOG_PAGE === page) {
+        sentinels.push({ key: 'qrzquicklog', pos: Math.max(0, QRZ_QUICK_LOG_POSITION) });
+    }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, hfcond, bandplan,
     // licensequiz, wspractivity, digipi, bigclock, notifications, satellites,
-    // recentcontacts, qsostats, topactivity, pota, hffav, rigpanel, THEN cameras), since
+    // recentcontacts, qsostats, topactivity, pota, hffav, rigpanel, qrzquicklog, THEN cameras), since
     // computeCardOrders() below now relies on a stable sort to break ties
     // by insertion order, not by an independent alphabetical rule. Two
     // sentinels can easily tie on position (e.g. right after enabling
@@ -4835,6 +4946,8 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (hfFavCard && 'hffav' in sentinelOrders) { moveIfNeeded(hfFavCard, cardsOuter); hfFavCard.style.order = sentinelOrders.hffav; }
     const rigPanelCard = document.getElementById('rig-panel-card');
     if (rigPanelCard && 'rigpanel' in sentinelOrders) { moveIfNeeded(rigPanelCard, cardsOuter); rigPanelCard.style.order = sentinelOrders.rigpanel; }
+    const qrzQuickLogCard = document.getElementById('qrz-quick-log-card');
+    if (qrzQuickLogCard && 'qrzquicklog' in sentinelOrders) { moveIfNeeded(qrzQuickLogCard, cardsOuter); qrzQuickLogCard.style.order = sentinelOrders.qrzquicklog; }
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -9038,21 +9151,27 @@ function renderPotaCard() {
         firehoseList = firehoseList.slice(0, RBN_MAX_ROWS);
     }
 
-    const newCount = potaSpots.filter(s => s.new_to_you).length;
-    document.getElementById('pota-cnt').textContent = hunterList.length + firehoseList.length;
-    document.getElementById('pota-newcnt').innerHTML = newCount
-        ? ` <span class="pota-newn">· ${newCount} new</span>` : '';
+    // v4.73: the "Spots N · N new" summary line was dropped when this
+    // card was trimmed for height -- each filter chip's own count
+    // already conveys volume, and the per-row "NEW" tag already flags
+    // individual new-to-you parks, so the aggregate text was redundant.
 
+    // The hunter glance ("21 parks · 24 Q · 3 awards...") moved from an
+    // always-visible row into this button's title tooltip in the same
+    // height-trim pass -- plain text only (a title attribute can't hold
+    // HTML), so no <b> tags here the way the old innerHTML version had.
     const h = potaData ? potaData.hunter : null;
-    const glance = document.getElementById('pota-glance');
-    if (h) {
-        const last = (h.recent_hunts && h.recent_hunts[0]) ? h.recent_hunts[0].reference : null;
-        glance.innerHTML = `<b>${h.parks ?? '—'}</b> parks · <b>${h.qsos ?? '—'}</b> Q · <b>${h.awards ?? '—'}</b> awards`
-            + (last ? ` · last ${escapeHtml(last)}` : '');
-    } else if (potaData) {
-        glance.innerHTML = potaData.has_callsign
-            ? 'Hunter stats unavailable right now'
-            : 'Set your callsign in Settings → Integrations for hunter stats';
+    const gearBtn = document.getElementById('pota-gear-btn');
+    if (gearBtn) {
+        if (h) {
+            const last = (h.recent_hunts && h.recent_hunts[0]) ? h.recent_hunts[0].reference : null;
+            gearBtn.title = `${h.parks ?? '—'} parks · ${h.qsos ?? '—'} Q · ${h.awards ?? '—'} awards`
+                + (last ? ` · last ${last}` : '');
+        } else if (potaData) {
+            gearBtn.title = potaData.has_callsign
+                ? 'Hunter stats unavailable right now'
+                : 'Set your callsign in Settings → Integrations for hunter stats';
+        }
     }
 
     const emptyEl = document.getElementById('pota-empty');
@@ -9661,16 +9780,202 @@ function openRigPanelDrawer() {
 }
 
 function fetchRigPanel() {
-    if (!SHOW_RIG_PANEL) return;
+    // Quick Log needs the same live freq/mode/power snapshot even when
+    // the Rig Panel card itself is hidden -- app.py's _rebuild_rig_panel()
+    // keeps the poller itself running in that case too.
+    if (!SHOW_RIG_PANEL && !SHOW_QRZ_QUICK_LOG) return;
     fetch('/api/rig_panel').then(r => r.json()).then(data => {
         rigPanelData = data;
         renderRigPanelCard();
         renderRigPanelDrawer();
+        renderQuickLogCard();
     }).catch(() => {});
 }
-if (SHOW_RIG_PANEL) {
+if (SHOW_RIG_PANEL || SHOW_QRZ_QUICK_LOG) {
     fetchRigPanel();
     setInterval(fetchRigPanel, RIG_PANEL_POLL_MS);
+}
+
+// --- QRZ Quick Log card ---
+// Cross-references the rig's live dial frequency against the SAME
+// POTA/SOTA/RBN/DX cluster arrays the Spots card already polls -- no
+// second fetch, just a client-side merge into one unified shape.
+function qlAllSpots() {
+    let list = [];
+    const potaSpots = (potaData && potaData.spots) || [];
+    list = list.concat(potaSpots.map(s => ({
+        call: s.activator, freq_hz: s.freq_hz, source: 'POTA',
+        reference: s.reference, park_name: s.park_name,
+    })));
+    const sotaRaw = (sotaCardData && sotaCardData.spots) || [];
+    const qthLat = potaData ? potaData.qth_lat : null;
+    const qthLon = potaData ? potaData.qth_lon : null;
+    list = list.concat(sotaRaw.map(s => sotaToPotaShape(s, qthLat, qthLon)).map(s => ({
+        call: s.activator, freq_hz: s.freq_hz, source: 'SOTA',
+        reference: s.reference, park_name: s.park_name,
+    })));
+    const rbnSpots = (rbnCardData && rbnCardData.spots) || [];
+    list = list.concat(rbnSpots.map(s => ({ call: s.call, freq_hz: s.freq_hz, source: 'RBN' })));
+    const dxSpots = (dxCardData && dxCardData.spots) || [];
+    list = list.concat(dxSpots.map(s => ({ call: s.call, freq_hz: s.freq_hz, source: 'DX' })));
+    return list.filter(s => s.call && s.freq_hz);
+}
+
+// Mode-dependent match tolerance -- a real, disclosed limitation, not
+// just a tuning knob: FT8/FT4 use ONE fixed dial frequency per band for
+// EVERY simultaneous QSO (the actual per-QSO audio offset isn't in any
+// spot feed here), so a tight window there only narrows things down to
+// "someone active on this channel," not a specific station -- the
+// closest-match tiebreak below is a best-effort heuristic, disclosed via
+// the match banner's own tooltip, not a precise identification. CW/SSB/
+// RTTY operators tune to QSO-specific frequencies, so a tight window
+// there is a much stronger signal.
+const QL_MATCH_TOLERANCE_HZ = { FT8: 100, FT4: 100, JS8: 100, MSK144: 200 };
+const QL_MATCH_TOLERANCE_DEFAULT_HZ = 1500;
+
+function qlFindSpotMatch(freqHz, mode) {
+    if (!freqHz) return null;
+    const tol = QL_MATCH_TOLERANCE_HZ[(mode || '').toUpperCase()] || QL_MATCH_TOLERANCE_DEFAULT_HZ;
+    let best = null, bestDelta = Infinity;
+    qlAllSpots().forEach(s => {
+        const delta = Math.abs(s.freq_hz - freqHz);
+        if (delta <= tol && delta < bestDelta) { best = s; bestDelta = delta; }
+    });
+    return best;
+}
+
+// Tracks which fields are currently auto-filled from a spot match, so a
+// fresh match doesn't stomp something the operator already typed by hand
+// -- clearing an auto-filled field (typing in it) drops its "auto" flag
+// so a later render never overwrites the manual edit.
+let qlAuto = { call: false, comment: false };
+function qlClearAuto(id) {
+    const key = id === 'ql-call' ? 'call' : 'comment';
+    qlAuto[key] = false;
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('auto');
+}
+
+function renderQuickLogCard() {
+    const card = document.getElementById('qrz-quick-log-card');
+    if (!card || !rigPanelData) return;
+    const r = rigPanelData;
+    const pill = document.getElementById('ql-pill');
+    if (pill) pill.classList.toggle('live', !!r.reachable);
+    const freqEl = document.getElementById('ql-freq');
+    const metaEl = document.getElementById('ql-meta');
+    const slot = document.getElementById('ql-match-slot');
+    const callInput = document.getElementById('ql-call');
+    const commentInput = document.getElementById('ql-comment');
+    const submitBtn = document.getElementById('ql-submit-btn');
+    if (!freqEl || !metaEl || !slot || !callInput || !commentInput || !submitBtn) return;
+
+    if (!r.reachable || !r.freq_hz) {
+        freqEl.textContent = '—';
+        metaEl.innerHTML = '';
+        slot.innerHTML = '<div class="ql-nomatch">Waiting for the rig…</div>';
+        submitBtn.disabled = true;
+        return;
+    }
+
+    const mhzStr = (r.freq_hz / 1e6).toFixed(6);
+    const dotIdx = mhzStr.indexOf('.');
+    freqEl.innerHTML = `${mhzStr.slice(0, dotIdx + 4)}<small>${mhzStr.slice(dotIdx + 4)}</small>`;
+    let metaHtml = '';
+    if (r.band) metaHtml += `<span class="ql-chip">${escapeHtml(r.band)}</span>`;
+    if (r.mode) metaHtml += `<span class="ql-chip">${escapeHtml(r.mode)}</span>`;
+    if (r.power_w != null) metaHtml += `<span class="ql-chip">${Math.round(r.power_w)}W</span>`;
+    metaEl.innerHTML = metaHtml;
+
+    const match = qlFindSpotMatch(r.freq_hz, r.mode);
+    if (match) {
+        const isPark = match.source === 'POTA' || match.source === 'SOTA';
+        const detail = isPark
+            ? `— ${escapeHtml(match.reference || '')}${match.park_name ? ', ' + escapeHtml(match.park_name) : ''}`
+            : '';
+        slot.innerHTML = `<div class="ql-match" title="Best-effort match within your mode's typical tuning tolerance — FT8/FT4 share one dial frequency for every QSO on the channel, so this narrows things down rather than uniquely identifying a station. Edit freely.">
+            <span class="ic">🎯</span><span class="src-tag">${match.source}</span><b>${escapeHtml(match.call)}</b>${detail ? '<span class="dim">' + detail + '</span>' : ''}
+        </div>`;
+        if (qlAuto.call || !callInput.value) {
+            callInput.value = match.call;
+            callInput.classList.add('auto');
+            qlAuto.call = true;
+        }
+        if (isPark && (qlAuto.comment || !commentInput.value)) {
+            commentInput.value = `${match.source} ${match.reference || ''}${match.park_name ? ' ' + match.park_name : ''}`.trim();
+            commentInput.title = 'Auto-filled from the spot match — edit or clear freely';
+            commentInput.classList.add('auto');
+            qlAuto.comment = true;
+        }
+    } else {
+        slot.innerHTML = '<div class="ql-nomatch">No spot matches this frequency — enter the callsign manually.</div>';
+        if (qlAuto.call) { callInput.value = ''; callInput.classList.remove('auto'); qlAuto.call = false; }
+        if (qlAuto.comment) { commentInput.value = ''; commentInput.classList.remove('auto'); qlAuto.comment = false; commentInput.removeAttribute('title'); }
+    }
+
+    // Digital modes report a dB-style signal report (-01..-30ish, WSJT-X
+    // convention); phone/CW use the classic 3-digit RST -- placeholder
+    // only, never overwrites something already typed.
+    const isDigital = /^(FT8|FT4|JS8|MSK144|JT65|JT9|FST4)/i.test(r.mode || '');
+    const rstSentEl = document.getElementById('ql-rst-sent');
+    const rstRcvdEl = document.getElementById('ql-rst-rcvd');
+    if (rstSentEl) rstSentEl.placeholder = isDigital ? '-12' : '599';
+    if (rstRcvdEl) rstRcvdEl.placeholder = isDigital ? '-08' : '599';
+
+    submitBtn.disabled = false;
+}
+
+function qlSubmit() {
+    const btn = document.getElementById('ql-submit-btn');
+    if (!btn || btn.classList.contains('pending')) return;
+    const callInput = document.getElementById('ql-call');
+    const call = (callInput.value || '').trim().toUpperCase();
+    if (!call) { rigToast('Enter a callsign first', 'err'); return; }
+    const r = rigPanelData || {};
+    const body = {
+        call,
+        band: r.band || '',
+        mode: r.mode || '',
+        freq_hz: r.freq_hz || null,
+        power_w: r.power_w != null ? r.power_w : null,
+        rst_sent: (document.getElementById('ql-rst-sent').value || '').trim(),
+        rst_rcvd: (document.getElementById('ql-rst-rcvd').value || '').trim(),
+        comment: (document.getElementById('ql-comment').value || '').trim(),
+    };
+    btn.classList.remove('ok', 'err');
+    btn.classList.add('pending');
+    btn.disabled = true;
+    btn.textContent = '📤 Logging…';
+    fetch('/api/qrz_quick_log', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }).then(r => r.json()).then(data => {
+        btn.classList.remove('pending');
+        btn.disabled = false;
+        if (data.success) {
+            btn.classList.add('ok');
+            btn.textContent = '✓ Logged';
+            rigToast(`Logged ${call} to QRZ`, 'ok');
+            callInput.value = '';
+            document.getElementById('ql-rst-sent').value = '';
+            document.getElementById('ql-rst-rcvd').value = '';
+            document.getElementById('ql-comment').value = '';
+            qlAuto = { call: false, comment: false };
+            fetchQsos();
+            setTimeout(() => { btn.classList.remove('ok'); btn.textContent = '📤 Log to QRZ'; }, 2500);
+        } else {
+            btn.classList.add('err');
+            btn.textContent = '⚠ Failed';
+            rigToast(data.message || 'QRZ logging failed', 'err');
+            setTimeout(() => { btn.classList.remove('err'); btn.textContent = '📤 Log to QRZ'; }, 3200);
+        }
+    }).catch(() => {
+        btn.classList.remove('pending');
+        btn.disabled = false;
+        btn.classList.add('err');
+        btn.textContent = '⚠ Failed';
+        rigToast('Network error', 'err');
+        setTimeout(() => { btn.classList.remove('err'); btn.textContent = '📤 Log to QRZ'; }, 3200);
+    });
 }
 
 function handleAdifFile(file) {

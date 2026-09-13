@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.72"
+APP_VERSION = "4.74"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -217,6 +217,10 @@ VERSION_CODENAMES = [
                         # co-vocalist, Eagles (1946-2023)
     "Wetton",           # v4.72 -- John Wetton, bassist/vocalist, Asia /
                         # King Crimson / UK (1949-2017)
+    "Manzarek",         # v4.73 -- Ray Manzarek, keyboardist/co-founder,
+                        # The Doors (1939-2013)
+    "Dio",              # v4.74 -- Ronnie James Dio, vocalist, Rainbow /
+                        # Black Sabbath / Dio (1942-2010)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1254,6 +1258,20 @@ DEFAULT_SETTINGS = {
     # switch" model as aprs_inbox_enabled.
     "qrz_logbook_enabled": False,
     "qrz_logbook_api_key": "",
+    # QRZ Quick Log card (v4.74) -- reads live freq/mode/power from the Rig
+    # Panel poller, cross-references the Spots card's already-merged POTA/
+    # SOTA/RBN/DX feeds for a best-effort callsign match, and submits via
+    # the SAME qrz_logbook_api_key above (QRZ's own ACTION=INSERT, a
+    # write to the identical per-logbook API this card's read-side sync
+    # already uses -- no separate credential). `qrz_quick_log_callsign` is
+    # the ADIF STATION_CALLSIGN sent with each logged QSO -- this app has
+    # no other single "my callsign" setting (pota_callsign/rbn_callsign/
+    # etc. are each scoped to their own integration), so this is its own
+    # field, blank by default like every other not-a-credential callsign
+    # setting here.
+    "show_qrz_quick_log": False,
+    "qrz_quick_log_position": 0,
+    "qrz_quick_log_callsign": "",
     # APRS.fi — requires a free API key from https://aprs.fi/page/api.
     # Blank disables it.
     "aprs_api_key": "",

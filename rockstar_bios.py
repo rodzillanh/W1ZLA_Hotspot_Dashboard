@@ -521,6 +521,16 @@ BIOS = {
         "blurb": "Bassist and vocalist across King Crimson, UK, and Asia, known for a powerful voice atop intricate progressive rock.",
         "wiki": "John_Wetton",
     },
+    "Manzarek": {
+        "name": "Ray Manzarek",
+        "blurb": "Co-founding keyboardist of The Doors, whose organ and bass-line keyboard work anchored the band's sound with no bassist at all.",
+        "wiki": "Ray_Manzarek",
+    },
+    "Dio": {
+        "name": "Ronnie James Dio",
+        "blurb": "Powerhouse vocalist who fronted Rainbow, Black Sabbath, and his own band Dio, and is widely credited with popularizing the metal 'devil horns' hand gesture.",
+        "wiki": "Ronnie_James_Dio",
+    },
 }
 
 

@@ -7212,6 +7212,218 @@ config for per-integration credentials; put it in
   correctly from their new location (theme toggle actually flips
   `data-theme`, Settings link still opens the Quick Settings drawer).
 
+- **Four cards trimmed toward the app's real 300px list-card standard
+  (v4.73) -- Hotspot Status, Spots, QSO Stats, and HF Favorites had all
+  grown taller than their peers over several rounds of feature
+  additions, prompted directly by the user asking for the actual
+  measured sizes of every card.** Every number in this whole effort came
+  from live Playwright measurements against the real running app with
+  realistic seeded data -- never from reading CSS values and doing
+  arithmetic, since grid stretch (two cards sharing a row get pulled to
+  match whichever is taller) makes a bounding-box reading misleading
+  unless the card is checked standalone (with its usual row-neighbor
+  hidden) at least once.
+  - **Hotspot Status: 340px -> 292px.** The user asked "how tall is
+    each hotspot row" before proposing the trim themselves -- measured
+    live at exactly **48px** per `.fs-entry` row (not estimated from the
+    8px padding + border in the CSS), so 340 - 48 = 292 is a real "one
+    row shorter", not a rounded guess. Pure `.fs-list` `max-height`
+    change, no markup touched.
+  - **Spots: 462px -> 307px standalone.** Three changes together: (1)
+    the always-visible hunter glance line ("21 parks · 24 Q..." --
+    confirmed measured at just 12px, but it dragged in its own 8px
+    margin-top and effectively another whole row's worth of surrounding
+    whitespace) moved from a permanent `.pota-glance` div into the
+    existing `⚙ Stats` button's `title` tooltip (inline in
+    `renderPotaCard()`) -- the info isn't gone, just not always spending
+    space; a `title` attribute is plain text only, so the old
+    `<b>...</b>`-formatted innerHTML became a plain string built the
+    same way. (2) The filter chips and the sort/band `<select>` merged
+    onto ONE row (`.spots-filter-row` gained `justify-content:
+    space-between` and its own `select` styling, copied from the
+    shared `.pota-controls select` rule rather than touching that rule
+    -- `.pota-controls` itself is still used by HF Favorites' own
+    "Favorites N" line, confirmed by grep before assuming it was safe to
+    repurpose). The old standalone "Spots N · N new" summary line was
+    dropped entirely rather than relocated -- each filter chip's own
+    count already conveys volume, and the per-row 🚩 NEW tag already
+    flags individual new-to-you parks, so the aggregate text added
+    nothing a chip glance didn't already show. This meant `#pota-cnt`/
+    `#pota-newcnt` needed deleting from `renderPotaCard()`, not just
+    hiding, since a `getElementById(...).textContent = ...` on a removed
+    element would throw. (3) `.pota-spots`' fixed height: 300px -> 200px
+    -- the one genuinely content-affecting cut (fewer spots visible
+    before scrolling), confirmed live to still show 2 full spot rows
+    comfortably before needing to scroll.
+  - **QSO Stats: 425-462px -> 334px standalone.** Two changes: (1) the
+    14-day sparkline's bars shrank 46px -> 26px with tighter surrounding
+    margins/padding (12px -> 8px, head's own margin-bottom 8px -> 5px)
+    -- still shows the full 14-day trend, just less visually dominant.
+    (2) The per-band breakdown's own scroll cap (`.qs-bb-wrap`) shrank
+    190px -> 130px, showing ~3 bands before scrolling instead of ~5 --
+    deliberately NOT pushed lower than this despite a more aggressive
+    90px option (measured at 294px total) being available and mocked up:
+    that option only showed ~2 bands before scrolling, and the per-band
+    breakdown is this card's actual reason for existing (added on
+    purpose, v4.67) -- squeezing it hard just to shave another ~40px
+    wasn't worth undercutting the card's core feature for anyone who's
+    worked more than a couple bands.
+  - **HF Favorites: 427px -> 367px standalone.** The simplest of the
+    four -- this card's chrome was already lean (one combined count+
+    mode-filter row, one footer line, no separate glance/controls split
+    the way Spots had), so the only real lever was `.hf-fav-list`'s own
+    fixed height: 300px -> 240px, confirmed live to still show 3 full
+    band groups plus the start of a 4th (each favorite row measures 21px
+    live) before scrolling. A more aggressive 200px option (327px total)
+    was mocked up and rejected -- it cut into the middle of the 2nd band
+    group, and this card is meant to be scanned by band.
+  - **A real bug, caught by re-verifying the LAST of the four trims, that
+    had silently affected TWO of the other three already-"verified"
+    ones**: `.hf-fav-list`'s height change appeared to do nothing at all
+    on first check (all 20 favorites still rendered, unscrolled) despite
+    the CSS looking correct on read-through. Root cause: three separate
+    explanatory comments added during this same effort used HTML
+    comment syntax (`<!-- ... -->`) INSIDE the `<style>` block instead of
+    CSS comment syntax (`/* ... */`) -- `<!--`/`-->` are technically
+    valid, individually-ignorable CSS tokens (the CDO/CDC tokens, kept in
+    the spec for the old "hide CSS from browsers that don't support
+    `<style>`" trick), but are NOT guaranteed to behave like a paired
+    `/* */` comment spanning everything between them, and in practice
+    caused SILENT PARTIAL PROPERTY LOSS on the following rule in two of
+    the three cases: `.qs-spark-wrap`'s `margin-top: 8px` was silently
+    dropped (computed value came back `0px`, confirmed via
+    `getComputedStyle` -- the OTHER properties on the same rule,
+    `padding-top` and `border-top`, were unaffected), and
+    `.hf-fav-list`'s entire `height: 240px` declaration was dropped
+    outright. The THIRD instance (`.spots-filter-row`'s preceding
+    comment) happened to cause no visible damage this time, purely by
+    luck of what else was on that rule. **This means the "317px" numbers
+    originally reported for Spots and QSO Stats after building v4.73 were
+    WRONG** -- silently under-measuring QSO Stats specifically (it should
+    have been computing 334px all along); Spots' own 307px happened to be
+    correct since its rule wasn't damaged. Both mockup-approval
+    conversations with the user already cited the corrected numbers
+    (307/334), not the transient wrong ones, since this was caught and
+    fixed before anything was ever committed. **Lesson: `<!-- -->` is
+    HTML comment syntax; inside a `<style>` block, ALWAYS use `/* */`,
+    even though browsers won't error loudly when you don't** -- there is
+    no linter catching this in this project, and the failure mode is a
+    silently-dropped property, not a visible parse error, so it can look
+    like "verified working" right up until a later property on the exact
+    same rule happens to matter. If a CSS change ever "looks right in the
+    code but does nothing live" again, grep for `<!--` between the
+    `<style>` and `</style>` tags before assuming the bug is anywhere
+    else.
+
+- **The QRZ Quick Log card (v4.74) is the first thing in this app that
+  WRITES a QSO to QRZ, not just reads from it** -- `qrz_logbook.py`'s
+  `insert_qso()` (`KEY=<key>&ACTION=INSERT&ADIF=<record>&OPTION=REPLACE`)
+  is QRZ's own documented API, built from that documentation alone --
+  UNLIKE the read side (STATUS/FETCH), it has **not** been verified
+  against a real logbook (this module's own docstring flags this
+  explicitly). Do one real test submit against a live account before
+  trusting the submit button in production, same "verify against the
+  real thing" discipline as every other integration in this project.
+  Reuses the SAME `qrz_logbook_api_key` as the read-side sync (QRZ's
+  Logbook API key is per-logbook, not per-action) -- gated on the key
+  being present, deliberately NOT on `qrz_logbook_enabled` (the
+  background-sync toggle), since submitting one QSO by hand is a
+  distinct user action from opting into historical sync.
+  - **Mockup went through a real trim round before being approved** --
+    the first cut measured 456px/407px against the app's ~300px card
+    standard (same standard the v4.73 entry above trims toward); the
+    user's only note was "just make sure we are staying near 300px
+    height," so the match banner went from two lines to one (`.ql-match`'s
+    `white-space: nowrap; overflow: hidden; text-overflow: ellipsis`),
+    the permanent footer note moved into the submit button's own `title`
+    tooltip, and card/field/header spacing all tightened -- landed at
+    307px/306px (measured live against the static mockup file, not
+    estimated), which is the exact height it renders at in the real
+    dashboard too (confirmed live via Playwright post-build) since every
+    spacing value is a scoped `#qrz-quick-log-card`/`.ql-*` override, not
+    a change to the shared `.metrics-card`/`.metrics-header` rules every
+    other card also uses.
+  - **Rig Panel's poller needed a THIRD activation reason.**
+    `app._rebuild_rig_panel()` used to run only when `show_rig_panel` OR
+    `rig_pa_alert_enabled` was on -- this card needs the identical live
+    freq/mode/power snapshot even when the Rig Panel card itself is
+    hidden, so `show_qrz_quick_log` was added as a third OR condition
+    (both in `_rebuild_rig_panel()` itself and the `/api/settings`
+    rebuild-trigger tuple). Mirrored client-side: `fetchRigPanel()` used
+    to gate its own fetch/interval on `SHOW_RIG_PANEL` alone -- now
+    `SHOW_RIG_PANEL || SHOW_QRZ_QUICK_LOG`, and the fetch callback also
+    calls the new `renderQuickLogCard()` alongside the existing
+    `renderRigPanelCard()`/`renderRigPanelDrawer()`.
+  - **Frequency-matching reuses the Spots card's ALREADY-POLLED client-side
+    arrays (`potaData`/`sotaCardData`/`rbnCardData`/`dxCardData`) --
+    no new fetch, no new backend route for spot data.** `qlAllSpots()`
+    maps all four into one `{call, freq_hz, source, reference,
+    park_name}` shape (SOTA via the existing `sotaToPotaShape()` helper,
+    same as the Spots card's own merge) and `qlFindSpotMatch()` picks the
+    closest one within a **mode-dependent tolerance**
+    (`QL_MATCH_TOLERANCE_HZ`: 100 Hz for FT8/FT4/JS8, 200 Hz for MSK144,
+    1500 Hz default for CW/SSB/RTTY/everything else). This tolerance
+    split is a real, disclosed design limitation, not just a tuning
+    knob: FT8/FT4 use ONE FIXED dial frequency per band for EVERY
+    simultaneous QSO on that channel (the actual per-QSO AUDIO offset
+    the two stations agreed on isn't in any spot feed this app has), so
+    a tight window there can only ever narrow things down to "someone
+    active on this channel," never uniquely identify a station -- the
+    match banner's own `title` tooltip says exactly this, and every
+    auto-filled field (`.auto`-tinted, cyan border) stays fully editable
+    before submit. CW/SSB/RTTY operators tune to QSO-specific
+    frequencies, so the wider default tolerance there is still a
+    meaningfully stronger signal, not just a fallback.
+  - **Auto-fill is presence-gated, not overwrite-gated** -- `qlAuto.call`/
+    `qlAuto.comment` track whether the CURRENT value in each field came
+    from a spot match (not from typing), and `qlClearAuto(id)` (wired to
+    each input's `oninput`) drops that flag the instant the operator
+    types anything, same "don't stomp what someone already typed by
+    hand" contract QSO Stats/HF Favorites/etc. don't need but a
+    live-updating auto-fill genuinely does. A field's own `.auto` CSS
+    class (cyan-tinted) is the visual signal for "this came from the
+    match, not you."
+  - **RST placeholder is mode-dependent** (`-12`/`-08` for FT8/FT4/JS8/
+    MSK144/JT65/JT9/FST4 digital modes' dB-style reports vs. `599` for
+    phone/CW's classic 3-digit RST) -- a placeholder only, never
+    overwrites a typed value, computed fresh every `renderQuickLogCard()`
+    call since the rig's mode can change between polls.
+  - **On submit success, the SAME `storage.append_qso()` wsjtx.py's live
+    logging already uses** is called from the new `POST /api/qrz_quick_log`
+    route (`app.py`) -- not a new storage path. Position/name/city/
+    state/country enrichment reuses `monitor.lookup_caller_info(call)`,
+    same as wsjtx.py's `_handle_qso()` and the ADIF importer; QTH
+    position falls back to settings' `station_grid` (this card has no
+    grid-square field of its own to prefer, unlike WSJT-X's own `my_grid`).
+    The stored QSO's `source` is `"qrz_quick_log"` -- a fourth distinct
+    value alongside `"wsjtx"`/`"qrz"`/(ADIF import's absent-source
+    convention) -- and its `qrz_logid` is QRZ's own returned LOGID,
+    letting a future confirm-sweep treat it identically to a QRZ-Logbook-
+    synced QSO if one is ever added for hand-logged entries.
+  - **`qrz_quick_log_callsign` (Settings → Integrations → QRZ Logbook
+    sync) is its own new setting, not a reuse of an existing "my
+    callsign" field** -- this app has no single global one (`pota_callsign`/
+    `rbn_callsign`/`dxcluster_callsign`/`psk_reporter_callsign` are each
+    scoped to their own integration, same "blank by default, plain
+    string, not a credential" convention this one follows too). It's the
+    ADIF `STATION_CALLSIGN` sent with every QSO this card logs.
+  - Verified live end-to-end via Playwright against the real running
+    app (not just the static mockup): mocked `rig_panel_poller._snap`
+    and `pota_client.get()` directly (no real rigctld/network needed,
+    same technique `generate_screenshots.py` uses to fake hotspot
+    status), confirmed the real card renders at exactly 307px, confirmed
+    a matching POTA spot auto-fills callsign + comment with the correct
+    park reference and the right tooltip text, confirmed clicking Log to
+    QRZ (with `qrz_logbook_client.insert_qso` mocked to avoid a real
+    network call) builds the correct ADIF fields end to end and appends
+    a real row to `qsos.json`, and confirmed three more states
+    separately: rig unreachable ("Waiting for the rig…", submit
+    disabled), rig reachable with no spot match ("No spot matches this
+    frequency…", RST placeholder switches to `599` for CW), and a
+    submit failure (no QRZ key configured) surfacing QRZ's own error
+    text via the existing `rigToast()` mechanism rather than failing
+    silently.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

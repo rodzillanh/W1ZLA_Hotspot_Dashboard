@@ -328,13 +328,16 @@ _rebuild_push_client()
 
 def _rebuild_rig_panel() -> None:
     """(Re)point the rigctld poller at the current settings -- runs only
-    when rig control is on AND something consumes it (the Rig Panel card
-    or the PA-temp alert). Same hot-swap-on-settings-save pattern as the
-    other integration clients; the poller's own generation counter
-    handles an in-flight reconnect."""
+    when rig control is on AND something consumes it (the Rig Panel card,
+    the PA-temp alert, or the QRZ Quick Log card -- the latter needs the
+    same live freq/mode/power snapshot even if the Rig Panel card itself
+    is hidden). Same hot-swap-on-settings-save pattern as the other
+    integration clients; the poller's own generation counter handles an
+    in-flight reconnect."""
     s = load_settings()
     active = bool(s.get("rig_control_enabled")) and (
         bool(s.get("show_rig_panel")) or bool(s.get("rig_pa_alert_enabled"))
+        or bool(s.get("show_qrz_quick_log"))
     )
     rig_panel_poller.configure(
         s.get("rig_host", ""), s.get("rig_port", 4532), active,
@@ -741,6 +744,15 @@ def api_settings_post():
             settings["rig_panel_position"] = max(0, int(data["rig_panel_position"]))
         except (TypeError, ValueError):
             pass
+    if "show_qrz_quick_log" in data:
+        settings["show_qrz_quick_log"] = bool(data["show_qrz_quick_log"])
+    if "qrz_quick_log_position" in data:
+        try:
+            settings["qrz_quick_log_position"] = max(0, int(data["qrz_quick_log_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "qrz_quick_log_callsign" in data:
+        settings["qrz_quick_log_callsign"] = data["qrz_quick_log_callsign"].strip().upper()
     if "rig_pa_temp_cal" in data:
         settings["rig_pa_temp_cal"] = str(data["rig_pa_temp_cal"] or "").strip()
     if "rig_pa_alert_enabled" in data:
@@ -773,7 +785,7 @@ def api_settings_post():
         "digipi_page", "big_clock_page", "notifications_page",
         "satellites_page", "flights_overhead_page", "recent_contacts_page",
         "qso_stats_page", "top_activity_page", "pota_page",
-        "hf_favorites_page", "rig_panel_page", "dvswitch_page",
+        "hf_favorites_page", "rig_panel_page", "dvswitch_page", "qrz_quick_log_page",
     ):
         if _page_key in data:
             try:
@@ -885,7 +897,8 @@ def api_settings_post():
         _rebuild_push_client()
     if any(k in data for k in ("rig_control_enabled", "rig_host", "rig_port",
                                "show_rig_panel", "rig_pa_alert_enabled",
-                               "rig_pa_alert_pct", "rig_pa_temp_cal")):
+                               "rig_pa_alert_pct", "rig_pa_temp_cal",
+                               "show_qrz_quick_log")):
         _rebuild_rig_panel()
     return jsonify({"ok": True})
 
@@ -1176,6 +1189,7 @@ _SENTINEL_DEFS = [
     ("__pota__", "show_pota", "pota_position", "🏕️", "POTA", "hunter + spots card"),
     ("__hf_favorites__", "show_hf_favorites", "hf_favorites_position", "📻", "HF Favorites", "tap-to-tune memory card"),
     ("__rig_panel__", "show_rig_panel", "rig_panel_position", "📻", "Rig Panel", "live rig front-panel card"),
+    ("__qrz_quick_log__", "show_qrz_quick_log", "qrz_quick_log_position", "📝", "Quick Log", "rig-panel-driven QRZ logging card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -2833,6 +2847,88 @@ def api_qrz_logbook_sync():
         daemon=True,
     ).start()
     return jsonify({"ok": True, "started": True})
+
+
+@app.route("/api/qrz_quick_log", methods=["POST"])
+def api_qrz_quick_log():
+    """Submit one QSO from the QRZ Quick Log card -- builds an ADIF
+    record from the rig-panel-driven freq/mode/power + the operator's
+    typed callsign/RST/comment, sends it to QRZ via qrz_logbook.py's
+    insert_qso() (ACTION=INSERT, unverified against a real account --
+    see that module's own docstring), and on success ALSO appends it to
+    qsos.json via storage.append_qso() -- the exact function wsjtx.py's
+    live logging already uses -- so it shows up in Recent Contacts
+    immediately, no separate code path. Position enrichment (lat/lon/
+    name/city/state/country) reuses monitor.lookup_caller_info(), same
+    as wsjtx.py's own _handle_qso() and the ADIF importer."""
+    data = request.json or {}
+    call = (data.get("call") or "").strip().upper()
+    if not call:
+        return jsonify({"success": False, "message": "Enter a callsign"}), 400
+
+    band = (data.get("band") or "").strip().lower()
+    mode = (data.get("mode") or "").strip().upper()
+    freq_hz = data.get("freq_hz")
+    try:
+        freq_hz = int(freq_hz) if freq_hz else None
+    except (TypeError, ValueError):
+        freq_hz = None
+    power_w = data.get("power_w")
+    try:
+        power_w = float(power_w) if power_w is not None else None
+    except (TypeError, ValueError):
+        power_w = None
+    rst_sent = (data.get("rst_sent") or "").strip()
+    rst_rcvd = (data.get("rst_rcvd") or "").strip()
+    comment = (data.get("comment") or "").strip()
+
+    settings = load_settings()
+    station_callsign = (settings.get("qrz_quick_log_callsign") or "").strip().upper()
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    qso_date = now.strftime("%Y%m%d")
+    time_on = now.strftime("%H%M%S")
+
+    adif_fields = {
+        "CALL": call,
+        "QSO_DATE": qso_date,
+        "TIME_ON": time_on,
+        "BAND": band,
+        "MODE": mode,
+        "RST_SENT": rst_sent,
+        "RST_RCVD": rst_rcvd,
+        "FREQ": (freq_hz / 1_000_000) if freq_hz else None,
+        "TX_PWR": power_w,
+        "COMMENT": comment,
+        "STATION_CALLSIGN": station_callsign,
+    }
+    try:
+        result = qrz_logbook_client.insert_qso(adif_fields)
+    except Exception as e:  # noqa: BLE001 -- surface QRZ's own message to the user
+        return jsonify({"success": False, "message": f"{type(e).__name__}: {e}"}), 400
+
+    info = monitor.lookup_caller_info(call)
+    qth = grid_to_latlon(settings.get("station_grid", ""))
+    qth_lat, qth_lon = qth if qth is not None else (None, None)
+    storage_mod.append_qso({
+        "call": call,
+        "band": band,
+        "mode": mode,
+        "date": qso_date,
+        "grid": None,
+        "frequency_hz": freq_hz,
+        "lat": info["lat"], "lon": info["lon"],
+        "qth_lat": qth_lat, "qth_lon": qth_lon,
+        "name": info["name"], "location": info["location"],
+        "city": info["city"], "state": info["state"], "country": info["country"],
+        "rst_sent": rst_sent or None,
+        "rst_rcvd": rst_rcvd or None,
+        "comment": comment or None,
+        "source": "qrz_quick_log",
+        "qrz_logid": result.get("logid"),
+        "logged_at": time.time(),
+    })
+    return jsonify({"success": True, "logid": result.get("logid")})
 
 
 @app.route("/api/test_hamalert", methods=["POST"])

@@ -1779,6 +1779,42 @@ threshold (% of full scale) is under Settings → Integrations → Rig
 control. This works whether or not the Rig Panel card itself is shown.
 
 <!-- wiki-group: Optional Cards -->
+## QRZ Quick Log card
+<!-- wiki-image: qrz-quick-log-card.png -->
+
+Optional dashboard card (Settings → Cards → "Show QRZ Quick Log card",
+off by default) — a fast one-QSO logger that pre-fills itself from your
+station's live state.
+
+- **Frequency, band, mode, and power** come straight from the
+  [Rig Panel](#rig-panel-card) connection (works even if that card
+  itself is hidden — enabling this one is enough)
+- **Callsign match**: your current dial frequency is cross-referenced
+  against the [Spots card](#spots-card)'s already-merged POTA, SOTA,
+  RBN, and DX cluster feeds. A match auto-fills the callsign — and for
+  a POTA/SOTA match, the Comment field with the park/summit reference
+  — with a cyan-tinted border showing it came from the match, not you.
+  This is a **best-effort heuristic, not a precise identification**:
+  FT8/FT4 share one fixed dial frequency for every simultaneous QSO on
+  that channel, so a match there narrows things down to "someone active
+  on this channel" rather than uniquely confirming who. CW/SSB/RTTY
+  operators tune to QSO-specific frequencies, so a match there is a
+  much stronger signal. Every auto-filled field stays fully editable —
+  clear or overwrite anything before you submit
+- **RST sent/received** — you type these; the placeholder switches
+  between a 3-digit RST (phone/CW) and a dB-style digital report
+  depending on the current mode
+- **📤 Log to QRZ** submits the QSO via QRZ's Logbook API, then adds it
+  to [Recent Contacts](#recent-contacts-card) immediately too — one
+  click, one write path
+
+Needs [Rig control](#rig-control-rigctld) turned on AND a QRZ Logbook
+API key (Settings → Integrations → "QRZ Logbook sync" — the same key
+used for the read-only sync into Recent Contacts). Your own station
+callsign for the log (ADIF's STATION_CALLSIGN) is set in that same
+section.
+
+<!-- wiki-group: Optional Cards -->
 ## Big Ass Clock card
 <!-- wiki-image: big-clock-card.png -->
 

@@ -117,9 +117,29 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.72 "Wetton"</span>
+                <span class="release-version">v4.74 "Dio"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>New: QRZ Quick Log card</span> — reads live frequency/mode/power straight from the Rig Panel poller, cross-references the Spots card's already-merged POTA/SOTA/RBN/DX cluster feeds for a best-effort callsign match (auto-filling the callsign and, for a POTA/SOTA match, a comment with the park/summit reference), and logs the QSO to QRZ with one click — it's also added to Recent Contacts immediately. Needs Rig control (Integrations) and a QRZ Logbook API key. The callsign match is a best-effort heuristic, not a precise ID — FT8/FT4 share one dial frequency for every QSO on a channel, so it can only narrow things down, not uniquely identify a station; every auto-filled field stays editable before you submit</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.73 "Manzarek"</span>
+                <span class="release-date">September 2026</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Trimmed four cards toward the app's real 300px standard</span> — Hotspot Status (340px → 292px), Spots (462px → ~307px), QSO Stats (425-462px → ~334px), and HF Favorites (427px → 367px). Hotspot Status and HF Favorites are pure list-height changes; Spots merged its filter chips and sort dropdown onto one row and moved the hunter stats line into the ⚙ Stats button's tooltip; QSO Stats shrank its 14-day sparkline and tightened the per-band breakdown's scroll area. No data was removed from any of the four — just how much space each shows at once</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.72 "Wetton"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Removed the empty toolbar bar</span> — the dark-mode toggle and ⚙ Settings link now live on the Dashboard / Live map tab row instead of their own strip, which used to render full-width even with zero custom links configured. Toolbar links (when you have any) now show as their own row only when there's something to show</li>
