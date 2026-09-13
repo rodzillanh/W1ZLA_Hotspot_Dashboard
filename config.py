@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.69"
+APP_VERSION = "4.70"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -211,6 +211,8 @@ VERSION_CODENAMES = [
                         # & Nash, singer-songwriter/guitarist (1941-2023)
     "Parfitt",          # v4.69 -- Rick Parfitt, rhythm guitarist/co-
                         # founder, Status Quo (1948-2016)
+    "Frey",             # v4.70 -- Glenn Frey, co-founder/guitarist/
+                        # vocalist, Eagles (1948-2016)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1544,6 +1546,22 @@ DEFAULT_SETTINGS = {
     "hf_favorites_page": 1,
     "rig_panel_page": 1,
     "dvswitch_page": 1,
+    # Big Ass Clock / Notifications (v4.70): the only two cards that can
+    # show on BOTH dashboard pages at once. big_clock_page/
+    # notifications_page above still mean exactly what they always have
+    # (the single "primary" page) -- big_clock_show_p1/_p2 and
+    # notifications_show_p1/_p2 are the new independent per-page toggles,
+    # and deliberately NOT given a default here (see
+    # app.py's _card_shown_on_page() docstring: their ABSENCE from this
+    # dict is what lets the app tell "never touched this UI" apart from
+    # "explicitly set", so an existing install's single-page placement
+    # via big_clock_page/notifications_page is preserved untouched until
+    # the user opts into the new per-page checkboxes). These two position
+    # keys are for the SECOND page's copy specifically, when duplicated --
+    # not currently drag-orderable in the Cards board, always effectively
+    # "at the end" of whichever page it duplicates onto.
+    "big_clock_position_p2": 0,
+    "notifications_position_p2": 0,
     # Editable tab label for the second dashboard page -- shown in the
     # tab bar only once something is actually assigned to page 2 (a
     # hotspot, a sentinel card, or a camera), same "presence-derived, no

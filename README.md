@@ -354,6 +354,15 @@ and **Version info**.
   too, one per camera.
   Adding/editing/deleting a hotspot itself is a separate list on the
   Hotspots tab — Card order is just for arranging what's already there.
+- **A second dashboard page** — drag any hotspot or card into the second
+  column of the Card order board to split a crowded fleet across two
+  tabs instead of one long scroll. The second tab only appears once
+  something is actually assigned to it, and its name is editable
+  (defaults to "Dashboard 2"). Two cards, **Big Ass Clock** and
+  **Notifications**, are the exception to "lives on exactly one page" —
+  right below the Card order board, "Multi-page cards" gives each of
+  them independent on/off switches per page, so either can show on
+  Dashboard 1, Dashboard 2, or both at once.
 - **Weather** — its own tab on the Settings page: a location field
   (city name, zip, or "City, ST" — blank hides the weather card) and a
   °F/°C toggle for the displayed temperature unit.

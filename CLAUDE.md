@@ -7018,6 +7018,125 @@ config for per-integration credentials; put it in
     and confirmed the post-fix screenshot shows no more duplicated
     mode/comment text.
 
+- **Big Ass Clock + Notifications can show on BOTH dashboard pages at
+  once (v4.70) -- the only two cards with this ability; every other
+  sentinel still lives on exactly one page.** Prompted directly by the
+  user asking "would there still be a toggle to switch them off
+  independently" -- offered a simpler "primary + one optional duplicate"
+  model first, but the user explicitly chose full symmetry (independent
+  per-page on/off, no primary/duplicate concept) after seeing the
+  tradeoff of each.
+  - **The real design problem was backward compatibility, not the UI.**
+    Every existing install already has a single `big_clock_page`/
+    `notifications_page` value (1 or 2) it's relying on. Two NEW
+    booleans per card (`<base>_show_p1`/`_show_p2`) needed fixed
+    DEFAULT_SETTINGS values to be independently meaningful -- but ANY
+    fixed default (e.g. p1=True/p2=False, matching a fresh install's
+    intent) would silently override an existing install's real
+    `..._page=2` placement the instant those two keys entered
+    `DEFAULT_SETTINGS`, since `storage.load_settings()`'s merge
+    (`dict(DEFAULT_SETTINGS); merged.update(saved)`) would inject the
+    hardcoded default for a key the saved file never had. **Fixed by
+    deliberately NOT putting `big_clock_show_p1`/`_show_p2`/
+    `notifications_show_p1`/`_show_p2` in `config.DEFAULT_SETTINGS` at
+    all** -- their absence is what makes `key in settings` (the merged
+    dict) a reliable one-time "has this specific key EVER been
+    explicitly saved" signal, the same trick `storage.load_settings()`
+    already uses at the whole-file level for `onboarding_tour_seen`
+    (fresh install vs. upgrading), just applied per-key instead. Until a
+    user actually touches the new Settings checkboxes,
+    `_card_shown_on_page(settings, pos_key, page)` (`app.py`) falls back
+    to the ORIGINAL single `<base>_page` value untouched -- verified
+    live with Playwright: seeding `big_clock_page=2` with the new keys
+    never touched correctly reparents the card into `#cards-outer-2`
+    exactly as it always has, zero regression, zero migration step
+    needed.
+  - **The "duplicate" element is a genuinely separate, PERMANENT DOM
+    node for these two cards specifically -- not `moveIfNeeded()`'s
+    usual reparent-the-one-instance trick**, since a card on both pages
+    needs two real instances, one node can't be in two places. But the
+    EXISTING single instance (`#big-clock-card`/`#notifications-card`)
+    keeps using `moveIfNeeded` completely unchanged for its own
+    placement -- a small derived helper, `_card_primary_page()`, picks
+    page 1 as "primary" whenever both flags are on (so the pre-existing
+    single-instance code path never needs to know duplication exists at
+    all), and a NEW, second element (`#big-clock-card-p2`/
+    `#notifications-card-p2`, gated by `big_clock_dup_on_p2`/
+    `notifications_dup_on_p2` template booleans) fills in page 2 only in
+    the genuinely-both-shown case. `_has_dashboard2_content()` needed
+    its own separate check (`_card_shown_on_page(...,2)`, NOT
+    `_card_primary_page`) specifically because a duplicate on page 2
+    must trigger the Dashboard-2 tab's existence even when the PRIMARY's
+    home is page 1 -- `_card_primary_page` alone would miss that case
+    entirely.
+  - **Big Ass Clock's generalization was mechanical and low-risk**:
+    `renderClock()`/`renderClockControls()` were ALREADY fully
+    parameterized by the container element passed in (confirmed by
+    reading them before touching anything) -- so becoming "loop over
+    whichever of `#clock-body`/`#clock-body-p2` actually exist" needed
+    zero changes to the rendering logic itself, just a thin wrapper
+    (`renderClockInto(bodyId)`/`renderClockControlsInto(elId)`) called
+    once per existing id. `setClockStyle()` additionally syncs BOTH
+    `<select>` elements' `.value` now, since style is one shared
+    `localStorage` preference, not a per-instance setting -- picking a
+    style from either copy updates both immediately.
+  - **Notifications' generalization deliberately did NOT follow the same
+    per-element pattern** -- it's fed by up to 7 independent poll loops
+    (APRS inbox, HamAlert, fleet/solar/Brandmeister alerts, QRZ confirm,
+    PA-temp alert), each updating its OWN connection-dot element
+    directly by a fixed id (`#aprs-inbox-conn-dot` etc.). Duplicating
+    every one of those ids and teaching all 7 update functions to also
+    touch a second instance would be a much larger, easier-to-desync
+    change for what's fundamentally a live status readout, not a
+    per-copy-interactive surface. Instead, `#notifications-card`'s
+    entire inner content was wrapped in one new `#notifications-card-
+    inner` div, and a single new function, `mirrorNotificationsToP2()`,
+    copies that div's whole `innerHTML` into `#notifications-card-p2-
+    inner` once per existing 3s `refresh()` tick -- riding a poll loop
+    that already runs unconditionally rather than adding a new one.
+    Onclick handlers (e.g. `toggleNotifFilter('aprs')`) survive the
+    clone intact since they're plain HTML attributes, so clicking a
+    filter chip in the MIRROR still works -- it just won't visibly
+    reflect its own effect on that copy until the next tick (up to ~3s),
+    since the actual list re-render always targets the PRIMARY's
+    `#notif-list` via a plain `getElementById` (which only ever finds
+    the first matching id in the document). Disclosed as an accepted
+    staleness tradeoff for a secondary "glance at it from the other
+    page" copy, not the primary interactive surface.
+  - **The duplicate's page-2 position is intentionally NOT drag-
+    orderable in the Cards board** -- `big_clock_position_p2`/
+    `notifications_position_p2` (new, ordinary DEFAULT_SETTINGS keys,
+    default 0) always place it "at the end" of whichever page. Extending
+    the two-column drag board itself to show one card in BOTH columns
+    simultaneously (with two independently-draggable rows for the same
+    card) was scoped out as real, separate added complexity for the
+    drag board specifically -- not attempted here.
+  - **The new Settings checkboxes' initial checked state reads the
+    EFFECTIVE (fallback-resolved) value, not the raw unset key** -- a
+    naive `settings.get('big_clock_show_p1', False)` would show every
+    checkbox unchecked for an existing install that's never touched this
+    feature, even one whose card is genuinely visible on page 1 right
+    now via the legacy field. Fixed by passing `big_clock_p1`/
+    `big_clock_p2`/`notifications_p1`/`notifications_p2` as explicit,
+    already-resolved booleans from `app.py`'s `setup()` route (via
+    `_card_shown_on_page()`) rather than reading the raw keys inline in
+    the template -- verified live: seeding legacy `big_clock_page=2`
+    with the new keys never saved renders the "Dashboard 2" checkbox
+    pre-checked and "Dashboard 1" unchecked, matching actual behavior.
+  - Verified live end-to-end with Playwright across four scenarios in
+    one run (not just each piece in isolation): (1) legacy default,
+    untouched -- single page, no Dashboard-2 tab; (2) legacy
+    `big_clock_page=2`, untouched -- correctly reparented to page 2,
+    confirming zero regression; (3) both new flags on for both cards --
+    both a primary and a `-p2` duplicate element exist for each card,
+    the duplicate's clock body genuinely ticks, the style select syncs
+    across both instances, and the Notifications mirror matches the
+    primary's rendered HTML after one refresh tick; (4) turning off just
+    the `_p2` flags -- both duplicates disappear, both primaries persist
+    untouched, and the Dashboard 2 tab itself disappears since nothing
+    else remained assigned there -- confirming the toggles are genuinely
+    independent, not a single combined on/off.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

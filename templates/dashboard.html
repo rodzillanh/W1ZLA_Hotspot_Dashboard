@@ -3037,6 +3037,7 @@
         {% if notif_source_count > 0 %}
         <div class="metrics-card" id="notifications-card"
              style="order:{{ settings.get('notifications_position', 0) }}">
+            <div id="notifications-card-inner">
             <div class="metrics-header">
                 <div class="card-name">🔔 Notifications</div>
                 <div class="notif-stats">Total <b id="notif-count">—</b> &middot; last <b id="notif-last">—</b></div>
@@ -3069,6 +3070,7 @@
                 <div id="notif-list"></div>
             </div>
             <div class="msg-empty" id="notif-empty">No notifications yet.</div>
+            </div>
         </div>
         {% endif %}
         {% if settings.get('show_satellites', False) %}
@@ -3535,6 +3537,48 @@
 {% if has_dashboard2 %}
 <div id="panel-dashboard2" class="tab-panel">
     <div class="cards-grid" id="cards-outer-2">
+        <!-- Big Ass Clock / Notifications (v4.70): the only two cards
+             that can show on both pages at once -- see
+             app.py's _card_shown_on_page()/_PAGE_DUPLICATABLE. This is a
+             genuinely SEPARATE, permanent element (never reparented the
+             way every other sentinel is via moveIfNeeded), since a card
+             on both pages needs two real DOM instances, not one moved
+             back and forth. Only rendered when the "show on both" state
+             actually applies -- same "no dead markup for an unused
+             feature" instinct as the has_dashboard2 gate itself. -->
+        {% if big_clock_dup_on_p2 %}
+        <div class="metrics-card" id="big-clock-card-p2"
+             style="order:{{ settings.get('big_clock_position_p2', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name">🕐 Big Ass Clock</div>
+                <select id="clock-style-select-p2" onchange="setClockStyle(this.value)"
+                        style="background:var(--card-bg);color:var(--text);
+                               border:1px solid var(--card-border);border-radius:5px;
+                               padding:3px 8px;font-size:12px;cursor:pointer">
+                    <option value="digital">Digital</option>
+                    <option value="analog">Analog</option>
+                    <option value="tix">TIX</option>
+                </select>
+            </div>
+            <div class="clock-body" id="clock-body-p2"></div>
+            <div class="clock-controls" id="clock-controls-p2"></div>
+        </div>
+        {% endif %}
+        {% if notifications_dup_on_p2 %}
+        <div class="metrics-card" id="notifications-card-p2"
+             style="order:{{ settings.get('notifications_position_p2', 0) }}">
+            <!-- Mirrored wholesale from #notifications-card-inner on a
+                 timer (see mirrorNotificationsToP2() in refresh()) rather
+                 than duplicating every individual sub-element id --
+                 Notifications is fed by 7 independent poll loops, each
+                 updating its own connection-dot element directly; making
+                 every one of those "update both instances" would be a
+                 much larger, easier-to-desync change for a card that's
+                 fundamentally just a live status readout, not something
+                 you interact with differently per copy. -->
+            <div id="notifications-card-p2-inner"></div>
+        </div>
+        {% endif %}
         <div id="cards-2" style="display:contents"></div>
         <div id="camera-cards-2" style="display:contents"></div>
         <div id="dvswitch-cards-2" style="display:contents"></div>
@@ -3856,6 +3900,8 @@ const DIGIPI_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS
 const DIGIPI_SCREEN_REFRESH_MS = 2000;  // direwatch.php's own cache-bust interval is 1000ms, dialed back slightly
 const SHOW_BIG_CLOCK = {{ 'true' if settings.get('show_big_clock', False) else 'false' }};
 const BIG_CLOCK_POSITION = {{ settings.get('big_clock_position', 0) }};
+const BIG_CLOCK_DUP_ON_P2 = {{ 'true' if big_clock_dup_on_p2 else 'false' }};
+const BIG_CLOCK_POSITION_P2 = {{ settings.get('big_clock_position_p2', 0) }};
 const SHOW_HAMALERT = {{ 'true' if settings.get('hamalert_enabled', False) else 'false' }};
 const HAMALERT_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS
 const SHOW_FLEET_ALERTS = {{ 'true' if settings.get('fleet_alerts_enabled', False) else 'false' }};
@@ -3869,6 +3915,8 @@ const SHOW_RIG_PA_ALERTS = {{ 'true' if settings.get('rig_pa_alert_enabled', Fal
 const QRZ_CONFIRM_POLL_MS = 60000;  // qrz_logbook.py's own sync runs every 30 min -- this just re-reads its in-memory event log
 const SHOW_NOTIFICATIONS = SHOW_APRS_INBOX || SHOW_HAMALERT || SHOW_FLEET_ALERTS || SHOW_SOLAR_ALERTS || SHOW_BRANDMEISTER_ALERTS || SHOW_QRZ_CONFIRM || SHOW_RIG_PA_ALERTS;
 const NOTIFICATIONS_POSITION = {{ settings.get('notifications_position', 0) }};
+const NOTIFICATIONS_DUP_ON_P2 = {{ 'true' if notifications_dup_on_p2 else 'false' }};
+const NOTIFICATIONS_POSITION_P2 = {{ settings.get('notifications_position_p2', 0) }};
 const SHOW_SATELLITES = {{ 'true' if settings.get('show_satellites', False) else 'false' }};
 const SATELLITES_POSITION = {{ settings.get('satellites_position', 0) }};
 const SATELLITES_POLL_MS = 15000;  // satellite position moves fast (~7.6km/s) --
@@ -4653,8 +4701,14 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (SHOW_BIG_CLOCK && BIG_CLOCK_PAGE === page) {
         sentinels.push({ key: 'bigclock', pos: Math.max(0, BIG_CLOCK_POSITION) });
     }
+    if (SHOW_BIG_CLOCK && BIG_CLOCK_DUP_ON_P2 && page === 2) {
+        sentinels.push({ key: 'bigclock_p2', pos: Math.max(0, BIG_CLOCK_POSITION_P2) });
+    }
     if (SHOW_NOTIFICATIONS && NOTIFICATIONS_PAGE === page) {
         sentinels.push({ key: 'notifications', pos: Math.max(0, NOTIFICATIONS_POSITION) });
+    }
+    if (SHOW_NOTIFICATIONS && NOTIFICATIONS_DUP_ON_P2 && page === 2) {
+        sentinels.push({ key: 'notifications_p2', pos: Math.max(0, NOTIFICATIONS_POSITION_P2) });
     }
     if (SHOW_SATELLITES && SATELLITES_PAGE === page) {
         sentinels.push({ key: 'satellites', pos: Math.max(0, SATELLITES_POSITION) });
@@ -4734,8 +4788,15 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (digipiCard && 'digipi' in sentinelOrders) { moveIfNeeded(digipiCard, cardsOuter); digipiCard.style.order = sentinelOrders.digipi; }
     const bigClockCard = document.getElementById('big-clock-card');
     if (bigClockCard && 'bigclock' in sentinelOrders) { moveIfNeeded(bigClockCard, cardsOuter); bigClockCard.style.order = sentinelOrders.bigclock; }
+    // The page-2 duplicate (v4.70) is a genuinely separate, permanent
+    // element -- never reparented, just given an order whenever this
+    // call is for page 2 and it's meant to show there.
+    const bigClockCardP2 = document.getElementById('big-clock-card-p2');
+    if (bigClockCardP2 && 'bigclock_p2' in sentinelOrders) { bigClockCardP2.style.order = sentinelOrders.bigclock_p2; }
     const notificationsCard = document.getElementById('notifications-card');
     if (notificationsCard && 'notifications' in sentinelOrders) { moveIfNeeded(notificationsCard, cardsOuter); notificationsCard.style.order = sentinelOrders.notifications; }
+    const notificationsCardP2 = document.getElementById('notifications-card-p2');
+    if (notificationsCardP2 && 'notifications_p2' in sentinelOrders) { notificationsCardP2.style.order = sentinelOrders.notifications_p2; }
     const satellitesCard = document.getElementById('satellites-card');
     if (satellitesCard && 'satellites' in sentinelOrders) { moveIfNeeded(satellitesCard, cardsOuter); satellitesCard.style.order = sentinelOrders.satellites; }
     const recentContactsCard = document.getElementById('recent-contacts-card');
@@ -6877,6 +6938,12 @@ const CLOCK_TZ_OPTIONS = [
 function setClockStyle(style) {
     clockStyle = style;
     localStorage.setItem(CLOCK_STYLE_KEY, style);
+    // Style is one shared preference, not per-instance -- keep whichever
+    // select the user DIDN'T just change in sync with it too.
+    ['clock-style-select', 'clock-style-select-p2'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (sel) sel.value = style;
+    });
     renderClockControls();
     renderClock();
 }
@@ -6893,8 +6960,22 @@ function clockFormatChipHtml() {
 // to eat ~140px of card height for Analog's 4 options. The timezone
 // control only appears as its own chip once "2nd clock" is on, rather
 // than a permanently-reserved (if hidden) row.
+// v4.70: Big Ass Clock can show on both dashboard pages at once (a
+// genuinely separate #clock-controls-p2/#clock-body-p2 pair, not a
+// reparented single instance -- see the has_dashboard2 markup block's
+// own comment). Both render functions below just loop over whichever of
+// the two id pairs actually exist in the DOM, so the single-page case
+// (the overwhelming majority of installs) does exactly what it always
+// did -- one iteration, same as before this feature existed.
+const CLOCK_CONTROLS_IDS = ['clock-controls', 'clock-controls-p2'];
+const CLOCK_BODY_IDS = ['clock-body', 'clock-body-p2'];
+
 function renderClockControls() {
-    const el = document.getElementById('clock-controls');
+    CLOCK_CONTROLS_IDS.forEach(renderClockControlsInto);
+}
+
+function renderClockControlsInto(elId) {
+    const el = document.getElementById(elId);
     if (!el) return;
     if (clockStyle === 'tix') {
         // TIX is always 12hr, full stop -- no format toggle, no second
@@ -7297,7 +7378,11 @@ function clockSingleWidth(container, heightPx) {
 }
 
 function renderClock() {
-    const body = document.getElementById('clock-body');
+    CLOCK_BODY_IDS.forEach(renderClockInto);
+}
+
+function renderClockInto(bodyId) {
+    const body = document.getElementById(bodyId);
     if (!body) return;
     body.innerHTML = '';
     if (clockStyle === 'tix') {
@@ -7330,7 +7415,10 @@ function renderClock() {
 }
 
 if (SHOW_BIG_CLOCK) {
-    document.getElementById('clock-style-select').value = clockStyle;
+    ['clock-style-select', 'clock-style-select-p2'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (sel) sel.value = clockStyle;
+    });
     renderClockControls();
     renderClock();
     setInterval(renderClock, 1000);
@@ -12527,6 +12615,26 @@ function refresh() {
     if (document.getElementById('settings-drawer')?.classList.contains('open')) {
         renderSettingsDrawer();
     }
+    if (NOTIFICATIONS_DUP_ON_P2) mirrorNotificationsToP2();
+}
+
+// v4.70: Notifications' page-2 copy is a periodic wholesale mirror of
+// #notifications-card-inner's rendered HTML, not a second set of
+// duplicated element ids -- the card is fed by up to 7 independent poll
+// loops (APRS inbox, HamAlert, fleet/solar/Brandmeister alerts, QRZ
+// confirm, PA-temp alert), each updating its own connection-dot element
+// directly by id; teaching every one of them to also update a second
+// instance would be a much larger, easier-to-desync change for what's
+// fundamentally a live status readout. Riding the existing 3s refresh()
+// tick means the mirror is never more than one poll cycle stale -- fine
+// for a secondary "glance at it on the other page" copy, not the
+// primary interactive surface (clicking a filter chip in the mirror
+// still works, since onclick attributes copy along with the HTML, but
+// its own visible effect on THAT copy lags by up to one tick).
+function mirrorNotificationsToP2() {
+    const src = document.getElementById('notifications-card-inner');
+    const dst = document.getElementById('notifications-card-p2-inner');
+    if (src && dst && dst.innerHTML !== src.innerHTML) dst.innerHTML = src.innerHTML;
 }
 refresh();
 setInterval(refresh, POLL_MS);

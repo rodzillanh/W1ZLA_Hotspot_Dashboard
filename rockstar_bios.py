@@ -506,6 +506,11 @@ BIOS = {
         "blurb": "Co-founding rhythm guitarist of Status Quo for nearly five decades, anchoring the band's boogie-rock sound with Francis Rossi.",
         "wiki": "Rick_Parfitt",
     },
+    "Frey": {
+        "name": "Glenn Frey",
+        "blurb": "Co-founder, guitarist, and co-lead vocalist of the Eagles, and co-writer of many of their biggest hits.",
+        "wiki": "Glenn_Frey",
+    },
 }
 
 

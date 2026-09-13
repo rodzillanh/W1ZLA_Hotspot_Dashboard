@@ -822,6 +822,17 @@ def api_settings_post():
         settings["dxcluster_host"] = data["dxcluster_host"].strip()
     if "dxcluster_callsign" in data:
         settings["dxcluster_callsign"] = data["dxcluster_callsign"].strip().upper()
+    # Big Ass Clock / Notifications: independent per-page visibility
+    # (v4.70) -- deliberately NOT in config.DEFAULT_SETTINGS, see
+    # _card_shown_on_page()'s docstring for why that absence matters.
+    if "big_clock_show_p1" in data:
+        settings["big_clock_show_p1"] = bool(data["big_clock_show_p1"])
+    if "big_clock_show_p2" in data:
+        settings["big_clock_show_p2"] = bool(data["big_clock_show_p2"])
+    if "notifications_show_p1" in data:
+        settings["notifications_show_p1"] = bool(data["notifications_show_p1"])
+    if "notifications_show_p2" in data:
+        settings["notifications_show_p2"] = bool(data["notifications_show_p2"])
     if "push_vapid_contact" in data:
         contact = (data["push_vapid_contact"] or "").strip()
         if contact and not contact.lower().startswith(("mailto:", "http://", "https://")):
@@ -959,7 +970,12 @@ def _has_dashboard2_content(settings: dict, hotspots: list, cameras: list) -> bo
     for _data_ip, enabled_key, pos_key, *_ in _SENTINEL_DEFS:
         is_enabled = (any(settings.get(k, False) for k in enabled_key)
                       if isinstance(enabled_key, tuple) else settings.get(enabled_key, False))
-        if is_enabled and settings.get(_sentinel_page_key(pos_key), 1) == 2:
+        # _card_shown_on_page (not _card_primary_page) here specifically --
+        # for a duplicatable card shown on BOTH pages, page 2 is a second,
+        # additional element (see _PAGE_DUPLICATABLE), not the "primary"
+        # _card_primary_page tracks, so this needs the direct per-page
+        # check to notice that duplicate at all.
+        if is_enabled and _card_shown_on_page(settings, pos_key, 2):
             return True
     if settings.get("show_cameras", False) and any(c.get("page", 1) == 2 for c in cameras):
         return True
@@ -974,7 +990,13 @@ def dashboard():
     settings = load_settings()
     hotspots = load_hotspots()
     cameras  = load_cameras()
-    return render_template("dashboard.html", settings=settings,
+    big_clock_dup_on_p2 = (_card_shown_on_page(settings, "big_clock_position", 1)
+                            and _card_shown_on_page(settings, "big_clock_position", 2))
+    notifications_dup_on_p2 = (_card_shown_on_page(settings, "notifications_position", 1)
+                                and _card_shown_on_page(settings, "notifications_position", 2))
+    return render_template("dashboard.html", settings=_with_effective_pages(settings),
+                            big_clock_dup_on_p2=big_clock_dup_on_p2,
+                            notifications_dup_on_p2=notifications_dup_on_p2,
                             has_dashboard2=_has_dashboard2_content(settings, hotspots, cameras))
 
 @app.route("/mobile")
@@ -1159,6 +1181,78 @@ def _sentinel_page_key(pos_key: str) -> str:
     return pos_key[: -len("_position")] + "_page" if pos_key.endswith("_position") else pos_key + "_page"
 
 
+# Two cards (Big Ass Clock, Notifications) can show on BOTH dashboard
+# pages at once (v4.70) -- everything else still lives on exactly one
+# page. Maps each duplicatable card's *_position key to its settings
+# base name (used to build <base>_show_p1/<base>_show_p2).
+_PAGE_DUPLICATABLE = {"big_clock_position": "big_clock", "notifications_position": "notifications"}
+
+
+def _card_shown_on_page(settings: dict, pos_key: str, page: int) -> bool:
+    """Whether a sentinel should render on the given page. For a
+    duplicatable card, this checks its independent <base>_show_p1/_p2
+    booleans -- but ONLY once the user has actually saved one of them at
+    least once. Until then it falls back to the ORIGINAL single
+    <base>_page value untouched, so an existing install's placement is
+    preserved exactly, with zero migration step needed.
+
+    This fallback relies on big_clock_show_p1/_p2 and
+    notifications_show_p1/_p2 being deliberately ABSENT from
+    config.DEFAULT_SETTINGS -- that absence is what makes "key in
+    settings" a reliable one-time signal for "has this ever been
+    explicitly saved", the same trick storage.load_settings() already
+    uses (onboarding_tour_seen) to tell a fresh install apart from an
+    upgrading one. Don't add these two keys to DEFAULT_SETTINGS without
+    re-deriving this whole fallback.
+    """
+    base = _PAGE_DUPLICATABLE.get(pos_key)
+    if base is None:
+        return settings.get(_sentinel_page_key(pos_key), 1) == page
+    p1_key, p2_key = f"{base}_show_p1", f"{base}_show_p2"
+    if p1_key in settings or p2_key in settings:
+        return settings.get(p1_key if page == 1 else p2_key, False)
+    return settings.get(_sentinel_page_key(pos_key), 1) == page
+
+
+def _card_primary_page(settings: dict, pos_key: str) -> "int | None":
+    """Which page a sentinel's own EXISTING single position/order field
+    applies to -- for a non-duplicatable card this is just its *_page
+    value (unchanged). For a duplicatable card shown on both pages, page
+    1 is always the "primary" (the second page's copy is a separate,
+    additional element handled outside this function entirely -- see
+    dashboard.html's *_DUP_ON_P2 consts) so the existing single position
+    field keeps a single, unambiguous meaning. None means "shown on
+    neither page" (both flags off)."""
+    base = _PAGE_DUPLICATABLE.get(pos_key)
+    if base is None:
+        return settings.get(_sentinel_page_key(pos_key), 1)
+    if _card_shown_on_page(settings, pos_key, 1):
+        return 1
+    if _card_shown_on_page(settings, pos_key, 2):
+        return 2
+    return None
+
+
+def _with_effective_pages(settings: dict) -> dict:
+    """A shallow copy of settings with big_clock_page/notifications_page
+    overridden to their computed PRIMARY page (_card_primary_page)
+    whenever the new independent per-page toggles are in play. Every
+    OTHER template read of these two legacy keys (dashboard.html's
+    BIG_CLOCK_PAGE/NOTIFICATIONS_PAGE consts, setup.html's interleaved-
+    position placement inside the Cards drag board) stays correct
+    without any of those call sites needing to know the new toggles
+    exist at all -- they just keep reading the same key they always
+    have. A card shown on neither page keeps its raw stored value here
+    (harmless either way, since nothing renders it regardless)."""
+    out = dict(settings)
+    for pos_key, page_key in (("big_clock_position", "big_clock_page"),
+                              ("notifications_position", "notifications_page")):
+        primary = _card_primary_page(settings, pos_key)
+        if primary is not None:
+            out[page_key] = primary
+    return out
+
+
 def _overflow_sentinels(settings: dict, hotspots: list, cameras: list, page: int = 1) -> list:
     """Enabled cards/cameras whose saved position is at or past the end
     of THIS PAGE's hotspot list, sorted by that position value with an
@@ -1213,7 +1307,7 @@ def _overflow_sentinels(settings: dict, hotspots: list, cameras: list, page: int
             is_enabled = settings.get(enabled_key, False)
         if not is_enabled:
             continue
-        if settings.get(_sentinel_page_key(pos_key), 1) != page:
+        if _card_primary_page(settings, pos_key) != page:
             continue
         pos = settings.get(pos_key, 0)
         if pos >= hotspot_count:
@@ -1422,7 +1516,11 @@ def setup():
     setup_settings = load_settings()
     setup_cameras  = load_cameras()
     return render_template("setup.html", hotspots=setup_hotspots,
-                           settings=setup_settings, favorites=load_favorites(),
+                           settings=_with_effective_pages(setup_settings), favorites=load_favorites(),
+                           big_clock_p1=_card_shown_on_page(setup_settings, "big_clock_position", 1),
+                           big_clock_p2=_card_shown_on_page(setup_settings, "big_clock_position", 2),
+                           notifications_p1=_card_shown_on_page(setup_settings, "notifications_position", 1),
+                           notifications_p2=_card_shown_on_page(setup_settings, "notifications_position", 2),
                            cameras=setup_cameras, asl_favorites=load_asl_favorites(),
                            bm_tg_favorites=load_bm_tg_favorites(),
                            ircddb_favorites=_ircddb_favorites_for_display(),

@@ -1120,6 +1120,43 @@
         </div>
     </div>
 
+    <div class="section">
+        <div class="section-title">Multi-page cards
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                Big Ass Clock and Notifications can appear on both dashboard pages at once
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            Every other card lives on exactly one page (drag it between the columns above).
+            These two are the exception — each has its own independent switch per page, so you
+            can show it on one, both, or neither, without affecting the other page's copy. A
+            duplicated card's page-2 position isn't drag-orderable yet — it always lands at the
+            end of that page.
+        </p>
+        <div class="toggle-row">
+            <span class="toggle-label">🕐 Big Ass Clock — Dashboard 1</span>
+            <div class="toggle {{ 'on' if big_clock_p1 else '' }}"
+                 id="big-clock-p1-toggle" onclick="this.classList.toggle('on'); saveMultiPageCard()"></div>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">🕐 Big Ass Clock — {{ settings.get('dashboard2_name', 'Dashboard 2') }}</span>
+            <div class="toggle {{ 'on' if big_clock_p2 else '' }}"
+                 id="big-clock-p2-toggle" onclick="this.classList.toggle('on'); saveMultiPageCard()"></div>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">🔔 Notifications — Dashboard 1</span>
+            <div class="toggle {{ 'on' if notifications_p1 else '' }}"
+                 id="notifications-p1-toggle" onclick="this.classList.toggle('on'); saveMultiPageCard()"></div>
+        </div>
+        <div class="toggle-row">
+            <span class="toggle-label">🔔 Notifications — {{ settings.get('dashboard2_name', 'Dashboard 2') }}</span>
+            <div class="toggle {{ 'on' if notifications_p2 else '' }}"
+                 id="notifications-p2-toggle" onclick="this.classList.toggle('on'); saveMultiPageCard()"></div>
+        </div>
+        <span class="status-txt" id="multi-page-status"></span>
+    </div>
+
 </div>
 
 <!-- ═══════════════════════════════════════════════
@@ -3875,6 +3912,24 @@ async function testDxCluster() {
     status.textContent = data.success ? '✓ ' + data.message : '✕ ' + data.message;
     status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
     setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
+}
+
+function saveMultiPageCard() {
+    const status = document.getElementById('multi-page-status');
+    const on = id => document.getElementById(id).classList.contains('on');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            big_clock_show_p1: on('big-clock-p1-toggle'),
+            big_clock_show_p2: on('big-clock-p2-toggle'),
+            notifications_show_p1: on('notifications-p1-toggle'),
+            notifications_show_p2: on('notifications-p2-toggle'),
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved -- reload the dashboard to see the change';
+        setTimeout(() => status.textContent = '', 4000);
+    });
 }
 
 // --- Brandmeister API key (no standalone Test button -- the only
