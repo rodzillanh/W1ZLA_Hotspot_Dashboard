@@ -1614,10 +1614,12 @@ Brandmeister live connection, for a different, narrower purpose).
 ## Spots card
 <!-- wiki-image: pota-card.png -->
 
-Optional dashboard card (Settings → Cards → "Show POTA card", off by
+Optional dashboard card (Settings → Cards → "Show Spots card", off by
 default) — despite the setting name, it's grown into a general **Spots**
-card merging three feeds: **POTA**, **SOTA**, and (opt-in) live **RBN**
-(Reverse Beacon Network) CW/RTTY spots. It's a **fixed-size card** — a
+card merging four feeds: **POTA**, **SOTA**, and two opt-in live
+firehoses, **RBN** (Reverse Beacon Network CW/RTTY skimmer spots) and
+**DX cluster** (human-spotted CW/SSB/digital from a classic packet
+cluster). It's a **fixed-size card** — a
 one-line stat glance, filter chips, then a ranked spot list at a fixed
 height that scrolls — so it sits level with your other cards no matter
 what.
@@ -1638,21 +1640,29 @@ each with real distance/bearing from your station (SOTA's own feed
 carries no coordinates at all, so the app resolves each summit's
 position separately — same as the Live map's "SOTA spots" overlay).
 
-**RBN** is a different kind of feed entirely — a live worldwide firehose
-of CW/RTTY skimmer spots (several per second), so it's **off by
-default** even once configured, toggled per-view with its own filter
-chip. Turning it on swaps the sort dropdown for a **band filter** and
-caps the list to the most recent spots after deduping (the same call
-heard by several skimmers in one pileup collapses to a single row).
-Set it up under Settings → Integrations → Reverse Beacon Network — it's
-a single free public feed, no account needed; the callsign field is
-only used to log in to RBN's feed, not a credential.
+**RBN** and **DX cluster** are a different kind of feed entirely — live
+worldwide firehoses (RBN alone runs several spots *per second*), so both
+are **off by default** even once configured, each toggled per-view with
+its own filter chip. Turning either on swaps the sort dropdown for a
+**band filter** and caps the list to the most recent spots after
+deduping (the same call heard by several skimmers/spotters in one
+pileup collapses to a single row). **RBN** is fully automated (CW/RTTY
+skimmers only, no phone) — set it up under Settings → Integrations →
+Reverse Beacon Network, a single free public feed, no account needed.
+**DX cluster** connects to a real human-run packet cluster (DXSpider or
+AR-Cluster) — since these are federated (not one canonical feed like
+RBN), the host is a plain editable `host:port` field under Settings →
+Integrations → DX Cluster, defaulting to a confirmed-active node but
+changeable to any cluster you prefer. Because a DX cluster's spots come
+from real operators, it's your best source of **phone/SSB** spots —
+RBN's automated skimmers can't hear voice at all. Neither field's
+callsign is a credential; it's only used to log in to the feed.
 
-Every row (POTA, SOTA, or RBN) shows the callsign (linked to QRZ, or a
-program-appropriate profile page when QRZ isn't configured), a
+Every row (POTA, SOTA, RBN, or DX) shows the callsign (linked to QRZ, or
+a program-appropriate profile page when QRZ isn't configured), a
 reference/park/summit where applicable, frequency/band/mode, age, and
-extra per-program detail (distance/bearing, QSO count, or CW
-speed/SNR/spotter).
+extra per-program detail (distance/bearing, QSO count, CW speed/SNR, or
+a spotter's free-text comment).
 
 The **⚙ Stats** button (or the glance line) opens a side drawer with
 your POTA **hunter stats** — parks, QSOs, awards, endorsements — and
@@ -1664,7 +1674,7 @@ Without a callsign the card still works — it just shows the spot list
 without stats.
 
 **Tap-to-tune:** with [Rig control](#rig-control-rigctld) configured,
-every spot's frequency — POTA, SOTA, or RBN — becomes a button that
+every spot's frequency — POTA, SOTA, RBN, or DX cluster — becomes a button that
 tunes your radio to it (and sets the mode, optionally). A pill in the
 card header shows whether the rig server is reachable; when it isn't,
 the frequency is plain text.

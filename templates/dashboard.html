@@ -3237,6 +3237,9 @@
                 {% if settings.get('rbn_enabled', False) %}
                 <span class="spots-filter-chip" id="spots-chip-rbn" onclick="toggleSpotsFilter('rbn')">RBN<span class="n" id="spots-n-rbn">off</span></span>
                 {% endif %}
+                {% if settings.get('dxcluster_enabled', False) %}
+                <span class="spots-filter-chip" id="spots-chip-dx" onclick="toggleSpotsFilter('dx')">DX<span class="n" id="spots-n-dx">off</span></span>
+                {% endif %}
             </div>
             <div class="pota-controls">
                 <span class="pota-cnt">Spots <b id="pota-cnt">—</b><span id="pota-newcnt"></span></span>
@@ -3907,6 +3910,8 @@ const SOTA_CARD_POLL_MS = 120000;  // matches sota.py's CACHE_TTL, same as the m
 const RBN_ENABLED = {{ 'true' if settings.get('rbn_enabled', False) else 'false' }};
 const RBN_POLL_MS = 15000;  // rbn.py's buffer updates continuously server-side; this is just how often the card re-reads it
 const RBN_MAX_ROWS = 25;    // shown after band filter -- RBN is a firehose, see the Spots card mockup discussion
+const DXCLUSTER_ENABLED = {{ 'true' if settings.get('dxcluster_enabled', False) else 'false' }};
+const DXCLUSTER_POLL_MS = 15000;
 const RIG_CONTROL_ENABLED = {{ 'true' if settings.get('rig_control_enabled', False) else 'false' }};
 // DVSwitch card shows when SHOW_DVSWITCH is on AND at least one hotspot
 // has dvswitch_enabled (derived per-poll from data.some(...)). Default
@@ -8690,9 +8695,10 @@ if (SHOW_QSO_STATS) {
 let potaData = null;      // /api/pota
 let sotaCardData = null;  // /api/sota_spots (reused verbatim from the map overlay's own endpoint)
 let rbnCardData = null;   // /api/rbn_spots
+let dxCardData = null;    // /api/dxcluster_spots
 
 const SPOTS_FILTER_KEY = 'w1zla_spots_filter';
-let spotsFilter = { pota: true, sota: true, rbn: false };
+let spotsFilter = { pota: true, sota: true, rbn: false, dx: false };
 try {
     const _savedFilter = JSON.parse(localStorage.getItem(SPOTS_FILTER_KEY) || 'null');
     if (_savedFilter && typeof _savedFilter === 'object') Object.assign(spotsFilter, _savedFilter);
@@ -8821,7 +8827,11 @@ function potaSpotHtml(s, rigOk) {
     </div>`;
 }
 
-function rbnSpotHtml(s, rigOk) {
+// RBN and DX cluster rows share this shape (call/freq/mode/age/comment,
+// no park/summit/QSO-count concept) -- `srcTag` and the detail line are
+// the only real differences: RBN has a fixed dB/speed schema, a DX
+// cluster spot only ever has whatever free text a human typed.
+function firehoseSpotHtml(s, rigOk, srcTag) {
     const age = rbnAgeSec(s.last_seen);
     const call = s.call || '?';
     const lookupHref = QRZ_ENABLED ? `https://www.qrz.com/db/${encodeURIComponent(call)}` : null;
@@ -8834,13 +8844,25 @@ function rbnSpotHtml(s, rigOk) {
         ? `<button class="pota-tune-chip" data-mhz="${freqMhz}" title="Tune the rig to ${freqMhz} MHz via rigctld"
              onclick="rigTune(this, ${s.freq_hz}, '${modeTok}')"><span class="ic">▶</span>${freqMhz}</button> `
         : (freqMhz ? freqMhz + ' ' : '');
+    let detail;
+    if (srcTag === 'RBN') {
+        detail = `${escapeHtml(s.mode || '')} · ${s.speed}${escapeHtml(s.speed_unit || '')} · ${s.snr_db} dB
+           <span class="pota-spot-cmt"> ${escapeHtml(s.tag || '')} · via ${escapeHtml(s.spotter || '?')}</span>`;
+    } else {
+        // A human-typed comment that's ONLY the mode word itself (e.g. "USB")
+        // carries no information beyond what `mode` already shows -- skip it
+        // rather than printing "USB · USB · via ...".
+        const rawComment = s.comment || '';
+        const commentIsJustMode = s.mode && rawComment.toUpperCase() === s.mode.toUpperCase();
+        const commentText = commentIsJustMode ? '' : rawComment;
+        detail = `${s.mode ? escapeHtml(s.mode) + ' · ' : ''}<span class="pota-spot-cmt">${commentText ? escapeHtml(commentText) + ' · ' : ''}via ${escapeHtml(s.spotter || '?')}</span>`;
+    }
     return `
     <div class="pota-spot">
         <div class="pota-dot${age < 30 ? ' fresh' : ''}"></div>
         <div class="pota-spot-main">
-            <div class="pota-spot-top"><span class="src-tag">RBN</span>${callHtml}</div>
-            <div class="pota-spot-sub">${freqCell}${escapeHtml(s.band || '')} · ${escapeHtml(s.mode || '')} · ${s.speed}${escapeHtml(s.speed_unit || '')} · ${s.snr_db} dB
-                <span class="pota-spot-cmt"> ${escapeHtml(s.tag || '')} · via ${escapeHtml(s.spotter || '?')}</span></div>
+            <div class="pota-spot-top"><span class="src-tag">${srcTag}</span>${callHtml}</div>
+            <div class="pota-spot-sub">${freqCell}${escapeHtml(s.band || '')} · ${detail}</div>
         </div>
         <div class="pota-spot-right"><span>${age < 5 ? 'now' : rbnAgeStr(age)}</span></div>
     </div>`;
@@ -8851,12 +8873,14 @@ function renderPotaCard() {
     if (!listEl) return;
 
     const rbnOn = RBN_ENABLED && spotsFilter.rbn;
+    const dxOn = DXCLUSTER_ENABLED && spotsFilter.dx;
+    const firehoseOn = rbnOn || dxOn;
     const sortSel = document.getElementById('pota-sort');
     const bandSel = document.getElementById('pota-band-filter');
-    if (sortSel) sortSel.style.display = rbnOn ? 'none' : '';
-    if (bandSel) bandSel.style.display = rbnOn ? '' : 'none';
+    if (sortSel) sortSel.style.display = firehoseOn ? 'none' : '';
+    if (bandSel) bandSel.style.display = firehoseOn ? '' : 'none';
 
-    ['pota', 'sota', 'rbn'].forEach(p => {
+    ['pota', 'sota', 'rbn', 'dx'].forEach(p => {
         const chip = document.getElementById('spots-chip-' + p);
         if (chip) chip.classList.toggle('active', !!spotsFilter[p]);
     });
@@ -8867,6 +8891,7 @@ function renderPotaCard() {
     const qthLon = potaData ? potaData.qth_lon : null;
     const sotaSpots = sotaRaw.map(s => sotaToPotaShape(s, qthLat, qthLon));
     const rbnSpots = (rbnCardData && rbnCardData.spots) || [];
+    const dxSpots = (dxCardData && dxCardData.spots) || [];
 
     const nPota = document.getElementById('spots-n-pota');
     if (nPota) nPota.textContent = potaSpots.length ? String(potaSpots.length) : '';
@@ -8874,6 +8899,8 @@ function renderPotaCard() {
     if (nSota) nSota.textContent = sotaSpots.length ? String(sotaSpots.length) : '';
     const nRbn = document.getElementById('spots-n-rbn');
     if (nRbn) nRbn.textContent = !RBN_ENABLED ? '' : (spotsFilter.rbn ? String(rbnSpots.length) : 'off');
+    const nDx = document.getElementById('spots-n-dx');
+    if (nDx) nDx.textContent = !DXCLUSTER_ENABLED ? '' : (spotsFilter.dx ? String(dxSpots.length) : 'off');
 
     // --- POTA + SOTA share the existing "hunter" sort/filter controls ---
     const v = (document.getElementById('pota-sort') || {}).value || 'smart';
@@ -8888,18 +8915,19 @@ function renderPotaCard() {
     else if (v === 'fresh') hunterList.sort((a, b) => potaAgeMin(a.spot_time) - potaAgeMin(b.spot_time));
     else                    hunterList.sort((a, b) => potaScore(b) - potaScore(a));
 
-    // --- RBN: band-filtered, freshest first, capped -- see rbn.py's own
-    // module docstring for why this needs a hard cap and a filter at all ---
-    let rbnList = [];
-    if (rbnOn) {
+    // --- RBN + DX cluster: band-filtered, freshest first, capped -- see
+    // rbn.py's own module docstring for why this needs a hard cap at all ---
+    let firehoseList = [];
+    if (firehoseOn) {
         const band = (bandSel && bandSel.value) || '';
-        rbnList = rbnSpots.filter(s => !band || s.band === band);
-        rbnList.sort((a, b) => (b.last_seen || 0) - (a.last_seen || 0));
-        rbnList = rbnList.slice(0, RBN_MAX_ROWS);
+        if (rbnOn) firehoseList = firehoseList.concat(rbnSpots.filter(s => !band || s.band === band).map(s => Object.assign({ _src: 'RBN' }, s)));
+        if (dxOn)  firehoseList = firehoseList.concat(dxSpots.filter(s => !band || s.band === band).map(s => Object.assign({ _src: 'DX' }, s)));
+        firehoseList.sort((a, b) => (b.last_seen || 0) - (a.last_seen || 0));
+        firehoseList = firehoseList.slice(0, RBN_MAX_ROWS);
     }
 
     const newCount = potaSpots.filter(s => s.new_to_you).length;
-    document.getElementById('pota-cnt').textContent = hunterList.length + rbnList.length;
+    document.getElementById('pota-cnt').textContent = hunterList.length + firehoseList.length;
     document.getElementById('pota-newcnt').innerHTML = newCount
         ? ` <span class="pota-newn">· ${newCount} new</span>` : '';
 
@@ -8916,7 +8944,7 @@ function renderPotaCard() {
     }
 
     const emptyEl = document.getElementById('pota-empty');
-    if (emptyEl) emptyEl.style.display = (hunterList.length + rbnList.length) ? 'none' : 'block';
+    if (emptyEl) emptyEl.style.display = (hunterList.length + firehoseList.length) ? 'none' : 'block';
 
     // rig-control pill + whether the tap-to-tune chips should render
     const rig = potaData ? potaData.rig : null;
@@ -8932,7 +8960,7 @@ function renderPotaCard() {
     }
 
     listEl.innerHTML = hunterList.map(s => potaSpotHtml(s, rigOk)).join('')
-        + rbnList.map(s => rbnSpotHtml(s, rigOk)).join('');
+        + firehoseList.map(s => firehoseSpotHtml(s, rigOk, s._src)).join('');
 }
 
 let _rigToastT = null;
@@ -9070,6 +9098,13 @@ function fetchRbnForCard() {
         renderPotaCard();
     }).catch(() => {});
 }
+function fetchDxClusterForCard() {
+    if (!SHOW_POTA || !DXCLUSTER_ENABLED) return;
+    fetch('/api/dxcluster_spots').then(r => r.json()).then(data => {
+        dxCardData = data;
+        renderPotaCard();
+    }).catch(() => {});
+}
 if (SHOW_POTA) {
     fetchPota();
     setInterval(fetchPota, POTA_POLL_MS);
@@ -9078,6 +9113,10 @@ if (SHOW_POTA) {
     if (RBN_ENABLED) {
         fetchRbnForCard();
         setInterval(fetchRbnForCard, RBN_POLL_MS);
+    }
+    if (DXCLUSTER_ENABLED) {
+        fetchDxClusterForCard();
+        setInterval(fetchDxClusterForCard, DXCLUSTER_POLL_MS);
     }
 }
 

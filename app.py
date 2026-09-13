@@ -54,6 +54,7 @@ from wsjtx import WsjtxListener, freq_to_band
 from qrz_logbook import QrzLogbookClient
 from hamalert import HamAlertListener
 from rbn import RbnListener
+from dxcluster import DxClusterListener
 from brandmeister_lastheard import BrandmeisterLastHeardListener
 from satellites import SatelliteTracker
 from starlink_trains import StarlinkTrainClient
@@ -122,6 +123,7 @@ qrz_logbook_client = QrzLogbookClient()
 hamalert_listener = HamAlertListener()
 brandmeister_lh = BrandmeisterLastHeardListener()
 rbn_listener = RbnListener()
+dxcluster_listener = DxClusterListener()
 
 # Gates the Settings "Host power control" buttons -- only true on a
 # standalone install running directly on real Raspberry Pi hardware (see
@@ -262,6 +264,18 @@ def _rebuild_rbn() -> None:
     )
 
 _rebuild_rbn()
+
+def _rebuild_dxcluster() -> None:
+    """configure() itself is a no-op unless enabled/host/callsign actually
+    changed -- same pattern as _rebuild_rbn above."""
+    settings = load_settings()
+    dxcluster_listener.configure(
+        settings.get("dxcluster_enabled", False),
+        settings.get("dxcluster_host", ""),
+        settings.get("dxcluster_callsign", ""),
+    )
+
+_rebuild_dxcluster()
 
 def _rebuild_brandmeister_lh() -> None:
     """configure() itself is a no-op unless enabled state actually
@@ -802,6 +816,12 @@ def api_settings_post():
         settings["rbn_enabled"] = bool(data["rbn_enabled"])
     if "rbn_callsign" in data:
         settings["rbn_callsign"] = data["rbn_callsign"].strip().upper()
+    if "dxcluster_enabled" in data:
+        settings["dxcluster_enabled"] = bool(data["dxcluster_enabled"])
+    if "dxcluster_host" in data:
+        settings["dxcluster_host"] = data["dxcluster_host"].strip()
+    if "dxcluster_callsign" in data:
+        settings["dxcluster_callsign"] = data["dxcluster_callsign"].strip().upper()
     if "push_vapid_contact" in data:
         contact = (data["push_vapid_contact"] or "").strip()
         if contact and not contact.lower().startswith(("mailto:", "http://", "https://")):
@@ -838,6 +858,8 @@ def api_settings_post():
         _rebuild_qrz_logbook()
     if any(k in data for k in ("rbn_enabled", "rbn_callsign")):
         _rebuild_rbn()
+    if any(k in data for k in ("dxcluster_enabled", "dxcluster_host", "dxcluster_callsign")):
+        _rebuild_dxcluster()
     if "push_vapid_contact" in data:
         _rebuild_push_client()
     if any(k in data for k in ("rig_control_enabled", "rig_host", "rig_port",
@@ -2711,6 +2733,33 @@ def api_rbn_spots():
     return jsonify(status)
 
 
+@app.route("/api/test_dxcluster", methods=["POST"])
+def test_dxcluster():
+    """Test a DX cluster Telnet login for the Settings 'Test connection'
+    button -- see DxClusterListener.test_connection()."""
+    data = request.json or {}
+    ok, message = DxClusterListener.test_connection(data.get("host", ""), data.get("callsign", ""))
+    return jsonify({"success": ok, "message": message})
+
+
+@app.route("/api/dxcluster_spots")
+def api_dxcluster_spots():
+    """Live classic packet DX cluster spots for the Spots card's "DX"
+    filter -- see dxcluster.py. Same `freq_hz`/`band` enrichment as
+    /api/rbn_spots, via the same _hf_band_of() helper."""
+    status = dxcluster_listener.status()
+    spots = dxcluster_listener.recent()
+    out = []
+    for s in spots:
+        row = dict(s)
+        hz = int(round(s["freq_khz"] * 1000))
+        row["freq_hz"] = hz
+        row["band"] = _hf_band_of(hz)
+        out.append(row)
+    status["spots"] = out
+    return jsonify(status)
+
+
 @app.route("/api/digipi")
 def api_digipi():
     """DigiPi connection status + recent parsed Direwolf/APRS activity --
@@ -3218,6 +3267,7 @@ def api_import_backup():
         _rebuild_brandmeister_lh()
         _rebuild_qrz_logbook()
         _rebuild_rbn()
+        _rebuild_dxcluster()
 
     return jsonify({"ok": True, "result": result})
 

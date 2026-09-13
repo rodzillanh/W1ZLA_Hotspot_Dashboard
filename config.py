@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.68"
+APP_VERSION = "4.69"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -209,6 +209,8 @@ VERSION_CODENAMES = [
                         # (1972-2022)
     "Crosby",           # v4.68 -- David Crosby, The Byrds / Crosby, Stills
                         # & Nash, singer-songwriter/guitarist (1941-2023)
+    "Parfitt",          # v4.69 -- Rick Parfitt, rhythm guitarist/co-
+                        # founder, Status Quo (1948-2016)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1410,6 +1412,17 @@ DEFAULT_SETTINGS = {
     # credential -- RBN has no password, any typed callsign logs in.
     "rbn_enabled": False,
     "rbn_callsign": "",
+    # DX cluster filter on the Spots card -- a persistent Telnet
+    # connection to a user-CHOSEN classic packet DX cluster (DXSpider/
+    # AR-Cluster/etc., see dxcluster.py), unlike RBN's one fixed global
+    # host. Off by default. `dxcluster_host` defaults to a real, live-
+    # confirmed node (W1NR, Hudson MA) but is a plain editable "host:port"
+    # field, not a hardcoded choice -- DX clusters are a federated
+    # network, there is no single canonical one the way RBN is. Same
+    # "not a credential" callsign convention as rbn_callsign.
+    "dxcluster_enabled": False,
+    "dxcluster_host": "dx.w1nr.net:7300",
+    "dxcluster_callsign": "",
     # Tap-to-tune from the POTA card via a Hamlib rigctld server -- see
     # rigctl.py. Off by default. `rig_host` is the machine running
     # WFView (Settings -> enable RigCtld) or a standalone `rigctld`;

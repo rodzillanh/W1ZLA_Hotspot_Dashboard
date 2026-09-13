@@ -501,6 +501,11 @@ BIOS = {
         "blurb": "Founding member of The Byrds and Crosby, Stills & Nash, whose soaring vocal harmonies helped define folk rock across two influential bands.",
         "wiki": "David_Crosby",
     },
+    "Parfitt": {
+        "name": "Rick Parfitt",
+        "blurb": "Co-founding rhythm guitarist of Status Quo for nearly five decades, anchoring the band's boogie-rock sound with Francis Rossi.",
+        "wiki": "Rick_Parfitt",
+    },
 }
 
 

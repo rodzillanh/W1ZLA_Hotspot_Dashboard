@@ -173,6 +173,22 @@ rbn.py             RbnListener: persistent Telnet connection to the
                    genuine multi-spot-per-second firehose, not just
                    documented as one.
 
+dxcluster.py       DxClusterListener: persistent Telnet connection to a
+                   USER-CONFIGURABLE classic packet DX cluster (DXSpider/
+                   AR-Cluster -- confirmed live against three real,
+                   different-software nodes, all emitting the identical
+                   AK1A-descended "DX de ..." line RBN itself uses) for
+                   the Spots card's opt-in "DX" filter. Same shape as
+                   rbn.py otherwise (dict-keyed dedupe, generation-counter
+                   reconfigure), but the host is a plain editable field,
+                   not a fixed constant -- DX clusters are a federated
+                   network, unlike RBN's one global feed. Mode is only
+                   ever populated when a human operator's free-text
+                   comment happens to start with a recognized mode word;
+                   the raw comment is always kept too, since real cluster
+                   comments are actual human notes ("Italian Navy Ship"),
+                   not RBN's fixed machine-generated schema.
+
 brandmeister_lastheard.py
                    BrandmeisterLastHeardListener: persistent WebSocket to
                    Brandmeister's own public real-time "Last Heard"
@@ -6927,6 +6943,80 @@ config for per-integration credentials; put it in
     at app import time) opened a REAL live connection to RBN mid-test --
     confirming the full real-network path works end-to-end, not just the
     seeded-data rendering path, entirely by accident.
+
+- **DX cluster support (v4.69) -- a direct follow-up to the RBN work
+  above, prompted by the user naming three real, nearby nodes to explore
+  (W1NR, W1NR-9, K1TTT).** Connected to and captured live traffic from
+  all three before writing any code, same discipline as the RBN
+  investigation:
+  - **All three, despite being two different codebases from different
+    operators, emit the IDENTICAL "DX de <spotter>: <freq> <call>
+    <freetext> <hhmm>Z" line RBN's own feed uses** -- confirming this is
+    a shared, decades-old AK1A PacketCluster convention, not something
+    RBN-specific. The one thing that genuinely differs: RBN's trailing
+    field is a fixed machine-generated schema (mode/dB/WPM/tag, always
+    present, always in order); a human-typed cluster spot's trailing
+    field is free text -- sometimes a bare mode ("USB"), sometimes a
+    comment with no mode ("cq dx", "Italian Navy Ship"), sometimes
+    nothing at all. `dxcluster.py`'s parser reflects this honestly: mode
+    is only populated when the comment's first word matches a known mode
+    token, and the raw comment is always kept verbatim regardless, so a
+    genuinely useful human note isn't discarded just because no mode was
+    recognized.
+  - **Real, corrected details found only by connecting live, not by
+    trusting the secondhand descriptions of these nodes**: W1NR-9's own
+    banner states it's filtered to CQ zones **2-8**, not the "1-8" it
+    was first described as. W1NR's own banner shows RBN skimmer spots
+    are mergeable via `SET/SKIMMER` but **OFF by default** -- so a fresh
+    login there is pure human-spotted traffic, not a mix. K1TTT's own
+    banner explicitly states "No RBN spots are available on this node."
+    A DXSpider node also does something unexpected: it greeted the login
+    by a resolved NAME ("Hello Rodney, this is W1NR...") for callsign
+    W1ZLA, not just the callsign -- a real behavior worth knowing about
+    if a future banner-parsing need ever cares about that line, though
+    it wasn't needed here.
+  - **The host is a genuinely user-editable `host:port` Settings field
+    (`dxcluster_host`, default `dx.w1nr.net:7300`), NOT a hardcoded
+    constant the way RBN's is** -- DX clusters are a federated network
+    (confirmed by the existence of three legitimately different, all-
+    live nodes near one station alone), so unlike RBN there is no single
+    canonical host to hardcode. `test_connection()` therefore can't check
+    for one fixed greeting string the way `RbnListener`'s "Hello, <CALL>"
+    check can -- confirmed live that DXSpider and AR-Cluster phrase their
+    banners completely differently from each other, and the host being
+    configurable means a third phrasing is always possible. Uses the
+    same "did the socket stay open" heuristic `hamalert.py`'s own
+    unverified-banner case already established for exactly this reason.
+  - **Deliberately NOT abstracted into a shared base class with
+    `RbnListener`/`HamAlertListener`** despite being structurally almost
+    identical (generation-counter reconfigure, reconnect-with-backoff,
+    dict-keyed dedupe) -- this project has never extracted a shared
+    "PersistentTelnetListener" base across its now-THREE instances of
+    this exact shape, and this follows that same established precedent
+    rather than introducing one now.
+  - **The Spots card's RBN-specific "firehose" handling generalized to
+    cover DX cluster too, in the same pass** -- `renderPotaCard()`'s old
+    `rbnOn`/`rbnList` became `firehoseOn` (true if EITHER the RBN or DX
+    chip is active) and `firehoseList` (both sources merged, tagged
+    `_src`, band-filtered and capped together, freshest-first) -- a DX
+    cluster spot and an RBN spot share a row template
+    (`firehoseSpotHtml(s, rigOk, srcTag)`) since neither has a park/
+    summit/QSO-count concept, only the detail line differs per source.
+  - **A real, caught-by-testing cosmetic bug**: a DX cluster comment
+    that's ONLY the mode word itself (e.g. a spot whose free text is
+    just "USB") rendered as "USB · USB · via ..." -- the extracted
+    `mode` field and the still-intact raw `comment` field said the
+    identical thing twice. Fixed by suppressing the comment specifically
+    when it exactly matches the extracted mode (case-insensitive),
+    caught by an actual rendered screenshot during verification, not by
+    reading the code.
+  - Verified live end-to-end with Playwright (not just the parser in
+    isolation): seeded real captured lines from all three nodes directly
+    into `DxClusterListener._spots`, confirmed the "DX" chip appears,
+    toggling it swaps the sort dropdown for the band filter and renders
+    exactly the seeded rows with the right mode/comment/spotter text,
+    and confirmed the post-fix screenshot shows no more duplicated
+    mode/comment text.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

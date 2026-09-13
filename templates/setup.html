@@ -754,7 +754,7 @@
             <div class="toggle-row">
                 <span class="toggle-label">Show Spots card
                     <span style="font-size:10px;color:var(--text-dim)">
-                        (POTA + SOTA activator spots, plus an opt-in RBN feed -- your POTA hunter stats need a callsign under Integrations)
+                        (POTA + SOTA activator spots, plus opt-in RBN and DX cluster feeds -- your POTA hunter stats need a callsign under Integrations)
                     </span>
                 </span>
                 <div class="toggle {{ 'on' if settings.get('show_pota', False) else '' }}"
@@ -1613,6 +1613,44 @@
         <button class="btn btn-primary" onclick="saveRbn()">Save RBN settings</button>
         <button class="btn btn-info" onclick="testRbn()">Test connection</button>
         <span class="status-txt" id="rbn-status"></span>
+    </div>
+
+    <div class="section">
+        <div class="section-title">DX Cluster
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — feeds the "DX" filter on the Spots card
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            Live human-spotted CW/SSB/digital DX from a classic packet cluster
+            (DXSpider/AR-Cluster) — unlike RBN's automated skimmers, these are real
+            operators, so this is your best source of phone/SSB spots. DX clusters
+            are a federated network — pick any node's host:port; the default below
+            is a real, confirmed-active one, not the only option. The callsign is
+            only used to log in, not a credential.
+        </p>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div style="grid-column:1/-1;display:flex;align-items:center">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="dxcluster-enabled" {% if settings.get('dxcluster_enabled', False) %}checked{% endif %}>
+                    Connect to a DX cluster
+                </label>
+            </div>
+            <div>
+                <label>Cluster host:port</label>
+                <input type="text" id="dxcluster-host" placeholder="dx.w1nr.net:7300"
+                       value="{{ settings.get('dxcluster_host', 'dx.w1nr.net:7300') }}">
+            </div>
+            <div>
+                <label>Login callsign</label>
+                <input type="text" id="dxcluster-callsign" placeholder="e.g. {{ settings.get('pota_callsign', '') or 'W1AW' }}"
+                       value="{{ settings.get('dxcluster_callsign', '') }}">
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveDxCluster()">Save DX cluster settings</button>
+        <button class="btn btn-info" onclick="testDxCluster()">Test connection</button>
+        <span class="status-txt" id="dxcluster-status"></span>
     </div>
 
     <div class="section">
@@ -3798,6 +3836,39 @@ async function testRbn() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             callsign: document.getElementById('rbn-callsign').value.trim(),
+        })
+    });
+    const data = await r.json();
+    status.textContent = data.success ? '✓ ' + data.message : '✕ ' + data.message;
+    status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
+}
+
+function saveDxCluster() {
+    const status = document.getElementById('dxcluster-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            dxcluster_enabled: document.getElementById('dxcluster-enabled').checked,
+            dxcluster_host: document.getElementById('dxcluster-host').value.trim(),
+            dxcluster_callsign: document.getElementById('dxcluster-callsign').value.trim(),
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+async function testDxCluster() {
+    const status = document.getElementById('dxcluster-status');
+    status.textContent = 'Testing...';
+    const r = await fetch('/api/test_dxcluster', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            host: document.getElementById('dxcluster-host').value.trim(),
+            callsign: document.getElementById('dxcluster-callsign').value.trim(),
         })
     });
     const data = await r.json();
