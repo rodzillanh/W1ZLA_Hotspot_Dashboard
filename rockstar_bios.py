@@ -466,6 +466,11 @@ BIOS = {
         "blurb": "Motown singer-songwriter whose \"What's Going On\" reshaped soul music into a vehicle for social commentary, influencing generations of rock and R&B artists alike.",
         "wiki": "Marvin_Gaye",
     },
+    "MeatLoaf": {
+        "name": "Meat Loaf",
+        "blurb": "Bombastic rock vocalist behind \"Bat Out of Hell,\" one of the best-selling albums of all time, built on Jim Steinman's operatic songwriting and Meat Loaf's own theatrical delivery.",
+        "wiki": "Meat_Loaf",
+    },
 }
 
 

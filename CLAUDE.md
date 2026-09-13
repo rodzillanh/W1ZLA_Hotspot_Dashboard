@@ -6595,6 +6595,36 @@ config for per-integration credentials; put it in
   `hotspots_transaction()` too -- this fix only covers the two routes
   known to race today, not every possible future writer.
 
+- **A real, reported bug: the Digital Voice Network Status chip row
+  (`.dv-strip`, v4.57) sat crammed directly against the `.stats-grid`
+  above it with zero gap, on every hotspot card.** `.card-info`'s
+  children (`.stats-grid`/`.dv-strip`/etc.) are plain stacked block
+  divs with no `display:flex`/`gap` on the parent -- each block is
+  responsible for its OWN spacing via margin. `.dv-strip` only had
+  `margin-bottom` (spacing before `recentBlock`), never a `margin-top`
+  to separate it from whatever precedes it, and `.stats-grid` has no
+  `margin-bottom` either -- so the two touched directly. Fixed by adding
+  `margin-top: 10px` to `.dv-strip` (matching its own existing
+  `margin-bottom`, for symmetry). Verified live with a screenshot of both
+  a Brandmeister card (which also shows the separate, NOT-removed
+  `bm_status_text` "Brandmeister: <status>" line right above the chip
+  row -- see below) and a D-Star card.
+- **`hs.bm_status_text` ("Brandmeister: <status>") was NOT actually
+  removed when the Digital Voice Network Status chip row shipped (v4.57),
+  despite that entry's own code comment claiming the old standalone line
+  was "folded into the strip's DMR chip and removed from the template."**
+  Checked what it actually represents before touching it: it's
+  Brandmeister's own `statusText` field (the repeater's CONNECTION status
+  to the network, from `brandmeister.py`'s `lookup()`) -- genuinely
+  different information from the DV chip's DMR value (`bm_static_tgs`,
+  which talkgroup(s) it's statically linked to), not a literal duplicate.
+  Left in place for that reason -- the CLAUDE.md v4.57 entry's "removed"
+  claim most likely describes a DIFFERENT, actually-deleted `.card-tg`
+  "BM static: ..." line, not this one. If duplicate/redundant display
+  is ever reported specifically (not just spacing), re-check whether
+  `bm_status_text` and the DMR chip's value are ever actually identical
+  in practice before deciding to remove either.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
