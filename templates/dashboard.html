@@ -1673,6 +1673,22 @@
         .hf-footer { display: flex; gap: 14px; font-size: 11.5px; color: var(--text-muted); flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--card-border); }
         .hf-footer b { color: var(--text); font-weight: 500; }
         .hf-source { font-size: 10px; color: var(--text-dim); margin-top: 8px; text-align: right; }
+        /* QSO Stats card (v4.63, mockup-approved -- see CLAUDE.md): a mode
+           breakdown as a SECOND plain-text footer row (not a status-style
+           dot+chip -- a mode count is a static breakdown, same kind of
+           data as the bands row right above it, not a live "linked now"
+           state the way this app's other chip components mean), plus a
+           14-day activity sparkline below both. */
+        .hf-footer.second { border-top: none; padding-top: 0; margin-top: 7px; }
+        .qs-spark-wrap { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--card-border); }
+        .qs-spark-head {
+            display: flex; justify-content: space-between; align-items: baseline;
+            font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 8px;
+        }
+        .qs-spark-head span:last-child { text-transform: none; color: var(--text-dim); font-size: 11px; letter-spacing: 0; }
+        .qs-spark-bars { display: flex; align-items: flex-end; gap: 3px; height: 46px; }
+        .qs-spark-bar { flex: 1; background: var(--live-dim); border-radius: 2px 2px 0 0; min-height: 1px; }
+        .qs-spark-bar.today { background: var(--live); }
         .hf-source a { color: var(--text-dim); }
         .hf-unavailable { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
 
@@ -3125,6 +3141,11 @@
                 <div class="hf-stat"><div class="hf-stat-label">Bands</div><div class="hf-stat-val" id="qs-bands">—</div></div>
             </div>
             <div class="hf-footer" id="qs-topbands"></div>
+            <div class="hf-footer second" id="qs-topmodes"></div>
+            <div class="qs-spark-wrap" id="qs-spark-wrap" style="display:none">
+                <div class="qs-spark-head"><span>Last 14 days</span><span id="qs-spark-today">—</span></div>
+                <div class="qs-spark-bars" id="qs-spark-bars"></div>
+            </div>
             <div class="msg-empty" id="qs-empty" style="display:none">No logged QSOs yet -- import an ADIF log or enable live WSJT-X logging in Settings.</div>
         </div>
         {% endif %}
@@ -8473,6 +8494,20 @@ if (SHOW_RECENT_CONTACTS) {
 // Grids are counted at 4-character Maidenhead precision (e.g. "FN42"),
 // the standard grid-square-award granularity -- not the 6-character
 // precision some logs store, which would wildly overcount "grids worked".
+// UTC day key ("YYYY-MM-DD") for a QSO -- logged_at (WSJT-X live logging,
+// QRZ Logbook sync) always wins when present; older ADIF-only entries
+// fall back to the plain QSO_DATE string, same priority Recent Contacts'
+// own sort/timestamp display already uses. UTC (not local time) so the
+// two sources bucket into the SAME calendar day consistently -- an ADIF
+// QSO_DATE has no timezone of its own to convert from, so treating a
+// logged_at epoch as local here would drift the two sources apart by
+// whatever the viewer's own UTC offset happens to be.
+function qsoDayKey(q) {
+    if (q.logged_at) return new Date(q.logged_at * 1000).toISOString().slice(0, 10);
+    if (q.date && q.date.length === 8) return `${q.date.slice(0, 4)}-${q.date.slice(4, 6)}-${q.date.slice(6, 8)}`;
+    return null;
+}
+
 function renderQsoStatsCard(qsos) {
     const subEl = document.getElementById('qs-card-sub');
     const emptyEl = document.getElementById('qs-empty');
@@ -8481,6 +8516,10 @@ function renderQsoStatsCard(qsos) {
     const gridsEl = document.getElementById('qs-grids');
     const bandsEl = document.getElementById('qs-bands');
     const topBandsEl = document.getElementById('qs-topbands');
+    const topModesEl = document.getElementById('qs-topmodes');
+    const sparkWrapEl = document.getElementById('qs-spark-wrap');
+    const sparkBarsEl = document.getElementById('qs-spark-bars');
+    const sparkTodayEl = document.getElementById('qs-spark-today');
     if (!totalEl) return;
 
     const list = qsos || [];
@@ -8489,6 +8528,8 @@ function renderQsoStatsCard(qsos) {
         if (emptyEl) emptyEl.style.display = 'block';
         totalEl.textContent = countriesEl.textContent = gridsEl.textContent = bandsEl.textContent = '—';
         if (topBandsEl) topBandsEl.innerHTML = '';
+        if (topModesEl) topModesEl.innerHTML = '';
+        if (sparkWrapEl) sparkWrapEl.style.display = 'none';
         return;
     }
     if (emptyEl) emptyEl.style.display = 'none';
@@ -8497,6 +8538,8 @@ function renderQsoStatsCard(qsos) {
     const grids4 = new Set(list.map(q => (q.grid || '').toUpperCase().slice(0, 4)).filter(g => g.length === 4));
     const bandCounts = {};
     list.forEach(q => { if (q.band) bandCounts[q.band] = (bandCounts[q.band] || 0) + 1; });
+    const modeCounts = {};
+    list.forEach(q => { if (q.mode) modeCounts[q.mode] = (modeCounts[q.mode] || 0) + 1; });
 
     totalEl.textContent = list.length;
     countriesEl.textContent = countries.size || '—';
@@ -8507,6 +8550,34 @@ function renderQsoStatsCard(qsos) {
     if (topBandsEl) {
         topBandsEl.innerHTML = topBands.map(([band, n]) => `<span><b>${escapeHtml(band)}</b> ${n}</span>`).join('');
     }
+    const topModes = Object.entries(modeCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    if (topModesEl) {
+        topModesEl.innerHTML = topModes.map(([mode, n]) => `<span><b>${escapeHtml(mode)}</b> ${n}</span>`).join('');
+    }
+
+    // 14-day sparkline -- a plain UTC day-bucket count, no smoothing/
+    // backfill for a genuine zero-QSO day (same "real sparse data isn't a
+    // bug" stance this app's Band Activity card already takes). Bar
+    // height is relative to the busiest day in the window, with a small
+    // floor on any NONZERO day so a lone QSO next to a much busier day
+    // doesn't round down to an invisible sliver.
+    if (sparkWrapEl && sparkBarsEl) {
+        const dayCounts = {};
+        list.forEach(q => { const k = qsoDayKey(q); if (k) dayCounts[k] = (dayCounts[k] || 0) + 1; });
+        const todayKey = new Date().toISOString().slice(0, 10);
+        const days = [];
+        for (let i = 13; i >= 0; i--) days.push(new Date(Date.now() - i * 86400000).toISOString().slice(0, 10));
+        const counts = days.map(k => dayCounts[k] || 0);
+        const maxCount = Math.max(1, ...counts);
+        sparkBarsEl.innerHTML = days.map((k, i) => {
+            const n = counts[i];
+            const pct = n === 0 ? 0 : Math.max(4, Math.round(n / maxCount * 100));
+            return `<div class="qs-spark-bar${k === todayKey ? ' today' : ''}" style="height:${pct}%" title="${k}: ${n} QSO${n === 1 ? '' : 's'}"></div>`;
+        }).join('');
+        if (sparkTodayEl) sparkTodayEl.textContent = `${dayCounts[todayKey] || 0} today`;
+        sparkWrapEl.style.display = 'block';
+    }
+
     if (subEl) subEl.textContent = `${list.length} logged`;
 }
 

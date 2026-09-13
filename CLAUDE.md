@@ -6625,6 +6625,53 @@ config for per-integration credentials; put it in
   `bm_status_text` and the DMR chip's value are ever actually identical
   in practice before deciding to remove either.
 
+- **QSO Stats gained a mode-count row + a 14-day activity sparkline
+  (v4.63) -- a mockup-driven design decision that went through a real
+  correction mid-round, worth recording since it's a small but
+  instructive example of "match the app's existing visual grammar, don't
+  introduce a new one."** The user's own first-cut mockup (a request to
+  combine an earlier "mode breakdown" option with a "sparkline" option)
+  used a colored-dot chip/pill for each mode, matching Digital Voice
+  Network Status's own `.dv-chip` styling -- reported back directly as
+  "that pill row just doesn't flow right with the card data." The real
+  reason, only articulated after looking at it rendered rather than
+  reasoned about up front: a dot+chip in THIS app always means "linked/
+  connected right now" (Digital Voice Network Status, ASL Favorites,
+  `.linked-item`/`.asl-ctrl-mode-badge` elsewhere -- status is color,
+  identity is text, per that convention's own documented reasoning), but
+  a mode COUNT is a static historical breakdown, not a live state --
+  visually borrowing status language for non-status data is what read as
+  "off," not a spacing or color problem. Fixed by re-mocking with modes
+  as a second plain-text `.hf-footer` row (`.hf-footer.second`, same
+  "**label** count" shape as the existing bands row directly above it,
+  just with `border-top: none` so the two rows share ONE divider from
+  the stat tiles rather than each drawing its own) -- the same kind of
+  data gets the same visual treatment, not a new component per data type.
+  - **`qsoDayKey(q)` buckets in UTC, not local time, deliberately** --
+    `logged_at` (WSJT-X live logging / QRZ Logbook sync) is a real Unix
+    epoch, but a legacy ADIF-only QSO's `date` field (`QSO_DATE`,
+    `YYYYMMDD`) has no timezone of its own to convert from. Bucketing
+    `logged_at` by the VIEWER's local calendar day while `date` is
+    implicitly UTC would silently split what should be the same day into
+    two different buckets depending on the browser's own UTC offset --
+    both sources convert to a UTC day key instead, so they land
+    consistently regardless of viewer timezone.
+  - **A zero-QSO day renders as a literal zero-height bar, not smoothed
+    or backfilled** -- same "real sparse data isn't a bug" stance
+    `wspr_activity.py`'s Band Activity card already takes elsewhere in
+    this file. Only NONZERO days get a small height floor (`Math.max(4,
+    ...)`), so a single lone QSO next to a much busier day doesn't round
+    down to an invisible sliver -- a real zero stays honestly at 0%.
+  - Verified live with a seeded mix of `logged_at`-bearing and legacy
+    `date`-only QSOs spread across the 14-day window (not just one
+    source): confirmed the bands/modes rows compute and rank correctly,
+    confirmed exactly 14 bars render with exactly one flagged `.today`,
+    confirmed the mode row's `border-top-width` computes to `0px` (no
+    double divider), confirmed a genuinely empty logbook hides the
+    sparkline entirely and shows the existing empty-state note rather
+    than an empty/broken chart, and compared the rendered screenshot
+    directly against the approved mockup before considering this done.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
