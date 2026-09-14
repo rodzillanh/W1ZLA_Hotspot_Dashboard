@@ -546,6 +546,11 @@ BIOS = {
         "blurb": "Plainspoken singer-songwriter revered for wry, deeply human lyrics on songs like 'Angel from Montgomery' and 'Sam Stone'.",
         "wiki": "John_Prine",
     },
+    "Emerson": {
+        "name": "Keith Emerson",
+        "blurb": "Virtuoso keyboardist and co-founder of Emerson, Lake & Palmer, known for bringing classical-influenced bombast and Moog synthesizer wizardry to progressive rock.",
+        "wiki": "Keith_Emerson",
+    },
 }
 
 

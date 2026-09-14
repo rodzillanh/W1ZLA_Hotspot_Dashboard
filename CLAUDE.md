@@ -7754,6 +7754,30 @@ config for per-integration credentials; put it in
     QRZ -- all before and after the height trim, confirming the CSS-only
     change didn't regress any of the functional behavior.
 
+- **A real, reported bug: `qrzLinkHtml()`'s callsign links on the
+  Beacons and Nearby Repeaters cards rendered in the browser's default
+  blue/underlined link color, not the app's own theme (v4.78).** Root
+  cause: `qrzLinkHtml()` returns a bare `<a href="...">` with no class
+  at all, wrapped inside a parent element (`.bcn-now .call`, `.bcn-row
+  .who .c`, `.rpt-row .call`) that sets `color: var(--text)` -- but a
+  browser's UA stylesheet gives `<a>` elements their own default color
+  directly on the element, which wins over an inherited color from a
+  parent. Every OTHER callsign link in this app avoids this because it
+  either sets a class directly on the anchor (`.qso-call { color:
+  var(--link); ... }`) or the anchor sits inside a rule that explicitly
+  targets `a` too (`.hs-tg-nokey a`, `.flights-footer a`, etc.) --
+  `qrzLinkHtml()` was a genuinely new call pattern (a helper injecting
+  a raw anchor into an existing text-styled span) that none of the
+  existing per-component `a` rules happened to cover. Fixed with
+  `color: inherit` on the anchor (so it always matches its parent's
+  `--text`) and `color: var(--link)` only on `:hover` (matching this
+  app's `--link` token, which is `var(--live)`) -- the same
+  hover-reveals-interactivity pattern already established elsewhere.
+  If `qrzLinkHtml()` (or a similar raw-anchor-into-styled-text helper)
+  is ever reused in a NEW component, check whether that component's own
+  CSS already has an `a` rule covering it before assuming inherited
+  `color` is enough -- it silently isn't, and a browser won't complain.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
