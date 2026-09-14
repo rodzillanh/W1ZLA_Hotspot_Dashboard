@@ -551,6 +551,11 @@ BIOS = {
         "blurb": "Virtuoso keyboardist and co-founder of Emerson, Lake & Palmer, known for bringing classical-influenced bombast and Moog synthesizer wizardry to progressive rock.",
         "wiki": "Keith_Emerson",
     },
+    "Lake": {
+        "name": "Greg Lake",
+        "blurb": "Singer, bassist, and co-founder of Emerson, Lake & Palmer (and a founding member of King Crimson), known for his rich baritone voice on tracks like 'Lucky Man' and the perennial holiday hit 'I Believe in Father Christmas'.",
+        "wiki": "Greg_Lake",
+    },
 }
 
 

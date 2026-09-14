@@ -7777,6 +7777,24 @@ config for per-integration credentials; put it in
   is ever reused in a NEW component, check whether that component's own
   CSS already has an `a` rule covering it before assuming inherited
   `color` is enough -- it silently isn't, and a browser won't complain.
+  **The v4.78 fix missed a second, different link on the same card**:
+  the Nearby Repeaters footer's own "Source: hearham.com" attribution
+  link (a plain, separate `<a>`, nothing to do with `qrzLinkHtml()`)
+  had the identical root cause -- `.rpt-foot` set `color: var(--text-
+  dim)` on itself but never on `a` specifically, so the anchor still
+  fell back to the browser default. Fixed in v4.79 with a plain
+  `.rpt-foot a { color: var(--text-dim); }` rule, matching the
+  established pattern every OTHER card's own footer-attribution link
+  already uses (`.hf-source a`, `.ba-footer a`, `.bp-caveat a`, etc.).
+  **Lesson**: when a "links render in the wrong color" report comes in
+  for a card, check EVERY anchor on that card, not just the one in the
+  screenshot circled -- a single component can have more than one bare,
+  unstyled `<a>` slipped in during the same build. (The Live map's one
+  other bare, unstyled popup link -- `renderMapKey()`'s "Go to card →"
+  in a favorite-hunted-caller popup -- was checked and deliberately
+  left alone: Leaflet popups render on their own default WHITE
+  background, never re-themed dark anywhere in this app, so the
+  browser's default blue is actually the right call there, not a bug.)
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
