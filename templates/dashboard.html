@@ -1696,6 +1696,81 @@
         .ql-submit.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); background: color-mix(in srgb, var(--good) 10%, transparent); }
         .ql-submit.err { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 
+        /* --- Beacons card (NCDXF/IARU International Beacon Project) ---
+           Pure client-side math from UTC time, no fetch -- see
+           renderBeaconsCard()'s own comment for the timing derivation,
+           confirmed live against ncdxf.org/beacon/index.html. */
+        .bcn-band-tabs { display: flex; gap: 5px; margin-bottom: 8px; }
+        .bcn-band-tab { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; padding: 4px 9px;
+            border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text-muted);
+            cursor: pointer; appearance: none; }
+        .bcn-band-tab.on { color: var(--live); border-color: color-mix(in srgb, var(--live) 45%, var(--border));
+            background: color-mix(in srgb, var(--live) 10%, transparent); }
+
+        .bcn-now { display: flex; align-items: center; gap: 12px; padding: 9px 13px; border-radius: 10px;
+            background: color-mix(in srgb, var(--live) 8%, transparent); border: 1px solid color-mix(in srgb, var(--live) 35%, var(--border));
+            margin-bottom: 8px; }
+        .bcn-now .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--live); flex: 0 0 auto;
+            box-shadow: 0 0 0 4px var(--live-dim); animation: bcnpulse 3s linear infinite; }
+        @keyframes bcnpulse { 0% { opacity: .5; } 50% { opacity: 1; } 100% { opacity: .5; } }
+        .bcn-now .call { font-family: var(--font-mono); font-weight: 700; font-size: 17px; color: var(--text); }
+        .bcn-now .qth { font-size: 12px; color: var(--text-muted); }
+        .bcn-now .ctdown { margin-left: auto; font-family: var(--font-mono); font-size: 13px; color: var(--live); font-variant-numeric: tabular-nums; }
+
+        .bcn-list { display: flex; flex-direction: column; height: 120px; overflow-y: auto; margin: 0 -4px; padding: 0 4px;
+            scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+        .bcn-list::-webkit-scrollbar { width: 8px; }
+        .bcn-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; border: 2px solid var(--panel); }
+        .bcn-row { display: grid; grid-template-columns: 20px 1fr auto; gap: 9px; align-items: center;
+            padding: 6px 4px; border-radius: 6px; }
+        .bcn-row + .bcn-row { border-top: 1px solid var(--border-soft); }
+        .bcn-row.next { background: color-mix(in srgb, var(--live) 6%, transparent); }
+        .bcn-row .slot { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+        .bcn-row .who { display: flex; flex-direction: column; min-width: 0; }
+        .bcn-row .who .c { font-family: var(--font-mono); font-weight: 700; font-size: 12.5px; color: var(--text); }
+        .bcn-row .who .q { font-size: 10.5px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bcn-row .in { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+        .bcn-foot { font-size: 10.5px; color: var(--text-dim); padding-top: 6px; margin-top: 4px; border-top: 1px solid var(--border-soft);
+            line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* --- Nearby Repeaters card (hearham.com) --- */
+        .rpt-filter-row { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+        .rpt-chip { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; padding: 4px 9px;
+            border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text-muted);
+            cursor: pointer; appearance: none; }
+        .rpt-chip.on { color: var(--live); border-color: color-mix(in srgb, var(--live) 45%, var(--border));
+            background: color-mix(in srgb, var(--live) 10%, transparent); }
+        .rpt-chip.count { margin-left: auto; background: none; border: none; color: var(--text-dim); font-weight: 400; cursor: default; }
+
+        .rpt-list { display: flex; flex-direction: column; height: 180px; overflow-y: auto; margin: 0 -4px; padding: 0 4px;
+            scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+        .rpt-list::-webkit-scrollbar { width: 8px; }
+        .rpt-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; border: 2px solid var(--panel); }
+        .rpt-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 8px 4px; }
+        .rpt-row + .rpt-row { border-top: 1px solid var(--border-soft); }
+        .rpt-row .top { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+        .rpt-row .call { font-family: var(--font-mono); font-weight: 700; font-size: 13px; color: var(--text); }
+        .rpt-row .name { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .rpt-row .mode { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .04em;
+            padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); color: var(--text-muted); background: var(--panel-2); flex: 0 0 auto; }
+        .rpt-row .mode.dmr    { color: #e67e22; border-color: rgba(230,126,34,.4); }
+        .rpt-row .mode.fusion { color: #9b59b6; border-color: rgba(155,89,182,.4); }
+        .rpt-row .mode.d-star { color: #00bcd4; border-color: rgba(0,188,212,.4); }
+        .rpt-row .mode.p25    { color: #2ecc71; border-color: rgba(46,204,113,.4); }
+        .rpt-row .mode.nxdn   { color: #f1c40f; border-color: rgba(241,196,15,.4); }
+        .rpt-row .sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+        .rpt-row .dist { text-align: right; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-muted); align-self: start; }
+        .rpt-row .dist b { color: var(--text); font-weight: 600; }
+        .rpt-tune-chip { appearance: none; border: none; background: none; color: var(--live); cursor: pointer;
+            font-family: var(--font-mono); font-size: 11px; padding: 0; display: inline-flex; align-items: center; gap: 3px; }
+        .rpt-tune-chip .ic { font-size: 9px; }
+        .rpt-tune-chip.pending { color: var(--caution); }
+        .rpt-tune-chip.ok { color: var(--good); }
+        .rpt-tune-chip.err { color: var(--danger); }
+        .rpt-foot { font-size: 10.5px; color: var(--text-dim); padding-top: 6px; margin-top: 4px; border-top: 1px solid var(--border-soft);
+            line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .rpt-empty { color: var(--text-muted); font-size: 12px; text-align: center; padding: 34px 10px; }
+
         /* --- HamAlert card --- */
         .ha-badge {
             font-size: 10px; font-weight: 600; letter-spacing: .3px; padding: 1px 7px; border-radius: 9px;
@@ -3436,6 +3511,30 @@
                     title="Logs to QRZ, then adds it to Recent Contacts too">📤 Log to QRZ</button>
         </div>
         {% endif %}
+        {% if settings.get('show_beacons', False) %}
+        <div class="metrics-card" id="beacons-card"
+             style="order:{{ settings.get('beacons_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name" title="NCDXF/IARU International Beacon Project — 18 worldwide beacons, 3-minute ladder, 10 seconds per band per beacon">📡 Beacons</div>
+            </div>
+            <div class="bcn-band-tabs" id="bcn-band-tabs"></div>
+            <div class="bcn-now" id="bcn-now"></div>
+            <div class="bcn-list" id="bcn-list"></div>
+            <div class="bcn-foot">Who you can actually hear right now is a live propagation read.</div>
+        </div>
+        {% endif %}
+        {% if settings.get('show_repeaters', False) %}
+        <div class="metrics-card" id="repeaters-card"
+             style="order:{{ settings.get('repeaters_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name" title="hearham.com's open worldwide repeater directory, free and no auth — within {{ settings.get('repeaters_radius_mi', 50) }} mi of your station grid (change the radius under Settings → Integrations)">🗼 Nearby Repeaters</div>
+                <span class="rp-pill" id="rpt-rig-pill" style="display:none"><span class="d"></span><span id="rpt-rig-pill-txt">rig</span></span>
+            </div>
+            <div class="rpt-filter-row" id="rpt-filter-row"></div>
+            <div class="rpt-list" id="rpt-list"><div class="rpt-empty">Loading…</div></div>
+            <div class="rpt-foot">Source: <a href="https://hearham.com" target="_blank" rel="noopener">hearham.com</a> — within {{ settings.get('repeaters_radius_mi', 50) }} mi.</div>
+        </div>
+        {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
         <div class="metrics-card" id="hf-conditions-card"
              style="order:{{ settings.get('hf_conditions_position', 0) }}">
@@ -3985,6 +4084,8 @@ const POTA_PAGE              = {{ settings.get('pota_page', 1) }};
 const HF_FAVORITES_PAGE      = {{ settings.get('hf_favorites_page', 1) }};
 const RIG_PANEL_PAGE         = {{ settings.get('rig_panel_page', 1) }};
 const QRZ_QUICK_LOG_PAGE     = {{ settings.get('qrz_quick_log_page', 1) }};
+const BEACONS_PAGE           = {{ settings.get('beacons_page', 1) }};
+const REPEATERS_PAGE         = {{ settings.get('repeaters_page', 1) }};
 const DVSWITCH_PAGE          = {{ settings.get('dvswitch_page', 1) }};
 const DASHBOARD2_NAME        = {{ settings.get('dashboard2_name', 'Dashboard 2') | tojson }};
 // Whether the "Dashboard 2" tab even appears -- presence-derived (any
@@ -4084,6 +4185,11 @@ const RIG_PANEL_POSITION = {{ settings.get('rig_panel_position', 0) }};
 const RIG_PANEL_POLL_MS = 1000;
 const SHOW_QRZ_QUICK_LOG = {{ 'true' if settings.get('show_qrz_quick_log', False) else 'false' }};
 const QRZ_QUICK_LOG_POSITION = {{ settings.get('qrz_quick_log_position', 0) }};
+const SHOW_BEACONS = {{ 'true' if settings.get('show_beacons', False) else 'false' }};
+const BEACONS_POSITION = {{ settings.get('beacons_position', 0) }};
+const SHOW_REPEATERS = {{ 'true' if settings.get('show_repeaters', False) else 'false' }};
+const REPEATERS_POSITION = {{ settings.get('repeaters_position', 0) }};
+const REPEATERS_POLL_MS = 60000;  // hearham's backend cache is 24h; no need to re-poll faster than this
 const POTA_POLL_MS = 20000;  // matches pota.py's spot cache TTL
 const SOTA_CARD_POLL_MS = 120000;  // matches sota.py's CACHE_TTL, same as the map overlay's own interval
 const RBN_ENABLED = {{ 'true' if settings.get('rbn_enabled', False) else 'false' }};
@@ -4663,6 +4769,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     recentcontacts: '__recent_contacts__', qsostats: '__qso_stats__',
     topactivity: '__top_activity__', pota: '__pota__', dvswitch: '__dvswitch__',
     hffav: '__hf_favorites__', rigpanel: '__rig_panel__', qrzquicklog: '__qrz_quick_log__',
+    beacons: '__beacons__', repeaters: '__repeaters__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -4869,10 +4976,17 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (SHOW_QRZ_QUICK_LOG && QRZ_QUICK_LOG_PAGE === page) {
         sentinels.push({ key: 'qrzquicklog', pos: Math.max(0, QRZ_QUICK_LOG_POSITION) });
     }
+    if (SHOW_BEACONS && BEACONS_PAGE === page) {
+        sentinels.push({ key: 'beacons', pos: Math.max(0, BEACONS_POSITION) });
+    }
+    if (SHOW_REPEATERS && REPEATERS_PAGE === page) {
+        sentinels.push({ key: 'repeaters', pos: Math.max(0, REPEATERS_POSITION) });
+    }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, hfcond, bandplan,
     // licensequiz, wspractivity, digipi, bigclock, notifications, satellites,
-    // recentcontacts, qsostats, topactivity, pota, hffav, rigpanel, qrzquicklog, THEN cameras), since
+    // recentcontacts, qsostats, topactivity, pota, hffav, rigpanel, qrzquicklog,
+    // beacons, repeaters, THEN cameras), since
     // computeCardOrders() below now relies on a stable sort to break ties
     // by insertion order, not by an independent alphabetical rule. Two
     // sentinels can easily tie on position (e.g. right after enabling
@@ -4948,6 +5062,10 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (rigPanelCard && 'rigpanel' in sentinelOrders) { moveIfNeeded(rigPanelCard, cardsOuter); rigPanelCard.style.order = sentinelOrders.rigpanel; }
     const qrzQuickLogCard = document.getElementById('qrz-quick-log-card');
     if (qrzQuickLogCard && 'qrzquicklog' in sentinelOrders) { moveIfNeeded(qrzQuickLogCard, cardsOuter); qrzQuickLogCard.style.order = sentinelOrders.qrzquicklog; }
+    const beaconsCard = document.getElementById('beacons-card');
+    if (beaconsCard && 'beacons' in sentinelOrders) { moveIfNeeded(beaconsCard, cardsOuter); beaconsCard.style.order = sentinelOrders.beacons; }
+    const repeatersCard = document.getElementById('repeaters-card');
+    if (repeatersCard && 'repeaters' in sentinelOrders) { moveIfNeeded(repeatersCard, cardsOuter); repeatersCard.style.order = sentinelOrders.repeaters; }
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -9992,6 +10110,225 @@ function qlSubmit() {
         rigToast('Network error', 'err');
         setTimeout(() => { btn.classList.remove('err'); btn.textContent = '📤 Log to QRZ'; }, 3200);
     });
+}
+
+// --- Beacons card (NCDXF/IARU International Beacon Project) ---
+// Pure client-side math from UTC time -- no fetch, no backend module,
+// same "zero backend" shape as Big Ass Clock/Band Plan. The schedule
+// itself (18 beacons, 5 bands, 10s/slot, 180s ladder) was confirmed
+// directly against ncdxf.org/beacon/index.html, not assumed:
+//   "Each beacon transmits once on each band once every three minutes...
+//   At the end of each 10 second transmission, the beacon steps to the
+//   next higher band and the next beacon in the sequence begins
+//   transmitting."
+// 18 beacons x 10s = the full 180s cycle divides evenly, and since
+// 3600 (seconds/hour) is itself a multiple of 180, a bare
+// `unix_epoch mod 180` needs no phase-alignment fudge -- verified
+// against NCDXF's own published example row (4U1UN at :00 on 14.100,
+// :10 on 18.110, :20 on 21.150, :30 on 24.930, :40 on 28.200 within the
+// same hour) before trusting it, not just derived from the English
+// description alone.
+const BEACON_STATIONS = [
+    { call: '4U1UN',   qth: 'United Nations HQ, New York' },
+    { call: 'VE8AT',   qth: 'Inuvik, NT, Canada' },  // moved from Eureka -- ncdxf.org's own current notice, not the older commonly-cited location
+    { call: 'W6WX',    qth: 'Mt. Umunhum, CA, USA' },
+    { call: 'KH6RS',   qth: 'Maui, Hawaii' },
+    { call: 'ZL6B',    qth: 'Masterton, New Zealand' },
+    { call: 'VK6RBP',  qth: 'Rolystone, Australia' },
+    { call: 'JA2IGY',  qth: 'Mt. Asama, Japan' },
+    { call: 'RR9O',    qth: 'Novosibirsk, Russia' },
+    { call: 'VR2B',    qth: 'Hong Kong' },
+    { call: '4S7B',    qth: 'Colombo, Sri Lanka' },
+    { call: 'ZS6DN',   qth: 'Pretoria, South Africa' },
+    { call: '5Z4B',    qth: 'Kikuyu, Kenya' },
+    { call: '4X6TU',   qth: 'Tel Aviv, Israel' },
+    { call: 'OH2B',    qth: 'Lohja, Finland' },
+    { call: 'CS3B',    qth: 'Madeira, Portugal' },
+    { call: 'LU4AA',   qth: 'Buenos Aires, Argentina' },
+    { call: 'OA4B',    qth: 'Lima, Peru' },
+    { call: 'YV5B',    qth: 'Caracas, Venezuela' },
+];
+// Offset in 10s slots "behind" 14.100's own lineup -- a beacon steps up
+// one band every 10s, so whoever's on 18.110 right now started their
+// slot 10s (1 slot) before whoever's on 14.100 right now, and so on.
+const BEACON_BANDS = [
+    { hz: 14100000, label: '14.100', offset: 0 },
+    { hz: 18110000, label: '18.110', offset: 1 },
+    { hz: 21150000, label: '21.150', offset: 2 },
+    { hz: 24930000, label: '24.930', offset: 3 },
+    { hz: 28200000, label: '28.200', offset: 4 },
+];
+let beaconSelectedBand = (() => {
+    try { return parseInt(localStorage.getItem('beacons-band'), 10) || 0; } catch (e) { return 0; }
+})();
+
+// Shared by the Beacons and Nearby Repeaters cards -- both show real,
+// licensed amateur callsigns (a beacon is a real licensed station too,
+// e.g. 4U1UN/JA2IGY), linked to QRZ the same way every other callsign
+// in this app is, when QRZ's configured.
+function qrzLinkHtml(call) {
+    if (!QRZ_ENABLED) return escapeHtml(call);
+    return `<a href="https://www.qrz.com/db/${encodeURIComponent(call)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(call)}</a>`;
+}
+function beaconSlotNow() {
+    const cyclePos = Math.floor(Date.now() / 1000) % 180;
+    return { baseSlot: Math.floor(cyclePos / 10), secondsLeft: 10 - (cyclePos % 10) };
+}
+function beaconAt(baseSlot, bandOffset) {
+    const idx = ((baseSlot - bandOffset) % 18 + 18) % 18;
+    return BEACON_STATIONS[idx];
+}
+function selectBeaconBand(i) {
+    beaconSelectedBand = i;
+    try { localStorage.setItem('beacons-band', String(i)); } catch (e) {}
+    renderBeaconsCard();
+    // Tap-to-tune: same /api/rig_tune route and rigToast() feedback the
+    // Spots card's own tune chips use -- beacons are always CW, so that's
+    // hardcoded rather than exposed as a chip-per-mode choice.
+    if (!RIG_CONTROL_ENABLED) return;
+    const band = BEACON_BANDS[i];
+    fetch('/api/rig_tune', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ freq_hz: band.hz, mode: 'CW' }),
+    }).then(r => r.json()).then(d => {
+        rigToast(d.ok ? ('Rig → ' + d.message) : ('Tune failed: ' + (d.message || 'rig server error')), d.ok ? 'ok' : 'err');
+    }).catch(() => rigToast('Tune failed: no response from the dashboard', 'err'));
+}
+
+function renderBeaconsCard() {
+    const card = document.getElementById('beacons-card');
+    if (!card) return;
+    const tabsEl = document.getElementById('bcn-band-tabs');
+    const nowEl = document.getElementById('bcn-now');
+    const listEl = document.getElementById('bcn-list');
+    if (!tabsEl || !nowEl || !listEl) return;
+
+    const { baseSlot, secondsLeft } = beaconSlotNow();
+    const band = BEACON_BANDS[beaconSelectedBand];
+
+    tabsEl.innerHTML = BEACON_BANDS.map((b, i) =>
+        `<button class="bcn-band-tab${i === beaconSelectedBand ? ' on' : ''}" onclick="selectBeaconBand(${i})">${b.label}</button>`
+    ).join('');
+
+    const current = beaconAt(baseSlot, band.offset);
+    nowEl.innerHTML = `
+        <span class="dot"></span>
+        <span>
+            <div class="call">${qrzLinkHtml(current.call)}</div>
+            <div class="qth">${escapeHtml(current.qth)}</div>
+        </span>
+        <span class="ctdown">${secondsLeft}s left</span>`;
+
+    // Next 8 stations due on THIS band, soonest first -- each one is
+    // exactly one 10s slot after the previous, so this is just walking
+    // baseSlot backward by band.offset then forward slot by slot.
+    let rows = '';
+    for (let i = 1; i <= 8; i++) {
+        const st = beaconAt(baseSlot + i, band.offset);
+        const inSec = i * 10 - (10 - secondsLeft);
+        rows += `<div class="bcn-row${i === 1 ? ' next' : ''}">
+            <span class="slot">${i === 1 ? '▶' : '·'}</span>
+            <span class="who"><span class="c">${qrzLinkHtml(st.call)}</span><span class="q">${escapeHtml(st.qth)}</span></span>
+            <span class="in">${i === 1 ? 'next' : '+' + inSec + 's'}</span>
+        </div>`;
+    }
+    listEl.innerHTML = rows;
+}
+if (SHOW_BEACONS) {
+    renderBeaconsCard();
+    setInterval(renderBeaconsCard, 1000);
+}
+
+// --- Nearby Repeaters card (hearham.com) ---
+let repeatersData = null;
+let repeaterFilter = 'ALL';
+const REPEATER_MODES = ['ALL', 'FM', 'DMR', 'D-STAR', 'FUSION', 'P25', 'NXDN'];
+
+function renderRepeatersFilterRow() {
+    const row = document.getElementById('rpt-filter-row');
+    if (!row || !repeatersData) return;
+    const rows = repeatersData.repeaters || [];
+    // Only offer a chip for a mode that's actually present nearby -- an
+    // all-FM area shouldn't show three dead DMR/D-Star/Fusion chips,
+    // same "don't show controls for data that isn't there" instinct as
+    // Quick Settings' mapProxyToggleRow() elsewhere in this file.
+    const present = new Set(rows.map(r => r.mode));
+    const chips = REPEATER_MODES.filter(m => m === 'ALL' || present.has(m));
+    row.innerHTML = chips.map(m =>
+        `<button class="rpt-chip${m === repeaterFilter ? ' on' : ''}" onclick="setRepeaterFilter('${m}')">${m === 'ALL' ? 'All' : m}</button>`
+    ).join('') + `<span class="rpt-chip count">${rows.length} nearby</span>`;
+}
+function setRepeaterFilter(m) {
+    repeaterFilter = m;
+    renderRepeatersFilterRow();
+    renderRepeatersList();
+}
+
+function repeaterRowHtml(r, rigOk) {
+    const modeClass = r.mode.toLowerCase();
+    const freqMhz = r.frequency_hz ? (r.frequency_hz / 1e6).toFixed(3) : '';
+    // Tap-to-tune only for FM -- DMR/D-STAR/FUSION/P25/NXDN aren't real
+    // Hamlib CAT modes a conventional rig understands, unlike the Spots
+    // card's FT8/CW/SSB spots (all genuine analog/CAT-settable modes).
+    const canTune = r.mode === 'FM' && rigOk && r.frequency_hz;
+    const freqCell = canTune
+        ? `<button class="rpt-tune-chip" data-mhz="${freqMhz}" title="Tune the rig to ${freqMhz} MHz via rigctld"
+             onclick="rigTune(this, ${r.frequency_hz}, 'FM')"><span class="ic">▶</span>${freqMhz}</button>`
+        : escapeHtml(freqMhz);
+    const offsetMhz = r.offset_hz ? (r.offset_hz / 1e6) : 0;
+    const offsetStr = offsetMhz > 0 ? '+' : (offsetMhz < 0 ? '−' : '');
+    const sub = [freqCell, offsetStr, r.tone ? escapeHtml(r.tone) : null].filter(Boolean).join(' · ');
+    const distBit = (r.dist_mi != null && r.bearing != null)
+        ? `${r.dist_mi} mi ${DIR_NAME[Math.round(((r.bearing % 360) + 360) % 360 / 22.5) % 16]}` : '';
+    return `
+    <div class="rpt-row">
+        <div class="top">
+            <span class="call">${qrzLinkHtml(r.callsign)}</span>
+            <span class="mode ${modeClass}">${escapeHtml(r.mode)}</span>
+            <span class="name">${escapeHtml(r.city || r.group || '')}</span>
+        </div>
+        <div class="dist"><b>${distBit}</b></div>
+        <div class="sub">${sub}</div>
+    </div>`;
+}
+
+function renderRepeatersList() {
+    const listEl = document.getElementById('rpt-list');
+    if (!listEl || !repeatersData) return;
+    const rows = (repeatersData.repeaters || []).filter(r => repeaterFilter === 'ALL' || r.mode === repeaterFilter);
+    if (!rows.length) {
+        listEl.innerHTML = `<div class="rpt-empty">No repeaters within ${repeatersData.radius_mi} mi${repeaterFilter !== 'ALL' ? ' on ' + repeaterFilter : ''}.</div>`;
+        return;
+    }
+    const rig = repeatersData.rig;
+    const rigOk = RIG_CONTROL_ENABLED && !!(rig && rig.reachable);
+    const pill = document.getElementById('rpt-rig-pill');
+    if (pill) {
+        pill.style.display = rig ? '' : 'none';
+        if (rig) {
+            pill.classList.toggle('live', !!rig.reachable);
+            document.getElementById('rpt-rig-pill-txt').textContent = rig.reachable ? (rig.rig || 'rig ready') : 'rig offline';
+        }
+    }
+    listEl.innerHTML = rows.map(r => repeaterRowHtml(r, rigOk)).join('');
+}
+
+function fetchRepeaters() {
+    if (!SHOW_REPEATERS) return;
+    fetch('/api/repeaters').then(r => r.json()).then(data => {
+        if (data.error) {
+            document.getElementById('rpt-list').innerHTML = `<div class="rpt-empty">${data.error === 'station_grid not set' ? 'Set your station grid under Settings → General to see nearby repeaters.' : 'Repeater directory unavailable right now.'}</div>`;
+            document.getElementById('rpt-filter-row').innerHTML = '';
+            return;
+        }
+        repeatersData = data;
+        renderRepeatersFilterRow();
+        renderRepeatersList();
+    }).catch(() => {});
+}
+if (SHOW_REPEATERS) {
+    fetchRepeaters();
+    setInterval(fetchRepeaters, REPEATERS_POLL_MS);
 }
 
 function handleAdifFile(file) {

@@ -125,6 +125,11 @@ SETTINGS = {
     # POTA/SOTA spots the Spots card itself pulls in for its own
     # screenshot -- no separate fake data needed.
     "show_qrz_quick_log": True,
+    "show_beacons": True,
+    # Nearby Repeaters card (v4.77) -- hits the real hearham.com feed,
+    # same "real free API, not faked" treatment as HF Conditions/
+    # Satellites/Band Activity elsewhere in this script.
+    "show_repeaters": True,
     # Rig control on so the POTA card screenshot shows the tap-to-tune
     # frequency chips + the reachability pill -- the actual rigctld
     # probe is monkeypatched to a fixed "reachable" reply below (there's
@@ -408,6 +413,8 @@ CARD_SHOTS = [
     ("hf-favorites-card", "hf-favorites-card.png"),
     ("rig-panel-card", "rig-panel-card.png"),
     ("qrz-quick-log-card", "qrz-quick-log-card.png"),
+    ("beacons-card", "beacons-card.png"),
+    ("repeaters-card", "repeaters-card.png"),
 ]
 
 with sync_playwright() as p:

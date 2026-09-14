@@ -1386,6 +1386,57 @@ module of its own, just data baked into the template.
 - Same drag-and-drop **Card order** placement as every other extra card.
 
 <!-- wiki-group: Optional Cards -->
+## Beacons card
+<!-- wiki-image: beacons-card.png -->
+
+Optional dashboard card (Settings → Cards → "Show Beacons card", off by
+default) — shows which of the 18 **NCDXF/IARU International Beacon
+Project** stations is transmitting right now, on whichever of the 5
+monitored bands you select (14.100 / 18.110 / 21.150 / 24.930 / 28.200
+MHz), plus who's coming up next. No network client, no Python module,
+no setup — like Band Plan above, it's pure clock math baked into the
+template.
+
+- Every 10 seconds a beacon steps up to the next band and the next
+  station in the 18-beacon ladder starts on the vacated one — the whole
+  cycle repeats every 3 minutes, confirmed directly against
+  [ncdxf.org](https://www.ncdxf.org/beacon/index.html)'s own published
+  schedule before building this.
+- Tune the selected band and listen — whichever beacons you can actually
+  copy is a real, live, zero-cost read on propagation to that part of
+  the world right now, the same way hams have used this network for
+  decades.
+- **Tap-to-tune**: with [Rig control](#rig-control-rigctld) configured,
+  clicking a band button also tunes your radio there (CW — the only
+  mode any beacon ever transmits).
+- Beacon callsigns link to QRZ, same as every other callsign in the app.
+- Same drag-and-drop **Card order** placement as every other extra card.
+
+<!-- wiki-group: Optional Cards -->
+## Nearby Repeaters card
+<!-- wiki-image: repeaters-card.png -->
+
+Optional dashboard card (Settings → Cards → "Show Nearby Repeaters card",
+off by default) — a free, no-account worldwide repeater directory from
+[hearham.com](https://hearham.com), filtered to a radius (default 50
+miles, adjustable under Settings → Integrations) around your
+`station_grid`.
+
+- **Filter chips by mode** (FM / DMR / D-STAR / Fusion / P25 / NXDN) —
+  only the modes actually present nearby get a chip, so an all-FM area
+  doesn't show three dead digital-mode buttons.
+- Each row shows **frequency, offset, and tone/code** (a CTCSS tone for
+  FM, a Color Code for DMR, a module letter for D-Star — whatever the
+  mode actually uses), plus **distance and bearing** from your station.
+- **Tap-to-tune** works for FM repeaters when
+  [Rig control](#rig-control-rigctld) is configured — DMR/D-Star/Fusion/
+  P25/NXDN aren't frequencies a conventional CAT-controlled rig can be
+  "tuned" into the way an FM repeater's input/output pair can, so those
+  show as plain text instead.
+- Callsigns link to QRZ, same as every other callsign in the app.
+- Same drag-and-drop **Card order** placement as every other extra card.
+
+<!-- wiki-group: Optional Cards -->
 ## License Quiz card
 <!-- wiki-image: license-quiz-card.png -->
 

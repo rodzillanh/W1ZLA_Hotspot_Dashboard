@@ -46,6 +46,7 @@ from rigctl import RigctlClient
 from rig_panel import RigPanelPoller
 from sota import SotaClient
 from psk_reporter import PskReporterClient
+from repeaters import RepeaterDirectoryClient
 from adif import parse_adif
 from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
@@ -104,6 +105,7 @@ rig_client      = RigctlClient()
 rig_panel_poller = RigPanelPoller()
 sota_client     = SotaClient()
 psk_reporter    = PskReporterClient()
+repeater_client = RepeaterDirectoryClient()
 digipi_monitor  = DigipiMonitor()
 openspot_manager = OpenSpot4Manager(monitor)
 openspot_manager.reconcile(load_hotspots())  # eager start at boot, mirrors mqtt_pub's startup rebuild
@@ -753,6 +755,25 @@ def api_settings_post():
             pass
     if "qrz_quick_log_callsign" in data:
         settings["qrz_quick_log_callsign"] = data["qrz_quick_log_callsign"].strip().upper()
+    if "show_beacons" in data:
+        settings["show_beacons"] = bool(data["show_beacons"])
+    if "beacons_position" in data:
+        try:
+            settings["beacons_position"] = max(0, int(data["beacons_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "show_repeaters" in data:
+        settings["show_repeaters"] = bool(data["show_repeaters"])
+    if "repeaters_position" in data:
+        try:
+            settings["repeaters_position"] = max(0, int(data["repeaters_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "repeaters_radius_mi" in data:
+        try:
+            settings["repeaters_radius_mi"] = max(1, min(500, int(data["repeaters_radius_mi"])))
+        except (TypeError, ValueError):
+            pass
     if "rig_pa_temp_cal" in data:
         settings["rig_pa_temp_cal"] = str(data["rig_pa_temp_cal"] or "").strip()
     if "rig_pa_alert_enabled" in data:
@@ -786,6 +807,7 @@ def api_settings_post():
         "satellites_page", "flights_overhead_page", "recent_contacts_page",
         "qso_stats_page", "top_activity_page", "pota_page",
         "hf_favorites_page", "rig_panel_page", "dvswitch_page", "qrz_quick_log_page",
+        "beacons_page", "repeaters_page",
     ):
         if _page_key in data:
             try:
@@ -1190,6 +1212,8 @@ _SENTINEL_DEFS = [
     ("__hf_favorites__", "show_hf_favorites", "hf_favorites_position", "📻", "HF Favorites", "tap-to-tune memory card"),
     ("__rig_panel__", "show_rig_panel", "rig_panel_position", "📻", "Rig Panel", "live rig front-panel card"),
     ("__qrz_quick_log__", "show_qrz_quick_log", "qrz_quick_log_position", "📝", "Quick Log", "rig-panel-driven QRZ logging card"),
+    ("__beacons__", "show_beacons", "beacons_position", "📡", "Beacons", "NCDXF/IARU beacon ladder card"),
+    ("__repeaters__", "show_repeaters", "repeaters_position", "🗼", "Repeaters", "nearby repeater directory card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -1992,6 +2016,43 @@ def _rig_status_block(settings: dict):
     rig = rig_client.status(settings.get("rig_host", ""), settings.get("rig_port", 4532))
     rig["send_mode"] = bool(settings.get("rig_send_mode", True))
     return rig
+
+@app.route("/api/repeaters")
+def api_repeaters():
+    """Nearby Repeaters card: hearham.com's cached worldwide directory
+    (see repeaters.py), filtered to settings.repeaters_radius_mi around
+    settings.station_grid -- same _haversine_bearing()/rig-status-block
+    reuse as /api/pota above, not a second implementation of either."""
+    settings = load_settings()
+    qth = grid_to_latlon(settings.get("station_grid", ""))
+    if qth is None:
+        return jsonify({"error": "station_grid not set", "repeaters": []}), 503
+    all_rows = repeater_client.get()
+    if all_rows is None:
+        return jsonify({"error": "unavailable"}), 503
+
+    radius_mi = settings.get("repeaters_radius_mi", 50)
+    out = []
+    for r in all_rows:
+        if not r.get("operational", True):
+            continue
+        lat, lon = r.get("latitude"), r.get("longitude")
+        if lat is None or lon is None:
+            continue
+        dist_mi, brg = _haversine_bearing(qth[0], qth[1], lat, lon)
+        if dist_mi > radius_mi:
+            continue
+        row = dict(r)
+        row["dist_mi"] = round(dist_mi, 1)
+        row["bearing"] = round(brg)
+        out.append(row)
+    out.sort(key=lambda r: r["dist_mi"])
+
+    return jsonify({
+        "repeaters": out,
+        "radius_mi": radius_mi,
+        "rig": _rig_status_block(settings),
+    })
 
 
 _HF_BAND_LO, _HF_BAND_HI = 5_250_000, 5_450_000  # 60m -- channelized, not in wsjtx._BAND_EDGES

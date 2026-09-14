@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.75"
+APP_VERSION = "4.77"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -223,6 +223,10 @@ VERSION_CODENAMES = [
                         # Black Sabbath / Dio (1942-2010)
     "Cornick",          # v4.75 -- Glenn Cornick, founding bassist,
                         # Jethro Tull (1947-2014)
+    "Fogelberg",        # v4.76 -- Dan Fogelberg, singer-songwriter
+                        # (1951-2007)
+    "Prine",            # v4.77 -- John Prine, singer-songwriter
+                        # (1946-2020)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1274,6 +1278,21 @@ DEFAULT_SETTINGS = {
     "show_qrz_quick_log": False,
     "qrz_quick_log_position": 0,
     "qrz_quick_log_callsign": "",
+    # Beacons card (v4.76) -- NCDXF/IARU International Beacon Project
+    # ladder, purely computed client-side from UTC time (see
+    # dashboard.html's BEACON_STATIONS/renderBeaconsCard()) -- no fetch,
+    # no backend module, same "zero backend" shape as Big Ass Clock/Band
+    # Plan. Off by default like every other optional card.
+    "show_beacons": False,
+    "beacons_position": 0,
+    # Nearby Repeaters card (v4.77) -- hearham.com's open worldwide
+    # directory (free, no auth, one cached bulk fetch -- see repeaters.py).
+    # `repeaters_radius_mi` is a plain distance filter applied server-side
+    # in /api/repeaters against settings.station_grid; no per-user
+    # credential needed at all, unlike RepeaterBook's own API.
+    "show_repeaters": False,
+    "repeaters_position": 0,
+    "repeaters_radius_mi": 50,
     # APRS.fi — requires a free API key from https://aprs.fi/page/api.
     # Blank disables it.
     "aprs_api_key": "",

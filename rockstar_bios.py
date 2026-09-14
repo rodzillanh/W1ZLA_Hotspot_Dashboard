@@ -536,6 +536,16 @@ BIOS = {
         "blurb": "Founding bassist of Jethro Tull, anchoring the band's early progressive-blues sound before leaving to form Wild Turkey.",
         "wiki": "Glenn_Cornick",
     },
+    "Fogelberg": {
+        "name": "Dan Fogelberg",
+        "blurb": "Singer-songwriter behind soft-rock staples like 'Leader of the Band' and 'Same Old Lang Syne', blending folk, rock, and orchestral pop.",
+        "wiki": "Dan_Fogelberg",
+    },
+    "Prine": {
+        "name": "John Prine",
+        "blurb": "Plainspoken singer-songwriter revered for wry, deeply human lyrics on songs like 'Angel from Montgomery' and 'Sam Stone'.",
+        "wiki": "John_Prine",
+    },
 }
 
 

@@ -7555,6 +7555,205 @@ config for per-integration credentials; put it in
     screen closes cleanly; and confirmed zero console errors in BOTH the
     feature-on and feature-off configurations, not just the happy path.
 
+- **The Beacons card (v4.76) -- the NCDXF/IARU International Beacon
+  Project ladder -- came from browsing github.com/kd9taw/Nexus for
+  feature ideas (same session as the Spots card's own POTA+SOTA+RBN
+  merge, v4.68), and its exact timing math was independently confirmed
+  against NCDXF's own site before writing a line of the real feature,
+  not trusted from Nexus's own `beacons.rs` comments or general ham
+  knowledge alone.**
+  - **A plain WebFetch summary of ncdxf.org's schedule page came back
+    genuinely useful but incomplete** ("the document lacks detailed
+    explanation of the transmission switching mechanism") -- it DID
+    surface one concrete, quotable example row (4U1UN: 00:00/:10/:20/
+    :30/:40 across the five bands), which turned out to be exactly
+    enough to cross-check a formula against once the real mechanism was
+    found. A raw `curl` of the actual page (not the AI-summarized
+    version) found the literal, load-bearing sentence WebFetch's
+    summarization missed: **"At the end of each 10 second transmission,
+    the beacon steps to the next higher band and the next beacon in the
+    sequence begins transmitting."** That one sentence, plus "each
+    beacon transmits once on each band once every three minutes," is
+    the whole mechanism -- confirmed by deriving a formula from it and
+    checking all 5 of the example row's values against that formula
+    before trusting either.
+  - **The derived formula, verified both analytically (against the
+    quoted example) and live (a second, independent Python
+    reimplementation cross-checked against the real browser's JS output
+    at the exact same instant, all 5 bands matching exactly, twice, once
+    before and once after the CSS trim below)**:
+    ```
+    cycle_pos = unix_epoch_seconds mod 180        # 0-179
+    base_slot = floor(cycle_pos / 10)             # 0-17, who's on 14.100 right now
+    band_offset = {14100:0, 18110:1, 21150:2, 24930:3, 28200:4}  # in 10s slots
+    beacon(band) = NCDXF_CALLS[(base_slot - band_offset[band]) mod 18]
+    seconds_left_in_slot = 10 - (cycle_pos mod 10)
+    ```
+    18 beacons x 10s = the full 180s cycle divides evenly, and 3600
+    (seconds/hour) is itself a multiple of 180 -- so a bare `epoch mod
+    180` needs no phase-alignment offset at all; 1970-01-01T00:00:00Z is
+    already an hour boundary. This is genuinely simpler than it first
+    looks precisely BECAUSE the numbers (18 beacons, 10s, 5 bands,
+    180s = 3 min) all divide evenly into each other -- don't add an
+    offset "just in case" if this is ever touched again, re-derive
+    against the same quoted mechanism instead.
+  - **A real, live-confirmed correction the same page surfaced**: NCDXF's
+    own current notice says VE8AT has moved from Eureka to **Inuvik,
+    NT** -- the older, more commonly-cited Eureka location (used in the
+    first mockup) is stale. `BEACON_STATIONS`' location strings were
+    sourced from general ham-radio knowledge otherwise (same disclosed-
+    provenance tier as `rockstar_bios.py`'s codename bios) -- re-verify
+    against ncdxf.org's locations page directly if a station's QTH is
+    ever reported wrong, rather than trusting recall a second time.
+  - **Zero backend, by design -- the third card in this app with no
+    Python module at all** (Band Plan and Big Ass Clock are the other
+    two): the entire schedule is deterministic clock math, so there's
+    nothing to fetch and nothing that can go stale except the STATIC
+    station list itself (which changes on the order of years, not
+    days). `BEACON_STATIONS`/`BEACON_BANDS`/`renderBeaconsCard()` live
+    entirely in `dashboard.html`'s own script block, ticking on a plain
+    `setInterval(renderBeaconsCard, 1000)` gated by `SHOW_BEACONS` --
+    same shape as Big Ass Clock's `renderClock()` gating.
+  - **First-cut card measured 402.5px live -- noticeably taller than
+    this app's own ~300-370px card standard established by the v4.73
+    trim work** -- caught immediately by measuring, not assumed
+    acceptable just because it "looked fine" in the mockup (which had no
+    real neighboring cards to size against). Trimmed the same way v4.73
+    did: `.bcn-list`'s fixed height 176px -> 120px (showing ~3 upcoming
+    beacons instead of ~4, still enough to plan a QSY), tighter
+    inter-block margins (10px/12px -> 8px each), and the two-line
+    permanent footer explanation collapsed to one short line with the
+    fuller "18 beacons, 3-minute ladder, 10s/slot" detail moved into the
+    card name's own `title` tooltip -- the exact "move detail into a
+    tooltip rather than deleting it" move the Spots card's own v4.73
+    trim already established. Landed at 315.7px, re-verified (not
+    assumed unaffected by a CSS-only change) that all 5 bands still
+    matched the independent Python reference after the trim.
+  - **Two follow-up gaps caught by direct user questions right after
+    shipping, not found independently**: the card's scrollbar wasn't
+    checked against the app's own thin-scrollbar convention (it turned
+    out already correct -- `.bcn-list` copies `.pota-spots`' exact
+    `scrollbar-width`/`::-webkit-scrollbar` rules verbatim, just never
+    called out as confirmed), and clicking a band tab didn't tune the
+    rig at all -- only selected which band's ladder to display. Fixed
+    by having `selectBeaconBand(i)` also POST to `/api/rig_tune` (mode
+    `'CW'` hardcoded -- every beacon transmission is CW, there's no
+    per-mode choice to expose) using the exact same route and
+    `rigToast()` feedback the Spots card's own tune chips use, WITHOUT
+    reusing `rigTune()` itself -- that function fully overwrites its
+    button's `innerHTML` with a pending/ok/err icon sequence, which
+    would have clobbered the band tab's own persistent "14.100" label
+    (a tune chip's content is disposable status text; a band tab's
+    label is the whole point of the control). If another button ever
+    needs to BOTH stay a persistent labeled control AND trigger a tune,
+    follow this same pattern -- a bespoke fetch + `rigToast()`, not
+    `rigTune()` -- rather than fighting that function's destructive
+    `innerHTML` contract.
+
+- **Nearby Repeaters card (v4.77) -- hearham.com's open worldwide
+  repeater directory -- was built only after a live full download and
+  inspection of its real JSON schema, not from Nexus's own parser code
+  or a plausible-looking field-name guess.** The RepeaterBook
+  alternative (the more "official" ham repeater directory) was
+  deliberately NOT used -- confirmed by reading Nexus's own
+  `repeaterbook.rs` that its real API requires an approval-gated
+  PERSONAL token (`rbuapp_...`, generated from a RepeaterBook account)
+  with no way to embed a shared credential per RepeaterBook's own terms
+  -- real friction this app's other free integrations don't have.
+  hearham.com's `https://hearham.com/api/repeaters/v1` is a single
+  bulk, free, no-auth GET (confirmed live: 22,670 rows, ~9MB
+  uncompressed) that Nexus itself uses as its own no-auth fallback --
+  the better fit for this app's existing "no per-user credential unless
+  truly unavoidable" posture.
+  - **The real schema has two genuinely messy, overloaded fields --
+    confirmed live by downloading and inspecting the full dataset, not
+    assumed from a couple of hand-picked examples.** `mode` is free
+    text, not a clean enum: `"DMR"`, `"DMR    "` (trailing whitespace
+    literally baked into the source data), `"D-STAR"`, `"D-star"`,
+    `"DSTAR"`, `"YSF/FM"`, `"P25/FM"`, `"NXDN    "`, etc. all appear as
+    DISTINCT literal strings in the same live feed --
+    `repeaters._normalize_mode()` classifies via case-insensitive
+    substring match into a small badge set (FM/DMR/D-STAR/FUSION/P25/
+    NXDN/OTHER), checking more specific digital-mode keywords BEFORE
+    the bare `"fm"` substring, since `"DMR/FM"`/`"YSF/FM"`/`"P25/FM"`
+    all also contain `"fm"`. `encode` is even more overloaded: FM rows
+    carry a real CTCSS tone (`"100.0"`, `"88.5"`, or `"0"`/`"0.00"`/
+    blank for none); DMR rows carry a Color Code (`"CC1"`..`"CC8"`
+    confirmed in the live sample); D-Star rows carry a single module
+    letter (`"B"`/`"C"` confirmed) OR, on some dual-mode repeaters, an
+    actual CTCSS-looking value -- `_tone_label()` interprets `encode`
+    according to the row's OWN normalized mode rather than trusting one
+    universal "this is a tone" assumption, and falls back to showing
+    the raw value as-is (not guessed at) for P25's NAC and NXDN's RAN
+    codes, since neither of those was confirmed against real
+    documentation the way DMR's Color Code and D-Star's module letter
+    were.
+  - **A real bug caught by testing against the FULL live dataset, not
+    a hand-picked sample: an early version showed a misleading "Mod 0"
+    badge on 145 real D-Star rows.** `encode: "0"` on those rows isn't
+    a real D-Star module named "0" -- it's the same "no tone/code set"
+    signal an FM row's `encode: "0"` already means, just landing on a
+    D-Star row instead. Fixed by treating `"0"`/`"0.0"`/`"0.00"` as
+    "no tone" UNIVERSALLY, before any mode-specific interpretation runs
+    -- and by additionally requiring a D-Star module to be a single
+    ALPHA character (matching the real confirmed values `"B"`/`"C"`,
+    not the 4-character `"88.5"` a dual-mode repeater can also report)
+    before applying the `"Mod "` prefix at all, rather than the
+    original's looser `len(enc) <= 2` check.
+  - **`operational` (0/1) is a real, meaningful flag** (19,208 of
+    22,670 rows were `1` in the live sample, not "always 1" the way a
+    rarely-populated flag sometimes turns out to be) -- rows with
+    `operational == 0` are dropped entirely by `/api/repeaters`, same
+    "don't show something as usable that isn't" instinct as
+    `satellites.py`'s own `DEFAULT_SATELLITES` filtering elsewhere in
+    this project.
+  - **Distance/bearing filtering lives in `app.py`'s route, not
+    `repeaters.py` itself** -- the exact same division of
+    responsibility `/api/pota` already has with `pota.py` (the client
+    fetches+normalizes, the route does the geo math via the existing
+    `_haversine_bearing()` helper), so `repeaters.py` never needs to
+    know `settings.station_grid` exists at all. A plain linear scan
+    over all 22,670 cached rows per request is fast enough to not need
+    a spatial index (confirmed live: ~0.2s end to end, including the
+    haversine call per row) -- this is a low-traffic self-hosted
+    dashboard, not a service handling concurrent load.
+  - **Tap-to-tune is deliberately FM-only** -- DMR/D-Star/Fusion/P25/
+    NXDN talkgroup/color-code/module identifiers aren't real Hamlib CAT
+    modes a conventional rig understands the way `'FM'`/`'CW'`/`'USB'`
+    are (unlike the Spots card's own tap-to-tune targets, which are all
+    genuine analog/CAT-settable modes) -- sending one of those digital-
+    mode strings to `/api/rig_tune` would either error or be silently
+    misinterpreted by rigctld, so digital-mode rows show their
+    frequency as plain text instead of a tune chip, same "don't offer a
+    control that doesn't actually do the right thing" instinct as
+    Beacons' own CW-only tune (see above).
+  - **First-cut card measured 392.5px live -- trimmed the same way
+    Beacons (and the whole v4.73 effort) already established**:
+    `.rpt-list`'s fixed height 240px -> 180px, tighter footer, and the
+    fuller "hearham.com's open worldwide directory... change the radius
+    under Settings" explanation moved into the card name's own `title`
+    tooltip, leaving one short line in the permanent footer. Landed at
+    313.7px, re-verified end to end (mode filter chips, FM tap-to-tune,
+    DMR's correctly-absent tune chip, QRZ callsign links) after the
+    trim, not just the height number.
+  - **The radius (`repeaters_radius_mi`, default 50) is a plain
+    Settings → Integrations number field, NOT an in-card gear-icon
+    popup** -- the originally-mocked-up "⚙ 50 mi" gear button was
+    dropped as unnecessary scope: this is a single number with no
+    per-integration credential or connection state to manage, so a
+    small Settings section (mirroring RBN's/DX Cluster's own section
+    shape immediately above it) is simpler than inventing a new
+    in-card settings-popup pattern for one field.
+  - Verified live end-to-end against the REAL downloaded hearham
+    dataset (not synthetic rows) seeded near a real US station grid:
+    226 repeaters found within 50 miles, filter chips only offered for
+    modes actually present, switching to the FM filter showed only FM
+    rows each with a working tune chip (confirmed the exact POSTed
+    `freq_hz`/`mode` and the resulting success toast), switching to DMR
+    correctly showed zero tune chips, and callsigns correctly linked to
+    QRZ -- all before and after the height trim, confirming the CSS-only
+    change didn't regress any of the functional behavior.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

@@ -788,6 +788,24 @@
                      id="qrz-quick-log-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show Beacons card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (NCDXF/IARU International Beacon Project ladder -- which of 18 worldwide beacons is transmitting right now on each band; no setup needed, pure clock math)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_beacons', False) else '' }}"
+                     id="beacons-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show Nearby Repeaters card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (a free worldwide repeater directory via hearham.com, filtered to your station grid's radius -- set under Settings → Integrations)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_repeaters', False) else '' }}"
+                     id="repeaters-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show DVSwitch card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (only appears if an ASL3 hotspot also has "This node also runs DVSwitch" on -- turn this off to hide the card while keeping that enabled)
@@ -942,6 +960,8 @@
             {% set hf_favorites_pos = settings.get('hf_favorites_position', 0) if (settings.get('show_hf_favorites', False) and settings.get('hf_favorites_page', 1) == page) else -1 %}
             {% set rig_panel_pos = settings.get('rig_panel_position', 0) if (settings.get('show_rig_panel', False) and settings.get('rig_panel_page', 1) == page) else -1 %}
             {% set qrz_quick_log_pos = settings.get('qrz_quick_log_position', 0) if (settings.get('show_qrz_quick_log', False) and settings.get('qrz_quick_log_page', 1) == page) else -1 %}
+            {% set beacons_pos = settings.get('beacons_position', 0) if (settings.get('show_beacons', False) and settings.get('beacons_page', 1) == page) else -1 %}
+            {% set repeaters_pos = settings.get('repeaters_position', 0) if (settings.get('show_repeaters', False) and settings.get('repeaters_page', 1) == page) else -1 %}
             {# DVSwitch (v3.99) -- one consolidated card, shown when the
                "Show DVSwitch card" toggle (show_dvswitch, default on) is
                on AND any hotspot has dvswitch_enabled set. #}
@@ -1093,6 +1113,20 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">📝 Quick Log</span>
                     <span class="node-meta">rig-panel-driven QRZ logging card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == beacons_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__beacons__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📡 Beacons</span>
+                    <span class="node-meta">NCDXF/IARU beacon ladder card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == repeaters_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__repeaters__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🗼 Nearby Repeaters</span>
+                    <span class="node-meta">nearby repeater directory card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -1737,6 +1771,30 @@
         <button class="btn btn-primary" onclick="saveDxCluster()">Save DX cluster settings</button>
         <button class="btn btn-info" onclick="testDxCluster()">Test connection</button>
         <span class="status-txt" id="dxcluster-status"></span>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Nearby Repeaters
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — feeds the Nearby Repeaters card
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            A free, no-account worldwide repeater directory from
+            <a href="https://hearham.com" target="_blank" rel="noopener">hearham.com</a>, filtered to
+            this radius around your station grid (set above, under General). No credential needed —
+            just a distance.
+        </p>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>Search radius (miles)</label>
+                <input type="number" id="repeaters-radius" min="1" max="500"
+                       value="{{ settings.get('repeaters_radius_mi', 50) }}">
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveRepeatersRadius()">Save</button>
+        <span class="status-txt" id="repeaters-radius-status"></span>
     </div>
 
     <div class="section">
@@ -2506,6 +2564,8 @@ function saveCards() {
             show_rig_panel: document.getElementById('rig-panel-toggle').classList.contains('on'),
             rig_pa_alert_enabled: document.getElementById('rig-pa-alert-toggle').classList.contains('on'),
             show_qrz_quick_log: document.getElementById('qrz-quick-log-toggle').classList.contains('on'),
+            show_beacons: document.getElementById('beacons-toggle').classList.contains('on'),
+            show_repeaters: document.getElementById('repeaters-toggle').classList.contains('on'),
             show_dvswitch: document.getElementById('dvswitch-card-toggle').classList.contains('on'),
             brandmeister_alerts_enabled: document.getElementById('brandmeister-alerts-toggle').classList.contains('on'),
             qrz_logbook_enabled: document.getElementById('qrz-logbook-toggle').classList.contains('on'),
@@ -2676,6 +2736,8 @@ const SENTINEL_POSITION_FIELDS = [
     ['__hf_favorites__', 'hf_favorites_position'],
     ['__rig_panel__', 'rig_panel_position'],
     ['__qrz_quick_log__', 'qrz_quick_log_position'],
+    ['__beacons__', 'beacons_position'],
+    ['__repeaters__', 'repeaters_position'],
     ['__dvswitch__', 'dvswitch_position'],
 ];
 
@@ -3953,6 +4015,20 @@ function saveDxCluster() {
             dxcluster_enabled: document.getElementById('dxcluster-enabled').checked,
             dxcluster_host: document.getElementById('dxcluster-host').value.trim(),
             dxcluster_callsign: document.getElementById('dxcluster-callsign').value.trim(),
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+function saveRepeatersRadius() {
+    const status = document.getElementById('repeaters-radius-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            repeaters_radius_mi: parseInt(document.getElementById('repeaters-radius').value, 10) || 50,
         })
     }).then(() => {
         status.textContent = '✓ Saved';
