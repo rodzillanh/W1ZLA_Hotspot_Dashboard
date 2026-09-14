@@ -561,6 +561,11 @@ BIOS = {
         "blurb": "Whisper-quiet indie singer-songwriter known for intricate, Beatles-influenced acoustic arrangements and stark, confessional lyrics, including the Oscar-nominated 'Miss Misery'.",
         "wiki": "Elliott_Smith",
     },
+    "HoneymanScott": {
+        "name": "James Honeyman-Scott",
+        "blurb": "Lead guitarist and co-founder of The Pretenders, prized for his melodic, chiming guitar work on hits like 'Brass in Pocket' and 'Kid'.",
+        "wiki": "James_Honeyman-Scott",
+    },
 }
 
 

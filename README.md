@@ -1858,6 +1858,12 @@ station's live state.
 - **📤 Log to QRZ** submits the QSO via QRZ's Logbook API, then adds it
   to [Recent Contacts](#recent-contacts-card) immediately too — one
   click, one write path
+- **✏ Manual** (header button, always available) switches to a fully
+  manual entry form — optional Freq/Mode/Power fields, no rig reading,
+  no spot matching — for logging a contact that never came from the rig
+  or a spot at all (a phone contact, something worked earlier, a
+  paper-log entry). Only the callsign is required. Toggle it off to
+  return to whatever the rig is reporting right now
 
 Needs [Rig control](#rig-control-rigctld) turned on AND a QRZ Logbook
 API key (Settings → Integrations → "QRZ Logbook sync" — the same key

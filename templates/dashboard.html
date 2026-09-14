@@ -1696,6 +1696,42 @@
         .ql-submit.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); background: color-mix(in srgb, var(--good) 10%, transparent); }
         .ql-submit.err { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 
+        /* Manual-entry toggle (v4.81, mockup-approved) -- always present
+           regardless of rig state, for logging a contact that never came
+           from the rig or a spot at all. .ql-header-right groups the
+           toggle with the rig pill so .metrics-header's space-between
+           only ever sees two things, same fix as .card-header-right
+           elsewhere in this file. */
+        .ql-header-right { display: flex; align-items: center; gap: 7px; }
+        .ql-manual-toggle {
+            appearance: none; border: 1px solid var(--border); background: var(--panel-2);
+            border-radius: 20px; color: var(--text-dim); font: inherit; font-size: 10px; font-weight: 700;
+            padding: 3px 9px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+        }
+        .ql-manual-toggle:hover { color: var(--text); border-color: var(--text-muted); }
+        .ql-manual-toggle.on {
+            color: var(--live); border-color: color-mix(in srgb, var(--live) 45%, var(--border));
+            background: color-mix(in srgb, var(--live) 12%, transparent);
+        }
+        /* The bare [hidden] attribute alone doesn't hide this element --
+           .ql-freq-row's own "display: flex" is author-origin CSS, which
+           always outranks the browser's UA-stylesheet "[hidden]{display:
+           none}" regardless of selector specificity. Need an explicit
+           author rule for the combination to actually win. */
+        .ql-freq-row[hidden] { display: none; }
+        .ql-freq-row.manual { align-items: flex-end; gap: 8px; }
+        .ql-mini { flex: 1 1 0; min-width: 0; }
+        .ql-mini.freq { flex: 1.3 1 0; }
+        .ql-mini label { display: block; font-size: 8px; text-transform: uppercase; letter-spacing: .06em;
+            color: var(--text-dim); margin-bottom: 2px; }
+        .ql-mini input, .ql-mini select {
+            width: 100%; background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px;
+            color: var(--text); font-family: var(--font-mono); font-size: 11px; padding: 4px 6px; box-sizing: border-box;
+            appearance: none;
+        }
+        .ql-mini input::placeholder { color: var(--text-dim); }
+        .ql-mini select { cursor: pointer; }
+
         /* --- Beacons card (NCDXF/IARU International Beacon Project) ---
            Pure client-side math from UTC time, no fetch -- see
            renderBeaconsCard()'s own comment for the timing derivation,
@@ -3485,11 +3521,33 @@
              style="order:{{ settings.get('qrz_quick_log_position', 0) }}">
             <div class="metrics-header">
                 <div class="card-name">📝 Quick Log</div>
-                <span class="rp-pill" id="ql-pill"><span class="d"></span>QRZ</span>
+                <div class="ql-header-right">
+                    <button class="ql-manual-toggle" id="ql-manual-toggle" type="button" onclick="qlToggleManual()"
+                            title="Log a contact by hand, ignoring the rig and any spot match">✏ Manual</button>
+                    <span class="rp-pill" id="ql-pill"><span class="d"></span>QRZ</span>
+                </div>
             </div>
-            <div class="ql-freq-row">
+            <div class="ql-freq-row" id="ql-freq-auto-row">
                 <div class="ql-freq" id="ql-freq">—</div>
                 <div class="ql-meta" id="ql-meta"></div>
+            </div>
+            <div class="ql-freq-row manual" id="ql-freq-manual-row" hidden>
+                <div class="ql-mini freq">
+                    <label>Freq (MHz)</label>
+                    <input id="ql-man-freq" placeholder="optional" autocomplete="off" inputmode="decimal">
+                </div>
+                <div class="ql-mini">
+                    <label>Mode</label>
+                    <select id="ql-man-mode">
+                        <option value="">—</option>
+                        <option>SSB</option><option>CW</option><option>FT8</option><option>FT4</option>
+                        <option>FM</option><option>RTTY</option><option>AM</option><option>Other</option>
+                    </select>
+                </div>
+                <div class="ql-mini">
+                    <label>Pwr (W)</label>
+                    <input id="ql-man-power" placeholder="optional" autocomplete="off" inputmode="decimal">
+                </div>
             </div>
             <div id="ql-match-slot"></div>
             <div class="ql-field">
@@ -9985,6 +10043,39 @@ function qlClearAuto(id) {
     qlAuto[key] = false;
     const el = document.getElementById(id);
     if (el) el.classList.remove('auto');
+    qlUpdateManualSubmit();
+}
+
+// Manual-entry toggle (v4.81) -- always available regardless of rig
+// state, for logging a contact that never came from the rig or a spot
+// at all (a phone contact, something worked earlier, a paper-log entry).
+// Deliberately does NOT try to spot-match a manually-typed frequency --
+// the whole point is logging something spot-independent -- and does NOT
+// clear the manual fields on toggle-off, so an accidental double-click
+// doesn't lose what was typed.
+let qlManualMode = false;
+function qlToggleManual() {
+    qlManualMode = !qlManualMode;
+    const toggle = document.getElementById('ql-manual-toggle');
+    const autoRow = document.getElementById('ql-freq-auto-row');
+    const manRow = document.getElementById('ql-freq-manual-row');
+    const slot = document.getElementById('ql-match-slot');
+    if (toggle) toggle.classList.toggle('on', qlManualMode);
+    if (autoRow) autoRow.hidden = qlManualMode;
+    if (manRow) manRow.hidden = !qlManualMode;
+    if (qlManualMode) {
+        if (slot) slot.innerHTML = '<div class="ql-nomatch">✏ Manual entry — rig and spots ignored</div>';
+        qlUpdateManualSubmit();
+    } else {
+        renderQuickLogCard();  // snap straight back to whatever the rig is reporting right now
+    }
+}
+function qlUpdateManualSubmit() {
+    if (!qlManualMode) return;
+    const btn = document.getElementById('ql-submit-btn');
+    const callInput = document.getElementById('ql-call');
+    if (!btn || !callInput) return;
+    btn.disabled = !(callInput.value || '').trim();
 }
 
 function renderQuickLogCard() {
@@ -9993,6 +10084,7 @@ function renderQuickLogCard() {
     const r = rigPanelData;
     const pill = document.getElementById('ql-pill');
     if (pill) pill.classList.toggle('live', !!r.reachable);
+    if (qlManualMode) return;  // manual mode owns the match-slot/submit state itself
     const freqEl = document.getElementById('ql-freq');
     const metaEl = document.getElementById('ql-meta');
     const slot = document.getElementById('ql-match-slot');
@@ -10067,17 +10159,34 @@ function qlSubmit() {
     const callInput = document.getElementById('ql-call');
     const call = (callInput.value || '').trim().toUpperCase();
     if (!call) { rigToast('Enter a callsign first', 'err'); return; }
-    const r = rigPanelData || {};
-    const body = {
-        call,
-        band: r.band || '',
-        mode: r.mode || '',
-        freq_hz: r.freq_hz || null,
-        power_w: r.power_w != null ? r.power_w : qlLastPowerW,
-        rst_sent: (document.getElementById('ql-rst-sent').value || '').trim(),
-        rst_rcvd: (document.getElementById('ql-rst-rcvd').value || '').trim(),
-        comment: (document.getElementById('ql-comment').value || '').trim(),
-    };
+    let body;
+    if (qlManualMode) {
+        const manFreqMhz = parseFloat(document.getElementById('ql-man-freq').value);
+        const manPowerW = parseFloat(document.getElementById('ql-man-power').value);
+        const freqHz = !isNaN(manFreqMhz) && manFreqMhz > 0 ? Math.round(manFreqMhz * 1e6) : null;
+        body = {
+            call,
+            band: freqHz ? mhzToBand(manFreqMhz) : '',
+            mode: (document.getElementById('ql-man-mode').value || '').trim(),
+            freq_hz: freqHz,
+            power_w: !isNaN(manPowerW) ? manPowerW : null,
+            rst_sent: (document.getElementById('ql-rst-sent').value || '').trim(),
+            rst_rcvd: (document.getElementById('ql-rst-rcvd').value || '').trim(),
+            comment: (document.getElementById('ql-comment').value || '').trim(),
+        };
+    } else {
+        const r = rigPanelData || {};
+        body = {
+            call,
+            band: r.band || '',
+            mode: r.mode || '',
+            freq_hz: r.freq_hz || null,
+            power_w: r.power_w != null ? r.power_w : qlLastPowerW,
+            rst_sent: (document.getElementById('ql-rst-sent').value || '').trim(),
+            rst_rcvd: (document.getElementById('ql-rst-rcvd').value || '').trim(),
+            comment: (document.getElementById('ql-comment').value || '').trim(),
+        };
+    }
     btn.classList.remove('ok', 'err');
     btn.classList.add('pending');
     btn.disabled = true;
@@ -10097,6 +10206,12 @@ function qlSubmit() {
             document.getElementById('ql-comment').value = '';
             qlAuto = { call: false, comment: false };
             qlLastPowerW = null;
+            if (qlManualMode) {
+                document.getElementById('ql-man-freq').value = '';
+                document.getElementById('ql-man-mode').value = '';
+                document.getElementById('ql-man-power').value = '';
+                qlUpdateManualSubmit();  // callsign's blank again -- re-disable submit
+            }
             fetchQsos();
             setTimeout(() => { btn.classList.remove('ok'); btn.textContent = '📤 Log to QRZ'; }, 2500);
         } else {

@@ -7836,6 +7836,73 @@ config for per-integration credentials; put it in
   Brandmeister ones -- resolved to `rgb(79, 216, 196)` (`var(--live)`),
   not a single computed-style spot-check on one or two links.
 
+- **Quick Log's manual-entry toggle (v4.81) went through two mockup
+  rounds with a real requirement correction between them, worth
+  recording since the fix wasn't a tweak, it was the opposite design.**
+  Round 1 (offline-fallback draft) auto-swapped to manual fields only
+  when the rig was unreachable, and tried to keep spot-matching alive
+  against a manually-typed frequency. The user's actual ask, given
+  directly after seeing that mockup: a manual override available
+  **regardless of rig state** (so you can log something even while
+  WFView IS running, if it just didn't come from a spot), toggled
+  EXPLICITLY via a button rather than automatically inferred from
+  reachability, and deliberately NOT trying to spot-match, since the
+  whole point is logging something spot-independent. Round 2 (what
+  shipped) is a header toggle, `.ql-header-right` grouping it with the
+  existing rig pill the same way `.card-header-right` groups multiple
+  badges elsewhere in this file -- default rig-connected/rig-offline
+  states are BYTE-FOR-BYTE unchanged from what shipped in v4.74; the
+  toggle only ever adds a parallel path, never modifies the existing one.
+  - **A real bug caught by the FIRST live Playwright run, not by
+    inspection: the plain `hidden` boolean attribute did nothing --
+    `#ql-freq-manual-row` measured a real, non-zero height even with
+    `.hidden = true` set on it.** Root cause is a genuine CSS cascade
+    trap, not a JS bug: the browser's own UA stylesheet has an implicit
+    `[hidden] { display: none }` rule, but `.ql-freq-row { display: flex;
+    ... }` is AUTHOR-origin CSS -- and author-origin styles always beat
+    UA-origin styles in the cascade regardless of selector specificity
+    (a `[hidden]` attribute selector's specificity, 0-1-0, would
+    normally lose to a two-class selector anyway, but the origin rule
+    means it would have lost even at equal or higher specificity). This
+    is a genuinely easy trap to fall into: `hidden` "just works" for a
+    plain unstyled `<div>`, and only breaks once that same element also
+    matches an author rule that sets `display` explicitly -- which is
+    exactly what `.ql-freq-row`'s existing `display: flex` did here.
+    Fixed with one explicit author rule, `.ql-freq-row[hidden] { display:
+    none; }` -- combining the class + attribute selector both raises the
+    specificity AND keeps it author-origin, so it correctly wins over the
+    bare `.ql-freq-row` rule. **This is the only place in this whole file
+    that uses the `hidden` property/attribute at all** -- every other
+    conditionally-shown element here uses a class toggle instead
+    (`.classList.toggle(...)`, checked via a full grep before assuming
+    otherwise) -- if `hidden` is ever reached for again on an element
+    that has its OWN `display` rule (not just inheriting the default
+    block/inline), add the matching `[hidden]` override at the same time,
+    don't assume the bare attribute is sufficient just because it works
+    for an unstyled element. Caught by measuring actual heights live
+    (306px expected, 355px+ measured with the bug present, back to
+    306px/318px after the fix) -- a pure visual/behavioral read-through
+    of the diff would not have caught this, since `el.hidden = true`
+    looks unambiguously correct on its own.
+  - **Band is derived client-side from the manually-typed frequency via
+    the EXISTING `mhzToBand()` helper** (already built for the Spots
+    card's SOTA rows, see that card's own gotcha entry) rather than
+    adding a Band input field or a second lookup table -- the backend
+    route (`/api/qrz_quick_log`) stores `band` verbatim from whatever the
+    client sends and does NOT derive it server-side, so leaving this
+    field empty in the manual submit body (as the very first draft did)
+    would have silently shipped every manually-logged QSO with a blank
+    band in `qsos.json`/QRZ's own ADIF record -- caught by reading the
+    route's own source before assuming band was optional to compute.
+  - **Height budget confirmed against the approved mockup exactly, not
+    just "close enough"**: 306px connected / 306px offline (both
+    byte-for-byte the pre-existing default, confirmed via live
+    `getBoundingClientRect()` with every OTHER card in the same grid row
+    hidden first -- see the CSS-Grid `align-items:stretch` gotcha
+    elsewhere in this file for why that isolation step is required, not
+    optional, to get a meaningful reading) / 318px with the toggle on --
+    matching the mockup's own measured 306/306/318 nearly exactly.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
