@@ -556,6 +556,11 @@ BIOS = {
         "blurb": "Singer, bassist, and co-founder of Emerson, Lake & Palmer (and a founding member of King Crimson), known for his rich baritone voice on tracks like 'Lucky Man' and the perennial holiday hit 'I Believe in Father Christmas'.",
         "wiki": "Greg_Lake",
     },
+    "Smith": {
+        "name": "Elliott Smith",
+        "blurb": "Whisper-quiet indie singer-songwriter known for intricate, Beatles-influenced acoustic arrangements and stark, confessional lyrics, including the Oscar-nominated 'Miss Misery'.",
+        "wiki": "Elliott_Smith",
+    },
 }
 
 

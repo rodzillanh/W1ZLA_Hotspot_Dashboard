@@ -7796,6 +7796,46 @@ config for per-integration credentials; put it in
   background, never re-themed dark anywhere in this app, so the
   browser's default blue is actually the right call there, not a bug.)
 
+- **`setup.html` (the Settings pages) had the SAME class of bug, at much
+  larger scale (v4.80) -- reported directly ("numerous blue links,"
+  offered screenshots) right after the two dashboard.html link-color
+  fixes above.** Unlike `dashboard.html`, `setup.html` never had a
+  blanket base rule at all -- its own established convention was
+  per-link inline `style="color:var(--link)"`, added by hand to SOME
+  prose links (CelesTrak, QRZ Logbook, aprs.fi, etc.) and simply
+  forgotten on others (HamAlert, HamAlert Destinations, reversebeacon.net,
+  hearham.com, Brandmeister dashboard, and the in-page `#` tab-jump
+  links like "Version info tab"/"Card order list") -- a real, ongoing
+  whack-a-mole gap, not a one-off miss, confirmed by grepping every
+  `<a href=` in the file and finding roughly half had no color at all.
+  **Fixed at the root instead of per-link**: a single `a { color:
+  var(--link); }` rule added right after `body {}` -- lower specificity
+  than `.btn-info`/`.back-link`/any inline `style=`, so every existing,
+  already-correct link is completely unaffected, and every future link
+  added to this file is covered by default with zero extra effort.
+  **This blanket-rule approach was deliberately NOT applied to
+  `dashboard.html`, and shouldn't be** -- `dashboard.html` has one bare,
+  intentionally-still-blue link (the Live map's popup "Go to card →",
+  see the entry above) sitting on Leaflet's own default WHITE popup
+  background; `var(--link)` there is `#4fd8c4`, a light cyan with poor
+  contrast on white, so a blanket rule would make that one link WORSE,
+  not fix a bug. `setup.html` has no such light-background third-party
+  widget anywhere in it (no map, no embedded iframe), so a blanket rule
+  is safe there in both its dark and light themes (`--link` resolves to
+  a properly darker `#0e8f7d` under `[data-theme="light"]`, confirmed
+  before trusting the blanket rule wouldn't break contrast there either).
+  **If a future component embeds a light-background third-party widget
+  in `setup.html`**, this blanket rule would need the same kind of
+  scoped exception the dashboard.html popup got -- don't assume "add a
+  global `a` rule" is always the safe fix, check what's actually
+  rendered underneath every anchor first.
+  Verified live via a throwaway Playwright script (deleted after): read
+  `getComputedStyle(a).color` for EVERY `<a>` on the page (General tab,
+  then switched to Integrations) and confirmed all 19 real links --
+  including every one of the previously-broken HamAlert/RBN/hearham.com/
+  Brandmeister ones -- resolved to `rgb(79, 216, 196)` (`var(--live)`),
+  not a single computed-style spot-check on one or two links.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

@@ -70,6 +70,13 @@
             font-size: 14px;
             min-height: 100vh;
         }
+        /* Base link color -- many prose links in this file (HamAlert/RBN/DX
+           cluster/hearham.com/etc. explanatory <p> text) were only ever
+           inline-styled one at a time, and several were missed, rendering
+           in the browser's default blue instead of the app's theme. A
+           base rule here covers every anchor by default; more specific
+           rules (.btn-info, .back-link, an inline style=) still win. */
+        a { color: var(--link); }
 
         /* --- top bar ---
            Full-width background/border, but the actual content sits in a
