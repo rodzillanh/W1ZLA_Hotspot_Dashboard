@@ -380,37 +380,34 @@ class QrzLogbookClient:
         unconfirmed and younger than QRZ_LOGBOOK_CONFIRM_MAX_AGE_DAYS,
         and report which are now confirmed.
 
-        TEMPORARY diagnostic prints (2026-09) -- a real, reported case
-        where a QSO shown starred/confirmed on qrz.com's own web UI still
-        came back unconfirmed here even with the force_confirm throttle
-        bug fixed, meaning this sweep genuinely runs and genuinely gets a
-        "not confirmed" answer from QRZ for that LOGID. These prints show
-        the exact raw APP_QRZLOG_STATUS/QSL_RCVD/LOTW_QSL_RCVD QRZ returns
-        per LOGID, and flag any requested LOGID that gets no record back
-        at all -- kept for one more live confirmation of the real fix
-        below, then remove.
-
-        FOUND THE REAL BUG (2026-09): `LOGIDS` was being embedded INSIDE
-        the `OPTION` string (`OPTION=LOGIDS:id1,id2,...,TYPE:ADIF`) --
-        but QRZ's actual API takes LOGIDS as its OWN top-level POST field,
-        exactly like KEY/ACTION/OPTION/ADIF, comma-separated. Confirmed by
-        THREE independent code-level sources, not a single doc summary
-        (which had claimed a `+`-joined value nested in OPTION and was
-        wrong): QRZ's own generated OpenAPI spec
-        (github.com/k0swe/qrz-logbook/api/openapi.yaml, "LOGIDS: A comma
-        separated list of integer logid values" as a top-level Request
-        property); that same client's own response parser
-        (`regexp.MustCompile('(^|&)LOGIDS=([\\d,]*)')`, parsing it as a
-        bare field, not something nested in OPTION); and a real, tested
-        client (github.com/kd9taw/Nexus, Rust) with a literal unit-test
-        assertion for a DELETE request: `assert_eq!(body, "KEY=my-key&
-        ACTION=DELETE&LOGIDS=130877825")`. This explains the exact
-        observed symptom live: with LOGIDS malformed inside OPTION, QRZ's
-        parser only recognized the trailing `TYPE:ADIF` and returned some
-        single arbitrary record instead of the requested set -- of 36
-        pending LOGIDs sent, only 1 came back, and it wasn't even one of
-        the ones asked for. Sending LOGIDS as its own field is what every
-        other real client above actually does."""
+        A real, reported bug lived here until 2026-09: `LOGIDS` was being
+        embedded INSIDE the `OPTION` string (`OPTION=LOGIDS:id1,id2,...,
+        TYPE:ADIF`) -- but QRZ's actual API takes LOGIDS as its OWN
+        top-level POST field, exactly like KEY/ACTION/OPTION/ADIF,
+        comma-separated. With it malformed, QRZ's parser only recognized
+        the trailing `TYPE:ADIF` and returned one arbitrary, unrelated
+        record instead of the requested set -- confirmed live: of 36
+        pending LOGIDs sent, only 1 came back, and it wasn't even one
+        that was asked for. This meant a QSO could NEVER flip from
+        unconfirmed to confirmed after its initial sync, no matter how
+        long you waited -- exactly the reported symptom (QSOs starred/
+        confirmed on qrz.com stayed unmarked here indefinitely).
+        Confirmed by three independent code-level sources, not a single
+        doc summary (an initial WebFetch of QRZ's own docs claimed a
+        `+`-joined value nested in OPTION and was WRONG): QRZ's own
+        generated OpenAPI spec (github.com/k0swe/qrz-logbook/api/
+        openapi.yaml, "LOGIDS: A comma separated list of integer logid
+        values" as a top-level Request property); that same client's own
+        response parser (`regexp.MustCompile('(^|&)LOGIDS=([\\d,]*)')`,
+        treating it as a bare field); and a real, tested client
+        (github.com/kd9taw/Nexus, Rust) with a literal unit-test
+        assertion: `assert_eq!(body, "KEY=my-key&ACTION=DELETE&
+        LOGIDS=130877825")`. Re-verified live after the fix against a
+        real logbook: a 36-LOGID sweep correctly returned all 36 real
+        records with genuine app_qrzlog_status values, not just one. If
+        this ever needs re-diagnosing, temporarily add a print of each
+        returned record's raw ADIF fields here rather than guessing --
+        that live capture is what caught this the first time."""
         cutoff = time.time() - config.QRZ_LOGBOOK_CONFIRM_MAX_AGE_DAYS * 86400
         pending = []
         for q in storage.load_qsos():
@@ -421,7 +418,6 @@ class QrzLogbookClient:
             if ts is not None and ts < cutoff:
                 continue
             pending.append(int(lid))
-        print(f"[qrz_logbook] confirm sweep: {len(pending)} pending logid(s): {pending}", flush=True)
         confirm_map, details = {}, {}
         chunk = config.QRZ_LOGBOOK_LOGID_CHUNK
         for i in range(0, len(pending), chunk):
@@ -433,16 +429,8 @@ class QrzLogbookClient:
             })
             data = _parse_response(_post(body))
             self._raise_for_result(data)
-            seen = set()
             for r in parse_adif(data.get("ADIF", "")):
                 lid = _int_or_none(r.get("APP_QRZLOG_LOGID"))
-                seen.add(lid)
-                print(
-                    f"[qrz_logbook] confirm sweep result: logid={lid} call={r.get('CALL')!r} "
-                    f"app_qrzlog_status={r.get('APP_QRZLOG_STATUS')!r} "
-                    f"qsl_rcvd={r.get('QSL_RCVD')!r} lotw_qsl_rcvd={r.get('LOTW_QSL_RCVD')!r}",
-                    flush=True,
-                )
                 if lid is None or not _is_confirmed(r):
                     continue
                 confirm_map[lid] = time.time()
@@ -453,9 +441,6 @@ class QrzLogbookClient:
                     "mode": (r.get("MODE") or "").strip().upper(),
                     "qso_date": (r.get("QSO_DATE") or "").strip(),
                 }
-            missing = [x for x in ids if x not in seen]
-            if missing:
-                print(f"[qrz_logbook] confirm sweep: {len(missing)} requested logid(s) got NO record back at all: {missing}", flush=True)
         return confirm_map, details
 
     def _build_qso(self, r: dict, lid: int, lookup_caller_info, grid_to_latlon, default_qth) -> "dict | None":
