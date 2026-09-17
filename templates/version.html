@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.83 "Barrett"</span>
+                <span class="release-version">v4.84 "Ayers"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fix: QRZ Logbook confirmations never actually got re-checked</span> — the re-check request sent QRZ a malformed <code>LOGIDS</code> parameter (nested inside <code>OPTION</code>, which isn't how QRZ's API accepts it), so it silently returned one arbitrary, unrelated record instead of the QSOs actually being asked about. This meant no QSO could ever flip from unconfirmed to confirmed after its first sync, no matter how long you waited or how many times you clicked "Sync now" — even QSOs already starred/confirmed on qrz.com's own site stayed unmarked here indefinitely. <code>LOGIDS</code> is now sent as its own field, matching QRZ's documented API and a real third-party client's tested request shape</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.83 "Barrett"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fix: "Sync now" (QRZ Logbook sync) could silently skip checking for new confirmations</span> — the confirmation re-check is normally throttled to every few hours so it doesn't hammer QRZ's API, but that throttle also applied to the manual "Sync now" button, so clicking it before the throttle had elapsed reported "newly confirmed 0" even when real confirmations were waiting on QRZ's side. "Sync now" now always forces a real check</li>

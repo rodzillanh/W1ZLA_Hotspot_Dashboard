@@ -15,9 +15,17 @@ Protocol (application/x-www-form-urlencoded both directions):
 
   POST body: KEY=<key>&ACTION=STATUS
              KEY=<key>&ACTION=FETCH&OPTION=AFTERLOGID:<n>,MAX:<n>,TYPE:ADIF
-             KEY=<key>&ACTION=FETCH&OPTION=LOGIDS:<a,b,c>,TYPE:ADIF
+             KEY=<key>&ACTION=FETCH&OPTION=TYPE:ADIF&LOGIDS=<a,b,c>
   response:  RESULT=OK&COUNT=<n>&...&ADIF=<url-encoded ADIF text>
              RESULT=FAIL&REASON=...   /   RESULT=AUTH&REASON=...
+
+  LOGIDS is its OWN top-level POST field (like KEY/ACTION/OPTION/ADIF),
+  comma-separated -- NOT nested inside the OPTION mini-language the way
+  AFTERLOGID/MAX/TYPE are. Confirmed live 2026-09 the hard way: this
+  module originally sent `OPTION=LOGIDS:a,b,c,TYPE:ADIF`, which QRZ's
+  server can't parse as intended -- see _confirm_sweep()'s own docstring
+  for the full real-bug story and the three independent sources that
+  confirmed the fix.
 
 Each returned ADIF record carries APP_QRZLOG_LOGID -- a monotonic
 per-logbook integer, used as BOTH the incremental cursor (OPTION
@@ -379,8 +387,30 @@ class QrzLogbookClient:
         "not confirmed" answer from QRZ for that LOGID. These prints show
         the exact raw APP_QRZLOG_STATUS/QSL_RCVD/LOTW_QSL_RCVD QRZ returns
         per LOGID, and flag any requested LOGID that gets no record back
-        at all, so the real cause can be read straight from docker logs
-        instead of guessed at. Remove once that's diagnosed."""
+        at all -- kept for one more live confirmation of the real fix
+        below, then remove.
+
+        FOUND THE REAL BUG (2026-09): `LOGIDS` was being embedded INSIDE
+        the `OPTION` string (`OPTION=LOGIDS:id1,id2,...,TYPE:ADIF`) --
+        but QRZ's actual API takes LOGIDS as its OWN top-level POST field,
+        exactly like KEY/ACTION/OPTION/ADIF, comma-separated. Confirmed by
+        THREE independent code-level sources, not a single doc summary
+        (which had claimed a `+`-joined value nested in OPTION and was
+        wrong): QRZ's own generated OpenAPI spec
+        (github.com/k0swe/qrz-logbook/api/openapi.yaml, "LOGIDS: A comma
+        separated list of integer logid values" as a top-level Request
+        property); that same client's own response parser
+        (`regexp.MustCompile('(^|&)LOGIDS=([\\d,]*)')`, parsing it as a
+        bare field, not something nested in OPTION); and a real, tested
+        client (github.com/kd9taw/Nexus, Rust) with a literal unit-test
+        assertion for a DELETE request: `assert_eq!(body, "KEY=my-key&
+        ACTION=DELETE&LOGIDS=130877825")`. This explains the exact
+        observed symptom live: with LOGIDS malformed inside OPTION, QRZ's
+        parser only recognized the trailing `TYPE:ADIF` and returned some
+        single arbitrary record instead of the requested set -- of 36
+        pending LOGIDs sent, only 1 came back, and it wasn't even one of
+        the ones asked for. Sending LOGIDS as its own field is what every
+        other real client above actually does."""
         cutoff = time.time() - config.QRZ_LOGBOOK_CONFIRM_MAX_AGE_DAYS * 86400
         pending = []
         for q in storage.load_qsos():
@@ -398,7 +428,8 @@ class QrzLogbookClient:
             ids = pending[i:i + chunk]
             body = urllib.parse.urlencode({
                 "KEY": key, "ACTION": "FETCH",
-                "OPTION": "LOGIDS:" + ",".join(str(x) for x in ids) + ",TYPE:ADIF",
+                "OPTION": "TYPE:ADIF",
+                "LOGIDS": ",".join(str(x) for x in ids),
             })
             data = _parse_response(_post(body))
             self._raise_for_result(data)
