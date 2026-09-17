@@ -1387,6 +1387,26 @@
         .spots-filter-row select { background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border);
             border-radius: 6px; font: inherit; font-size: 10.5px; padding: 2px 6px; letter-spacing: 0;
             text-transform: none; cursor: pointer; margin-left: auto; }
+        /* Search by callsign -- see the spots-filter-row markup's own
+           comment for why this is an expand-on-click icon, not a
+           permanent field. */
+        .spots-search-btn { appearance: none; border: 1px solid var(--border); background: var(--panel-2);
+            color: var(--text-muted); border-radius: 20px; width: 22px; height: 22px; padding: 0; line-height: 1;
+            display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+            font-size: 11px; flex-shrink: 0; }
+        .spots-search-btn:hover { color: var(--text); border-color: var(--text-muted); }
+        .spots-search-btn.active { background: var(--live-dim);
+            border-color: color-mix(in srgb, var(--live) 45%, var(--border)); color: var(--live); }
+        .spots-search-row { display: none; align-items: center; gap: 6px; margin-top: 8px; }
+        .spots-search-row.open { display: flex; }
+        .spots-search-row input { flex: 1; background: var(--panel-2); border: 1px solid var(--border);
+            border-radius: 6px; padding: 5px 9px; font: inherit; font-family: var(--font-mono); font-size: 12px;
+            color: var(--text); outline: none; }
+        .spots-search-row input:focus { border-color: color-mix(in srgb, var(--live) 55%, var(--border)); }
+        .spots-search-row input::placeholder { color: var(--text-dim); }
+        .spots-search-row .clear { appearance: none; border: none; background: none; color: var(--text-dim);
+            cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; }
+        .spots-search-row .clear:hover { color: var(--text); }
         .src-tag { font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: .04em;
             color: var(--text-dim); background: var(--panel-2); border: 1px solid var(--border-soft);
             border-radius: 4px; padding: 1px 5px; }
@@ -3453,6 +3473,13 @@
                 {% if settings.get('dxcluster_enabled', False) %}
                 <span class="spots-filter-chip" id="spots-chip-dx" onclick="toggleSpotsFilter('dx')">DX<span class="n" id="spots-n-dx">off</span></span>
                 {% endif %}
+                <!-- Search by callsign (mockup-approved "Option A": icon
+                     expands into a field in place of the chips, zero
+                     added height at rest -- a persistent field was
+                     rejected since it competes with RBN/DX chips for
+                     room in this already-oversized card). -->
+                <button class="spots-search-btn" type="button" id="spots-search-btn"
+                        title="Search spots by callsign" onclick="toggleSpotsSearch()">🔍</button>
                 <select id="pota-sort" onchange="renderPotaCard()">
                     <option value="smart">Smart rank</option>
                     <option value="new">New parks only</option>
@@ -3471,6 +3498,11 @@
                     <option value="12m">12m</option><option value="10m">10m</option>
                     <option value="6m">6m</option>
                 </select>
+            </div>
+            <div class="spots-search-row" id="spots-search-row">
+                <input type="text" id="spots-search-input" placeholder="Search callsign…"
+                       autocomplete="off" oninput="onSpotsSearchInput(this.value)">
+                <button class="clear" type="button" onclick="closeSpotsSearch()" title="Close search">&times;</button>
             </div>
             <div class="pota-spots" id="pota-spots"></div>
             <div class="msg-empty" id="pota-empty" style="display:none">No activator or DX spots right now.</div>
@@ -9108,6 +9140,37 @@ try {
     if (_savedFilter && typeof _savedFilter === 'object') Object.assign(spotsFilter, _savedFilter);
 } catch (e) { /* ignore a corrupt/foreign value */ }
 
+// Search by callsign -- session-only (not persisted, unlike spotsFilter
+// above), since a stale search left open across a page reload would be
+// more surprising than useful. Must match pota-empty's own default text
+// in the Jinja markup -- kept in sync manually, same as every other
+// duplicated string in this file.
+let spotsSearchTerm = '';
+const POTA_EMPTY_DEFAULT = 'No activator or DX spots right now.';
+
+function toggleSpotsSearch() {
+    const row = document.getElementById('spots-search-row');
+    const btn = document.getElementById('spots-search-btn');
+    if (!row || !btn) return;
+    const opening = !row.classList.contains('open');
+    row.classList.toggle('open', opening);
+    btn.classList.toggle('active', opening);
+    if (opening) {
+        const input = document.getElementById('spots-search-input');
+        if (input) input.focus();
+    } else {
+        spotsSearchTerm = '';
+        const input = document.getElementById('spots-search-input');
+        if (input) input.value = '';
+        renderPotaCard();
+    }
+}
+function closeSpotsSearch() { toggleSpotsSearch(); }
+function onSpotsSearchInput(v) {
+    spotsSearchTerm = v;
+    renderPotaCard();
+}
+
 function toggleSpotsFilter(program) {
     spotsFilter[program] = !spotsFilter[program];
     try { localStorage.setItem(SPOTS_FILTER_KEY, JSON.stringify(spotsFilter)); } catch (e) {}
@@ -9276,19 +9339,6 @@ function renderPotaCard() {
     const listEl = document.getElementById('pota-spots');
     if (!listEl) return;
 
-    const rbnOn = RBN_ENABLED && spotsFilter.rbn;
-    const dxOn = DXCLUSTER_ENABLED && spotsFilter.dx;
-    const firehoseOn = rbnOn || dxOn;
-    const sortSel = document.getElementById('pota-sort');
-    const bandSel = document.getElementById('pota-band-filter');
-    if (sortSel) sortSel.style.display = firehoseOn ? 'none' : '';
-    if (bandSel) bandSel.style.display = firehoseOn ? '' : 'none';
-
-    ['pota', 'sota', 'rbn', 'dx'].forEach(p => {
-        const chip = document.getElementById('spots-chip-' + p);
-        if (chip) chip.classList.toggle('active', !!spotsFilter[p]);
-    });
-
     const potaSpots = (potaData && potaData.spots) || [];
     const sotaRaw = (sotaCardData && sotaCardData.spots) || [];
     const qthLat = potaData ? potaData.qth_lat : null;
@@ -9296,6 +9346,90 @@ function renderPotaCard() {
     const sotaSpots = sotaRaw.map(s => sotaToPotaShape(s, qthLat, qthLon));
     const rbnSpots = (rbnCardData && rbnCardData.spots) || [];
     const dxSpots = (dxCardData && dxCardData.spots) || [];
+
+    // rig-control pill + whether the tap-to-tune chips should render --
+    // moved ahead of the chip/sort/search logic below (was previously
+    // computed near the end of this function) so the search branch can
+    // use rigOk too, not just the normal chip-driven render path.
+    const rig = potaData ? potaData.rig : null;
+    const rigOk = RIG_CONTROL_ENABLED && !!(rig && rig.reachable);
+    const rigPill = document.getElementById('pota-rig-pill');
+    if (rigPill && rig) {
+        rigPill.classList.toggle('live', !!rig.reachable);
+        document.getElementById('pota-rig-pill-txt').textContent =
+            rig.reachable ? (rig.rig || 'rig ready') : 'rig offline';
+        rigPill.title = rig.reachable
+            ? 'rigctld reachable' + (rig.freq_hz ? ' — on ' + (rig.freq_hz / 1e6).toFixed(3) + ' MHz' : '')
+            : (rig.error || 'Rig server not reachable');
+    }
+
+    const h = potaData ? potaData.hunter : null;
+    const gearBtn = document.getElementById('pota-gear-btn');
+    if (gearBtn) {
+        if (h) {
+            const last = (h.recent_hunts && h.recent_hunts[0]) ? h.recent_hunts[0].reference : null;
+            gearBtn.title = `${h.parks ?? '—'} parks · ${h.qsos ?? '—'} Q · ${h.awards ?? '—'} awards`
+                + (last ? ` · last ${last}` : '');
+        } else if (potaData) {
+            gearBtn.title = potaData.has_callsign
+                ? 'Hunter stats unavailable right now'
+                : 'Set your callsign in Settings → Integrations for hunter stats';
+        }
+    }
+
+    const emptyEl = document.getElementById('pota-empty');
+    const sortSel = document.getElementById('pota-sort');
+    const bandSel = document.getElementById('pota-band-filter');
+
+    // Search by callsign deliberately bypasses the on/off filter chips
+    // and the sort/band selects entirely -- it looks across every source
+    // this install has DATA for (not just what's currently toggled on),
+    // sorted freshest-first, since "smart rank"/CW-SSB-FT8/band filtering
+    // don't apply uniformly across POTA/SOTA/RBN/DX's very different
+    // field shapes. See spots-search-btn's own markup comment for why
+    // this is the mockup-approved shape (icon expands, zero height cost
+    // at rest).
+    const term = spotsSearchTerm.trim();
+    if (term) {
+        ['pota', 'sota', 'rbn', 'dx'].forEach(p => {
+            const chip = document.getElementById('spots-chip-' + p);
+            if (chip) chip.style.display = 'none';
+        });
+        if (sortSel) sortSel.style.display = 'none';
+        if (bandSel) bandSel.style.display = 'none';
+
+        const termUpper = term.toUpperCase();
+        let combined = [];
+        combined = combined.concat(potaSpots.map(s =>
+            ({ html: potaSpotHtml(Object.assign({ _program: 'POTA' }, s), rigOk), call: s.activator || '', ageMin: potaAgeMin(s.spot_time) })));
+        combined = combined.concat(sotaSpots.map(s =>
+            ({ html: potaSpotHtml(s, rigOk), call: s.activator || '', ageMin: potaAgeMin(s.spot_time) })));
+        if (RBN_ENABLED) combined = combined.concat(rbnSpots.map(s =>
+            ({ html: firehoseSpotHtml(s, rigOk, 'RBN'), call: s.call || '', ageMin: rbnAgeSec(s.last_seen) / 60 })));
+        if (DXCLUSTER_ENABLED) combined = combined.concat(dxSpots.map(s =>
+            ({ html: firehoseSpotHtml(s, rigOk, 'DX'), call: s.call || '', ageMin: rbnAgeSec(s.last_seen) / 60 })));
+        combined = combined.filter(x => x.call.toUpperCase().includes(termUpper));
+        combined.sort((a, b) => a.ageMin - b.ageMin);
+
+        listEl.innerHTML = combined.map(x => x.html).join('');
+        if (emptyEl) {
+            emptyEl.style.display = combined.length ? 'none' : 'block';
+            emptyEl.textContent = combined.length ? '' : `No spots match "${term}".`;
+        }
+        return;
+    }
+    if (emptyEl) emptyEl.textContent = POTA_EMPTY_DEFAULT;
+
+    const rbnOn = RBN_ENABLED && spotsFilter.rbn;
+    const dxOn = DXCLUSTER_ENABLED && spotsFilter.dx;
+    const firehoseOn = rbnOn || dxOn;
+    if (sortSel) sortSel.style.display = firehoseOn ? 'none' : '';
+    if (bandSel) bandSel.style.display = firehoseOn ? '' : 'none';
+
+    ['pota', 'sota', 'rbn', 'dx'].forEach(p => {
+        const chip = document.getElementById('spots-chip-' + p);
+        if (chip) { chip.style.display = ''; chip.classList.toggle('active', !!spotsFilter[p]); }
+    });
 
     const nPota = document.getElementById('spots-n-pota');
     if (nPota) nPota.textContent = potaSpots.length ? String(potaSpots.length) : '';
@@ -9324,6 +9458,16 @@ function renderPotaCard() {
     let firehoseList = [];
     if (firehoseOn) {
         const band = (bandSel && bandSel.value) || '';
+        // Real, reported bug: this filter only ever applied to the RBN/DX
+        // rows below -- POTA/SOTA's own hunterList (built above, before
+        // firehoseOn is even known) kept rendering every band regardless
+        // of what was selected here, even though the band select is only
+        // shown once RBN/DX is on and replaces the POTA-only sort select
+        // in that same slot -- so it visually reads as "filter everything
+        // currently shown," not "filter just the RBN/DX rows." Band names
+        // match between the two (server-computed for POTA, mhzToBand()
+        // for SOTA) so this is a safe, direct string filter.
+        if (band) hunterList = hunterList.filter(s => s.band === band);
         if (rbnOn) firehoseList = firehoseList.concat(rbnSpots.filter(s => !band || s.band === band).map(s => Object.assign({ _src: 'RBN' }, s)));
         if (dxOn)  firehoseList = firehoseList.concat(dxSpots.filter(s => !band || s.band === band).map(s => Object.assign({ _src: 'DX' }, s)));
         firehoseList.sort((a, b) => (b.last_seen || 0) - (a.last_seen || 0));
@@ -9335,39 +9479,7 @@ function renderPotaCard() {
     // already conveys volume, and the per-row "NEW" tag already flags
     // individual new-to-you parks, so the aggregate text was redundant.
 
-    // The hunter glance ("21 parks · 24 Q · 3 awards...") moved from an
-    // always-visible row into this button's title tooltip in the same
-    // height-trim pass -- plain text only (a title attribute can't hold
-    // HTML), so no <b> tags here the way the old innerHTML version had.
-    const h = potaData ? potaData.hunter : null;
-    const gearBtn = document.getElementById('pota-gear-btn');
-    if (gearBtn) {
-        if (h) {
-            const last = (h.recent_hunts && h.recent_hunts[0]) ? h.recent_hunts[0].reference : null;
-            gearBtn.title = `${h.parks ?? '—'} parks · ${h.qsos ?? '—'} Q · ${h.awards ?? '—'} awards`
-                + (last ? ` · last ${last}` : '');
-        } else if (potaData) {
-            gearBtn.title = potaData.has_callsign
-                ? 'Hunter stats unavailable right now'
-                : 'Set your callsign in Settings → Integrations for hunter stats';
-        }
-    }
-
-    const emptyEl = document.getElementById('pota-empty');
     if (emptyEl) emptyEl.style.display = (hunterList.length + firehoseList.length) ? 'none' : 'block';
-
-    // rig-control pill + whether the tap-to-tune chips should render
-    const rig = potaData ? potaData.rig : null;
-    const rigOk = RIG_CONTROL_ENABLED && !!(rig && rig.reachable);
-    const rigPill = document.getElementById('pota-rig-pill');
-    if (rigPill && rig) {
-        rigPill.classList.toggle('live', !!rig.reachable);
-        document.getElementById('pota-rig-pill-txt').textContent =
-            rig.reachable ? (rig.rig || 'rig ready') : 'rig offline';
-        rigPill.title = rig.reachable
-            ? 'rigctld reachable' + (rig.freq_hz ? ' — on ' + (rig.freq_hz / 1e6).toFixed(3) + ' MHz' : '')
-            : (rig.error || 'Rig server not reachable');
-    }
 
     listEl.innerHTML = hunterList.map(s => potaSpotHtml(s, rigOk)).join('')
         + firehoseList.map(s => firehoseSpotHtml(s, rigOk, s._src)).join('');

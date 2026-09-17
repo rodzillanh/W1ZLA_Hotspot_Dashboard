@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.81 "HoneymanScott"</span>
+                <span class="release-version">v4.82 "Hoon"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>New: search the Spots card by callsign</span> — a 🔍 icon in the filter row expands into a search field (zero added height at rest, mockup-approved over a permanent field which would've competed with the RBN/DX chips for room). Searches every source you have data for — POTA, SOTA, RBN, DX — regardless of which filter chips are currently toggled on, sorted freshest-first</li>
+                <li><span>Fix: Spots card's band filter didn't actually filter POTA/SOTA spots</span> — it only ever applied to the RBN/DX rows below, even though it's shown in the same slot as (and replaces) the POTA sort dropdown once RBN or DX is toggled on, so it read as "filter everything currently shown." Selecting a band now filters POTA/SOTA rows too</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.81 "HoneymanScott"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>New: Quick Log manual-entry toggle</span> — a small "✏ Manual" button in the card header, always available regardless of whether the rig is connected, switches to a fully manual QSO form (optional Freq/Mode/Power, no spot matching) for logging a contact that never came from the rig or a spot at all. Toggling it off returns to whatever the rig is reporting right now — the default behavior is otherwise completely unchanged</li>
