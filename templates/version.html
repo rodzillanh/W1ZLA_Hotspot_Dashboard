@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.82 "Hoon"</span>
+                <span class="release-version">v4.83 "Barrett"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fix: "Sync now" (QRZ Logbook sync) could silently skip checking for new confirmations</span> — the confirmation re-check is normally throttled to every few hours so it doesn't hammer QRZ's API, but that throttle also applied to the manual "Sync now" button, so clicking it before the throttle had elapsed reported "newly confirmed 0" even when real confirmations were waiting on QRZ's side. "Sync now" now always forces a real check</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.82 "Hoon"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>New: search the Spots card by callsign</span> — a 🔍 icon in the filter row expands into a search field (zero added height at rest, mockup-approved over a permanent field which would've competed with the RBN/DX chips for room). Searches every source you have data for — POTA, SOTA, RBN, DX — regardless of which filter chips are currently toggled on, sorted freshest-first</li>

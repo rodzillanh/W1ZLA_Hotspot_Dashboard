@@ -2898,13 +2898,21 @@ def api_qrz_logbook_sync():
     background cycle -- for the Settings "Sync now" button. Fires in a
     daemon thread and returns immediately; poll /api/qrz_confirmations
     for the result (last_sync / last_error). A sync already in progress
-    is a harmless no-op (qrz_logbook.py's own _sync_lock guard)."""
+    is a harmless no-op (qrz_logbook.py's own _sync_lock guard).
+
+    force_confirm=True is the real fix for a reported bug: without it,
+    this button's confirmation re-check was silently subject to the same
+    due/confirmed_rose throttle as the background loop, so clicking
+    "Sync now" while a confirm sweep wasn't yet due reported "newly
+    confirmed 0" that read as "nothing new" when it actually meant "we
+    didn't check" -- see qrz_logbook.py's sync() docstring."""
     if not qrz_logbook_client.enabled:
         return jsonify({"ok": False, "reason": "QRZ Logbook sync is off or has no API key"}), 400
     grid = load_settings().get("station_grid", "")
     threading.Thread(
         target=qrz_logbook_client.sync,
         args=(monitor.lookup_caller_info, grid),
+        kwargs={"force_confirm": True},
         daemon=True,
     ).start()
     return jsonify({"ok": True, "started": True})

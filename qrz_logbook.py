@@ -212,11 +212,23 @@ class QrzLogbookClient:
 
     # --- the background loop calls this ---
 
-    def sync(self, lookup_caller_info=None, station_grid: str = "") -> None:
-        """Pull new QSOs, then (on the slower confirm cadence) re-check
-        unconfirmed ones. Never raises -- records the failure in status()
-        and prints it, same degrade-gracefully contract as every other
-        integration client here."""
+    def sync(self, lookup_caller_info=None, station_grid: str = "", force_confirm: bool = False) -> None:
+        """Pull new QSOs, then (on the slower confirm cadence, unless
+        `force_confirm`) re-check unconfirmed ones. Never raises -- records
+        the failure in status() and prints it, same degrade-gracefully
+        contract as every other integration client here.
+
+        `force_confirm` is a real, reported bug fix, not a nice-to-have:
+        the manual "Sync now" button in Settings used to call this with no
+        way to bypass the due/confirmed_rose throttle below, so clicking
+        it while a confirm sweep wasn't yet due silently skipped the
+        confirmation re-check entirely -- reporting "newly confirmed 0"
+        that read as "nothing to confirm" when it actually meant "we
+        didn't check." app.py's /api/qrz_logbook_sync (the manual button)
+        passes True; the background loop still passes the default False,
+        so the automatic 30-min cadence doesn't hammer QRZ's LOGIDS
+        endpoint every cycle -- only the user's own explicit "check right
+        now" click forces it."""
         with self._lock:
             if not (self._enabled and self._api_key):
                 return
@@ -236,7 +248,8 @@ class QrzLogbookClient:
                 and new_confirmed_count > self._prev_confirmed_count
             )
             due = (now - self._last_confirm_at) >= config.QRZ_LOGBOOK_CONFIRM_INTERVAL
-            if due or confirmed_rose:
+            confirm_checked = due or confirmed_rose or force_confirm
+            if confirm_checked:
                 confirm_map, confirm_details = self._confirm_sweep(key)
                 self._last_confirm_at = now
             self._prev_confirmed_count = new_confirmed_count
@@ -256,6 +269,7 @@ class QrzLogbookClient:
                     "confirmed": result.get("confirmed", 0),
                     "total": status.get("count"),
                     "total_confirmed": new_confirmed_count,
+                    "confirm_checked": confirm_checked,
                 }
         except Exception as e:  # noqa: BLE001 -- must never escape into the loop
             msg = f"{type(e).__name__}: {e}"
