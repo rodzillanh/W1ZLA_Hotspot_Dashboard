@@ -370,7 +370,17 @@ class QrzLogbookClient:
     def _confirm_sweep(self, key: str):
         """Re-fetch the LOGIDS of stored QRZ QSOs that are still
         unconfirmed and younger than QRZ_LOGBOOK_CONFIRM_MAX_AGE_DAYS,
-        and report which are now confirmed."""
+        and report which are now confirmed.
+
+        TEMPORARY diagnostic prints (2026-09) -- a real, reported case
+        where a QSO shown starred/confirmed on qrz.com's own web UI still
+        came back unconfirmed here even with the force_confirm throttle
+        bug fixed, meaning this sweep genuinely runs and genuinely gets a
+        "not confirmed" answer from QRZ for that LOGID. These prints show
+        the exact raw APP_QRZLOG_STATUS/QSL_RCVD/LOTW_QSL_RCVD QRZ returns
+        per LOGID, and flag any requested LOGID that gets no record back
+        at all, so the real cause can be read straight from docker logs
+        instead of guessed at. Remove once that's diagnosed."""
         cutoff = time.time() - config.QRZ_LOGBOOK_CONFIRM_MAX_AGE_DAYS * 86400
         pending = []
         for q in storage.load_qsos():
@@ -381,6 +391,7 @@ class QrzLogbookClient:
             if ts is not None and ts < cutoff:
                 continue
             pending.append(int(lid))
+        print(f"[qrz_logbook] confirm sweep: {len(pending)} pending logid(s): {pending}", flush=True)
         confirm_map, details = {}, {}
         chunk = config.QRZ_LOGBOOK_LOGID_CHUNK
         for i in range(0, len(pending), chunk):
@@ -391,8 +402,16 @@ class QrzLogbookClient:
             })
             data = _parse_response(_post(body))
             self._raise_for_result(data)
+            seen = set()
             for r in parse_adif(data.get("ADIF", "")):
                 lid = _int_or_none(r.get("APP_QRZLOG_LOGID"))
+                seen.add(lid)
+                print(
+                    f"[qrz_logbook] confirm sweep result: logid={lid} call={r.get('CALL')!r} "
+                    f"app_qrzlog_status={r.get('APP_QRZLOG_STATUS')!r} "
+                    f"qsl_rcvd={r.get('QSL_RCVD')!r} lotw_qsl_rcvd={r.get('LOTW_QSL_RCVD')!r}",
+                    flush=True,
+                )
                 if lid is None or not _is_confirmed(r):
                     continue
                 confirm_map[lid] = time.time()
@@ -403,6 +422,9 @@ class QrzLogbookClient:
                     "mode": (r.get("MODE") or "").strip().upper(),
                     "qso_date": (r.get("QSO_DATE") or "").strip(),
                 }
+            missing = [x for x in ids if x not in seen]
+            if missing:
+                print(f"[qrz_logbook] confirm sweep: {len(missing)} requested logid(s) got NO record back at all: {missing}", flush=True)
         return confirm_map, details
 
     def _build_qso(self, r: dict, lid: int, lookup_caller_info, grid_to_latlon, default_qth) -> "dict | None":
