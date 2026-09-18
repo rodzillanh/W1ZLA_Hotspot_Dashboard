@@ -90,7 +90,19 @@ def _split_host_port(host_port: str, default_port: int = 7300) -> "tuple | None"
 
 
 def _parse_line(line: str) -> "dict | None":
-    m = _SPOT_RE.match(line.strip())
+    # Real, live-confirmed bug (2026-09): a genuine spot from dx.w1nr.net
+    # ended in two trailing BEL bytes ("...0104Z\x07\x07") -- some DX
+    # cluster software appends a control character like this to audibly
+    # flag certain spots (e.g. an alert match). Plain str.strip() only
+    # strips WHITESPACE, not control bytes, so those BEL characters
+    # were still attached right after the timestamp when the regex ran,
+    # and its trailing `\s*$` anchor (only whitespace allowed after the
+    # timestamp) silently failed to match -- dropping a real spot with
+    # no error anywhere. Stripped here, before the regex runs, rather
+    # than loosening the anchor itself, so a genuinely malformed line
+    # still correctly fails to match.
+    line = re.sub(r"[\x00-\x1f\x7f\s]+$", "", line.strip())
+    m = _SPOT_RE.match(line)
     if not m:
         return None
     spotter, freq_khz, call, comment, hhmm = m.groups()

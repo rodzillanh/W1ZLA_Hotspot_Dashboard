@@ -61,7 +61,17 @@ _SPOT_RE = re.compile(
 
 
 def _parse_line(line: str) -> "dict | None":
-    m = _SPOT_RE.match(line.strip())
+    # Same shared regex shape as dxcluster.py's _parse_line -- and the
+    # identical trailing `\s*$`-anchor vulnerability, confirmed live
+    # there against a real dx.w1nr.net spot carrying trailing BEL control
+    # bytes (0x07) that plain str.strip() doesn't remove. RBN's own feed
+    # is machine-generated (not a human-typed cluster), so this hasn't
+    # been reported broken here, but there's no guarantee some skimmer/
+    # aggregator never appends a control byte either -- applying the same
+    # defensive fix preemptively rather than waiting for an identical
+    # silent-drop bug report.
+    line = re.sub(r"[\x00-\x1f\x7f\s]+$", "", line.strip())
+    m = _SPOT_RE.match(line)
     if not m:
         return None
     spotter, freq_khz, call, mode, snr, speed, speed_unit, tag, hhmm = m.groups()
