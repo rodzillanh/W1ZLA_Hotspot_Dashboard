@@ -151,8 +151,23 @@ class RigPanelPoller:
         freq = _num(self._get1(sock, "f", raw))
         mode_lines = self._cmd(sock, "m", 2)
         raw["m"] = " / ".join(mode_lines) or "(no reply)"
-        mode = mode_lines[0] if mode_lines and not mode_lines[0].startswith("RPRT") else None
-        passband = _num(mode_lines[1]) if len(mode_lines) > 1 and not mode_lines[1].startswith("RPRT") else None
+        # A real, live-captured raw reading against a wfweb/IC-7300MK2
+        # setup (2026-09) showed `m` answering the literal text
+        # "UNKNOWN" (mode) while the rig was clearly mid-operation (real
+        # S-meter/PWR/filter readings alongside it) -- not the standard
+        # Hamlib `RPRT -n` convention for "can't answer this", so the
+        # original `.startswith("RPRT")`-only check trusted it as a
+        # genuine mode name. Whether "UNKNOWN" is wfweb's own bridge
+        # failing to map this rig's CI-V mode byte, or some other
+        # backend's placeholder, wasn't pinned down further -- either
+        # way, showing it as an actual mode is worse than showing
+        # nothing. "None" is treated the same way, for the same reason
+        # (see _get1()'s own docstring, which hit this identically on
+        # the `v` field from the same capture).
+        mode = mode_lines[0] if mode_lines and mode_lines[0] not in ("None", "UNKNOWN") \
+            and not mode_lines[0].startswith("RPRT") else None
+        passband = _num(mode_lines[1]) if len(mode_lines) > 1 and mode_lines[1] != "None" \
+            and not mode_lines[1].startswith("RPRT") else None
         vfo = self._get1(sock, "v", raw)
         split_lines = self._cmd(sock, "s", 2)
         raw["s"] = " / ".join(split_lines) or "(no reply)"
@@ -343,12 +358,20 @@ class RigPanelPoller:
         on an error / empty reply. If `raw` is a dict, the exact reply
         (incl. an `RPRT -n` error) is recorded under `line` -- surfaced
         in the card's drawer so it's obvious what a given rig / Hamlib
-        build actually answers for each level/func."""
+        build actually answers for each level/func.
+
+        A reply of the literal text "None" is treated the same as an
+        `RPRT -n` error, not as real data -- confirmed live (2026-09)
+        against wfweb's own rigctld bridge, which doesn't always follow
+        Hamlib's `RPRT -n` convention for a field it can't answer (`v`
+        answered literal "None" for a real IC-7300MK2 rather than an
+        error line, which the original `.startswith("RPRT")`-only check
+        would have trusted as a genuine VFO name)."""
         r = cls._cmd(sock, line, 1)
         val = r[0] if r else ""
         if raw is not None:
             raw[line] = val or "(no reply)"
-        if not val or val.startswith("RPRT"):
+        if not val or val.startswith("RPRT") or val == "None":
             return None
         return val
 

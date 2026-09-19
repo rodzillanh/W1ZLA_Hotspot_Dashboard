@@ -566,6 +566,36 @@ BIOS = {
         "blurb": "Lead guitarist and co-founder of The Pretenders, prized for his melodic, chiming guitar work on hits like 'Brass in Pocket' and 'Kid'.",
         "wiki": "James_Honeyman-Scott",
     },
+    "Hoon": {
+        "name": "Shannon Hoon",
+        "blurb": "Blind Melon's frontman, whose plaintive vocal on 'No Rain' became a defining alt-rock single of the early 1990s.",
+        "wiki": "Shannon_Hoon",
+    },
+    "Barrett": {
+        "name": "Syd Barrett",
+        "blurb": "Founding singer, guitarist, and chief early songwriter of Pink Floyd, whose psychedelic vision shaped the band before his own decline forced him out in 1968.",
+        "wiki": "Syd_Barrett",
+    },
+    "Ayers": {
+        "name": "Kevin Ayers",
+        "blurb": "Singer, bassist, and founding member of Soft Machine, later a droll, prolific solo artist across the Canterbury scene and beyond.",
+        "wiki": "Kevin_Ayers",
+    },
+    "Burnette": {
+        "name": "Johnny Burnette",
+        "blurb": "Rockabilly pioneer with the Rock 'n Roll Trio, whose blistering 'Train Kept A-Rollin'' became a foundational riff for rock guitar.",
+        "wiki": "Johnny_Burnette",
+    },
+    "Ocasek": {
+        "name": "Ric Ocasek",
+        "blurb": "Singer, guitarist, and principal songwriter of The Cars, blending new wave synths with hooky pop-rock on hits like 'Just What I Needed' and 'Drive'.",
+        "wiki": "Ric_Ocasek",
+    },
+    "McVie": {
+        "name": "Christine McVie",
+        "blurb": "Singer, keyboardist, and songwriter for Fleetwood Mac behind some of the band's warmest hits, including 'Don't Stop', 'Everywhere', and 'Songbird'.",
+        "wiki": "Christine_McVie",
+    },
 }
 
 

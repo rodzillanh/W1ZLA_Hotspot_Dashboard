@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.86 "Ocasek"</span>
+                <span class="release-version">v4.87 "McVie"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fix: Rig Panel could show a wrong "UNKNOWN" mode / blank VFO with wfweb</span> — confirmed live against a real wfweb + IC-7300MK2 setup: for a field it can't answer, wfweb's own rigctld bridge doesn't always follow Hamlib's standard "unsupported" reply (<code>RPRT -n</code>) — it answered the literal text <code>UNKNOWN</code> for mode and <code>None</code> for VFO instead, which this app's parser trusted as real data since neither started with <code>RPRT</code>. Both literal placeholders are now treated the same as an unsupported field (the badge is hidden, same as any other field a rig doesn't report), rather than showing misleading text. The card's own raw-readings drawer is unaffected — it still shows exactly what rigctld answered either way</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.86 "Ocasek"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>New: Power On/Off + LAN Disconnect/Reconnect on the Rig Panel card, for <a href="https://github.com/adecarolis/wfweb" target="_blank" rel="noopener">wfweb</a> users</span> — a separate WebSocket connection to wfweb's own native protocol (not the generic rigctld one this app already speaks for tap-to-tune), confirmed directly from wfweb's own source. A new ⏻ icon in the card's header powers the radio off (with a confirmation first) when it's on, and the card body switches to a "Radio is powered off → Power On" prompt when it's off — wfweb keeps its own connection to the radio's LAN session independent of the radio's power state, which is exactly what makes remote Power On possible at all. A LAN connected/disconnected row with its own Disconnect/Reconnect button sits below the card regardless of power state. Off by default — opt in under Settings → Integrations → "wfweb power / LAN control"</li>
