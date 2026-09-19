@@ -10220,7 +10220,7 @@ function renderRigPanelCard() {
     // PA temp
     let paRow;
     if (s.temp_frac == null) {
-        paRow = `<div class="rp-pa"><span class="lab">PA</span><span class="na">temperature not reported by this rig / Hamlib build</span><span></span></div>`;
+        paRow = '';   // rig/Hamlib build doesn't report PA temp -- show nothing rather than a "not reported" row
     } else {
         const pctNow = s.temp_frac * 100;
         const tCls = pctNow >= s.alert_pct ? 'hot' : pctNow >= s.alert_pct - 12 ? 'warn' : '';
