@@ -7,3 +7,6 @@ waitress>=3.0
 websocket-client>=1.7
 sgp4>=2.23
 pywebpush>=1.14
+numpy>=1.26
+Pillow>=10.0
+sstv>=0.1; platform_machine == "x86_64" or platform_machine == "AMD64" or platform_machine == "aarch64" or platform_machine == "arm64"

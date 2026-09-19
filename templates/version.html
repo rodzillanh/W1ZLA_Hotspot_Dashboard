@@ -117,9 +117,24 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.90 "Cale"</span>
+                <span class="release-version">v4.91 "Lewis"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>New: SSTV card</span> &mdash; a receive-only slow-scan TV decoder that shows the <b>last picture heard</b> on your HF rig. It listens through wfweb's own WebSocket audio stream (the same connection settings as the Rig Panel's power control), finds transmissions by their VIS header, decodes Martin, Scottie, Robot, PD and other common modes, and keeps the most recent pictures on the data volume. The card has four states: the last image with its mode, time and signal quality; a live partial image filling in as it is received; standby when the rig is in use; and an empty state. The &#9881; drawer has the settings, an audio-stream test, and the recent-images grid</li>
+                <li><span>Optional: listen automatically when the rig is idle</span> &mdash; a separate opt-in switch in the drawer (off by default, so merely showing the card never touches your radio). Once the rig has been left alone for a set time (default 25 min: no transmitting, no tuning, no dashboard rig use), it tunes to 14.230 MHz USB and starts listening. <b>It never transmits.</b> Turning the knob, using wfweb, or tapping a tune chip makes it step aside immediately without fighting you, and the idle clock starts over. <b>Stop</b> puts the rig back on its previous frequency and mode if that setting is on. Needs Rig control (rigctld) set up for the retune</li>
+                <li><span>Noise-rejection so junk never reaches the card</span> &mdash; the decoder's own header detector needs about 28 dB of signal to lock on, far too strict for HF, so the card uses its own noise-tolerant one (found headers down to about 0 dB in tests, tolerating &plusmn;60 Hz of mistuning). Every result is then checked before it is shown: pictures that are just static, blank, or that lost audio in transit are discarded and counted as &ldquo;rejected as noise&rdquo; in the drawer. Against a real 9.5-minute recording of 14.230 MHz this correctly rejected three false or too-weak headers</li>
+                <li><span>Audio-stream safeguards</span> &mdash; during development wfweb was seen dropping the first 682-sample frame of one in three 20 ms audio packets (cleared by a container restart), which wrecks any SSTV image. The receiver zero-fills those gaps to keep timing right, counts them, rejects any picture that lost more than 3% of its audio, and the drawer's <b>Test audio stream</b> button reports whether the stream is healthy</li>
+                <li><span>New dependencies</span> &mdash; <code>numpy</code>, <code>Pillow</code> and <code>sstv</code> (a Rust decoder) are added to <code>requirements.txt</code>; Docker rebuilds and <code>update.sh</code> pick them up automatically. <code>sstv</code> only has prebuilt packages for x86-64 and 64-bit ARM, so on a 32-bit Pi install the card simply reports the decoder isn't available while every other card keeps working</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.90 "Cale"</span>
+                <span class="release-date">September 2026</span>
+                
             </div>
             <ul class="change-list">
                 <li><span>Spots card: new full-height "Browse" drawer</span> &mdash; the card's Stats button is now <b>&#9776; Browse</b> and opens a side drawer with two tabs. <b>Spots</b> is a searchable list across POTA, SOTA, RBN and DX (callsign, park or summit match, with source and mode chips, sort, and tap-to-tune), giving the list the whole screen height instead of ~3 rows. <b>POTA Stats</b> is the drawer's previous hunter-stats content, unchanged. The drawer's filters are its own (seeded from the card's chips on open) so narrowing there never changes the card</li>

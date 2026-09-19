@@ -611,6 +611,11 @@ BIOS = {
         "blurb": "Tulsa-sound songwriter whose laid-back shuffle gave the world 'Cocaine' and 'After Midnight', both made famous by Eric Clapton.",
         "wiki": "J._J._Cale",
     },
+    "Lewis": {
+        "name": "Jerry Lee Lewis",
+        "blurb": "Wild-fingered rock 'n' roll piano pioneer, \u201cThe Killer,\u201d behind \u201cGreat Balls of Fire\u201d and \u201cWhole Lotta Shakin' Goin' On.\u201d",
+        "wiki": "Jerry_Lee_Lewis",
+    },
 }
 
 

@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.90"
+APP_VERSION = "4.91"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -257,6 +257,9 @@ VERSION_CODENAMES = [
                         # (1962-1988)
     "Cale",             # v4.90 -- J.J. Cale, Tulsa-sound songwriter
                         # ("Cocaine", "After Midnight") (1938-2013)
+    "Lewis",            # v4.91 -- Jerry Lee Lewis, rock 'n' roll pianist
+                        # ("Great Balls of Fire", "Whole Lotta Shakin'
+                        # Goin' On") (1935-2022)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1323,6 +1326,26 @@ DEFAULT_SETTINGS = {
     "show_repeaters": False,
     "repeaters_position": 0,
     "repeaters_radius_mi": 50,
+    # SSTV card (v4.91) -- receive-only slow-scan TV decoder fed by wfweb's
+    # own WebSocket audio (see sstv_rx.py / sstv_controller.py). `show_sstv`
+    # is the card + the connection; it reuses wfweb_host/wfweb_port/
+    # wfweb_use_ssl (Integrations) and needs rig_control_enabled + rig_host
+    # only for the automatic retune. `sstv_auto_enabled` is a separate,
+    # deliberate opt-in: it lets the dashboard tune YOUR rig to
+    # `sstv_freq_hz` once it has been idle `sstv_idle_minutes` -- off by
+    # default so merely showing the card never touches the radio.
+    # `sstv_restore` puts the previous frequency/mode back when the
+    # operator presses Stop; `sstv_quality_gate` hides decodes that look
+    # like noise; `sstv_keep` is how many pictures are kept on disk.
+    "show_sstv": False,
+    "sstv_position": 0,
+    "sstv_auto_enabled": False,
+    "sstv_idle_minutes": 25,
+    "sstv_freq_hz": 14230000,
+    "sstv_mode": "USB",
+    "sstv_restore": True,
+    "sstv_quality_gate": True,
+    "sstv_keep": 12,
     # APRS.fi — requires a free API key from https://aprs.fi/page/api.
     # Blank disables it.
     "aprs_api_key": "",

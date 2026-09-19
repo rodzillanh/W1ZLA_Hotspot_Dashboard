@@ -1868,6 +1868,91 @@
             line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .rpt-empty { color: var(--text-muted); font-size: 12px; text-align: center; padding: 34px 10px; }
 
+        /* --- SSTV card (v4.91) -- mockup-approved: the last decoded picture
+           + a little metadata, in four states (resting / receiving /
+           standby / empty) and a gear drawer. The picture frame scales with
+           the card (58% of the width, capped at 260px, always 5:4 like the
+           320x256 SSTV modes) so the metadata column never gets squeezed at
+           the grid's 420px minimum card width. --- */
+        .sstv-header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .sstv-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px;
+            background: var(--panel-2); border: 1px solid var(--border); color: var(--text-muted);
+            font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+            text-transform: uppercase; white-space: nowrap; }
+        .sstv-pill .d { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); }
+        .sstv-pill.live { background: var(--live-dim); border-color: transparent; color: var(--live); }
+        .sstv-pill.live .d { background: var(--live); }
+        .sstv-pill.rx .d { animation: pulse 1.2s ease-in-out infinite; }
+        .sstv-gear { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; padding: 0;
+            border-radius: 6px; border: 1px solid var(--card-border); background: var(--panel-2);
+            color: var(--text-muted); cursor: pointer; font-size: 14px; flex-shrink: 0;
+            transition: color .15s, border-color .15s; }
+        .sstv-gear:hover { color: var(--text); border-color: var(--text-dim); }
+        .sstv-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin: -4px 0 12px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sstv-body { display: flex; gap: 16px; align-items: stretch; }
+        .sstv-frame { width: 58%; max-width: 260px; aspect-ratio: 5 / 4; flex-shrink: 0; border-radius: 6px; overflow: hidden;
+            border: 1px solid var(--border); background: #0f1216; position: relative; }
+        .sstv-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+        .sstv-frame.dim img { opacity: .32; }
+        .sstv-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 4px; background: rgba(18,21,26,.72); text-align: center; padding: 0 14px; }
+        .sstv-overlay b { font-size: 13px; color: var(--text); }
+        .sstv-overlay span { font-size: 11px; color: var(--text-muted); }
+        .sstv-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; gap: 6px; padding: 0 12px; text-align: center;
+            background: repeating-linear-gradient(0deg, var(--panel) 0, var(--panel) 3px, var(--border-soft) 3px, var(--border-soft) 4px); }
+        .sstv-empty b { font-size: 12px; font-weight: 500; color: var(--text-muted); }
+        .sstv-empty span { font-size: 10.5px; color: var(--text-dim); }
+        .sstv-meta { display: flex; flex-direction: column; gap: 10px; flex-grow: 1; min-width: 0; }
+        .sstv-k { font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 2px; }
+        .sstv-v { font-family: var(--font-mono); font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sstv-v.big { font-size: 20px; }
+        .sstv-note { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .sstv-quality { display: flex; align-items: flex-end; gap: 6px; }
+        .sstv-bars { display: inline-flex; align-items: flex-end; gap: 2px; }
+        .sstv-bars i { display: inline-block; width: 4px; border-radius: 1px; background: var(--border); }
+        .sstv-bars i.on { background: var(--live); }
+        .sstv-prog { height: 4px; border-radius: 2px; background: var(--border); margin-top: 6px; }
+        .sstv-prog i { display: block; height: 4px; border-radius: 2px; background: var(--live); transition: width .6s linear; }
+        .sstv-actions { display: flex; align-items: center; gap: 12px; margin-top: auto; flex-wrap: wrap; }
+        .sstv-actions a, .sstv-linkbtn { color: var(--live); font-size: 11.5px; text-decoration: none; background: none; border: none; padding: 0; cursor: pointer; }
+        .sstv-actions a:hover, .sstv-linkbtn:hover { text-decoration: underline; }
+        .sstv-linkbtn.quiet { color: var(--text-muted); }
+        .sstv-btn { padding: 6px 10px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--border);
+            color: var(--text); font-size: 11.5px; cursor: pointer; }
+        .sstv-btn:hover { border-color: var(--text-dim); }
+        .sstv-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+        .sstv-btn:disabled { opacity: .5; cursor: default; }
+        .sstv-foot { border-top: 1px solid var(--border-soft); padding-top: 8px; margin-top: 12px; display: flex;
+            justify-content: space-between; gap: 12px; font-size: 10.5px; color: var(--text-dim); }
+        .sstv-foot span:last-child { font-family: var(--font-mono); white-space: nowrap; }
+        .sstv-eq { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
+        .sstv-eq i { display: inline-block; width: 4px; border-radius: 1px; background: var(--border); }
+        .sstv-eq.ok i { background: var(--live); }
+        /* SSTV drawer */
+        .sstv-set-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 9px 0;
+            border-top: 1px solid var(--border-soft); }
+        .sstv-set-row:first-child { border-top: none; }
+        .sstv-set-row .lbl { font-size: 13px; color: var(--text); }
+        .sstv-set-row .hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .sstv-switch { position: relative; width: 34px; height: 20px; padding: 0; border-radius: 10px; border: none;
+            background: var(--border); flex-shrink: 0; cursor: pointer; transition: background .15s; }
+        .sstv-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+            border-radius: 50%; background: #ffffff; transition: left .15s; }
+        .sstv-switch[aria-pressed="true"] { background: var(--live); }
+        .sstv-switch[aria-pressed="true"]::after { left: 16px; }
+        .sstv-select { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 6px;
+            padding: 6px 8px; font-family: var(--font-mono); font-size: 12px; }
+        .sstv-thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
+        .sstv-thumb { display: block; text-decoration: none; }
+        .sstv-thumb img { display: block; width: 100%; aspect-ratio: 5 / 4; object-fit: cover; border-radius: 5px;
+            border: 1px solid var(--border); background: #0f1216; }
+        .sstv-thumb div { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+        .sstv-test-res { font-family: var(--font-mono); font-size: 11px; }
+        .sstv-test-res.ok { color: var(--live); }
+        .sstv-test-res.err { color: var(--danger); }
+
         /* --- HamAlert card --- */
         .ha-badge {
             font-size: 10px; font-weight: 600; letter-spacing: .3px; padding: 1px 7px; border-radius: 9px;
@@ -3676,6 +3761,21 @@
             <div class="rpt-foot">Source: <a href="https://hearham.com" target="_blank" rel="noopener">hearham.com</a> — within {{ settings.get('repeaters_radius_mi', 50) }} mi.</div>
         </div>
         {% endif %}
+        {% if settings.get('show_sstv', False) %}
+        <div class="metrics-card" id="sstv-card"
+             style="order:{{ settings.get('sstv_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name" title="Slow-scan TV: decodes SSTV pictures heard through wfweb. Receive only. Shows the last decoded image.">🖼️ SSTV</div>
+                <div class="sstv-header-right">
+                    <span class="sstv-pill" id="sstv-pill"><span class="d"></span><span id="sstv-pill-txt">…</span></span>
+                    <button class="sstv-gear" onclick="openSstvDrawer()" aria-label="SSTV settings" title="SSTV settings">⚙</button>
+                </div>
+            </div>
+            <div class="sstv-sub" id="sstv-sub"></div>
+            <div class="sstv-body" id="sstv-body"><div class="rpt-empty" style="width:100%">Loading…</div></div>
+            <div class="sstv-foot"><span id="sstv-foot-l"></span><span id="sstv-foot-r"></span></div>
+        </div>
+        {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
         <div class="metrics-card" id="hf-conditions-card"
              style="order:{{ settings.get('hf_conditions_position', 0) }}">
@@ -4057,6 +4157,7 @@
 <div class="hs-drawer" id="hf-fav-drawer"></div>
 <div class="hs-drawer" id="rig-panel-drawer"></div>
 <div class="hs-drawer" id="fleet-status-drawer"></div>
+<div class="hs-drawer" id="sstv-drawer"></div>
 
 <!-- ASL Control's "Disconnect all links on this node" confirm dialog
      (v4.8) -- a standalone overlay, not one more hs-drawer, since it
@@ -4227,6 +4328,7 @@ const RIG_PANEL_PAGE         = {{ settings.get('rig_panel_page', 1) }};
 const QRZ_QUICK_LOG_PAGE     = {{ settings.get('qrz_quick_log_page', 1) }};
 const BEACONS_PAGE           = {{ settings.get('beacons_page', 1) }};
 const REPEATERS_PAGE         = {{ settings.get('repeaters_page', 1) }};
+const SSTV_PAGE              = {{ settings.get('sstv_page', 1) }};
 const DVSWITCH_PAGE          = {{ settings.get('dvswitch_page', 1) }};
 const DASHBOARD2_NAME        = {{ settings.get('dashboard2_name', 'Dashboard 2') | tojson }};
 // Whether the "Dashboard 2" tab even appears -- presence-derived (any
@@ -4332,6 +4434,10 @@ const BEACONS_POSITION = {{ settings.get('beacons_position', 0) }};
 const SHOW_REPEATERS = {{ 'true' if settings.get('show_repeaters', False) else 'false' }};
 const REPEATERS_POSITION = {{ settings.get('repeaters_position', 0) }};
 const REPEATERS_POLL_MS = 60000;  // hearham's backend cache is 24h; no need to re-poll faster than this
+const SHOW_SSTV = {{ 'true' if settings.get('show_sstv', False) else 'false' }};
+const SSTV_POSITION = {{ settings.get('sstv_position', 0) }};
+const SSTV_POLL_MS = 3000;
+const SSTV_RX_POLL_MS = 1500;  // faster while an image is being received, so the preview keeps up
 const POTA_POLL_MS = 20000;  // matches pota.py's spot cache TTL
 const SOTA_CARD_POLL_MS = 120000;  // matches sota.py's CACHE_TTL, same as the map overlay's own interval
 const RBN_ENABLED = {{ 'true' if settings.get('rbn_enabled', False) else 'false' }};
@@ -4911,7 +5017,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     recentcontacts: '__recent_contacts__', qsostats: '__qso_stats__',
     topactivity: '__top_activity__', pota: '__pota__', dvswitch: '__dvswitch__',
     hffav: '__hf_favorites__', rigpanel: '__rig_panel__', qrzquicklog: '__qrz_quick_log__',
-    beacons: '__beacons__', repeaters: '__repeaters__',
+    beacons: '__beacons__', repeaters: '__repeaters__', sstv: '__sstv__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -5124,11 +5230,14 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (SHOW_REPEATERS && REPEATERS_PAGE === page) {
         sentinels.push({ key: 'repeaters', pos: Math.max(0, REPEATERS_POSITION) });
     }
+    if (SHOW_SSTV && SSTV_PAGE === page) {
+        sentinels.push({ key: 'sstv', pos: Math.max(0, SSTV_POSITION) });
+    }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, hfcond, bandplan,
     // licensequiz, wspractivity, digipi, bigclock, notifications, satellites,
     // recentcontacts, qsostats, topactivity, pota, hffav, rigpanel, qrzquicklog,
-    // beacons, repeaters, THEN cameras), since
+    // beacons, repeaters, sstv, THEN cameras), since
     // computeCardOrders() below now relies on a stable sort to break ties
     // by insertion order, not by an independent alphabetical rule. Two
     // sentinels can easily tie on position (e.g. right after enabling
@@ -5208,6 +5317,8 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (beaconsCard && 'beacons' in sentinelOrders) { moveIfNeeded(beaconsCard, cardsOuter); beaconsCard.style.order = sentinelOrders.beacons; }
     const repeatersCard = document.getElementById('repeaters-card');
     if (repeatersCard && 'repeaters' in sentinelOrders) { moveIfNeeded(repeatersCard, cardsOuter); repeatersCard.style.order = sentinelOrders.repeaters; }
+    const sstvCard = document.getElementById('sstv-card');
+    if (sstvCard && 'sstv' in sentinelOrders) { moveIfNeeded(sstvCard, cardsOuter); sstvCard.style.order = sentinelOrders.sstv; }
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -10861,6 +10972,325 @@ if (SHOW_REPEATERS) {
     setInterval(fetchRepeaters, REPEATERS_POLL_MS);
 }
 
+// --- SSTV card (v4.91) -- see sstv_rx.py / sstv_controller.py. Receive-
+// only: the card shows the last decoded picture; the controller behind it
+// decides when the rig is idle enough to tune to the SSTV frequency.
+// Everything is prefixed sstv* -- this file is one big script scope, and a
+// same-named helper declared twice silently replaces the first (the real
+// fmtAgo bug documented in CLAUDE.md), so grep before adding a helper here.
+let sstvData = null;
+let sstvTimer = null;
+let sstvCountdown = null;   // {remaining, at} -- server value at last poll, ticked down locally
+let sstvCardSig = '';
+let sstvDrawerSigs = { status: '', images: '' };
+
+function sstvMmss(secs) {
+    secs = Math.max(0, Math.round(secs));
+    return Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+}
+function sstvClock(ts) {
+    return new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+function sstvStamp(ts) {
+    const d = new Date(ts * 1000);
+    const sameDay = d.toDateString() === new Date().toDateString();
+    return sameDay ? sstvClock(ts)
+        : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + sstvClock(ts);
+}
+function sstvFreq(hz) { return hz ? (hz / 1e6).toFixed(3) + ' MHz' : '—'; }
+function sstvRigText(rig) {
+    rig = rig || {};
+    return rig.freq_hz ? sstvFreq(rig.freq_hz) + (rig.mode ? ' · ' + rig.mode : '') : 'unknown';
+}
+function sstvBars(quality) {
+    const on = quality === 'good' ? 3 : quality === 'fair' ? 2 : 1;
+    const hs = [4, 7, 10, 13];
+    return '<span class="sstv-bars">' + hs.map((h, i) =>
+        `<i class="${i < on ? 'on' : ''}" style="height:${h}px"></i>`).join('') + '</span>';
+}
+function sstvMeta(k, v, note) {
+    return `<div><div class="sstv-k">${k}</div><div class="sstv-v">${v}</div>${note ? `<div class="sstv-note">${note}</div>` : ''}</div>`;
+}
+
+function sstvView() {
+    if (!sstvData) return null;
+    const rx = sstvData.rx || {}, ctl = sstvData.ctl || {}, cfg = sstvData.config || {};
+    if (!rx.libs_ok) return 'error';
+    if (!cfg.host_set) return 'setup';
+    if (rx.receiving) return 'receiving';
+    if (ctl.state === 'active') return rx.last ? 'resting' : 'empty';
+    return 'standby';
+}
+
+function sstvStandbyText(ctl, cfg) {
+    // Plain-English reason the card isn't listening right now.
+    let txt = ctl.reason || (cfg.auto ? 'Listens automatically once the rig has been idle for ' + (cfg.idle_minutes || 25) + ' min'
+        : 'Auto-listen is off');
+    if (ctl.reason_at) txt += ' (' + sstvClock(ctl.reason_at) + ')';
+    return txt;
+}
+
+function renderSstvCard() {
+    if (!SHOW_SSTV || !sstvData) return;
+    const body = document.getElementById('sstv-body');
+    if (!body) return;
+    const view = sstvView();
+    const rx = sstvData.rx || {}, ctl = sstvData.ctl || {}, cfg = sstvData.config || {};
+    const rig = rx.rig || {};
+    const last = rx.last, recv = rx.receiving;
+
+    // header pill + subline
+    const pill = document.getElementById('sstv-pill');
+    const pillTxt = document.getElementById('sstv-pill-txt');
+    const live = (view === 'resting' || view === 'empty' || view === 'receiving');
+    pill.className = 'sstv-pill' + (live ? ' live' : '') + (view === 'receiving' ? ' rx' : '');
+    pillTxt.textContent = { receiving: 'Receiving', resting: 'Listening', empty: 'Listening', standby: 'Standby',
+        error: 'Unavailable', setup: 'Setup' }[view] || '…';
+    let sub = '';
+    if (view === 'resting' || view === 'empty') sub = sstvRigText(rig) + ' · SSTV listening';
+    else if (view === 'receiving') sub = sstvRigText(rig) + ' · header detected ' + sstvClock(recv.started_at);
+    else if (view === 'standby') sub = (cfg.auto ? 'Will tune to ' + sstvFreq((ctl.target || {}).freq_hz) + ' · ' : '') + 'rig is on ' + sstvRigText(rig);
+    document.getElementById('sstv-sub').textContent = sub;
+
+    // footer
+    let fl = '', fr = '';
+    if (view === 'resting' || view === 'empty') {
+        fl = rx.listening_since ? 'Listening since ' + sstvClock(rx.listening_since) : 'Listening';
+        fr = (rx.today || 0) + (rx.today === 1 ? ' image today' : ' images today');
+    } else if (view === 'receiving') {
+        fl = 'Rig stays on ' + sstvFreq(rig.freq_hz) + ' while receiving'; fr = 'decoding';
+    } else if (view === 'standby') {
+        fl = last ? 'Last image ' + sstvStamp(last.ts) + ' · ' + escapeHtml(last.label) : 'Nothing decoded yet';
+        fr = cfg.auto ? 'idle rule: ' + (cfg.idle_minutes || 25) + ' min' : 'auto-listen off';
+    }
+    document.getElementById('sstv-foot-l').innerHTML = fl;
+    document.getElementById('sstv-foot-r').textContent = fr;
+
+    // Rebuild the body only when its structure changes -- progress, the
+    // countdown and the live preview are updated in place by
+    // sstvUpdateLive(), so the <img> isn't torn down every poll.
+    const sig = [view, last && last.id, recv && recv.label, !!rx.has_preview, ctl.reason, ctl.reason_at, cfg.auto,
+        cfg.idle_minutes, rx.audio_ok, rx.dropped_samples, rx.today, rx.rejected_total, rx.sample_rate,
+        ctl.idle_remaining_s == null].join('|');
+    if (sig !== sstvCardSig) {
+        sstvCardSig = sig;
+        body.innerHTML = sstvBodyHtml(view, rx, ctl, cfg, last, recv);
+    }
+    sstvUpdateLive(true);
+}
+
+function sstvFrame(inner, cls) { return `<div class="sstv-frame ${cls || ''}">${inner}</div>`; }
+function sstvEmptyFrame(title, subtxt) {
+    return sstvFrame(`<div class="sstv-empty"><b>${title}</b><span>${subtxt}</span></div>`);
+}
+function sstvBodyHtml(view, rx, ctl, cfg, last, recv) {
+    if (view === 'error') {
+        return `<div class="rpt-empty" style="width:100%">${escapeHtml(rx.error || 'SSTV is unavailable')}</div>`;
+    }
+    if (view === 'setup') {
+        return '<div class="rpt-empty" style="width:100%">Set your wfweb host under <a href="/setup#integrations" style="color:var(--link)">Settings → Integrations</a> to use this card.</div>';
+    }
+    if (view === 'receiving') {
+        const frame = rx.has_preview
+            ? sstvFrame('<img id="sstv-preview-img" src="/api/sstv/preview.png" alt="Image being received" onerror="this.style.display=\'none\'">')
+            : sstvEmptyFrame('Receiving', 'Waiting for the first lines');
+        return frame + `<div class="sstv-meta">
+            ${sstvMeta('Mode', escapeHtml(recv.label))}
+            <div><div class="sstv-k">Progress</div><div class="sstv-v" id="sstv-prog-txt">—</div>
+                <div class="sstv-prog"><i id="sstv-prog-bar" style="width:0%"></i></div></div>
+            <div class="sstv-note" style="margin-top:auto">Image appears when complete</div>
+        </div>`;
+    }
+    if (view === 'resting') {
+        const ago = fmtAgoCompact(Math.max(0, Date.now() / 1000 - last.ts));
+        return sstvFrame(`<img src="/api/sstv/image/${last.id}.png" alt="Last decoded SSTV image">`) + `<div class="sstv-meta">
+            ${sstvMeta('Mode', escapeHtml(last.label))}
+            ${sstvMeta('Received', sstvClock(last.ts), ago + ' ago · ' + sstvMmss(last.duration_s) + ' on air')}
+            <div><div class="sstv-k">Signal</div><div class="sstv-quality">${sstvBars(last.quality)}<span class="sstv-v" style="line-height:1">${last.quality[0].toUpperCase() + last.quality.slice(1)}</span></div></div>
+            <div class="sstv-actions"><a href="/api/sstv/image/${last.id}.png" target="_blank" rel="noopener">Open full size</a>
+                <button class="sstv-linkbtn quiet" onclick="sstvControl('stop')" title="Stop listening${cfg.restore ? ' and put the rig back where it was' : ''}">Stop</button></div>
+        </div>`;
+    }
+    if (view === 'empty') {
+        const bars = [6, 9, 12, 8, 14, 10, 16, 11, 7, 13, 9, 12].map(h => `<i style="height:${h}px"></i>`).join('');
+        const drop = rx.dropped_samples ? (rx.dropped_samples + ' samples lost') : 'no packets dropped';
+        return sstvEmptyFrame('Nothing decoded yet', 'Waiting for an SSTV header') + `<div class="sstv-meta">
+            ${sstvMeta('Listening since', rx.listening_since ? sstvClock(rx.listening_since) : '—')}
+            <div><div class="sstv-k">Audio</div><div class="sstv-eq ${rx.audio_ok ? 'ok' : ''}">${bars}</div>
+                <div class="sstv-note">${rx.audio_ok ? ((rx.sample_rate || 48000) / 1000) + ' kHz · ' + drop : 'no audio arriving'}</div></div>
+            ${sstvMeta('Images today', String(rx.today || 0))}
+            <div class="sstv-actions"><button class="sstv-linkbtn quiet" onclick="sstvControl('stop')">Stop</button></div>
+        </div>`;
+    }
+    // standby
+    const why = sstvStandbyText(ctl, cfg);
+    const frame = last
+        ? sstvFrame(`<img src="/api/sstv/image/${last.id}.png" alt="Last decoded SSTV image">` +
+            `<div class="sstv-overlay"><b>Standby</b><span>${escapeHtml(why)}</span></div>`, 'dim')
+        : sstvEmptyFrame('Standby', escapeHtml(why));
+    const countdown = (ctl.idle_remaining_s != null)
+        ? `<div><div class="sstv-k">Listens again in</div><div class="sstv-v big" id="sstv-countdown">${sstvMmss(ctl.idle_remaining_s)}</div><div class="sstv-note">if the rig stays idle</div></div>`
+        : `<div class="sstv-note">Auto-listen is off. It only listens when you press Listen now.</div>`;
+    return frame + `<div class="sstv-meta">
+        ${sstvMeta('State', 'Standby')}
+        ${countdown}
+        ${sstvMeta('Rig now', escapeHtml(sstvRigText(rx.rig)))}
+        <div class="sstv-actions"><button class="sstv-btn" onclick="sstvControl('listen_now')">Listen now</button></div>
+    </div>`;
+}
+
+// Per-second / per-poll in-place updates (no innerHTML churn).
+function sstvUpdateLive(fromPoll) {
+    if (!sstvData) return;
+    const recv = (sstvData.rx || {}).receiving;
+    if (recv) {
+        const bar = document.getElementById('sstv-prog-bar');
+        const txt = document.getElementById('sstv-prog-txt');
+        if (bar) bar.style.width = Math.round((recv.progress || 0) * 100) + '%';
+        if (txt) txt.textContent = sstvMmss(recv.elapsed_s) + ' of ' + sstvMmss(recv.total_s);
+        const img = document.getElementById('sstv-preview-img');
+        if (img && fromPoll) img.src = '/api/sstv/preview.png?t=' + Date.now();
+    }
+    const cd = document.getElementById('sstv-countdown');
+    if (cd && sstvCountdown) cd.textContent = sstvMmss(sstvCountdown.remaining - (Date.now() - sstvCountdown.at) / 1000);
+}
+
+function sstvControl(action) {
+    fetch('/api/sstv/control', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action }),
+    }).then(r => r.json()).then(d => {
+        rigToast(d.message || (d.ok ? 'Done' : 'Failed'), d.ok ? 'ok' : 'err');
+        fetchSstv();
+    }).catch(() => rigToast('SSTV request failed', 'err'));
+}
+
+// --- SSTV drawer: the shell (with its inputs) is built ONCE per open; polls
+// only rewrite the read-only status + image grid, never the inputs -- the
+// same "don't destroy a control the user is mid-way through" rule as the
+// ASL Control drawer's isAslDrawerFocused() guard, solved structurally.
+function sstvSet(key, value) {
+    const body = {}; body[key] = value;
+    fetch('/api/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    }).then(r => r.json()).then(() => fetchSstv()).catch(() => rigToast('Could not save the setting', 'err'));
+}
+function sstvToggle(btn, key) {
+    const on = btn.getAttribute('aria-pressed') !== 'true';
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    sstvSet(key, on);
+}
+function sstvClear() {
+    if (!confirm('Delete all stored SSTV images?')) return;
+    sstvControl('clear');
+}
+function sstvTestStream(btn) {
+    const res = document.getElementById('sstv-d-test');
+    btn.disabled = true; res.className = 'sstv-test-res'; res.textContent = 'Listening for 4 s…';
+    fetch('/api/sstv/test_stream', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+        .then(r => r.json()).then(d => {
+            res.className = 'sstv-test-res ' + (d.success ? 'ok' : 'err');
+            res.textContent = d.message;
+        }).catch(() => { res.className = 'sstv-test-res err'; res.textContent = 'Request failed'; })
+        .finally(() => { btn.disabled = false; });
+}
+function sstvSwitchRow(label, hint, key, on) {
+    return `<div class="sstv-set-row"><div><div class="lbl">${label}</div><div class="hint">${hint}</div></div>
+        <button class="sstv-switch" aria-label="${label}" aria-pressed="${on ? 'true' : 'false'}" onclick="sstvToggle(this,'${key}')"></button></div>`;
+}
+function sstvSelectRow(label, hint, key, options, current, suffix) {
+    const opts = options.slice();
+    if (!opts.includes(current)) { opts.push(current); opts.sort((a, b) => a - b); }
+    return `<div class="sstv-set-row"><div><div class="lbl">${label}</div><div class="hint">${hint}</div></div>
+        <select class="sstv-select" aria-label="${label}" onchange="sstvSet('${key}', parseInt(this.value, 10))">
+        ${opts.map(o => `<option value="${o}" ${o === current ? 'selected' : ''}>${o}${suffix}</option>`).join('')}</select></div>`;
+}
+
+function openSstvDrawer() {
+    closeAllDrawers();
+    const d = document.getElementById('sstv-drawer');
+    const cfg = (sstvData && sstvData.config) || {};
+    sstvDrawerSigs = { status: '', images: '' };
+    d.innerHTML = `
+        <div class="hs-drawer-header">
+            <div class="hs-drawer-title-row"><div class="hs-drawer-title">🖼️ SSTV</div>
+                <button class="hs-drawer-close" onclick="closeAllDrawers()" aria-label="Close">✕</button></div>
+            <div class="hs-drawer-sub">Receive only. Decodes SSTV pictures heard through wfweb.</div>
+        </div>
+        <div class="hs-drawer-body">
+            <div class="hs-drawer-section"><div class="hs-drawer-section-title">Status</div><div id="sstv-d-status"></div></div>
+            <div class="hs-drawer-section"><div class="hs-drawer-section-title">Auto-listen</div>
+                ${sstvSwitchRow('Listen for SSTV when the rig is idle', 'Tunes to ' + sstvFreq(cfg.freq_hz || 14230000) + ' USB. Never transmits.', 'sstv_auto_enabled', !!cfg.auto)}
+                ${sstvSelectRow('Rig must be idle for', 'No tuning, no transmitting, no dashboard rig use', 'sstv_idle_minutes', [5, 10, 15, 25, 45, 60, 120], cfg.idle_minutes || 25, ' min')}
+                ${sstvSwitchRow('Restore my frequency when I press Stop', 'Puts the rig back on the frequency and mode from before', 'sstv_restore', cfg.restore !== false)}
+                ${sstvSwitchRow('Hide images that look like noise', 'Rejects decodes that are just static or have lost audio', 'sstv_quality_gate', cfg.quality_gate !== false)}
+                ${sstvSelectRow('Pictures to keep', 'Older ones are deleted from the data volume', 'sstv_keep', [6, 12, 24, 48], cfg.keep || 12, '')}
+                <div style="display:flex;align-items:center;gap:12px;margin:14px 0 4px;flex-wrap:wrap">
+                    <button class="sstv-btn" onclick="sstvTestStream(this)">Test audio stream</button>
+                    <span class="sstv-test-res" id="sstv-d-test"></span></div>
+            </div>
+            <div class="hs-drawer-section"><div class="hs-drawer-section-title">Recent images <span class="count" id="sstv-d-count"></span></div>
+                <div id="sstv-d-images"></div>
+                <div style="margin-top:14px"><button class="sstv-btn danger" onclick="sstvClear()">Clear images</button></div>
+            </div>
+        </div>`;
+    d.classList.add('open');
+    document.getElementById('hs-drawer-backdrop').classList.add('open');
+    renderSstvDrawer();
+}
+
+function renderSstvDrawer() {
+    const d = document.getElementById('sstv-drawer');
+    if (!d || !d.classList.contains('open') || !sstvData) return;
+    const rx = sstvData.rx || {}, ctl = sstvData.ctl || {}, cfg = sstvData.config || {};
+    const row = (k, v) => `<div class="sstv-set-row"><div class="lbl">${k}</div><div class="sstv-v">${v}</div></div>`;
+    const stateTxt = { active: 'Listening', standby: 'Standby', off: 'Off' }[ctl.state] || '—';
+    const btns = ctl.state === 'active'
+        ? '<button class="sstv-btn" onclick="sstvControl(\'stop\')">Stop listening</button>'
+        : '<button class="sstv-btn" onclick="sstvControl(\'listen_now\')">Listen now</button>';
+    const statusHtml =
+        row('State', stateTxt) +
+        (ctl.state !== 'active' ? `<div class="sstv-note" style="padding:0 0 8px">${escapeHtml(sstvStandbyText(ctl, cfg))}</div>` : '') +
+        row('wfweb', rx.connected ? 'connected' : 'not connected') +
+        row('Audio', rx.audio_ok ? ((rx.sample_rate || 48000) / 1000) + ' kHz' + (rx.dropped_samples ? ' · ' + rx.dropped_samples + ' samples lost' : ' · clean') : 'not receiving') +
+        row('Rig', escapeHtml(sstvRigText(rx.rig))) +
+        row('Rejected as noise', String(rx.rejected_total || 0)) +
+        `<div style="padding-top:10px">${btns}</div>`;
+    if (statusHtml !== sstvDrawerSigs.status) {
+        sstvDrawerSigs.status = statusHtml;
+        document.getElementById('sstv-d-status').innerHTML = statusHtml;
+    }
+    const imgs = sstvData.images || [];
+    const imgHtml = imgs.length ? '<div class="sstv-thumbs">' + imgs.map(i =>
+        `<a class="sstv-thumb" href="/api/sstv/image/${i.id}.png" target="_blank" rel="noopener" title="${escapeHtml(i.label)} · ${i.quality}">
+            <img loading="lazy" src="/api/sstv/image/${i.id}.png" alt="${escapeHtml(i.label)}">
+            <div>${sstvStamp(i.ts)} · ${escapeHtml(i.label)}</div></a>`).join('') + '</div>'
+        : '<div class="sstv-note">No pictures yet.</div>';
+    if (imgHtml !== sstvDrawerSigs.images) {
+        sstvDrawerSigs.images = imgHtml;
+        document.getElementById('sstv-d-images').innerHTML = imgHtml;
+        document.getElementById('sstv-d-count').textContent = imgs.length ? imgs.length + ' kept' : '';
+    }
+}
+
+function fetchSstv() {
+    if (!SHOW_SSTV) return;
+    clearTimeout(sstvTimer);
+    fetch('/api/sstv').then(r => r.json()).then(d => {
+        sstvData = d;
+        const c = d.ctl || {};
+        sstvCountdown = (c.idle_remaining_s != null) ? { remaining: c.idle_remaining_s, at: Date.now() } : null;
+        renderSstvCard();
+        renderSstvDrawer();
+    }).catch(() => {}).finally(() => {
+        const recv = sstvData && sstvData.rx && sstvData.rx.receiving;
+        sstvTimer = setTimeout(fetchSstv, recv ? SSTV_RX_POLL_MS : SSTV_POLL_MS);
+    });
+}
+if (SHOW_SSTV) {
+    fetchSstv();
+    setInterval(() => sstvUpdateLive(false), 1000);   // countdown ticks between polls
+}
+
 function handleAdifFile(file) {
     if (!file) return;
     const reader = new FileReader();
@@ -12065,6 +12495,7 @@ function closeAllDrawers() {
     document.getElementById('hf-fav-drawer').classList.remove('open');
     document.getElementById('rig-panel-drawer').classList.remove('open');
     document.getElementById('fleet-status-drawer').classList.remove('open');
+    document.getElementById('sstv-drawer').classList.remove('open');
     document.getElementById('hs-drawer-backdrop').classList.remove('open');
 }
 function closeHotspotDrawer() { closeAllDrawers(); }

@@ -813,6 +813,15 @@
                      id="repeaters-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show SSTV card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (receive-only slow-scan TV decoder -- shows the last picture heard through wfweb. Needs the wfweb host under Settings → Integrations. Automatic retuning to 14.230 MHz is a separate opt-in inside the card's ⚙ drawer and needs Rig control set up)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_sstv', False) else '' }}"
+                     id="sstv-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show DVSwitch card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (only appears if an ASL3 hotspot also has "This node also runs DVSwitch" on -- turn this off to hide the card while keeping that enabled)
@@ -969,6 +978,7 @@
             {% set qrz_quick_log_pos = settings.get('qrz_quick_log_position', 0) if (settings.get('show_qrz_quick_log', False) and settings.get('qrz_quick_log_page', 1) == page) else -1 %}
             {% set beacons_pos = settings.get('beacons_position', 0) if (settings.get('show_beacons', False) and settings.get('beacons_page', 1) == page) else -1 %}
             {% set repeaters_pos = settings.get('repeaters_position', 0) if (settings.get('show_repeaters', False) and settings.get('repeaters_page', 1) == page) else -1 %}
+            {% set sstv_pos = settings.get('sstv_position', 0) if (settings.get('show_sstv', False) and settings.get('sstv_page', 1) == page) else -1 %}
             {# DVSwitch (v3.99) -- one consolidated card, shown when the
                "Show DVSwitch card" toggle (show_dvswitch, default on) is
                on AND any hotspot has dvswitch_enabled set. #}
@@ -1134,6 +1144,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🗼 Nearby Repeaters</span>
                     <span class="node-meta">nearby repeater directory card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == sstv_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__sstv__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🖼️ SSTV</span>
+                    <span class="node-meta">last decoded SSTV image card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -1689,6 +1706,8 @@
             equivalent. wfweb's own TLS certificate is normally self-signed, so this
             connects without verifying it — same trusted-LAN assumption as every other
             rig/hotspot integration here.
+            <b>The SSTV card also uses the host, port and SSL fields below</b> (for its
+            audio stream), even with the power control above switched off.
         </p>
         <div class="toggle-group" style="margin-bottom:10px">
             <div class="toggle-row">
@@ -2620,6 +2639,7 @@ function saveCards() {
             show_qrz_quick_log: document.getElementById('qrz-quick-log-toggle').classList.contains('on'),
             show_beacons: document.getElementById('beacons-toggle').classList.contains('on'),
             show_repeaters: document.getElementById('repeaters-toggle').classList.contains('on'),
+            show_sstv: document.getElementById('sstv-toggle').classList.contains('on'),
             show_dvswitch: document.getElementById('dvswitch-card-toggle').classList.contains('on'),
             brandmeister_alerts_enabled: document.getElementById('brandmeister-alerts-toggle').classList.contains('on'),
             qrz_logbook_enabled: document.getElementById('qrz-logbook-toggle').classList.contains('on'),
@@ -2792,6 +2812,7 @@ const SENTINEL_POSITION_FIELDS = [
     ['__qrz_quick_log__', 'qrz_quick_log_position'],
     ['__beacons__', 'beacons_position'],
     ['__repeaters__', 'repeaters_position'],
+    ['__sstv__', 'sstv_position'],
     ['__dvswitch__', 'dvswitch_position'],
 ];
 

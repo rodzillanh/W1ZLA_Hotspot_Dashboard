@@ -275,6 +275,17 @@ hamalert.py        HamAlertListener: persistent Telnet connection to
                    dashboard to accept a public inbound connection --
                    the one thing every other integration here avoids.
 
+sstv_vis.py,       The SSTV card's three modules (v4.91). sstv_vis.py is a pure-
+sstv_rx.py,        numpy VIS-header detector (finds an SSTV transmission's mode
+sstv_controller.py and exact start in noise); sstv_rx.py is the wfweb-audio
+                   client + receiver (buffering, header scan, decode via the
+                   `sstv` PyPI package, noise gate, image storage under
+                   CONFIG_DIR/sstv/); sstv_controller.py is the idle-detect/
+                   tune/yield/restore state machine, with an injectable clock
+                   so it can be tested without waiting real minutes. All in-
+                   process (like wfweb_power.py), NOT a separate container.
+                   See the SSTV gotcha entry below before touching any of it.
+
 host_stats.py, weather.py
                    Small standalone pollers (host CPU/mem, Open-Meteo).
                    host_stats.py also has is_pi_standalone() (checks
@@ -7926,6 +7937,95 @@ config for per-integration credentials; put it in
     included); RBN/DX rows are capped at `POTA_DRAWER_FIREHOSE_MAX` (60),
     POTA/SOTA never. Mode chips are computed from modes actually present
     (FT4->FT8, USB/LSB->SSB grouped), top 5 by count.
+
+- **The SSTV card (v4.91) was built from a live investigation of a real
+  wfweb + IC-7300 MK2, not from wfweb's docs -- which don't document the
+  audio protocol at all.** Everything below was confirmed 2026-09-19.
+  - **wfweb's audio WebSocket**: on wfweb's HTTPS port (same port as its
+    web UI, `wss://host:port/`, self-signed cert, no auth) -- NOT the
+    plain-HTTP "REST" port, even though a container template may label
+    that one "Audio". Audio is OFF until a client sends
+    `{"cmd":"enableAudio","value":true}`; the server then answers
+    `{"type":"audioStatus","enabled":true,"sampleRate":48000}` and streams
+    binary frames: `[0x02][0x00][seq u16 LE][rateDiv u16 LE][int16 LE PCM
+    from byte 6]`. wfweb's own UI ignores `rateDiv`. A 20 ms packet
+    (960 samples) arrives as two frames, 682 + 278 samples. Rig state
+    (`frequency`, `mode`, `powerState`, and `transmitting` inside `meters`
+    messages) arrives as JSON on the same socket -- and is RELIABLE,
+    unlike wfweb's rigctld bridge (see wfweb_power.py).
+  - **A real, unexplained fault: for several consecutive runs exactly one
+    in three 20 ms packets arrived missing its 682-sample FIRST frame** (a
+    lone 278 after a 278) -- ~14 ms lost in every 60 ms, with NO sequence-
+    number gap and the sample rate still reading 48 kHz. Diagnosed by
+    checking waveform continuity at frame boundaries (a jump ~5.7x the
+    in-frame jump at every lone tail), not from the counters. It vanished
+    after a wfweb container restart (a `[LAN]` settings edit made at the
+    same time was NOT proven to be the cause -- the restart alone may have
+    cleared it), and could recur. `sstv_rx._on_audio` zero-fills each
+    detected missing head, counts them in `dropped_samples`, and
+    `_finalize` rejects any image that lost >3% of its audio (a third-lost
+    Martin M1 decoded to streaks that the smoothness gate alone still
+    called "fair").
+  - **The `sstv` decoder's own header detection is unusable on HF** (needs
+    ~28 dB SNR to find a VIS header, measured by mixing synthetic Martin
+    M1 into REAL recorded rig noise), while its image decoder, handed the
+    mode and start point (`header=False`), gave readable pictures down to
+    ~6 dB. Hence sstv_vis.py's own detector (tone-dominance scoring at
+    +-60 Hz of mistuning, parity + known-VIS-code check). MODE_SECONDS was
+    MEASURED by encoding a blank frame per mode (minus the encoder's fixed
+    0.8 s lead-in + 0.910 s header), and matches the published figures.
+  - **A VIS header is NOT proof of an image** -- the first version's
+    "0 false alarms in 16 minutes" was recycled from a single minute of
+    noise and was wrong. A real 9.5-minute recording of 14.230 MHz gave
+    three detections: one was a genuine, too-weak Robot 36 transmission
+    (confirmed by a 1200 Hz sync pulse repeating at exactly the 150 ms
+    line period, ac 0.38 vs ~0.0 in control segments), the rest noise --
+    ALL decoded to pure static. The gate therefore lives at decode time:
+    `image_quality()` = mean row-to-row luma difference (real pictures
+    3.5-10 across 28..0 dB synthetic; decoded real rig noise 86) plus
+    luma contrast (a flat decode of silence has structure ~1). Reject
+    structure > 40 or contrast < 6. An early check drops a probably-false
+    header after ~20 s so a real one isn't blocked for a whole image
+    duration. Don't trust "header found" anywhere in this feature.
+  - **The controller never uses audio level as an idle signal**: an HF
+    receiver always emits band noise (measured, constant ~4400 RMS), so
+    "the radio isn't receiving any audio" can't distinguish idle from in
+    use. The real signals are `transmitting`, a frequency/mode change not
+    caused by this module, and dashboard rig activity (`app.py` calls
+    `sstv_controller.note_activity()` from /api/rig_tune, the wfweb power
+    route and Quick Log). An operator retune while active is a YIELD, never
+    a restore -- restoring against someone who just chose a frequency would
+    fight them; restore only happens on the card's Stop (or hiding the
+    card). Active state is persisted (`sstv/controller.json`) so a
+    dashboard restart doesn't strand the rig on 14.230 with no memory of
+    where it was. Verified end-to-end with the real components + a fake
+    rigctld: waits the full idle time, tunes exactly once, yields on a
+    retune with zero further tune commands.
+  - **numpy/Pillow/sstv are imported defensively in sstv_rx.py** (one
+    `try` around all of them plus `sstv_vis`): an install that pulled this
+    code but hasn't yet installed the new requirements must still START,
+    and the controller refuses to tune the rig when the libraries are
+    missing (otherwise it would retune the radio with nothing able to
+    decode). `sstv` only ships prebuilt wheels for x86-64/aarch64 glibc,
+    so its `requirements.txt` line carries a `platform_machine` marker --
+    a plain line would make `pip install -r` fail on a 32-bit Pi and take
+    the whole `update.sh` run with it.
+  - **Test-harness traps hit while building this (each cost real time)**:
+    a fake server that paced with `asyncio.sleep(0.0025)` ran at ~1.3x, not
+    8x, because Windows timer granularity turns tiny sleeps into ~15 ms
+    (pace by wall-clock target position instead); a synthetic mix that
+    exceeded int16 range WRAPPED on `astype(np.int16)` into garbage that no
+    detector could find (clip first); a shared-`pos` fake couldn't serve a
+    second listener the way real wfweb's per-client broadcast does; and a
+    scan window of 25 s every 3 s only overlaps at real-time speed -- at
+    10x replay it skips headers, so replay real recordings at <=4x.
+  - **The settings drawer's inputs are built once per open** and polls
+    only rewrite the read-only status + image grid -- the same
+    "never destroy a control mid-use" rule as the ASL Control drawer's
+    isAslDrawerFocused() guard, solved structurally; the card body is only
+    rebuilt when a signature of its structural state changes, with
+    progress/countdown/preview updated in place so the <img> isn't torn
+    down every poll.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

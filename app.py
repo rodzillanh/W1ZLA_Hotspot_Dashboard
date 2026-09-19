@@ -12,7 +12,7 @@ import uuid
 
 import paramiko
 import waitress
-from flask import Flask, jsonify, render_template, request, redirect, Response
+from flask import Flask, jsonify, render_template, request, redirect, Response, send_file
 
 import config
 import models
@@ -45,6 +45,8 @@ from pota import PotaClient
 from rigctl import RigctlClient
 from rig_panel import RigPanelPoller
 from wfweb_power import WfwebPowerClient
+from sstv_rx import SstvReceiver
+from sstv_controller import SstvController
 from sota import SotaClient
 from psk_reporter import PskReporterClient
 from repeaters import RepeaterDirectoryClient
@@ -109,6 +111,26 @@ rig_panel_poller = RigPanelPoller()
 # port/protocol from rig_panel_poller's rigctld socket above, even though
 # both typically point at the same physical rig. See wfweb_power.py.
 wfweb_power_client = WfwebPowerClient()
+
+
+def _sstv_tune(freq_hz, mode):
+    """The one rig command the SSTV card ever sends: set frequency + mode
+    through the same rigctld path as the POTA card's tap-to-tune (see
+    rigctl.py). Deliberately does NOT honour `rig_send_mode` -- SSTV needs
+    USB regardless of that tap-to-tune preference."""
+    s = load_settings()
+    if not s.get("rig_control_enabled") or not (s.get("rig_host") or "").strip():
+        return False, "Rig control isn't set up (Settings → Integrations → Rig control)"
+    return rig_client.tune(s.get("rig_host", ""), s.get("rig_port", 4532), freq_hz, mode or "")
+
+
+# SSTV card: receive-only decoder fed by wfweb's own WebSocket audio stream
+# (sstv_rx.py) plus the idle-detection/tune/yield logic that decides when
+# it listens (sstv_controller.py). Both are reconfigured in place from
+# settings by _rebuild_sstv() below; the controller's own loop thread is
+# started in main().
+sstv_receiver = SstvReceiver()
+sstv_controller = SstvController(sstv_receiver, _sstv_tune, load_settings)
 sota_client     = SotaClient()
 psk_reporter    = PskReporterClient()
 repeater_client = RepeaterDirectoryClient()
@@ -368,6 +390,21 @@ def _rebuild_wfweb_power() -> None:
     )
 
 _rebuild_wfweb_power()
+
+
+def _rebuild_sstv() -> None:
+    """(Re)point the SSTV receiver at wfweb's WebSocket. It reuses the
+    wfweb_host/wfweb_port/wfweb_use_ssl settings but is gated by
+    show_sstv, NOT wfweb_power_enabled -- the power controls and the SSTV
+    card are independent features that just happen to share a server."""
+    s = load_settings()
+    sstv_receiver.configure(
+        s.get("show_sstv"), s.get("wfweb_host", ""), s.get("wfweb_port", 8080),
+        s.get("wfweb_use_ssl", True), keep=s.get("sstv_keep", 12),
+        gate=s.get("sstv_quality_gate", True),
+    )
+
+_rebuild_sstv()
 
 import radioid as radioid_mod
 import aprs as aprs_mod
@@ -805,6 +842,36 @@ def api_settings_post():
             settings["repeaters_radius_mi"] = max(1, min(500, int(data["repeaters_radius_mi"])))
         except (TypeError, ValueError):
             pass
+    if "show_sstv" in data:
+        settings["show_sstv"] = bool(data["show_sstv"])
+    if "sstv_position" in data:
+        try:
+            settings["sstv_position"] = max(0, int(data["sstv_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "sstv_auto_enabled" in data:
+        settings["sstv_auto_enabled"] = bool(data["sstv_auto_enabled"])
+    if "sstv_restore" in data:
+        settings["sstv_restore"] = bool(data["sstv_restore"])
+    if "sstv_quality_gate" in data:
+        settings["sstv_quality_gate"] = bool(data["sstv_quality_gate"])
+    if "sstv_idle_minutes" in data:
+        try:
+            settings["sstv_idle_minutes"] = max(1, min(720, int(data["sstv_idle_minutes"])))
+        except (TypeError, ValueError):
+            pass
+    if "sstv_keep" in data:
+        try:
+            settings["sstv_keep"] = max(1, min(60, int(data["sstv_keep"])))
+        except (TypeError, ValueError):
+            pass
+    if "sstv_freq_hz" in data:
+        try:
+            hz = int(data["sstv_freq_hz"])
+            if 1_800_000 <= hz <= 29_700_000:      # HF amateur range only
+                settings["sstv_freq_hz"] = hz
+        except (TypeError, ValueError):
+            pass
     if "rig_pa_temp_cal" in data:
         settings["rig_pa_temp_cal"] = str(data["rig_pa_temp_cal"] or "").strip()
     if "rig_pa_alert_enabled" in data:
@@ -838,7 +905,7 @@ def api_settings_post():
         "satellites_page", "flights_overhead_page", "recent_contacts_page",
         "qso_stats_page", "top_activity_page", "pota_page",
         "hf_favorites_page", "rig_panel_page", "dvswitch_page", "qrz_quick_log_page",
-        "beacons_page", "repeaters_page",
+        "beacons_page", "repeaters_page", "sstv_page",
     ):
         if _page_key in data:
             try:
@@ -955,6 +1022,9 @@ def api_settings_post():
         _rebuild_rig_panel()
     if any(k in data for k in ("wfweb_power_enabled", "wfweb_host", "wfweb_port", "wfweb_use_ssl")):
         _rebuild_wfweb_power()
+    if any(k in data for k in ("show_sstv", "wfweb_host", "wfweb_port", "wfweb_use_ssl",
+                               "sstv_keep", "sstv_quality_gate")):
+        _rebuild_sstv()
     return jsonify({"ok": True})
 
 
@@ -1247,6 +1317,7 @@ _SENTINEL_DEFS = [
     ("__qrz_quick_log__", "show_qrz_quick_log", "qrz_quick_log_position", "📝", "Quick Log", "rig-panel-driven QRZ logging card"),
     ("__beacons__", "show_beacons", "beacons_position", "📡", "Beacons", "NCDXF/IARU beacon ladder card"),
     ("__repeaters__", "show_repeaters", "repeaters_position", "🗼", "Repeaters", "nearby repeater directory card"),
+    ("__sstv__", "show_sstv", "sstv_position", "🖼️", "SSTV", "last decoded SSTV image card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -2176,6 +2247,7 @@ def api_rig_tune():
     settings = load_settings()
     if not settings.get("rig_control_enabled"):
         return jsonify({"ok": False, "message": "Rig control is turned off"}), 400
+    sstv_controller.note_activity("tune")   # someone is using the rig: SSTV yields / idle clock resets
     data = request.json or {}
     ok, message = rig_client.tune(
         settings.get("rig_host", ""),
@@ -2244,6 +2316,7 @@ def api_wfweb_power_action():
     settings = load_settings()
     if not settings.get("wfweb_power_enabled"):
         return jsonify({"ok": False, "message": "wfweb power control is turned off"}), 400
+    sstv_controller.note_activity("other")
     data = request.json or {}
     actions = {
         "power_on": (lambda: wfweb_power_client.set_power(True), "Power-on sent"),
@@ -2265,6 +2338,78 @@ def test_wfweb_power():
     data = request.json or {}
     ok, message = WfwebPowerClient.test_connection(
         data.get("host", ""), data.get("port") or 8080, data.get("use_ssl", True),
+    )
+    return jsonify({"success": ok, "message": message})
+
+@app.route("/api/sstv")
+def api_sstv():
+    """Everything the SSTV card and its drawer render: the receiver's
+    status (connection, listening, in-progress image, last image, counts),
+    the controller's status (standby/active, why, idle countdown) and the
+    stored image list. See sstv_rx.py / sstv_controller.py."""
+    s = load_settings()
+    return jsonify({
+        "rx": sstv_receiver.status(),
+        "ctl": sstv_controller.status(),
+        "images": sstv_receiver.images(),
+        "config": {
+            "host_set": bool((s.get("wfweb_host") or "").strip()),
+            "rig_control": bool(s.get("rig_control_enabled") and (s.get("rig_host") or "").strip()),
+            "auto": bool(s.get("sstv_auto_enabled")),
+            "idle_minutes": s.get("sstv_idle_minutes", 25),
+            "restore": bool(s.get("sstv_restore", True)),
+            "quality_gate": bool(s.get("sstv_quality_gate", True)),
+            "keep": s.get("sstv_keep", 12),
+            "freq_hz": s.get("sstv_freq_hz", 14230000),
+        },
+    })
+
+@app.route("/api/sstv/image/<image_id>.png")
+def api_sstv_image(image_id):
+    """A stored decoded image. The id is validated (hex only) inside
+    SstvReceiver.image_file() so it can never name a path outside the
+    sstv data directory."""
+    path = sstv_receiver.image_file(image_id)
+    if not path:
+        return jsonify({"error": "not found"}), 404
+    return send_file(path, mimetype="image/png", max_age=86400)
+
+@app.route("/api/sstv/preview.png")
+def api_sstv_preview():
+    """The partially-received image while a transmission is in progress."""
+    data = sstv_receiver.preview_png()
+    if not data:
+        return jsonify({"error": "no preview"}), 404
+    return Response(data, mimetype="image/png", headers={"Cache-Control": "no-store"})
+
+@app.route("/api/sstv/control", methods=["POST"])
+def api_sstv_control():
+    """'Listen now' / 'Stop' (which restores the rig's previous frequency
+    when that setting is on) / 'Clear' from the SSTV card and drawer."""
+    data = request.json or {}
+    action = data.get("action")
+    if action == "listen_now":
+        ok, message = sstv_controller.listen_now()
+    elif action == "stop":
+        ok, message = sstv_controller.stop()
+    elif action == "clear":
+        sstv_receiver.clear_images()
+        ok, message = True, "Cleared"
+    else:
+        return jsonify({"ok": False, "message": "Unknown action"}), 400
+    return jsonify({"ok": ok, "message": message})
+
+@app.route("/api/sstv/test_stream", methods=["POST"])
+def api_sstv_test_stream():
+    """The drawer's 'Test audio stream' button: a fresh one-off wfweb
+    connection that reports what audio actually arrives, including the
+    missing-first-frame fault described in sstv_rx.py."""
+    s = load_settings()
+    data = request.json or {}
+    ok, message = SstvReceiver.test_stream(
+        data.get("host") or s.get("wfweb_host", ""),
+        data.get("port") or s.get("wfweb_port", 8080),
+        data.get("use_ssl", s.get("wfweb_use_ssl", True)),
     )
     return jsonify({"success": ok, "message": message})
 
@@ -3024,6 +3169,7 @@ def api_qrz_quick_log():
     immediately, no separate code path. Position enrichment (lat/lon/
     name/city/state/country) reuses monitor.lookup_caller_info(), same
     as wsjtx.py's own _handle_qso() and the ADIF importer."""
+    sstv_controller.note_activity("other")
     data = request.json or {}
     call = (data.get("call") or "").strip().upper()
     if not call:
@@ -3812,7 +3958,19 @@ def _qrz_logbook_loop():
         time.sleep(config.QRZ_LOGBOOK_SYNC_INTERVAL)
 
 
+def _sstv_controller_loop():
+    """Drives the SSTV idle/tune/yield state machine every couple of
+    seconds. tick() never raises. Separate thread, same pattern as
+    _qrz_logbook_loop / _aprs_alert_loop -- reads the receiver's own
+    live rig state, so it needs nothing threaded through monitor.py."""
+    time.sleep(10)  # let the WebSocket connect before the first decision
+    while True:
+        sstv_controller.tick()
+        time.sleep(2)
+
+
 def main():
+    threading.Thread(target=_sstv_controller_loop, daemon=True).start()
     threading.Thread(target=monitor.run_forever, daemon=True).start()
     threading.Thread(target=monitor.run_slow_checks_forever, daemon=True).start()
     threading.Thread(target=_mqtt_publish_loop, daemon=True).start()

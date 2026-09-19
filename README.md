@@ -1437,6 +1437,53 @@ miles, adjustable under Settings → Integrations) around your
 - Same drag-and-drop **Card order** placement as every other extra card.
 
 <!-- wiki-group: Optional Cards -->
+## SSTV card
+
+Optional dashboard card (Settings → Cards → "Show SSTV card", off by
+default) — a **receive-only slow-scan TV decoder** that shows the last
+picture heard on your HF rig. It needs [wfweb](https://github.com/adecarolis/wfweb)
+(the wfview web fork), because that is where the receive audio comes
+from: set its host/port under Settings → Integrations (the same fields
+the Rig Panel's power control uses).
+
+- **What it decodes**: Martin, Scottie, Robot, PD, Wraase SC2-180 and
+  Pasokon modes, found by their VIS header. The card shows the last
+  picture with its mode, when it arrived, and a Good/Fair/Weak signal
+  grade; **⚙** opens a drawer with the settings, an audio-stream test,
+  and a grid of the recent pictures (12 by default, stored on the data
+  volume).
+- **Four states**: the last image; a live partial image filling in from
+  the top while one is being received; **Standby** (the rig is in use, or
+  auto-listen is off); and empty (nothing decoded yet).
+- **Automatic listening is a separate opt-in** (⚙ drawer → "Listen for
+  SSTV when the rig is idle", off by default — merely showing the card
+  never touches your radio). Once the rig has been idle for a set time
+  (default 25 minutes: no transmitting, no frequency/mode change, no
+  dashboard rig use), it tunes to **14.230 MHz USB** and listens. It needs
+  [Rig control](#rig-control-rigctld) configured for that retune.
+- **It never transmits, and it never fights you.** Turn the knob, use
+  wfweb, or tap a tune chip and it stops listening at once; the idle clock
+  restarts. **Stop** on the card puts the rig back on its previous
+  frequency and mode (if "Restore my frequency" is on). A dashboard
+  restart while it is listening resumes cleanly and still remembers where
+  the rig was.
+- **Noise never reaches the card**: every decode is checked before it is
+  shown, and pictures that are just static, blank, or that lost audio in
+  transit are discarded (counted as "rejected as noise" in the drawer). A
+  header alone is not trusted — real 14.230 MHz audio produced headers
+  that decoded to pure static.
+- **Be realistic about the band**: SSTV on 14.230 is sporadic, and a
+  picture needs a signal roughly at or above the noise to be readable, so
+  the card will often say "nothing decoded yet". The **Test audio stream**
+  button checks that wfweb's audio is arriving cleanly.
+- Requires the `numpy`, `Pillow` and `sstv` packages (installed
+  automatically by a Docker rebuild or `update.sh`). `sstv` ships
+  prebuilt for x86-64 and 64-bit ARM only; on other platforms the card
+  reports that the decoder isn't available and the rest of the app is
+  unaffected.
+- Same drag-and-drop **Card order** placement as every other extra card.
+
+<!-- wiki-group: Optional Cards -->
 ## License Quiz card
 <!-- wiki-image: license-quiz-card.png -->
 
