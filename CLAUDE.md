@@ -8001,6 +8001,21 @@ config for per-integration credentials; put it in
     where it was. Verified end-to-end with the real components + a fake
     rigctld: waits the full idle time, tunes exactly once, yields on a
     retune with zero further tune commands.
+  - **Selectable listening frequency (v4.92)**: `config.SSTV_FREQUENCIES`
+    is the five ANALOG SSTV entries from ARRL's Considerate Operator's
+    Frequency Guide (QST Nov 2013 p.103 -- read directly from the PDF, not a
+    search summary): 3.845, 7.171, 14.230, 21.340, 28.680 MHz. Its two
+    DIGITAL entries (7.173, 14.233 "D-SSTV") are deliberately omitted (a
+    different system this decoder can't read); regional variants other
+    sources mention (3.730, 14.240) aren't in the guide, so they're only
+    reachable through the drawer's Custom entry. The client only ever sends
+    `sstv_freq_hz` -- `/api/settings` derives `sstv_mode` from it
+    (`config.sstv_mode_for()`: LSB below 10 MHz, USB above) so the two can
+    never disagree, and rejects anything outside 1.8-29.7 MHz server-side
+    (verified a 145.8 MHz POST is ignored). The controller follows a
+    frequency change made WHILE listening (retunes, keeps the original
+    pre-SSTV frequency, sets a new grace window so the move isn't mistaken
+    for the operator retuning; a failed move yields with a reason).
   - **numpy/Pillow/sstv are imported defensively in sstv_rx.py** (one
     `try` around all of them plus `sstv_vis`): an install that pulled this
     code but hasn't yet installed the new requirements must still START,

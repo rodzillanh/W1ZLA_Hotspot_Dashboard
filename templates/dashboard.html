@@ -11049,7 +11049,7 @@ function renderSstvCard() {
     let sub = '';
     if (view === 'resting' || view === 'empty') sub = sstvRigText(rig) + ' · SSTV listening';
     else if (view === 'receiving') sub = sstvRigText(rig) + ' · header detected ' + sstvClock(recv.started_at);
-    else if (view === 'standby') sub = (cfg.auto ? 'Will tune to ' + sstvFreq((ctl.target || {}).freq_hz) + ' · ' : '') + 'rig is on ' + sstvRigText(rig);
+    else if (view === 'standby') sub = (cfg.auto ? 'Will tune to ' + sstvFreq((ctl.target || {}).freq_hz) + ' ' + ((ctl.target || {}).mode || '') + ' · ' : '') + 'rig is on ' + sstvRigText(rig);
     document.getElementById('sstv-sub').textContent = sub;
 
     // footer
@@ -11193,6 +11193,36 @@ function sstvTestStream(btn) {
         }).catch(() => { res.className = 'sstv-test-res err'; res.textContent = 'Request failed'; })
         .finally(() => { btn.disabled = false; });
 }
+// Frequency picker: the standard analog SSTV frequencies from the server
+// (config.SSTV_FREQUENCIES, ARRL's guide) plus "Custom..." for a regional
+// one. The server sets the sideband from the frequency, so this only ever
+// sends sstv_freq_hz.
+function sstvFreqRow(cfg) {
+    const list = cfg.frequencies || [];
+    const cur = cfg.freq_hz || 14230000;
+    const known = list.some(f => f.freq_hz === cur);
+    const opts = list.map(f => `<option value="${f.freq_hz}" ${f.freq_hz === cur ? 'selected' : ''}>${f.label} · ${(f.freq_hz / 1e6).toFixed(3)} MHz ${f.mode}</option>`).join('')
+        + `<option value="custom" ${known ? '' : 'selected'}>Custom…</option>`;
+    return `<div class="sstv-set-row"><div><div class="lbl">Listening frequency</div><div class="hint">Standard SSTV frequencies (ARRL). Sideband follows the band.</div></div>
+        <select class="sstv-select" id="sstv-d-freq" aria-label="Listening frequency" onchange="sstvFreqChange(this)">${opts}</select></div>
+        <div class="sstv-set-row" id="sstv-d-custom-row" style="${known ? 'display:none' : 'display:flex'}"><div><div class="lbl">Custom frequency</div><div class="hint">kHz, 1800 to 29700</div></div>
+            <div style="display:flex;gap:6px;align-items:center"><input class="sstv-select" id="sstv-d-custom" type="number" min="1800" max="29700" step="0.1" style="width:96px" value="${known ? '' : cur / 1000}" aria-label="Custom frequency in kHz"><button class="sstv-btn" onclick="sstvCustomSet()">Set</button></div></div>`;
+}
+function sstvFreqChange(sel) {
+    const row = document.getElementById('sstv-d-custom-row');
+    if (sel.value === 'custom') {
+        row.style.display = 'flex';
+        document.getElementById('sstv-d-custom').focus();
+        return;
+    }
+    row.style.display = 'none';
+    sstvSet('sstv_freq_hz', parseInt(sel.value, 10));
+}
+function sstvCustomSet() {
+    const v = parseFloat(document.getElementById('sstv-d-custom').value);
+    if (!(v >= 1800 && v <= 29700)) { rigToast('Enter a frequency between 1800 and 29700 kHz', 'err'); return; }
+    sstvSet('sstv_freq_hz', Math.round(v * 1000));
+}
 function sstvSwitchRow(label, hint, key, on) {
     return `<div class="sstv-set-row"><div><div class="lbl">${label}</div><div class="hint">${hint}</div></div>
         <button class="sstv-switch" aria-label="${label}" aria-pressed="${on ? 'true' : 'false'}" onclick="sstvToggle(this,'${key}')"></button></div>`;
@@ -11219,7 +11249,8 @@ function openSstvDrawer() {
         <div class="hs-drawer-body">
             <div class="hs-drawer-section"><div class="hs-drawer-section-title">Status</div><div id="sstv-d-status"></div></div>
             <div class="hs-drawer-section"><div class="hs-drawer-section-title">Auto-listen</div>
-                ${sstvSwitchRow('Listen for SSTV when the rig is idle', 'Tunes to ' + sstvFreq(cfg.freq_hz || 14230000) + ' USB. Never transmits.', 'sstv_auto_enabled', !!cfg.auto)}
+                ${sstvSwitchRow('Listen for SSTV when the rig is idle', 'Tunes to the frequency below. Never transmits.', 'sstv_auto_enabled', !!cfg.auto)}
+                ${sstvFreqRow(cfg)}
                 ${sstvSelectRow('Rig must be idle for', 'No tuning, no transmitting, no dashboard rig use', 'sstv_idle_minutes', [5, 10, 15, 25, 45, 60, 120], cfg.idle_minutes || 25, ' min')}
                 ${sstvSwitchRow('Restore my frequency when I press Stop', 'Puts the rig back on the frequency and mode from before', 'sstv_restore', cfg.restore !== false)}
                 ${sstvSwitchRow('Hide images that look like noise', 'Rejects decodes that are just static or have lost audio', 'sstv_quality_gate', cfg.quality_gate !== false)}

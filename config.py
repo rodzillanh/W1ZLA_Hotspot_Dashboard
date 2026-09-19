@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.91"
+APP_VERSION = "4.92"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -260,6 +260,9 @@ VERSION_CODENAMES = [
     "Lewis",            # v4.91 -- Jerry Lee Lewis, rock 'n' roll pianist
                         # ("Great Balls of Fire", "Whole Lotta Shakin'
                         # Goin' On") (1935-2022)
+    "Kantner",          # v4.92 -- Paul Kantner, founding member of
+                        # Jefferson Airplane, co-founder of Jefferson
+                        # Starship ("Wooden Ships") (1941-2016)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1189,6 +1192,30 @@ HF_FAVORITE_DEFAULTS = [
 
 # Rig modes the HF Favorites edit UI / POST route accept for an entry.
 HF_FAVORITE_MODES = ["USB", "LSB", "CW", "PKTUSB", "PKTLSB", "AM", "FM", "RTTY"]
+
+# Analog SSTV activity frequencies offered in the SSTV card's drawer (v4.92).
+# Taken from ARRL's "Considerate Operator's Frequency Guide" (QST, November
+# 2013, p.103): 3.845, 7.171, 14.230, 21.340 and 28.680 MHz are its analog
+# "SSTV" entries. Its two DIGITAL SSTV entries (7.173, 14.233 "D-SSTV") are
+# deliberately left out -- a different system this decoder can't read. Other
+# sources list regional variants (e.g. 3.730, 14.240 MHz); those aren't in
+# the ARRL guide, so they're reachable through the drawer's "Custom" entry
+# rather than presented as standard. Sideband follows the universal HF
+# convention (LSB below 10 MHz, USB at/above) -- see sstv_mode_for().
+SSTV_FREQUENCIES = [
+    {"freq_hz": 3845000,  "label": "80 m"},
+    {"freq_hz": 7171000,  "label": "40 m"},
+    {"freq_hz": 14230000, "label": "20 m"},
+    {"freq_hz": 21340000, "label": "15 m"},
+    {"freq_hz": 28680000, "label": "10 m"},
+]
+SSTV_FREQ_MIN_HZ = 1_800_000     # HF amateur range only for any custom entry
+SSTV_FREQ_MAX_HZ = 29_700_000
+
+
+def sstv_mode_for(freq_hz):
+    """Sideband for an SSTV frequency: LSB below 10 MHz, USB from there up."""
+    return "LSB" if int(freq_hz) < 10_000_000 else "USB"
 
 # --- Rig Panel card + Operating Timeline + PA-temp alert (v4.51) -------
 # One persistent-socket poller (rig_panel.py) shared by all three. Poll

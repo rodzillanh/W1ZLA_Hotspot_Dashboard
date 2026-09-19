@@ -616,6 +616,11 @@ BIOS = {
         "blurb": "Wild-fingered rock 'n' roll piano pioneer, \u201cThe Killer,\u201d behind \u201cGreat Balls of Fire\u201d and \u201cWhole Lotta Shakin' Goin' On.\u201d",
         "wiki": "Jerry_Lee_Lewis",
     },
+    "Kantner": {
+        "name": "Paul Kantner",
+        "blurb": "Founding rhythm guitarist and singer-songwriter of Jefferson Airplane and co-founder of Jefferson Starship, co-writer of \u201cWooden Ships.\u201d",
+        "wiki": "Paul_Kantner",
+    },
 }
 
 

@@ -868,8 +868,9 @@ def api_settings_post():
     if "sstv_freq_hz" in data:
         try:
             hz = int(data["sstv_freq_hz"])
-            if 1_800_000 <= hz <= 29_700_000:      # HF amateur range only
+            if config.SSTV_FREQ_MIN_HZ <= hz <= config.SSTV_FREQ_MAX_HZ:   # HF amateur range only
                 settings["sstv_freq_hz"] = hz
+                settings["sstv_mode"] = config.sstv_mode_for(hz)   # the sideband always follows the frequency
         except (TypeError, ValueError):
             pass
     if "rig_pa_temp_cal" in data:
@@ -2361,6 +2362,8 @@ def api_sstv():
             "quality_gate": bool(s.get("sstv_quality_gate", True)),
             "keep": s.get("sstv_keep", 12),
             "freq_hz": s.get("sstv_freq_hz", 14230000),
+            "mode": s.get("sstv_mode", "USB"),
+            "frequencies": [dict(f, mode=config.sstv_mode_for(f["freq_hz"])) for f in config.SSTV_FREQUENCIES],
         },
     })
 

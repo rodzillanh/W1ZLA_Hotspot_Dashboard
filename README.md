@@ -1459,7 +1459,10 @@ the Rig Panel's power control uses).
   SSTV when the rig is idle", off by default — merely showing the card
   never touches your radio). Once the rig has been idle for a set time
   (default 25 minutes: no transmitting, no frequency/mode change, no
-  dashboard rig use), it tunes to **14.230 MHz USB** and listens. It needs
+  dashboard rig use), it tunes to your chosen SSTV frequency and listens
+  (**14.230 MHz USB** by default; the ⚙ drawer also offers 3.845, 7.171,
+  21.340 and 28.680 MHz — the analog SSTV entries in ARRL's Considerate
+  Operator's Frequency Guide — plus a Custom entry). It needs
   [Rig control](#rig-control-rigctld) configured for that retune.
 - **It never transmits, and it never fights you.** Turn the knob, use
   wfweb, or tap a tune chip and it stops listening at once; the idle clock

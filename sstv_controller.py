@@ -215,6 +215,21 @@ class SstvController:
         if key[0] is not None:
             self._last_seen = key
 
+        if (self.state == "active" and self._target is not None
+                and (cfg["freq_hz"], cfg["mode"]) != (self._target["freq_hz"], self._target["mode"])):
+            # the operator picked a different SSTV frequency in the drawer while
+            # listening: move there (the pre-SSTV frequency stays remembered)
+            ok, msg = self._tune(cfg["freq_hz"], cfg["mode"])
+            if ok:
+                self._target = {"freq_hz": cfg["freq_hz"], "mode": cfg["mode"]}
+                self._grace_until = now + TUNE_GRACE_S
+                self._last_seen = (cfg["freq_hz"], cfg["mode"])
+                self._persist()
+                return
+            self._yield(f"Couldn't move to the new frequency: {msg}")
+            self._cooldown_until = now + FAILED_TUNE_COOLDOWN_S
+            return
+
         if self.state == "active":
             if not st.get("connected"):
                 self.reason = "Lost the connection to wfweb"

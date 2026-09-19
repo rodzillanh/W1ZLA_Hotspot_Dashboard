@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.91 "Lewis"</span>
+                <span class="release-version">v4.92 "Kantner"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>SSTV card: choose the listening frequency</span> &mdash; the &#9881; drawer now has a <b>Listening frequency</b> selector with the standard analog SSTV frequencies from ARRL's Considerate Operator's Frequency Guide: <b>80 m 3.845 MHz LSB</b>, <b>40 m 7.171 MHz LSB</b>, <b>20 m 14.230 MHz USB</b> (still the default), <b>15 m 21.340 MHz USB</b> and <b>10 m 28.680 MHz USB</b>, plus a <b>Custom&hellip;</b> entry (any frequency from 1800 to 29700 kHz) for regional variants. The sideband follows the frequency automatically (LSB below 10 MHz, USB above). Switching band while the card is listening retunes the rig there without treating it as you touching the radio, and Stop still restores the frequency you had before SSTV started. The two <i>digital</i> SSTV frequencies in the ARRL guide (7.173 and 14.233 MHz) are deliberately not offered &mdash; that is a different system this decoder can't read</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.91 "Lewis"</span>
+                <span class="release-date">September 2026</span>
+                
             </div>
             <ul class="change-list">
                 <li><span>New: SSTV card</span> &mdash; a receive-only slow-scan TV decoder that shows the <b>last picture heard</b> on your HF rig. It listens through wfweb's own WebSocket audio stream (the same connection settings as the Rig Panel's power control), finds transmissions by their VIS header, decodes Martin, Scottie, Robot, PD and other common modes, and keeps the most recent pictures on the data volume. The card has four states: the last image with its mode, time and signal quality; a live partial image filling in as it is received; standby when the rig is in use; and an empty state. The &#9881; drawer has the settings, an audio-stream test, and the recent-images grid</li>
