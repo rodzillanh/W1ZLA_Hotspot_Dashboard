@@ -113,7 +113,13 @@ class PotaClient:
             if lat is None or lon is None:
                 continue  # can't plot / distance-rank without a position
             try:
-                freq_hz = int(float(r["frequency"]) * 1000)
+                khz = float(r["frequency"])
+                # POTA's feed is kHz, but some spotters/apps submit Hz
+                # ("14325000" for 14.325 MHz). Nothing real is over 1 GHz,
+                # so a value that large is already Hz -- otherwise it shows
+                # as ~14 GHz, gets no band, and the tune chip would send the
+                # rig a nonsense frequency.
+                freq_hz = int(khz) if khz >= 1_000_000 else int(khz * 1000)
             except (KeyError, TypeError, ValueError):
                 freq_hz = None
             spots.append({
