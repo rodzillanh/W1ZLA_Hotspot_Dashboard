@@ -11128,7 +11128,7 @@ function sstvBodyHtml(view, rx, ctl, cfg, last, recv) {
         const ago = fmtAgoCompact(Math.max(0, Date.now() / 1000 - last.ts));
         return sstvFrame(`<img src="/api/sstv/image/${last.id}.png" alt="Last decoded SSTV image">`) + `<div class="sstv-meta">
             ${sstvMeta('Mode', escapeHtml(last.label))}
-            ${sstvMeta('Received', sstvClock(last.ts), ago + ' ago · ' + sstvMmss(last.duration_s) + ' on air')}
+            <div><div class="sstv-k">Received</div><div class="sstv-v">${sstvClock(last.ts)}</div><div class="sstv-note" id="sstv-ago">${ago} ago · ${sstvMmss(last.duration_s)} on air</div></div>
             <div><div class="sstv-k">Signal</div><div class="sstv-quality">${sstvBars(last.quality)}<span class="sstv-v" style="line-height:1">${last.quality[0].toUpperCase() + last.quality.slice(1)}</span></div></div>
             <div class="sstv-actions"><a href="/api/sstv/image/${last.id}.png" target="_blank" rel="noopener">Open full size</a>
                 <button class="sstv-linkbtn quiet" onclick="sstvControl('stop')" title="Stop listening${cfg.restore ? ' and put the rig back where it was' : ''}">Stop</button></div>
@@ -11157,7 +11157,7 @@ function sstvBodyHtml(view, rx, ctl, cfg, last, recv) {
     return frame + `<div class="sstv-meta">
         ${sstvMeta('State', 'Standby')}
         ${countdown}
-        ${sstvMeta('Rig now', escapeHtml(sstvRigText(rx.rig)))}
+        <div><div class="sstv-k">Rig now</div><div class="sstv-v" id="sstv-rig-now">${escapeHtml(sstvRigText(rx.rig))}</div></div>
         <div class="sstv-actions"><button class="sstv-btn" onclick="sstvControl('listen_now')">Listen now</button></div>
     </div>`;
 }
@@ -11165,6 +11165,13 @@ function sstvBodyHtml(view, rx, ctl, cfg, last, recv) {
 // Per-second / per-poll in-place updates (no innerHTML churn).
 function sstvUpdateLive(fromPoll) {
     if (!sstvData) return;
+    const rxNow = sstvData.rx || {};
+    const rigEl = document.getElementById('sstv-rig-now');
+    if (rigEl) rigEl.textContent = sstvRigText(rxNow.rig);
+    const agoEl = document.getElementById('sstv-ago');
+    if (agoEl && rxNow.last) {
+        agoEl.textContent = fmtAgoCompact(Math.max(0, Date.now() / 1000 - rxNow.last.ts)) + ' ago · ' + sstvMmss(rxNow.last.duration_s) + ' on air';
+    }
     const recv = (sstvData.rx || {}).receiving;
     if (recv) {
         const bar = document.getElementById('sstv-prog-bar');
@@ -11319,6 +11326,7 @@ function renderSstvDrawer() {
         row('Audio', rx.audio_ok ? ((rx.sample_rate || 48000) / 1000) + ' kHz' + (rx.dropped_samples ? ' · ' + rx.dropped_samples + ' samples lost' : ' · clean') + '<span id="sstv-d-level"></span>' : 'not receiving') +
         row('Rig', escapeHtml(sstvRigText(rx.rig))) +
         row('Rejected as noise', String(rx.rejected_total || 0)) +
+        (rx.last_signal ? `<div class="sstv-set-row"><div class="lbl">Audio of the last signal<div class="hint">${escapeHtml(rx.last_signal.label)} at ${sstvClock(rx.last_signal.ts)} &middot; ${({ stored: 'picture kept', noise: 'dropped as too weak', audio_loss: 'dropped: audio dropouts', blank: 'dropped: no usable picture', decode_failed: "couldn't decode", timeout: 'never completed', interrupted: 'interrupted', dropped: 'dropped' })[rx.last_signal.outcome] || rx.last_signal.outcome} &middot; ${rx.last_signal.seconds} s</div></div><a class="sstv-btn" style="text-decoration:none;color:var(--text)" href="/api/sstv/last_signal.wav?t=${Math.round(rx.last_signal.ts)}" title="Download this signal's audio as a WAV (for diagnosis)">Download</a></div>` : '') +
         (rx.last_reject ? `<div class="sstv-note" style="padding:0 0 8px">Last: ${sstvRejectText(rx.last_reject)}<br>${escapeHtml(rx.last_reject.detail || '')}${rx.last_reject.dropped_samples ? ' · ' + rx.last_reject.dropped_samples + ' samples lost' : ''} · offset ${rx.last_reject.offset_hz >= 0 ? '+' : ''}${rx.last_reject.offset_hz} Hz · header score ${rx.last_reject.score}</div>` : '') +
         `<div style="padding-top:10px">${btns}</div>`;
     if (statusHtml !== sstvDrawerSigs.status) {

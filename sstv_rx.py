@@ -103,6 +103,8 @@ LEVEL_FLOOR_DB = -50.0         # a level meter's bottom: anything at/below this 
 IMAGES_DIRNAME = "sstv"
 REJECT_FILENAME = "last_reject.png"
 REJECT_AUDIO_FILENAME = "last_reject.wav"
+SIGNAL_AUDIO_FILENAME = "last_signal.wav"      # the most recent signal's audio, however it ended
+SIGNAL_AUDIO_MAX_S = 130                       # long enough for a whole Martin 1 / Scottie 1 transmission
 
 
 def _images_dir():
@@ -234,7 +236,7 @@ class SstvReceiver:
         self._levels = []           # last LEVEL_HISTORY readings, 0..1 (under _lock)
         self._level_db = None       # latest reading in dBFS, None = silence/no audio
         # results (under _index_lock)
-        self._images, self._rejected, self._last_reject = self._load_index()
+        self._images, self._rejected, self._last_reject, self._last_signal = self._load_index()
 
     # ---------- config ----------
 
@@ -302,6 +304,7 @@ class SstvReceiver:
             imgs = list(self._images)
             out["rejected_total"] = self._rejected
             out["last_reject"] = dict(self._last_reject) if self._last_reject else None
+            out["last_signal"] = dict(self._last_signal) if self._last_signal else None
         midnight = time.mktime(time.localtime()[:3] + (0, 0, 0, 0, 0, -1))
         out["last"] = imgs[0] if imgs else None
         out["today"] = sum(1 for i in imgs if i.get("ts", 0) >= midnight)
@@ -327,6 +330,14 @@ class SstvReceiver:
     def preview_png(self):
         with self._lock:
             return self._preview_png
+
+    def signal_audio_file(self):
+        """Path to the most recent signal's audio (WAV), or None."""
+        with self._index_lock:
+            if not self._last_signal:
+                return None
+        path = os.path.join(_images_dir(), SIGNAL_AUDIO_FILENAME)
+        return path if os.path.isfile(path) else None
 
     def rejected_audio_file(self):
         """Path to the last rejected signal's audio (WAV), or None."""
@@ -356,7 +367,8 @@ class SstvReceiver:
             self._images = []
             self._rejected = 0
             self._last_reject = None
-            for fn in (REJECT_FILENAME, REJECT_AUDIO_FILENAME):
+            self._last_signal = None
+            for fn in (REJECT_FILENAME, REJECT_AUDIO_FILENAME, SIGNAL_AUDIO_FILENAME):
                 try:
                     os.remove(os.path.join(_images_dir(), fn))
                 except OSError:
@@ -373,9 +385,11 @@ class SstvReceiver:
             cutoff = time.time() - MAX_RESULT_AGE
             imgs = [i for i in d.get("images", []) if isinstance(i, dict) and i.get("id") and i.get("ts", 0) >= cutoff]
             lr = d.get("last_reject")
-            return imgs, int(d.get("rejected", 0)), (lr if isinstance(lr, dict) else None)
+            ls = d.get("last_signal")
+            return (imgs, int(d.get("rejected", 0)), (lr if isinstance(lr, dict) else None),
+                    (ls if isinstance(ls, dict) else None))
         except Exception:
-            return [], 0, None
+            return [], 0, None, None
 
     def _save_index_locked(self):
         try:
@@ -383,7 +397,8 @@ class SstvReceiver:
             path = os.path.join(_images_dir(), "index.json")
             tmp = path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"images": self._images, "rejected": self._rejected, "last_reject": self._last_reject}, f)
+                json.dump({"images": self._images, "rejected": self._rejected, "last_reject": self._last_reject,
+                           "last_signal": self._last_signal}, f)
             os.replace(tmp, path)
         except Exception as e:
             print(f"[sstv] could not save index: {e}")
@@ -431,6 +446,33 @@ class SstvReceiver:
         except Exception as e:
             print(f"[sstv] could not keep the rejected audio: {e}")
             return False
+
+    def _note_signal(self, rx, outcome):
+        """Remember the audio of a reception that just ended -- whether it was
+        stored, dropped as noise/audio loss, or interrupted -- so 'why did that
+        signal fail?' can always be answered from a recording, independent of
+        the 'hide noise' switch (with it off nothing is 'rejected')."""
+        try:
+            a0 = max(0, rx["start_abs"] - RATE)
+            arr = self._gather(a0)[:SIGNAL_AUDIO_MAX_S * RATE]
+            if len(arr) < RATE:
+                return
+            os.makedirs(_images_dir(), exist_ok=True)
+            with wave.open(os.path.join(_images_dir(), SIGNAL_AUDIO_FILENAME), "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(RATE)
+                wf.writeframes(np.asarray(arr, dtype="<i2").tobytes())
+            with self._index_lock:
+                self._last_signal = {
+                    "ts": time.time(), "mode": rx["mode"], "label": MODE_LABELS.get(rx["mode"], rx["mode"]),
+                    "outcome": outcome, "seconds": round(len(arr) / RATE, 1), "score": round(rx["score"], 2),
+                    "offset_hz": rx["offset_hz"], "dropped_samples": self._dropped - rx["dropped0"],
+                    "freq_hz": rx["freq_hz"],
+                }
+                self._save_index_locked()
+        except Exception as e:
+            print(f"[sstv] could not keep the signal audio: {e}")
 
     def _count_reject(self, meta=None, im=None, has_audio=False):
         """Count a dropped signal. With `meta` it is also remembered (and its
@@ -725,6 +767,8 @@ class SstvReceiver:
             self._count_reject(self._reject_meta(rx, kind, reason), im, self._save_reject_audio(rx))
         elif count:
             self._count_reject()
+        if rx is not None:
+            self._note_signal(rx, kind if count else "interrupted")
         self._rx = None
         with self._lock:
             self._pub_rx = None
@@ -786,6 +830,16 @@ class SstvReceiver:
             self._abort("timed out", kind="timeout")
 
     def _finalize(self, rx):
+        with self._index_lock:
+            first0 = self._images[0]["id"] if self._images else None
+            rej0 = self._rejected
+        self._finalize_inner(rx)
+        with self._index_lock:
+            first1 = self._images[0]["id"] if self._images else None
+            kind = self._last_reject.get("kind") if (self._rejected > rej0 and self._last_reject) else None
+        self._note_signal(rx, "stored" if first1 != first0 else (kind or "dropped"))
+
+    def _finalize_inner(self, rx):
         end_abs = rx["start_abs"] + int((rx["dur"] + FINISH_MARGIN) * RATE)
         im = self._decode_span(rx, rx["start_abs"], min(end_abs, self._total))
         self._scanned_upto = rx["start_abs"] + int(rx["dur"] * RATE)

@@ -8030,12 +8030,30 @@ config for per-integration credentials; put it in
     replayed offline. The gate is now noise = structure > 40 AND row
     correlation < 0.35 (`looks_like_noise()`), and the early check honours
     the "hide noise" switch (it previously dropped the picture even with
-    the gate off). If this recurs, START from the downloaded WAV and
+    the gate off). The footer's "audio" link only exists after a DROP, so
+    with the gate off (nothing is "rejected") there was no link at all --
+    the user hit exactly that -- hence `last_signal`: `_note_signal()` keeps
+    the audio (<= 130 s, `last_signal.wav`, /api/sstv/last_signal.wav) of
+    the most recent reception however it ended (stored / noise / audio_loss
+    / blank / interrupted), offered in the drawer regardless of the switch.
+    If this recurs, START from the downloaded WAV and
     `docker logs ... | grep sstv`, not from theory. Test-harness lessons:
     a fake wfweb child process that never exits keeps a piped test run
     from ever finishing (it inherits stderr); a 3x replay makes a ~3 s
     Receiving window fall between the card's 3 s polls, so test state
     transitions at 1x.
+  - **Stale-body rule for the SSTV card (v4.93)**: `renderSstvCard()`
+    rebuilds `#sstv-body` ONLY when a structural signature changes (so the
+    <img> and drawer inputs survive polls), which means ANY value inside
+    the body that changes with time or with the rig must be refreshed in
+    place by `sstvUpdateLive()` via an element id -- not baked into the
+    template string. Missing this showed the user two different rig
+    frequencies on one card (header line live, "Rig now" frozen at the last
+    rebuild) and would have frozen the resting view's "N min ago" forever.
+    Ids currently updated in place: `sstv-rig-now`, `sstv-ago`,
+    `sstv-countdown`, `sstv-prog-*`, `sstv-eq`, `sstv-preview-img`. When
+    adding a body field, either put its inputs in the `sig` array or give it
+    an id and update it there.
   - **The card's audio bars are a real level meter (v4.93), not decoration**
     -- the first version drew fixed heights and only toggled colour on
     `audio_ok`, which read as a live meter and wasn't (called out by the

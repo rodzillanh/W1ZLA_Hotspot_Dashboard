@@ -2395,6 +2395,16 @@ def api_sstv_rejected():
         return jsonify({"error": "none"}), 404
     return send_file(path, mimetype="image/png", max_age=0)
 
+@app.route("/api/sstv/last_signal.wav")
+def api_sstv_last_signal_audio():
+    """The audio of the most recent signal the receiver worked on, however it
+    ended (picture kept, dropped, interrupted) -- independent of the 'hide
+    noise' switch, which decides whether anything is 'rejected' at all."""
+    path = sstv_receiver.signal_audio_file()
+    if not path:
+        return jsonify({"error": "none"}), 404
+    return send_file(path, mimetype="audio/wav", as_attachment=True, download_name="sstv_last_signal.wav", max_age=0)
+
 @app.route("/api/sstv/rejected.wav")
 def api_sstv_rejected_audio():
     """The audio of the last dropped signal, as a download -- so a loud
