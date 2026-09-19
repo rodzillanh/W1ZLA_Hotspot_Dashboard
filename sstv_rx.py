@@ -50,6 +50,7 @@ import io
 import json
 import os
 import ssl
+import wave
 import threading
 import time
 import uuid
@@ -87,12 +88,21 @@ PREVIEW_EVERY = 4.0            # seconds between partial-image previews
 FINISH_MARGIN = 3.0            # seconds of audio past the nominal image length
 NOISE_STRUCTURE = 40.0         # row-to-row luma difference: real pictures 3.5-10 (synthetic, 28..0 dB),
                                # decoded real rig noise 86 -- calibrated 2026-09
+NOISE_CORRELATION = 0.35       # ...AND adjacent rows this uncorrelated: measured 2026-09 on 14 real photographs sent
+                               # as SSTV (Martin 1, 30..3 dB into real rig noise) the row correlation never fell below
+                               # 0.71, while decoded rig noise is 0.00 -- so a busy but real picture can't be mistaken
+                               # for static by the absolute-difference measure alone
 MIN_CONTRAST = 6.0             # luma std-dev below this = a flat/blank decode, not a picture
+REJECT_AUDIO_MAX_S = 90        # keep at most this much audio of a rejected attempt (for diagnosis)
 MAX_GAP_FRACTION = 0.03        # reject an image whose audio lost more than 3% in transit
 MAX_RESULT_AGE = 60 * 60 * 24 * 60   # ignore any index entries older than this on load
 PAIR_FIRST, PAIR_SECOND = 682, 278   # wfweb's 20 ms packet split, see module docstring
+LEVEL_HISTORY = 12             # one audio-level reading per analyzer tick (~1 s), newest last
+LEVEL_FLOOR_DB = -50.0         # a level meter's bottom: anything at/below this reads 0
 
 IMAGES_DIRNAME = "sstv"
+REJECT_FILENAME = "last_reject.png"
+REJECT_AUDIO_FILENAME = "last_reject.wav"
 
 
 def _images_dir():
@@ -131,7 +141,17 @@ def image_quality(im, rows=None):
         a = a[:rows]
     if a.shape[0] < 3:
         return None
-    return {"structure": float(np.abs(np.diff(a, axis=0)).mean()), "contrast": float(a.std())}
+    z = a - a.mean(axis=1, keepdims=True)
+    num = (z[:-1] * z[1:]).sum(axis=1)
+    den = np.sqrt((z[:-1] ** 2).sum(axis=1) * (z[1:] ** 2).sum(axis=1)) + 1e-9
+    return {"structure": float(np.abs(np.diff(a, axis=0)).mean()), "contrast": float(a.std()),
+            "correlation": float((num / den).mean())}
+
+
+def looks_like_noise(q):
+    """True only when BOTH measures say static: big row-to-row differences
+    AND adjacent rows that don't resemble each other."""
+    return q["structure"] > NOISE_STRUCTURE and q.get("correlation", 0.0) < NOISE_CORRELATION
 
 
 def quality_label(structure):
@@ -211,8 +231,10 @@ class SstvReceiver:
         self._pub_rx = None         # public copy of _rx for status(), under _lock
         self._preview_png = None
         self._listening_since = None
+        self._levels = []           # last LEVEL_HISTORY readings, 0..1 (under _lock)
+        self._level_db = None       # latest reading in dBFS, None = silence/no audio
         # results (under _index_lock)
-        self._images, self._rejected = self._load_index()
+        self._images, self._rejected, self._last_reject = self._load_index()
 
     # ---------- config ----------
 
@@ -272,11 +294,14 @@ class SstvReceiver:
                 "has_preview": self._preview_png is not None and rx is not None,
                 "dropped_samples": self._dropped,
                 "seq_gaps": self._seq_gaps,
+                "levels": list(self._levels),
+                "level_db": self._level_db,
                 "error": LIBS_ERROR or self._last_error,
             }
         with self._index_lock:
             imgs = list(self._images)
             out["rejected_total"] = self._rejected
+            out["last_reject"] = dict(self._last_reject) if self._last_reject else None
         midnight = time.mktime(time.localtime()[:3] + (0, 0, 0, 0, 0, -1))
         out["last"] = imgs[0] if imgs else None
         out["today"] = sum(1 for i in imgs if i.get("ts", 0) >= midnight)
@@ -303,6 +328,24 @@ class SstvReceiver:
         with self._lock:
             return self._preview_png
 
+    def rejected_audio_file(self):
+        """Path to the last rejected signal's audio (WAV), or None."""
+        with self._index_lock:
+            lr = self._last_reject
+            if not lr or not lr.get("has_audio"):
+                return None
+        path = os.path.join(_images_dir(), REJECT_AUDIO_FILENAME)
+        return path if os.path.isfile(path) else None
+
+    def rejected_file(self):
+        """Path to the last rejected signal's (partial) picture, or None."""
+        with self._index_lock:
+            lr = self._last_reject
+            if not lr or not lr.get("has_image"):
+                return None
+        path = os.path.join(_images_dir(), REJECT_FILENAME)
+        return path if os.path.isfile(path) else None
+
     def clear_images(self):
         with self._index_lock:
             for i in self._images:
@@ -312,6 +355,12 @@ class SstvReceiver:
                     pass
             self._images = []
             self._rejected = 0
+            self._last_reject = None
+            for fn in (REJECT_FILENAME, REJECT_AUDIO_FILENAME):
+                try:
+                    os.remove(os.path.join(_images_dir(), fn))
+                except OSError:
+                    pass
             self._save_index_locked()
 
     # ---------- persistence ----------
@@ -323,9 +372,10 @@ class SstvReceiver:
                 d = json.load(f)
             cutoff = time.time() - MAX_RESULT_AGE
             imgs = [i for i in d.get("images", []) if isinstance(i, dict) and i.get("id") and i.get("ts", 0) >= cutoff]
-            return imgs, int(d.get("rejected", 0))
+            lr = d.get("last_reject")
+            return imgs, int(d.get("rejected", 0)), (lr if isinstance(lr, dict) else None)
         except Exception:
-            return [], 0
+            return [], 0, None
 
     def _save_index_locked(self):
         try:
@@ -333,7 +383,7 @@ class SstvReceiver:
             path = os.path.join(_images_dir(), "index.json")
             tmp = path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"images": self._images, "rejected": self._rejected}, f)
+                json.dump({"images": self._images, "rejected": self._rejected, "last_reject": self._last_reject}, f)
             os.replace(tmp, path)
         except Exception as e:
             print(f"[sstv] could not save index: {e}")
@@ -357,9 +407,50 @@ class SstvReceiver:
             self._images = self._images[:keep]
             self._save_index_locked()
 
-    def _count_reject(self):
+    def _reject_meta(self, rx, kind, detail):
+        return {"ts": time.time(), "mode": rx["mode"], "label": MODE_LABELS.get(rx["mode"], rx["mode"]),
+                "kind": kind, "detail": detail, "score": round(rx["score"], 2), "freq_hz": rx["freq_hz"],
+                "offset_hz": rx["offset_hz"], "dropped_samples": self._dropped - rx["dropped0"]}
+
+    def _save_reject_audio(self, rx):
+        """Keep the audio of a dropped reception (from a second before its
+        header to now, capped) as a WAV, so 'why did that loud signal fail?'
+        can be answered by replaying exactly what the receiver heard."""
+        try:
+            a0 = max(0, rx["start_abs"] - RATE)
+            arr = self._gather(a0)[:REJECT_AUDIO_MAX_S * RATE]
+            if len(arr) < RATE:
+                return False
+            os.makedirs(_images_dir(), exist_ok=True)
+            with wave.open(os.path.join(_images_dir(), REJECT_AUDIO_FILENAME), "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(RATE)
+                wf.writeframes(np.asarray(arr, dtype="<i2").tobytes())
+            return True
+        except Exception as e:
+            print(f"[sstv] could not keep the rejected audio: {e}")
+            return False
+
+    def _count_reject(self, meta=None, im=None, has_audio=False):
+        """Count a dropped signal. With `meta` it is also remembered (and its
+        partial picture kept) so the card can say WHAT was heard and why it
+        was dropped instead of silently returning to 'nothing decoded yet'
+        -- a real weak transmission looked exactly like a flaky card."""
+        has_image = False
+        if meta is not None and im is not None:
+            try:
+                os.makedirs(_images_dir(), exist_ok=True)
+                im.convert("RGB").save(os.path.join(_images_dir(), REJECT_FILENAME), format="PNG")
+                has_image = True
+            except Exception as e:
+                print(f"[sstv] could not keep the rejected picture: {e}")
         with self._index_lock:
             self._rejected += 1
+            if meta is not None:
+                meta["has_image"] = has_image
+                meta["has_audio"] = bool(has_audio)
+                self._last_reject = meta
             self._save_index_locked()
 
     # ---------- websocket ----------
@@ -533,6 +624,23 @@ class SstvReceiver:
         floor = self._total - int(keep_s * RATE)
         self._parts = [(a0, arr) for a0, arr in self._parts if a0 + len(arr) > floor]
 
+    def _record_level(self, chunks):
+        """Append this tick's audio level (RMS of the frames that arrived
+        since the last tick, mapped from LEVEL_FLOOR_DB..0 dBFS onto 0..1)
+        to the short history the card draws as its audio meter. No frames
+        this tick = 0 (nothing is arriving)."""
+        rms = 0.0
+        if chunks:
+            a = np.concatenate(chunks).astype(np.float32)
+            if len(a):
+                rms = float(np.sqrt(np.mean(a * a)))
+        db = 20.0 * np.log10(rms / 32768.0) if rms > 0 else None
+        level = 0.0 if db is None else float(min(1.0, max(0.0, (db - LEVEL_FLOOR_DB) / -LEVEL_FLOOR_DB)))
+        with self._lock:
+            self._levels.append(round(level, 3))
+            del self._levels[:-LEVEL_HISTORY]
+            self._level_db = None if db is None else round(float(db), 1)
+
     def _analyze_once(self):
         now = time.time()
         with self._lock:
@@ -544,7 +652,10 @@ class SstvReceiver:
         if not listening:
             if self._parts or self._rx is not None:
                 self._reset_audio()
+            with self._lock:
+                self._levels, self._level_db = [], None
             return
+        self._record_level(chunks)
         for c in chunks:
             self._parts.append((self._total, c))
             self._total += len(c)
@@ -607,9 +718,12 @@ class SstvReceiver:
                     "started_at": rx["started_at"], "freq_hz": rx["freq_hz"],
                 }
 
-    def _abort(self, reason, count=True):
+    def _abort(self, reason, count=True, kind="noise", im=None):
         print(f"[sstv] reception dropped: {reason}")
-        if count:
+        rx = self._rx
+        if count and rx is not None:
+            self._count_reject(self._reject_meta(rx, kind, reason), im, self._save_reject_audio(rx))
+        elif count:
             self._count_reject()
         self._rx = None
         with self._lock:
@@ -632,12 +746,23 @@ class SstvReceiver:
         # first rows are clearly just noise, freeing the receiver for a real one
         if not rx["early_done"] and elapsed >= min(20.0, 0.25 * rx["dur"]):
             rx["early_done"] = True
-            im = self._decode_span(rx, rx["start_abs"], None)
+            with self._lock:
+                gate = self._gate
+            gaps = self._dropped - rx["dropped0"]
+            if gate and gaps / max(1, int(elapsed * RATE)) > MAX_GAP_FRACTION:
+                # a loud signal decoding to garbage because the AUDIO lost packets in transit
+                # is not "noise" -- say so, it points at wfweb rather than the band
+                im = self._decode_span(rx, rx["start_abs"], None)
+                return self._abort(f"{gaps} of the first {int(elapsed * RATE)} audio samples were lost in transit",
+                                   kind="audio_loss", im=im)
+            im = self._decode_span(rx, rx["start_abs"], None) if gate else None   # gate off: the operator wants to see it
             if im is not None:
                 rows = _rows_decoded(im)
                 q = image_quality(im, rows)
-                if q and rows >= 10 and q["structure"] > NOISE_STRUCTURE:
-                    return self._abort(f"header at score {rx['score']:.2f} but the first {rows} rows are noise")
+                if q and rows >= 10 and looks_like_noise(q):
+                    return self._abort(f"header at score {rx['score']:.2f} but the first {rows} rows look like noise "
+                                       f"(structure {q['structure']:.0f}, row correlation {q['correlation']:.2f})",
+                                       kind="noise", im=im)
         if elapsed >= 5 and now - rx["preview_at"] >= PREVIEW_EVERY and elapsed < rx["dur"]:
             rx["preview_at"] = now
             im = self._decode_span(rx, rx["start_abs"], None)
@@ -658,7 +783,7 @@ class SstvReceiver:
         if elapsed >= rx["dur"] + FINISH_MARGIN:
             return self._finalize(rx)
         if elapsed > rx["dur"] + 60:
-            self._abort("timed out")
+            self._abort("timed out", kind="timeout")
 
     def _finalize(self, rx):
         end_abs = rx["start_abs"] + int((rx["dur"] + FINISH_MARGIN) * RATE)
@@ -670,7 +795,7 @@ class SstvReceiver:
             self._preview_png = None
             gate = self._gate
         if im is None:
-            return self._count_reject()
+            return self._count_reject(self._reject_meta(rx, "decode_failed", "the decoder returned no image"))
         q = image_quality(im) or {"structure": 999.0, "contrast": 0.0}
         gaps = self._dropped - rx["dropped0"]
         gap_frac = gaps / max(1, int(rx["dur"] * RATE))
@@ -678,10 +803,15 @@ class SstvReceiver:
             # audio that lost this much in transit decodes to streaks that a
             # smoothness check can still call "fair" -- never show it
             print(f"[sstv] {rx['mode']} image rejected: {gap_frac * 100:.0f}% of its audio was lost in transit")
-            return self._count_reject()
-        if gate and (q["structure"] > NOISE_STRUCTURE or q["contrast"] < MIN_CONTRAST):
-            print(f"[sstv] {rx['mode']} image rejected (structure {q['structure']:.1f}, contrast {q['contrast']:.1f})")
-            return self._count_reject()
+            return self._count_reject(self._reject_meta(rx, "audio_loss", f"{gap_frac * 100:.0f}% of the audio was lost in transit"), im,
+                                      self._save_reject_audio(rx))
+        if gate and (looks_like_noise(q) or q["contrast"] < MIN_CONTRAST):
+            print(f"[sstv] {rx['mode']} image rejected (structure {q['structure']:.1f}, correlation {q.get('correlation', 0):.2f}, "
+                  f"contrast {q['contrast']:.1f})")
+            kind = "noise" if looks_like_noise(q) else "blank"
+            return self._count_reject(self._reject_meta(
+                rx, kind, f"structure {q['structure']:.0f}, row correlation {q.get('correlation', 0):.2f}, contrast {q['contrast']:.0f}"),
+                im, self._save_reject_audio(rx))
         meta = {
             "id": uuid.uuid4().hex[:12], "ts": time.time(), "started_at": rx["started_at"],
             "mode": rx["mode"], "label": MODE_LABELS.get(rx["mode"], rx["mode"]),

@@ -1927,8 +1927,10 @@
         .sstv-foot { border-top: 1px solid var(--border-soft); padding-top: 8px; margin-top: 12px; display: flex;
             justify-content: space-between; gap: 12px; font-size: 10.5px; color: var(--text-dim); }
         .sstv-foot span:last-child { font-family: var(--font-mono); white-space: nowrap; }
+        .sstv-foot a { color: var(--live); text-decoration: none; }
+        .sstv-foot a:hover { text-decoration: underline; }
         .sstv-eq { display: flex; align-items: flex-end; gap: 2px; height: 16px; }
-        .sstv-eq i { display: inline-block; width: 4px; border-radius: 1px; background: var(--border); }
+        .sstv-eq i { display: inline-block; width: 4px; height: 2px; border-radius: 1px; background: var(--border); transition: height .4s ease; }
         .sstv-eq.ok i { background: var(--live); }
         /* SSTV drawer */
         .sstv-set-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 9px 0;
@@ -3666,7 +3668,12 @@
         <div class="metrics-card rp-card" id="rig-panel-card"
              style="order:{{ settings.get('rig_panel_position', 0) }}">
             <div class="metrics-header">
+                {% set rp_wfweb_host = (settings.get('wfweb_host') or '').strip() %}
+                {% if rp_wfweb_host %}
+                <a class="card-name" href="{{ 'https' if settings.get('wfweb_use_ssl', True) else 'http' }}://{{ rp_wfweb_host }}:{{ settings.get('wfweb_port', 8080) }}/" target="_blank" rel="noopener" title="Open the wfweb page">📻 Rig Panel</a>
+                {% else %}
                 <div class="card-name">📻 Rig Panel</div>
+                {% endif %}
                 <div style="display:flex;align-items:center;gap:8px">
                     <span class="rp-pill" id="rp-pill"><span class="d"></span><span id="rp-pill-txt">rig</span></span>
                     {% if settings.get('wfweb_power_enabled') %}
@@ -11012,6 +11019,20 @@ function sstvMeta(k, v, note) {
     return `<div><div class="sstv-k">${k}</div><div class="sstv-v">${v}</div>${note ? `<div class="sstv-note">${note}</div>` : ''}</div>`;
 }
 
+// A signal the decoder heard but dropped (weak/noise/lost audio) -- shown instead of
+// silently falling back to "nothing decoded yet". Only when it is newer than the last picture.
+function sstvRejectText(lr) {
+    const why = { noise: 'too weak to decode', audio_loss: 'audio dropouts', blank: 'no usable picture',
+        decode_failed: "couldn't be decoded", timeout: 'never completed' }[lr.kind] || 'dropped';
+    return 'Heard ' + escapeHtml(lr.label) + ' at ' + sstvClock(lr.ts) + ' · ' + why +
+        (lr.has_image ? ' · <a href="/api/sstv/rejected.png?t=' + Math.round(lr.ts) + '" target="_blank" rel="noopener" title="See what was received before it was dropped">view</a>' : '') +
+        (lr.has_audio ? ' · <a href="/api/sstv/rejected.wav?t=' + Math.round(lr.ts) + '" title="Download the audio of this attempt (for diagnosis)">audio</a>' : '');
+}
+function sstvNewerReject(rx) {
+    const lr = rx.last_reject;
+    return (lr && (!rx.last || lr.ts > rx.last.ts)) ? lr : null;
+}
+
 function sstvView() {
     if (!sstvData) return null;
     const rx = sstvData.rx || {}, ctl = sstvData.ctl || {}, cfg = sstvData.config || {};
@@ -11055,7 +11076,9 @@ function renderSstvCard() {
     // footer
     let fl = '', fr = '';
     if (view === 'resting' || view === 'empty') {
-        fl = rx.listening_since ? 'Listening since ' + sstvClock(rx.listening_since) : 'Listening';
+        const lr = sstvNewerReject(rx);
+        fl = lr ? sstvRejectText(lr)
+            : (rx.listening_since ? 'Listening since ' + sstvClock(rx.listening_since) : 'Listening');
         fr = (rx.today || 0) + (rx.today === 1 ? ' image today' : ' images today');
     } else if (view === 'receiving') {
         fl = 'Rig stays on ' + sstvFreq(rig.freq_hz) + ' while receiving'; fr = 'decoding';
@@ -11112,11 +11135,11 @@ function sstvBodyHtml(view, rx, ctl, cfg, last, recv) {
         </div>`;
     }
     if (view === 'empty') {
-        const bars = [6, 9, 12, 8, 14, 10, 16, 11, 7, 13, 9, 12].map(h => `<i style="height:${h}px"></i>`).join('');
+        const bars = new Array(12).fill('<i></i>').join('');   // heights come from rx.levels in sstvUpdateLive()
         const drop = rx.dropped_samples ? (rx.dropped_samples + ' samples lost') : 'no packets dropped';
         return sstvEmptyFrame('Nothing decoded yet', 'Waiting for an SSTV header') + `<div class="sstv-meta">
             ${sstvMeta('Listening since', rx.listening_since ? sstvClock(rx.listening_since) : '—')}
-            <div><div class="sstv-k">Audio</div><div class="sstv-eq ${rx.audio_ok ? 'ok' : ''}">${bars}</div>
+            <div><div class="sstv-k">Audio</div><div class="sstv-eq ${rx.audio_ok ? 'ok' : ''}" id="sstv-eq">${bars}</div>
                 <div class="sstv-note">${rx.audio_ok ? ((rx.sample_rate || 48000) / 1000) + ' kHz · ' + drop : 'no audio arriving'}</div></div>
             ${sstvMeta('Images today', String(rx.today || 0))}
             <div class="sstv-actions"><button class="sstv-linkbtn quiet" onclick="sstvControl('stop')">Stop</button></div>
@@ -11150,6 +11173,17 @@ function sstvUpdateLive(fromPoll) {
         if (txt) txt.textContent = sstvMmss(recv.elapsed_s) + ' of ' + sstvMmss(recv.total_s);
         const img = document.getElementById('sstv-preview-img');
         if (img && fromPoll) img.src = '/api/sstv/preview.png?t=' + Date.now();
+    }
+    const eq = document.getElementById('sstv-eq');
+    if (eq && fromPoll) {
+        const rx = sstvData.rx || {};
+        const lv = rx.levels || [];
+        const n = eq.children.length;
+        for (let i = 0; i < n; i++) {
+            const v = lv[lv.length - n + i] || 0;     // right-aligned: newest reading on the right
+            eq.children[i].style.height = Math.max(2, Math.round(v * 16)) + 'px';
+        }
+        eq.title = rx.level_db != null ? 'Audio level ' + rx.level_db + ' dBFS (last ' + lv.length + ' s)' : 'No audio arriving';
     }
     const cd = document.getElementById('sstv-countdown');
     if (cd && sstvCountdown) cd.textContent = sstvMmss(sstvCountdown.remaining - (Date.now() - sstvCountdown.at) / 1000);
@@ -11282,14 +11316,17 @@ function renderSstvDrawer() {
         row('State', stateTxt) +
         (ctl.state !== 'active' ? `<div class="sstv-note" style="padding:0 0 8px">${escapeHtml(sstvStandbyText(ctl, cfg))}</div>` : '') +
         row('wfweb', rx.connected ? 'connected' : 'not connected') +
-        row('Audio', rx.audio_ok ? ((rx.sample_rate || 48000) / 1000) + ' kHz' + (rx.dropped_samples ? ' · ' + rx.dropped_samples + ' samples lost' : ' · clean') : 'not receiving') +
+        row('Audio', rx.audio_ok ? ((rx.sample_rate || 48000) / 1000) + ' kHz' + (rx.dropped_samples ? ' · ' + rx.dropped_samples + ' samples lost' : ' · clean') + '<span id="sstv-d-level"></span>' : 'not receiving') +
         row('Rig', escapeHtml(sstvRigText(rx.rig))) +
         row('Rejected as noise', String(rx.rejected_total || 0)) +
+        (rx.last_reject ? `<div class="sstv-note" style="padding:0 0 8px">Last: ${sstvRejectText(rx.last_reject)}<br>${escapeHtml(rx.last_reject.detail || '')}${rx.last_reject.dropped_samples ? ' · ' + rx.last_reject.dropped_samples + ' samples lost' : ''} · offset ${rx.last_reject.offset_hz >= 0 ? '+' : ''}${rx.last_reject.offset_hz} Hz · header score ${rx.last_reject.score}</div>` : '') +
         `<div style="padding-top:10px">${btns}</div>`;
     if (statusHtml !== sstvDrawerSigs.status) {
         sstvDrawerSigs.status = statusHtml;
         document.getElementById('sstv-d-status').innerHTML = statusHtml;
     }
+    const lvEl = document.getElementById('sstv-d-level');
+    if (lvEl) lvEl.textContent = rx.level_db != null ? ' · ' + rx.level_db + ' dBFS' : '';
     const imgs = sstvData.images || [];
     const imgHtml = imgs.length ? '<div class="sstv-thumbs">' + imgs.map(i =>
         `<a class="sstv-thumb" href="/api/sstv/image/${i.id}.png" target="_blank" rel="noopener" title="${escapeHtml(i.label)} · ${i.quality}">

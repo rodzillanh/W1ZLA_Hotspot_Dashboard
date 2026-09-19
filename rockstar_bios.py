@@ -621,6 +621,11 @@ BIOS = {
         "blurb": "Founding rhythm guitarist and singer-songwriter of Jefferson Airplane and co-founder of Jefferson Starship, co-writer of \u201cWooden Ships.\u201d",
         "wiki": "Paul_Kantner",
     },
+    "Jordison": {
+        "name": "Joey Jordison",
+        "blurb": "Co-founding drummer of Slipknot, known for his blistering speed and thunderous double-bass work.",
+        "wiki": "Joey_Jordison",
+    },
 }
 
 

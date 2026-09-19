@@ -117,9 +117,25 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.92 "Kantner"</span>
+                <span class="release-version">v4.93 "Jordison"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>SSTV card: the audio bars are now a real level meter</span> &mdash; the bar graph on the empty (&ldquo;nothing decoded yet&rdquo;) state used to be a fixed decoration that only changed colour. It now shows the actual received audio level: one reading per second for the last 12 seconds, newest on the right, so you can see at a glance whether audio is arriving, whether the feed has gone silent, or whether it is overdriven. Hover it for the level in dBFS; the drawer's Status shows the same figure next to the sample rate</li>
+                <li><span>SSTV card: a dropped signal is no longer a silent reset</span> &mdash; previously, when the decoder found a transmission but then dropped it (for example because the first rows decoded as static), the card just went back to &ldquo;Nothing decoded yet&rdquo; a few seconds after it had started receiving, which looked like the card flaking out. It now says what happened in the footer &mdash; <i>&ldquo;Heard Robot 36 at 4:20 PM &middot; too weak to decode&rdquo;</i> (or <i>audio dropouts</i> / <i>no usable picture</i>) &mdash; and keeps the partial picture (<b>view</b>) and the audio of that attempt (<b>audio</b>, a WAV download) so a signal that should have decoded can be examined instead of guessed at. The drawer's Status shows the same detail plus the header score, mistuning offset and any lost samples</li>
+                <li><span>SSTV card: audio loss is now diagnosed as audio loss</span> &mdash; a loud signal on a wfweb audio stream that is dropping packets used to be reported as &ldquo;noise&rdquo;. The receiver now checks for lost audio first and says so, which points at wfweb rather than the band</li>
+                <li><span>SSTV card: the noise check is harder to fool</span> &mdash; a picture is only treated as static if adjacent rows are BOTH very different and uncorrelated. Measured on 14 real photographs sent as SSTV into real rig noise (30 dB down to 3 dB), row correlation never fell below 0.71, against 0.00 for decoded noise, so a detailed real picture can't be discarded for looking busy</li>
+                <li><span>Fix: &ldquo;Hide images that look like noise&rdquo; off now really shows them</span> &mdash; the early noise check ignored that switch and dropped the picture anyway. With the switch off, a weak or noisy picture is now received to the end and kept (graded &ldquo;weak&rdquo;)</li>
+                <li><span>Rig Panel: the title links to your wfweb page</span> &mdash; when a wfweb host is set under Settings &rarr; Integrations, the &ldquo;Rig Panel&rdquo; card title becomes a link that opens wfweb's web UI in a new tab (https or http to match your SSL setting, same as the DigiPi card's title link). With no wfweb host set it stays a plain title</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.92 "Kantner"</span>
+                <span class="release-date">September 2026</span>
+                
             </div>
             <ul class="change-list">
                 <li><span>SSTV card: choose the listening frequency</span> &mdash; the &#9881; drawer now has a <b>Listening frequency</b> selector with the standard analog SSTV frequencies from ARRL's Considerate Operator's Frequency Guide: <b>80 m 3.845 MHz LSB</b>, <b>40 m 7.171 MHz LSB</b>, <b>20 m 14.230 MHz USB</b> (still the default), <b>15 m 21.340 MHz USB</b> and <b>10 m 28.680 MHz USB</b>, plus a <b>Custom&hellip;</b> entry (any frequency from 1800 to 29700 kHz) for regional variants. The sideband follows the frequency automatically (LSB below 10 MHz, USB above). Switching band while the card is listening retunes the rig there without treating it as you touching the radio, and Stop still restores the frequency you had before SSTV started. The two <i>digital</i> SSTV frequencies in the ARRL guide (7.173 and 14.233 MHz) are deliberately not offered &mdash; that is a different system this decoder can't read</li>

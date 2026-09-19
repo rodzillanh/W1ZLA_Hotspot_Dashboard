@@ -8001,6 +8001,54 @@ config for per-integration credentials; put it in
     where it was. Verified end-to-end with the real components + a fake
     rigctld: waits the full idle time, tunes exactly once, yields on a
     retune with zero further tune commands.
+  - **"It decodes for ~17 s then goes back to 'Nothing decoded yet'" (v4.93
+    investigation)**: the card polls read-only and the receiver's state
+    lives entirely server-side, so other cards refreshing cannot reset it.
+    A stress run (12 threads re-rendering the dashboard + a CPU-bound
+    thread against an in-process fake wfweb) only DELAYED header detection
+    (112 s instead of ~2 s) -- it never flipped the state -- and the early
+    noise check is measured in AUDIO samples (`min(20 s, 25% of the
+    image)`), not wall-clock time, so load can't move it. The real cause
+    on the first (weak) report was correct behavior with no explanation: a
+    real but too-weak Robot 36 was dropped by the early check ~9 s in and
+    the card silently fell back to empty (reproduced replaying the real
+    14.230 recording at 1x: Receiving 22 s -> preview 27 s -> dropped 31 s).
+    The second report -- a LOUD signal lasting ~17 s (= a mode of >= 80 s,
+    where the early check fires at 20 s of audio) -- is NOT explained by
+    weak signal: 14 real photographs (C:\Windows\Web wallpapers) sent as
+    Martin 1 into real rig noise from 30 dB to 3 dB all decode with
+    structure 1-20 and row correlation >= 0.71 (real rig noise: 86 and
+    0.00), so the noise gate never touches a decodable picture. What
+    remains for a loud real signal to decode as static: lost audio packets
+    (the wfweb fault above -- now diagnosed as `audio_loss`, not "noise"),
+    a mis-read VIS mode, or something about real transmitters that
+    synthetic tests can't show. `SstvReceiver._count_reject()` therefore
+    remembers the last dropped attempt (`last_reject`: mode, time, kind,
+    detail, header score, offset, lost samples), keeps its partial picture
+    (`last_reject.png`, /api/sstv/rejected.png) AND its audio
+    (`last_reject.wav`, /api/sstv/rejected.wav, <= 90 s) so it can be
+    replayed offline. The gate is now noise = structure > 40 AND row
+    correlation < 0.35 (`looks_like_noise()`), and the early check honours
+    the "hide noise" switch (it previously dropped the picture even with
+    the gate off). If this recurs, START from the downloaded WAV and
+    `docker logs ... | grep sstv`, not from theory. Test-harness lessons:
+    a fake wfweb child process that never exits keeps a piped test run
+    from ever finishing (it inherits stderr); a 3x replay makes a ~3 s
+    Receiving window fall between the card's 3 s polls, so test state
+    transitions at 1x.
+  - **The card's audio bars are a real level meter (v4.93), not decoration**
+    -- the first version drew fixed heights and only toggled colour on
+    `audio_ok`, which read as a live meter and wasn't (called out by the
+    user asking "is this doing something?"). `SstvReceiver._record_level()`
+    keeps one reading per analyzer tick (RMS of the frames that arrived,
+    mapped -50..0 dBFS onto 0..1, last 12 kept, newest last) so the meter is
+    real history independent of the card's 1.5-3 s poll rate; `/api/sstv`
+    exposes `rx.levels` + `rx.level_db`. Real rig noise (~4400 RMS) reads
+    about -17 dBFS = ~65% of the scale. The bars are updated IN PLACE by
+    `sstvUpdateLive(fromPoll)` (never by rebuilding the card body, which
+    only happens when a structural signature changes) and the drawer's dBFS
+    text is a `<span>` filled in place so the Listen/Stop buttons aren't
+    re-rendered every poll.
   - **Selectable listening frequency (v4.92)**: `config.SSTV_FREQUENCIES`
     is the five ANALOG SSTV entries from ARRL's Considerate Operator's
     Frequency Guide (QST Nov 2013 p.103 -- read directly from the PDF, not a

@@ -2385,6 +2385,27 @@ def api_sstv_preview():
         return jsonify({"error": "no preview"}), 404
     return Response(data, mimetype="image/png", headers={"Cache-Control": "no-store"})
 
+@app.route("/api/sstv/rejected.png")
+def api_sstv_rejected():
+    """The partial picture from the last signal the decoder heard but
+    dropped (too weak / noise / lost audio) -- so a rejection can be judged
+    by eye instead of taken on faith. See SstvReceiver._count_reject()."""
+    path = sstv_receiver.rejected_file()
+    if not path:
+        return jsonify({"error": "none"}), 404
+    return send_file(path, mimetype="image/png", max_age=0)
+
+@app.route("/api/sstv/rejected.wav")
+def api_sstv_rejected_audio():
+    """The audio of the last dropped signal, as a download -- so a loud
+    transmission that failed to decode can be replayed offline and the real
+    cause found (dropped audio packets? wrong mode? mistuning?) instead of
+    guessed at."""
+    path = sstv_receiver.rejected_audio_file()
+    if not path:
+        return jsonify({"error": "none"}), 404
+    return send_file(path, mimetype="audio/wav", as_attachment=True, download_name="sstv_rejected.wav", max_age=0)
+
 @app.route("/api/sstv/control", methods=["POST"])
 def api_sstv_control():
     """'Listen now' / 'Stop' (which restores the rig's previous frequency
