@@ -68,6 +68,13 @@ RECV_TIMEOUT = 30
 RECONNECT_BACKOFF = 10
 
 
+def _as_int(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
 class WfwebPowerClient:
     def __init__(self):
         self._lock = threading.Lock()
@@ -80,6 +87,9 @@ class WfwebPowerClient:
         self._connected = False
         self._power_state = None   # True/False/None (unknown -- no status seen yet)
         self._lan_connected = None
+        self._freq_hz = None
+        self._mode = None
+        self._vfo = None
         self._last_error = None
 
     # --- config ---
@@ -103,6 +113,9 @@ class WfwebPowerClient:
                 self._connected = False
                 self._power_state = None
                 self._lan_connected = None
+                self._freq_hz = None
+                self._mode = None
+                self._vfo = None
         if enabled:
             threading.Thread(target=self._loop, args=(gen,), daemon=True).start()
 
@@ -115,6 +128,17 @@ class WfwebPowerClient:
                 "connected": self._connected,
                 "power_state": self._power_state,
                 "lan_connected": self._lan_connected,
+                # Frequency/mode/VFO read straight from wfweb's own rig
+                # cache over its native protocol -- confirmed live
+                # (2026-09) to be reliable on a real wfweb + IC-7300MK2
+                # setup where wfweb's OWN rigctld compatibility bridge
+                # (rig_panel.py's connection) answered a flatly wrong
+                # literal "0.000000"/"UNKNOWN"/"None" for these same
+                # three fields. app.py's /api/rig_panel merges these in
+                # as an override on top of the rigctld snapshot.
+                "freq_hz": self._freq_hz,
+                "mode": self._mode,
+                "vfo": self._vfo,
                 "error": self._last_error,
             }
 
@@ -254,6 +278,20 @@ class WfwebPowerClient:
                     self._power_state = bool(msg["powerState"])
                 if "lanConnected" in msg:
                     self._lan_connected = bool(msg["lanConnected"])
+                # `frequency`/`mode`/`selectedVfo` are confirmed from
+                # wfweb's own source (buildStatusJson()) to be a real,
+                # authoritative live snapshot each time -- a JSON null
+                # is wfweb's own explicit "no value right now" signal
+                # (its own code comment: distinguishing that from a
+                # real 0 Hz), not a gap to hold the last value through,
+                # so every "status" message updates these three fields
+                # outright rather than only on a truthy value.
+                if "frequency" in msg:
+                    self._freq_hz = _as_int(msg["frequency"])
+                if "mode" in msg:
+                    self._mode = msg["mode"] if isinstance(msg["mode"], str) else None
+                if "selectedVfo" in msg:
+                    self._vfo = msg["selectedVfo"] if isinstance(msg["selectedVfo"], str) else None
         elif mtype == "lanStatus":
             with self._lock:
                 if "lanConnected" in msg:

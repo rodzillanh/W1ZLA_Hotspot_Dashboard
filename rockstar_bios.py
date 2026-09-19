@@ -596,6 +596,11 @@ BIOS = {
         "blurb": "Singer, keyboardist, and songwriter for Fleetwood Mac behind some of the band's warmest hits, including 'Don't Stop', 'Everywhere', and 'Songbird'.",
         "wiki": "Christine_McVie",
     },
+    "Lightfoot": {
+        "name": "Gordon Lightfoot",
+        "blurb": "Canadian folk-rock singer-songwriter behind enduring hits like 'Sundown' and 'If You Could Read My Mind'.",
+        "wiki": "Gordon_Lightfoot",
+    },
 }
 
 

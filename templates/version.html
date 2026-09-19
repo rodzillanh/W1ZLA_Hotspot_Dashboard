@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.87 "McVie"</span>
+                <span class="release-version">v4.88 "Lightfoot"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fix: Rig Panel frequency/mode/VFO could stay stuck at "— — —" / blank with wfweb</span> — confirmed live against a real wfweb + IC-7300MK2 setup that even after v4.87's fix, wfweb's own rigctld compatibility bridge genuinely never reports a real frequency for this rig (a literal <code>0.000000</code>, not just an "unsupported" answer) — a limitation in wfweb's own rigctld emulation, confirmed by comparing against wfweb's own web UI, which showed the correct live frequency the whole time via its separate native protocol. Since this app already opens that same native WebSocket connection for the Power On/Off + LAN control added in v4.86, the Rig Panel card (and the QRZ Quick Log card, which reads the same feed) now also pulls frequency/mode/VFO from it directly whenever that connection is enabled and live, overriding rigctld's broken answer for just those three fields. Requires "wfweb power / LAN control" to be configured under Settings → Integrations — everything else on the card still comes from rigctld as before</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.87 "McVie"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fix: Rig Panel could show a wrong "UNKNOWN" mode / blank VFO with wfweb</span> — confirmed live against a real wfweb + IC-7300MK2 setup: for a field it can't answer, wfweb's own rigctld bridge doesn't always follow Hamlib's standard "unsupported" reply (<code>RPRT -n</code>) — it answered the literal text <code>UNKNOWN</code> for mode and <code>None</code> for VFO instead, which this app's parser trusted as real data since neither started with <code>RPRT</code>. Both literal placeholders are now treated the same as an unsupported field (the badge is hidden, same as any other field a rig doesn't report), rather than showing misleading text. The card's own raw-readings drawer is unaffected — it still shows exactly what rigctld answered either way</li>

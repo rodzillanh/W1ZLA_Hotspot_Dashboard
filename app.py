@@ -2197,8 +2197,31 @@ def test_rigctl():
 def api_rig_panel():
     """Live rig state for the Rig Panel card + the Operating Timeline in
     its drawer -- the persistent rigctld poller's latest snapshot, temp
-    history and band/mode segments. See rig_panel.py."""
-    return jsonify(rig_panel_poller.snapshot())
+    history and band/mode segments. See rig_panel.py.
+
+    When wfweb's own native WebSocket connection (see wfweb_power.py) is
+    enabled and connected, its frequency/mode/VFO -- read directly from
+    wfweb's own rig cache -- override rigctld's answer for those same
+    three fields. Confirmed live (2026-09) against a real wfweb +
+    IC-7300MK2 setup that this is a real fix, not a nice-to-have: wfweb's
+    OWN rigctld compatibility bridge answered a flatly wrong literal
+    "0.000000" for frequency and "UNKNOWN"/"None" for mode/VFO on this
+    rig, while wfweb's own web UI (built on this same native protocol)
+    showed the correct live frequency/mode the whole time. Only applied
+    on top of an already-reachable rigctld snapshot -- this doesn't
+    change how a fully unreachable rigctld server is handled."""
+    snap = rig_panel_poller.snapshot()
+    if snap.get("reachable"):
+        wp = wfweb_power_client.status()
+        if wp.get("connected"):
+            if wp.get("freq_hz"):
+                snap["freq_hz"] = wp["freq_hz"]
+                snap["band"] = freq_to_band(wp["freq_hz"]) or snap.get("band")
+            if wp.get("mode"):
+                snap["mode"] = wp["mode"]
+            if wp.get("vfo"):
+                snap["vfo"] = "B" if wp["vfo"].upper().endswith("B") else "A"
+    return jsonify(snap)
 
 @app.route("/api/rig_pa_alerts")
 def api_rig_pa_alerts():
