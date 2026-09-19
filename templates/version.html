@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.89 "Slovak"</span>
+                <span class="release-version">v4.90 "Cale"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Spots card: new full-height "Browse" drawer</span> &mdash; the card's Stats button is now <b>&#9776; Browse</b> and opens a side drawer with two tabs. <b>Spots</b> is a searchable list across POTA, SOTA, RBN and DX (callsign, park or summit match, with source and mode chips, sort, and tap-to-tune), giving the list the whole screen height instead of ~3 rows. <b>POTA Stats</b> is the drawer's previous hunter-stats content, unchanged. The drawer's filters are its own (seeded from the card's chips on open) so narrowing there never changes the card</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.89 "Slovak"</span>
+                <span class="release-date">September 2026</span>
+                
             </div>
             <ul class="change-list">
                 <li><span>Fix (unverified — please test live): wfweb-sourced frequency/mode/VFO could freeze at whatever value was current the instant the connection opened</span> — reported live: v4.88's fix showed the right frequency at first, then stayed stuck on it even while the rig was visibly retuned in wfweb's own web UI at the same time. This app's wfweb connection only ever passively listened for broadcasts; it never asked wfweb to re-poll the rig, unlike the browser tab's own JS (which is almost certainly what keeps that tab's own display fresh). wfweb's source hints at why this matters: its own comment about needing an explicit VFO-update request after a LAN reconnect implies the cached value doesn't refresh on its own. This connection now sends a periodic status request (every 1.5s) to try to keep it live. This is a best-effort guess at the real mechanism, not a confirmed fix — there's no live wfweb instance available to verify it against directly, so it needs a real test before trusting it</li>

@@ -606,6 +606,11 @@ BIOS = {
         "blurb": "Original guitarist and founding member of Red Hot Chili Peppers, whose funk-punk riffing shaped the band's earliest sound.",
         "wiki": "Hillel_Slovak",
     },
+    "Cale": {
+        "name": "J.J. Cale",
+        "blurb": "Tulsa-sound songwriter whose laid-back shuffle gave the world 'Cocaine' and 'After Midnight', both made famous by Eric Clapton.",
+        "wiki": "J._J._Cale",
+    },
 }
 
 

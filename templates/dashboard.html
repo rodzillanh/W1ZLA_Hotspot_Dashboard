@@ -1473,6 +1473,22 @@
         .pota-d-hunt .h-park { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
         .pota-d-hunt .h-park small { font-family: var(--font-mono); color: var(--text-dim); }
         .pota-d-hunt .h-when { font-family: var(--font-mono); color: var(--text-muted); font-size: 10px; white-space: nowrap; }
+        /* Spots drawer (v4.90): tabs + search + filter chips + list */
+        .pota-d-tabs { display: flex; gap: 4px; margin-top: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+        .pota-d-tab { flex: 1; text-align: center; font-size: 12px; font-weight: 600; padding: 5px 0; border-radius: 6px; color: var(--text-muted); cursor: pointer; user-select: none; }
+        .pota-d-tab.on { background: var(--live-dim); color: var(--live); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live) 40%, var(--border)); }
+        .pota-d-search { position: relative; margin-top: 12px; }
+        .pota-d-search input { width: 100%; box-sizing: border-box; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font: inherit; font-family: var(--font-mono); font-size: 12.5px; padding: 7px 30px; }
+        .pota-d-search input:focus { outline: none; border-color: var(--live); }
+        .pota-d-search .ic { position: absolute; left: 10px; top: 8px; font-size: 12px; color: var(--text-dim); }
+        .pota-d-search .clr { position: absolute; right: 9px; top: 7px; font-size: 12px; color: var(--text-dim); cursor: pointer; }
+        .pota-d-chips { display: flex; gap: 5px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+        .pota-d-chips .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); margin: 0 2px 0 6px; }
+        .pota-d-chips .lbl:first-child { margin-left: 0; }
+        .pota-d-countline { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); margin: 10px 0 2px; }
+        .pota-d-countline select { background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: 10.5px; padding: 2px 6px; cursor: pointer; }
+        #pota-d-list mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); border-radius: 2px; padding: 0 1px; }
+        .pota-d-empty { padding: 30px 0; text-align: center; font-size: 12px; color: var(--text-muted); }
         @media (prefers-reduced-motion: reduce) { .pota-dot.fresh { animation: none; } }
         /* --- POTA card: tap-to-tune via rigctld (rigctl.py) --- */
         .pota-rig-pill { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono);
@@ -3482,7 +3498,7 @@
                          height trim) so the info isn't lost, just not
                          spending vertical space when you're not looking
                          at it. See fillPotaGlanceTooltip() in JS. -->
-                    <button class="pota-gear" type="button" id="pota-gear-btn" onclick="openPotaDrawer()">⚙ Stats</button>
+                    <button class="pota-gear" type="button" id="pota-gear-btn" onclick="openPotaDrawer()">☰ Browse</button>
                 </div>
             </div>
             <div class="spots-filter-row">
@@ -9556,9 +9572,9 @@ function rigTune(btn, freqHz, mode) {
     });
 }
 
-function renderPotaDrawer() {
-    const d = document.getElementById('pota-drawer');
-    if (!d || !d.classList.contains('open') || !potaData) return;
+// Builds the "POTA Stats" tab's body HTML (the drawer's original content,
+// unchanged) -- v4.90 moved it behind a tab next to the new Spots list.
+function potaStatsBodyHtml() {
     const h = potaData.hunter;
     const call = potaData.callsign || '—';
     // Each stat tile links to the operator's POTA profile page (which is
@@ -9598,24 +9614,185 @@ function renderPotaDrawer() {
         statsHtml = '<div style="font-size:12px;color:var(--text-muted)">Set a callsign under <a href="/setup#integrations" style="color:var(--link)">Settings → Integrations → Parks on the Air</a> to see your hunter stats here. No POTA login needed.</div>';
     }
 
+    return `
+            <div class="hs-drawer-section-title">Hunter</div>
+            ${statsHtml}
+            ${potaData.callsign ? `<a href="https://pota.app/#/profile/${encodeURIComponent(potaData.callsign)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:18px;font-size:12px;color:var(--link)">Open your profile on pota.app →</a>` : ''}`;
+}
+
+// --- Spots drawer (v4.90): the card's full-height browse view. Two tabs:
+// "Spots" (searchable/filterable list over all four feeds) and "POTA
+// Stats" (the drawer's original hunter-stats content). Its filter state is
+// its own (seeded from the card's chips on open) so narrowing here never
+// disturbs the card's teaser list.
+let potaDrawerTab = 'spots';
+let potaDrawerSearch = '';
+let potaDrawerMode = '';
+let potaDrawerSort = 'smart';
+let potaDrawerSrc = { pota: true, sota: true, rbn: false, dx: false };
+const POTA_DRAWER_FIREHOSE_MAX = 60;
+
+function potaModeKey(m) {
+    m = (m || '').toUpperCase();
+    if (m === 'FT4') return 'FT8';
+    if (m === 'USB' || m === 'LSB') return 'SSB';
+    return m;
+}
+
+// Every spot from every feed this install has, normalized to the few
+// fields the drawer filters/sorts on plus a lazy row renderer that reuses
+// the card's own potaSpotHtml()/firehoseSpotHtml() verbatim.
+function potaDrawerItems(rigOk) {
+    const items = [];
+    const qthLat = potaData ? potaData.qth_lat : null, qthLon = potaData ? potaData.qth_lon : null;
+    ((potaData && potaData.spots) || []).forEach(s => {
+        const x = Object.assign({ _program: 'POTA' }, s);
+        items.push({ prog: 'POTA', hunter: true, call: s.activator || '', ref: s.reference || '', park: s.park_name || '',
+            mode: potaModeKey(s.mode), band: s.band || '', ageMin: potaAgeMin(s.spot_time), score: potaScore(x),
+            dist: s.dist_mi, html: () => potaSpotHtml(x, rigOk) });
+    });
+    (((sotaCardData && sotaCardData.spots) || [])).forEach(raw => {
+        const x = sotaToPotaShape(raw, qthLat, qthLon);
+        items.push({ prog: 'SOTA', hunter: true, call: x.activator || '', ref: x.reference || '', park: x.park_name || '',
+            mode: potaModeKey(x.mode), band: x.band || '', ageMin: potaAgeMin(x.spot_time), score: potaScore(x),
+            dist: x.dist_mi, html: () => potaSpotHtml(x, rigOk) });
+    });
+    [['RBN', RBN_ENABLED, rbnCardData], ['DX', DXCLUSTER_ENABLED, dxCardData]].forEach(([tag, on, feed]) => {
+        if (!on) return;
+        ((feed && feed.spots) || []).forEach(s => {
+            items.push({ prog: tag, hunter: false, call: s.call || '', ref: '', park: '',
+                mode: potaModeKey(s.mode), band: s.band || '', ageMin: rbnAgeSec(s.last_seen) / 60, score: 0,
+                dist: null, html: () => firehoseSpotHtml(s, rigOk, tag) });
+        });
+    });
+    return items;
+}
+
+function potaDrawerShell(d) {
+    const call = (potaData && potaData.callsign) || '—';
+    const tabBtn = (id, label) =>
+        `<div class="pota-d-tab${potaDrawerTab === id ? ' on' : ''}" onclick="setPotaDrawerTab('${id}')">${label}</div>`;
     d.innerHTML = `
         <div class="hs-drawer-header">
             <div class="hs-drawer-title-row">
-                <div class="hs-drawer-title">🏕️ POTA — <span style="font-family:var(--font-mono);font-size:13px">${escapeHtml(call)}</span></div>
+                <div class="hs-drawer-title">📡 Spots <span style="font-family:var(--font-mono);font-size:13px">${escapeHtml(call)}</span></div>
                 <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
             </div>
-            <div class="hs-drawer-sub">Parks on the Air — hunter</div>
+            <div class="hs-drawer-sub">POTA · SOTA${RBN_ENABLED ? ' · RBN' : ''}${DXCLUSTER_ENABLED ? ' · DX' : ''}</div>
+            <div class="pota-d-tabs">${tabBtn('spots', 'Spots')}${tabBtn('stats', 'POTA Stats')}</div>
         </div>
-        <div class="hs-drawer-body">
-            <div class="hs-drawer-section-title">Hunter</div>
-            ${statsHtml}
-            ${potaData.callsign ? `<a href="https://pota.app/#/profile/${encodeURIComponent(potaData.callsign)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:18px;font-size:12px;color:var(--link)">Open your profile on pota.app →</a>` : ''}
-        </div>`;
+        <div class="hs-drawer-body" id="pota-d-body"></div>`;
+    const body = document.getElementById('pota-d-body');
+    if (potaDrawerTab === 'spots') {
+        // Built once per tab switch (not per poll) so the search input keeps
+        // focus/caret while spots refresh underneath it.
+        body.innerHTML = `
+            <div class="pota-d-search">
+                <span class="ic">⌕</span>
+                <input type="text" id="pota-d-search-input" placeholder="Search callsign, park, summit…" autocomplete="off"
+                       value="${escapeHtml(potaDrawerSearch)}" oninput="potaDrawerSetSearch(this.value)">
+                <span class="clr" onclick="potaDrawerSetSearch(''); document.getElementById('pota-d-search-input').value=''">✕</span>
+            </div>
+            <div class="pota-d-chips" id="pota-d-chips"></div>
+            <div class="pota-d-countline"><span id="pota-d-count"></span>
+                <select id="pota-d-sort" onchange="potaDrawerSort=this.value; potaDrawerUpdateList()">
+                    <option value="smart">Smart rank</option><option value="near">Nearest</option><option value="fresh">Freshest</option>
+                </select></div>
+            <div id="pota-d-list"></div>`;
+        document.getElementById('pota-d-sort').value = potaDrawerSort;
+    }
+    d.dataset.built = potaDrawerTab;
 }
 
-function openPotaDrawer() {
+function potaDrawerSetSearch(v) { potaDrawerSearch = v; potaDrawerUpdateList(); }
+function potaDrawerToggleSrc(p) { potaDrawerSrc[p] = !potaDrawerSrc[p]; potaDrawerUpdateList(); }
+function potaDrawerSetMode(m) { potaDrawerMode = m; potaDrawerUpdateList(); }
+
+function potaDrawerUpdateList() {
+    const listEl = document.getElementById('pota-d-list');
+    if (!listEl) return;
+    const rig = potaData ? potaData.rig : null;
+    const rigOk = RIG_CONTROL_ENABLED && !!(rig && rig.reachable);
+    const all = potaDrawerItems(rigOk);
+    const term = potaDrawerSearch.trim().toLowerCase();
+
+    // Source chips (counts are per-source totals, stable while filtering).
+    const srcCounts = {};
+    all.forEach(i => { srcCounts[i.prog] = (srcCounts[i.prog] || 0) + 1; });
+    const srcs = ['POTA', 'SOTA'].concat(RBN_ENABLED ? ['RBN'] : []).concat(DXCLUSTER_ENABLED ? ['DX'] : []);
+    // Mode chips: only modes actually present, most common first.
+    const modeCounts = {};
+    all.forEach(i => { if (i.mode) modeCounts[i.mode] = (modeCounts[i.mode] || 0) + 1; });
+    const modes = Object.keys(modeCounts).sort((a, b) => modeCounts[b] - modeCounts[a]).slice(0, 5);
+    if (potaDrawerMode && !modes.includes(potaDrawerMode)) potaDrawerMode = '';
+    document.getElementById('pota-d-chips').innerHTML =
+        '<span class="lbl">Source</span>'
+        + srcs.map(p => `<span class="spots-filter-chip${potaDrawerSrc[p.toLowerCase()] ? ' active' : ''}" onclick="potaDrawerToggleSrc('${p.toLowerCase()}')">${p}<span class="n">${srcCounts[p] || 0}</span></span>`).join('')
+        + '<span class="lbl">Mode</span>'
+        + `<span class="spots-filter-chip${potaDrawerMode ? '' : ' active'}" onclick="potaDrawerSetMode('')">All</span>`
+        + modes.map(m => `<span class="spots-filter-chip${potaDrawerMode === m ? ' active' : ''}" onclick="potaDrawerSetMode('${m}')">${escapeHtml(m)}</span>`).join('');
+
+    let list = all.filter(i => potaDrawerSrc[i.prog.toLowerCase()]);
+    if (potaDrawerMode) list = list.filter(i => i.mode === potaDrawerMode);
+    if (term) list = list.filter(i => [i.call, i.ref, i.park].some(v => v.toLowerCase().includes(term)));
+    const total = list.length;
+
+    const hunters = list.filter(i => i.hunter), fire = list.filter(i => !i.hunter);
+    fire.sort((a, b) => a.ageMin - b.ageMin);
+    let ordered;
+    if (potaDrawerSort === 'fresh') {
+        ordered = list.slice().sort((a, b) => a.ageMin - b.ageMin);
+    } else if (potaDrawerSort === 'near') {
+        hunters.sort((a, b) => (a.dist ?? 1e9) - (b.dist ?? 1e9));
+        ordered = hunters.concat(fire);
+    } else {
+        hunters.sort((a, b) => b.score - a.score);
+        ordered = hunters.concat(fire);
+    }
+    // Same reasoning as the card's own RBN_MAX_ROWS cap -- the firehose
+    // feeds can hold hundreds of rows; hunter (POTA/SOTA) rows are never capped.
+    let firehoseSeen = 0;
+    ordered = ordered.filter(i => i.hunter || ++firehoseSeen <= POTA_DRAWER_FIREHOSE_MAX);
+
+    document.getElementById('pota-d-count').textContent = `${total} of ${all.length} spots`;
+    listEl.innerHTML = ordered.length
+        ? ordered.map(i => i.html()).join('')
+        : `<div class="pota-d-empty">${term ? `No spots match “${escapeHtml(potaDrawerSearch.trim())}”.` : 'No spots match these filters.'}</div>`;
+    if (term) {
+        listEl.querySelectorAll('.pota-spot-act, .pota-spot-ref, .pota-spot-park').forEach(el => {
+            if (el.children.length) return;
+            const txt = el.textContent, k = txt.toLowerCase().indexOf(term);
+            if (k < 0) return;
+            el.innerHTML = escapeHtml(txt.slice(0, k)) + '<mark>' + escapeHtml(txt.slice(k, k + term.length)) + '</mark>' + escapeHtml(txt.slice(k + term.length));
+        });
+    }
+}
+
+function setPotaDrawerTab(tab) {
+    potaDrawerTab = tab;
+    renderPotaDrawer();
+}
+
+function renderPotaDrawer() {
+    const d = document.getElementById('pota-drawer');
+    if (!d || !d.classList.contains('open') || !potaData) return;
+    if (d.dataset.built !== potaDrawerTab) potaDrawerShell(d);
+    if (potaDrawerTab === 'stats') {
+        document.getElementById('pota-d-body').innerHTML = potaStatsBodyHtml();
+    } else {
+        potaDrawerUpdateList();
+    }
+}
+
+function openPotaDrawer(tab) {
     closeAllDrawers();
-    document.getElementById('pota-drawer').classList.add('open');
+    potaDrawerTab = tab || 'spots';
+    potaDrawerSearch = '';
+    potaDrawerMode = '';
+    potaDrawerSrc = Object.assign({ pota: true, sota: true, rbn: false, dx: false }, spotsFilter);
+    const d = document.getElementById('pota-drawer');
+    d.dataset.built = '';
+    d.classList.add('open');
     document.getElementById('hs-drawer-backdrop').classList.add('open');
     renderPotaDrawer();
 }
@@ -9636,6 +9813,7 @@ function fetchSotaForCard() {
         if (data && !data.error) {
             sotaCardData = data;
             renderPotaCard();
+            renderPotaDrawer();
         }
     }).catch(() => {});
 }
@@ -9644,6 +9822,7 @@ function fetchRbnForCard() {
     fetch('/api/rbn_spots').then(r => r.json()).then(data => {
         rbnCardData = data;
         renderPotaCard();
+        renderPotaDrawer();
     }).catch(() => {});
 }
 function fetchDxClusterForCard() {
@@ -9651,6 +9830,7 @@ function fetchDxClusterForCard() {
     fetch('/api/dxcluster_spots').then(r => r.json()).then(data => {
         dxCardData = data;
         renderPotaCard();
+        renderPotaDrawer();
     }).catch(() => {});
 }
 if (SHOW_POTA) {

@@ -7903,6 +7903,30 @@ config for per-integration credentials; put it in
     optional, to get a meaningful reading) / 318px with the toggle on --
     matching the mockup's own measured 306/306/318 nearly exactly.
 
+- **The Spots card's side drawer became a two-tab "Browse" drawer (v4.90)
+  -- mockup-approved "Option B" (one entry button, tabs inside) over a
+  second header pill.** The card's `pota-gear` button is now `☰ Browse`
+  (id `pota-gear-btn` kept, since its hunter-stats tooltip logic keys off
+  it). `#pota-drawer` has a **Spots** tab (default) and a **POTA Stats**
+  tab (the old content, moved verbatim into `potaStatsBodyHtml()`).
+  - **The drawer's filter state is its own** (`potaDrawerSrc`/`Mode`/
+    `Sort`/`Search`), seeded from the card's `spotsFilter` on each open, so
+    narrowing in the drawer never disturbs the card's teaser list. Search
+    matches callsign + reference + park/summit name across all four feeds
+    (the card's own search icon only matches callsign).
+  - **The shell is built once per tab switch, not per poll** --
+    `renderPotaDrawer()` checks `d.dataset.built` and, for the Spots tab,
+    only calls `potaDrawerUpdateList()` (rewrites chips/count/list, never
+    the `<input>`), same "don't destroy a focused input on a poll tick"
+    reasoning as the ASL Control drawer. Verified live: caret/value
+    survive a forced re-render. `fetchSotaForCard`/`fetchRbnForCard`/
+    `fetchDxClusterForCard` now also call `renderPotaDrawer()` since the
+    list spans all four feeds, not just `/api/pota`.
+  - Rows reuse `potaSpotHtml()`/`firehoseSpotHtml()` verbatim (tap-to-tune
+    included); RBN/DX rows are capped at `POTA_DRAWER_FIREHOSE_MAX` (60),
+    POTA/SOTA never. Mode chips are computed from modes actually present
+    (FT4->FT8, USB/LSB->SSB grouped), top 5 by count.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
