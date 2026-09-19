@@ -44,6 +44,7 @@ from aurora import AuroraClient
 from pota import PotaClient
 from rigctl import RigctlClient
 from rig_panel import RigPanelPoller
+from wfweb_power import WfwebPowerClient
 from sota import SotaClient
 from psk_reporter import PskReporterClient
 from repeaters import RepeaterDirectoryClient
@@ -103,6 +104,11 @@ rig_client      = RigctlClient()
 # path. Its own background thread (started in main()); reconfigured from
 # settings by _rebuild_rig_panel() below.
 rig_panel_poller = RigPanelPoller()
+# wfweb's own native WebSocket connection (Power On/Off + LAN Disconnect/
+# Reconnect on the Rig Panel card) -- a completely separate connection/
+# port/protocol from rig_panel_poller's rigctld socket above, even though
+# both typically point at the same physical rig. See wfweb_power.py.
+wfweb_power_client = WfwebPowerClient()
 sota_client     = SotaClient()
 psk_reporter    = PskReporterClient()
 repeater_client = RepeaterDirectoryClient()
@@ -348,6 +354,20 @@ def _rebuild_rig_panel() -> None:
     )
 
 _rebuild_rig_panel()
+
+
+def _rebuild_wfweb_power() -> None:
+    """(Re)point the wfweb-native power/LAN WebSocket at the current
+    settings -- same hot-swap-on-settings-save pattern as every other
+    integration client here. Independent of _rebuild_rig_panel() above --
+    a different connection/port/protocol to (typically) the same rig."""
+    s = load_settings()
+    wfweb_power_client.configure(
+        s.get("wfweb_power_enabled"), s.get("wfweb_host", ""),
+        s.get("wfweb_port", 8080), s.get("wfweb_use_ssl", True),
+    )
+
+_rebuild_wfweb_power()
 
 import radioid as radioid_mod
 import aprs as aprs_mod
@@ -739,6 +759,17 @@ def api_settings_post():
             pass
     if "rig_send_mode" in data:
         settings["rig_send_mode"] = bool(data["rig_send_mode"])
+    if "wfweb_power_enabled" in data:
+        settings["wfweb_power_enabled"] = bool(data["wfweb_power_enabled"])
+    if "wfweb_host" in data:
+        settings["wfweb_host"] = data["wfweb_host"].strip()
+    if "wfweb_port" in data:
+        try:
+            settings["wfweb_port"] = max(1, min(65535, int(data["wfweb_port"])))
+        except (TypeError, ValueError):
+            pass
+    if "wfweb_use_ssl" in data:
+        settings["wfweb_use_ssl"] = bool(data["wfweb_use_ssl"])
     if "show_rig_panel" in data:
         settings["show_rig_panel"] = bool(data["show_rig_panel"])
     if "rig_panel_position" in data:
@@ -922,6 +953,8 @@ def api_settings_post():
                                "rig_pa_alert_pct", "rig_pa_temp_cal",
                                "show_qrz_quick_log")):
         _rebuild_rig_panel()
+    if any(k in data for k in ("wfweb_power_enabled", "wfweb_host", "wfweb_port", "wfweb_use_ssl")):
+        _rebuild_wfweb_power()
     return jsonify({"ok": True})
 
 
@@ -2173,6 +2206,44 @@ def api_rig_pa_alerts():
     card's 'rig_pa' source, plus whether the poller is currently
     connected (for the source pill's dot). See rig_panel.py."""
     return jsonify(rig_panel_poller.pa_alert_status())
+
+@app.route("/api/wfweb_power")
+def api_wfweb_power():
+    """Live wfweb-native power/LAN status for the Rig Panel card's
+    Power On/Off + LAN control -- a completely separate WebSocket
+    connection from the rigctld poller above. See wfweb_power.py."""
+    return jsonify(wfweb_power_client.status())
+
+@app.route("/api/wfweb_power_action", methods=["POST"])
+def api_wfweb_power_action():
+    """Power on/off or LAN disconnect/reconnect via wfweb's own native
+    WebSocket protocol -- see wfweb_power.py."""
+    settings = load_settings()
+    if not settings.get("wfweb_power_enabled"):
+        return jsonify({"ok": False, "message": "wfweb power control is turned off"}), 400
+    data = request.json or {}
+    actions = {
+        "power_on": (lambda: wfweb_power_client.set_power(True), "Power-on sent"),
+        "power_off": (lambda: wfweb_power_client.set_power(False), "Power-off sent"),
+        "disconnect_lan": (lambda: wfweb_power_client.disconnect_lan(), "LAN disconnect sent"),
+        "reconnect_lan": (lambda: wfweb_power_client.reconnect_lan(), "LAN reconnect sent"),
+    }
+    entry = actions.get(data.get("action"))
+    if entry is None:
+        return jsonify({"ok": False, "message": "Unknown action"}), 400
+    fn, ok_message = entry
+    ok, err = fn()
+    return jsonify({"ok": ok, "message": ok_message if ok else err})
+
+@app.route("/api/test_wfweb_power", methods=["POST"])
+def test_wfweb_power():
+    """Test reachability of wfweb's own native WebSocket for the
+    Settings 'Test connection' button -- see wfweb_power.py."""
+    data = request.json or {}
+    ok, message = WfwebPowerClient.test_connection(
+        data.get("host", ""), data.get("port") or 8080, data.get("use_ssl", True),
+    )
+    return jsonify({"success": ok, "message": message})
 
 @app.route("/api/sota_spots")
 def api_sota_spots():

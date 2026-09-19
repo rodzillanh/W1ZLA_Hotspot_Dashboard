@@ -1673,6 +1673,53 @@
     </div>
 
     <div class="section">
+        <div class="section-title">wfweb power / LAN control
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — adds a power icon + LAN row to the Rig Panel card
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            <a href="https://github.com/adecarolis/wfweb" target="_blank" rel="noopener"
+               style="color:var(--link)">wfweb</a> exposes its own Power On/Off and
+            LAN Disconnect/Reconnect over a WebSocket connection to its web UI —
+            a separate connection from the <b>rigctld</b> one above, and usually on a
+            different port (its web UI port, often <code>8080</code>, not rigctld's <code>4532</code>).
+            This is a wfweb-specific feature — a generic <code>rigctld</code> server has no
+            equivalent. wfweb's own TLS certificate is normally self-signed, so this
+            connects without verifying it — same trusted-LAN assumption as every other
+            rig/hotspot integration here.
+        </p>
+        <div class="toggle-group" style="margin-bottom:10px">
+            <div class="toggle-row">
+                <span class="toggle-label">Enable Power On/Off + LAN control on the Rig Panel card</span>
+                <div class="toggle {{ 'on' if settings.get('wfweb_power_enabled') else '' }}"
+                     id="wfweb-pwr-enabled-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Connect with <code>wss://</code> (SSL — wfweb's default)</span>
+                <div class="toggle {{ 'on' if settings.get('wfweb_use_ssl', True) else '' }}"
+                     id="wfweb-pwr-ssl-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>wfweb web UI host</label>
+                <input type="text" id="wfweb-pwr-host" placeholder="192.168.1.44"
+                       value="{{ settings.get('wfweb_host', '') }}">
+            </div>
+            <div>
+                <label>Port</label>
+                <input type="text" id="wfweb-pwr-port" placeholder="8080" style="width:90px"
+                       value="{{ settings.get('wfweb_port', 8080) }}">
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveWfwebPower()">Save wfweb power settings</button>
+        <button class="btn btn-info" onclick="testWfwebPower()">Test connection</button>
+        <span class="status-txt" id="wfweb-pwr-status"></span>
+    </div>
+
+    <div class="section">
         <div class="section-title">HamAlert
             <span style="font-size:10px;color:var(--text-dim);font-weight:400;
                          text-transform:none;letter-spacing:0;margin-left:6px">
@@ -3938,6 +3985,45 @@ async function testRigControl() {
             body: JSON.stringify({
                 host: document.getElementById('rig-host').value.trim(),
                 port: parseInt(document.getElementById('rig-port').value, 10) || 4532,
+            })
+        });
+        const data = await r.json();
+        status.textContent = (data.success ? '✓ ' : '✕ ') + data.message;
+        status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
+    } catch (e) {
+        status.textContent = '✕ ' + e;
+        status.style.color = 'var(--danger)';
+    }
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
+}
+
+// --- wfweb power / LAN control (separate WebSocket from rigctld above) ---
+function saveWfwebPower() {
+    const status = document.getElementById('wfweb-pwr-status');
+    fetch('/api/settings', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            wfweb_power_enabled: document.getElementById('wfweb-pwr-enabled-toggle').classList.contains('on'),
+            wfweb_use_ssl: document.getElementById('wfweb-pwr-ssl-toggle').classList.contains('on'),
+            wfweb_host: document.getElementById('wfweb-pwr-host').value.trim(),
+            wfweb_port: parseInt(document.getElementById('wfweb-pwr-port').value, 10) || 8080,
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved'; status.style.color = '';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+async function testWfwebPower() {
+    const status = document.getElementById('wfweb-pwr-status');
+    status.textContent = 'Testing...'; status.style.color = '';
+    try {
+        const r = await fetch('/api/test_wfweb_power', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                host: document.getElementById('wfweb-pwr-host').value.trim(),
+                port: parseInt(document.getElementById('wfweb-pwr-port').value, 10) || 8080,
+                use_ssl: document.getElementById('wfweb-pwr-ssl-toggle').classList.contains('on'),
             })
         });
         const data = await r.json();

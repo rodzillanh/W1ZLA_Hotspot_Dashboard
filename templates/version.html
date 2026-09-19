@@ -117,12 +117,32 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.85 "Burnette"</span>
+                <span class="release-version">v4.86 "Ocasek"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
             </div>
             <ul class="change-list">
+                <li><span>New: Power On/Off + LAN Disconnect/Reconnect on the Rig Panel card, for <a href="https://github.com/adecarolis/wfweb" target="_blank" rel="noopener">wfweb</a> users</span> — a separate WebSocket connection to wfweb's own native protocol (not the generic rigctld one this app already speaks for tap-to-tune), confirmed directly from wfweb's own source. A new ⏻ icon in the card's header powers the radio off (with a confirmation first) when it's on, and the card body switches to a "Radio is powered off → Power On" prompt when it's off — wfweb keeps its own connection to the radio's LAN session independent of the radio's power state, which is exactly what makes remote Power On possible at all. A LAN connected/disconnected row with its own Disconnect/Reconnect button sits below the card regardless of power state. Off by default — opt in under Settings → Integrations → "wfweb power / LAN control"</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.85 "Burnette"</span>
+                <span class="release-date">September 2026</span>
+            </div>
+            <ul class="change-list">
                 <li><span>Fix: DX cluster (and RBN) spots silently dropped when a spot carried an alert bell</span> — some DX cluster software appends control characters (e.g. an audible "BEL" byte) to certain spots to flag them, which a plain whitespace-only trim doesn't remove. That left the control character attached right after the timestamp, and the spot-line parser's own end-of-line check silently rejected the whole line as unrecognized — dropping a real, valid spot with no error anywhere. Confirmed live against a real spot from dx.w1nr.net; fixed in both the DX cluster and RBN parsers, which share the same pattern</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.84 "Ayers"</span>
+                <span class="release-date">September 2026</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fix: QRZ Logbook confirmations almost never actually came back</span> — the confirmation re-check sent QRZ a malformed request (the list of logids to re-check was nested inside the OPTION field with commas, instead of QRZ's own documented top-level LOGIDS field), so a sweep of 36 pending QSOs got exactly 1 back, and not even one that was actually requested. Fixed by sending LOGIDS as its own field, cross-checked against real third-party QRZ Logbook client source rather than trusting a single AI-summarized reading of QRZ's docs, which gave the wrong shape the first time</li>
             </ul>
         </div>
 

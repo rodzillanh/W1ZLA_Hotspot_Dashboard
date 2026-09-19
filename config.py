@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.85"
+APP_VERSION = "4.86"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -244,6 +244,8 @@ VERSION_CODENAMES = [
                         # member of Soft Machine (1944-2013)
     "Burnette",         # v4.85 -- Johnny Burnette, rockabilly pioneer,
                         # Rock 'n Roll Trio (1934-1964)
+    "Ocasek",           # v4.86 -- Ric Ocasek, singer/guitarist and
+                        # principal songwriter of The Cars (1944-2019)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1497,6 +1499,21 @@ DEFAULT_SETTINGS = {
     "rig_host": "",
     "rig_port": 4532,
     "rig_send_mode": True,
+    # wfweb-native Power On/Off + LAN Disconnect/Reconnect (v4.86) -- a
+    # SEPARATE connection from the rigctld one above: wfweb's own
+    # WebSocket protocol (confirmed live from its actual source, see
+    # wfweb_power.py), used because rigctld has no concept of powering
+    # the rig on/off or managing wfweb's own LAN session to it.
+    # `wfweb_host`/`wfweb_port` is wfweb's web UI (the WebSocket shares
+    # that same port when SSL is on, confirmed from source -- NOT the
+    # separate REST-only port). Off by default -- most installs never
+    # need this, and it requires wfweb specifically (not every rigctld
+    # server has an equivalent). Not a credential, same trusted-LAN
+    # assumption as rig_host itself.
+    "wfweb_power_enabled": False,
+    "wfweb_host": "",
+    "wfweb_port": 8080,
+    "wfweb_use_ssl": True,
     # HF Favorites card (v4.50) -- a tap-to-tune memory bank (80m-6m
     # common activity frequencies), each row a button that drives the
     # same rigctld path as the POTA card. The favorites list itself

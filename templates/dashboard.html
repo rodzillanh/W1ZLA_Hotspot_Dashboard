@@ -1649,6 +1649,27 @@
             padding: 2px 7px; border-radius: 4px; }
         .rp-txtag.rx { color: var(--good); border: 1px solid color-mix(in srgb, var(--good) 45%, var(--border)); }
         .rp-txtag.tx { color: #fff; background: var(--danger); animation: rigPulse 1s ease-in-out infinite; }
+        /* wfweb-native Power On/Off + LAN Disconnect/Reconnect (v4.86) */
+        .rp-power-icon-btn { appearance: none; border: 1px solid var(--border); background: var(--panel-2); color: var(--text-muted);
+            border-radius: 20px; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 12px; }
+        .rp-power-icon-btn:hover { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+        .rp-poweroff-prompt { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 30px 10px 20px; text-align: center; }
+        .rp-poweroff-icon { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--text-dim);
+            display: flex; align-items: center; justify-content: center; font-size: 18px; color: var(--text-dim); }
+        .rp-poweroff-prompt .msg { font-size: 12.5px; color: var(--text-muted); }
+        .rp-power-btn { appearance: none; border: 1px solid color-mix(in srgb, var(--live) 50%, var(--border));
+            background: var(--live-dim); color: var(--live); border-radius: 8px; font: inherit; font-size: 13px; font-weight: 700;
+            padding: 8px 18px; cursor: pointer; }
+        .rp-power-btn:hover { background: color-mix(in srgb, var(--live) 22%, transparent); }
+        .rp-lan-row { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            padding-top: 8px; border-top: 1px solid var(--border-soft); margin-top: 7px; }
+        .rp-lan-status { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px; }
+        .rp-lan-status .d { width: 6px; height: 6px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent); }
+        .rp-lan-status.down .d { background: var(--text-muted); box-shadow: none; }
+        .rp-lan-btn { appearance: none; border: 1px solid var(--border); background: var(--panel-2); color: var(--text-muted);
+            border-radius: 6px; font: inherit; font-size: 10.5px; font-weight: 600; padding: 4px 10px; cursor: pointer; }
+        .rp-lan-btn:hover { color: var(--text); border-color: var(--text-muted); }
         /* Operating Timeline (drawer) */
         .rp-tl { display: flex; flex-direction: column; }
         .rp-tl-row { display: grid; grid-template-columns: 84px 70px 1fr auto; gap: 9px; align-items: baseline;
@@ -3540,6 +3561,10 @@
                 <div class="card-name">📻 Rig Panel</div>
                 <div style="display:flex;align-items:center;gap:8px">
                     <span class="rp-pill" id="rp-pill"><span class="d"></span><span id="rp-pill-txt">rig</span></span>
+                    {% if settings.get('wfweb_power_enabled') %}
+                    <button class="rp-power-icon-btn" id="rp-pwr-btn" type="button"
+                            onclick="wfwebPowerToggle()" title="Power the radio off" style="display:none">⏻</button>
+                    {% endif %}
                     <button class="pota-gear" type="button" onclick="openRigPanelDrawer()">⚙</button>
                 </div>
             </div>
@@ -4276,6 +4301,7 @@ const HF_FAV_FILTER_KEY = 'w1zla_hf_fav_filter';
 const SHOW_RIG_PANEL = {{ 'true' if settings.get('show_rig_panel', False) else 'false' }};
 const RIG_PANEL_POSITION = {{ settings.get('rig_panel_position', 0) }};
 const RIG_PANEL_POLL_MS = 1000;
+const WFWEB_POWER_ENABLED = {{ 'true' if settings.get('wfweb_power_enabled', False) else 'false' }};
 const SHOW_QRZ_QUICK_LOG = {{ 'true' if settings.get('show_qrz_quick_log', False) else 'false' }};
 const QRZ_QUICK_LOG_POSITION = {{ settings.get('qrz_quick_log_position', 0) }};
 const SHOW_BEACONS = {{ 'true' if settings.get('show_beacons', False) else 'false' }};
@@ -9883,6 +9909,7 @@ if (SHOW_HF_FAVORITES) {
 // Fed by /api/rig_panel (rig_panel.py's persistent rigctld poller).
 let rigPanelData = null;
 let rpTxStart = null;
+let wfwebPowerData = null;  // wfweb-native power/LAN status -- see wfweb_power.py
 
 function rpBar(frac, cls) {
     const N = 16, on = Math.max(0, Math.min(N, Math.round((frac || 0) * N)));
@@ -9932,10 +9959,39 @@ function renderRigPanelCard() {
     document.getElementById('rp-pill-txt').textContent = s.reachable ? 'rig' : 'rig offline';
     pill.title = s.reachable ? 'rigctld poller connected' : (s.error || 'Rig server not reachable');
 
+    // wfweb-native power/LAN status is fetched independently from the
+    // rigctld snapshot above (see fetchWfwebPower()) -- powerState and
+    // lanConnected are independent booleans on wfweb's own side too
+    // (confirmed from its source, wfweb_power.py's own docstring), so
+    // the LAN row can show "connected" even while the radio itself is
+    // reported off.
+    const wp = wfwebPowerData;
+    const pwrBtn = document.getElementById('rp-pwr-btn');
+    if (pwrBtn) pwrBtn.style.display = (wp && wp.connected && wp.power_state === true) ? '' : 'none';
+    const lanRow = (wp && wp.connected && wp.lan_connected != null) ? `
+        <div class="rp-lan-row">
+            <span class="rp-lan-status${wp.lan_connected ? '' : ' down'}"><span class="d"></span>LAN ${wp.lan_connected ? 'connected' : 'disconnected'}</span>
+            <button type="button" class="rp-lan-btn" onclick="wfwebPowerAction('${wp.lan_connected ? 'disconnect_lan' : 'reconnect_lan'}')">${wp.lan_connected ? 'Disconnect' : 'Reconnect'}</button>
+        </div>` : '';
+
+    if (wp && wp.connected && wp.power_state === false) {
+        // wfweb reports the radio itself as off -- show this regardless
+        // of rigctld's own reachability, since it's the more specific
+        // and more actionable of the two (and rigctld may well also be
+        // unreachable in this exact state, since the radio is off).
+        rpTxStart = null;
+        body.innerHTML = `<div class="rp-poweroff-prompt">
+            <div class="rp-poweroff-icon">⏻</div>
+            <div class="msg">Radio is powered off</div>
+            <button type="button" class="rp-power-btn" onclick="wfwebPowerAction('power_on')">Power On</button>
+        </div>${lanRow}`;
+        return;
+    }
+
     if (!s.reachable) {
         rpTxStart = null;
         body.innerHTML = `<div class="rp-empty">Rig server not reachable${s.error ? ' — ' + escapeHtml(s.error) : ''}.<br>
-            Check Settings → Integrations → Rig control.</div>`;
+            Check Settings → Integrations → Rig control.</div>${lanRow}`;
         return;
     }
 
@@ -10025,7 +10081,8 @@ function renderRigPanelCard() {
         ${txMeters}
         ${paRow}
         ${pillRow}
-        ${foot}`;
+        ${foot}
+        ${lanRow}`;
 }
 
 function renderRigPanelDrawer() {
@@ -10081,10 +10138,48 @@ function fetchRigPanel() {
         renderRigPanelDrawer();
         renderQuickLogCard();
     }).catch(() => {});
+    // The Power On/Off + LAN row is an add-on to the Rig Panel card
+    // specifically -- it has nowhere to render if that card itself is
+    // hidden, so this only fires alongside SHOW_RIG_PANEL, not
+    // SHOW_QRZ_QUICK_LOG.
+    if (SHOW_RIG_PANEL && WFWEB_POWER_ENABLED) fetchWfwebPower();
 }
 if (SHOW_RIG_PANEL || SHOW_QRZ_QUICK_LOG) {
     fetchRigPanel();
     setInterval(fetchRigPanel, RIG_PANEL_POLL_MS);
+}
+
+// --- wfweb-native Power On/Off + LAN Disconnect/Reconnect (v4.86) ---
+// A separate WebSocket connection from the rigctld poller above -- see
+// wfweb_power.py's own docstring for the full protocol.
+function fetchWfwebPower() {
+    fetch('/api/wfweb_power').then(r => r.json()).then(d => {
+        wfwebPowerData = d;
+        renderRigPanelCard();
+    }).catch(() => {});
+}
+
+function wfwebPowerToggle() {
+    // The header ⏻ icon only shows while the radio is confirmed on (see
+    // renderRigPanelCard()), so this is always a power-OFF request --
+    // confirmed first, matching ASL Control's Disconnect All pattern,
+    // since this is a genuinely disruptive action with no per-instance
+    // data to interpolate (a plain confirm() is safe here).
+    if (!wfwebPowerData || wfwebPowerData.power_state !== true) return;
+    if (!confirm('Power off the radio?')) return;
+    wfwebPowerAction('power_off');
+}
+
+function wfwebPowerAction(action) {
+    fetch('/api/wfweb_power_action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: action }),
+    }).then(r => r.json()).then(d => {
+        rigToast(d.message || (d.ok ? 'Done' : 'Action failed'), d.ok ? 'ok' : 'err');
+        setTimeout(fetchWfwebPower, 600);
+    }).catch(() => {
+        rigToast('No response from the dashboard', 'err');
+    });
 }
 
 // --- QRZ Quick Log card ---
