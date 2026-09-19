@@ -1486,6 +1486,7 @@
         .pota-d-chips .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); margin: 0 2px 0 6px; }
         .pota-d-chips .lbl:first-child { margin-left: 0; }
         .pota-d-countline { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); margin: 10px 0 2px; }
+        .pota-d-selects { display: flex; gap: 6px; }
         .pota-d-countline select { background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: 10.5px; padding: 2px 6px; cursor: pointer; }
         #pota-d-list mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); border-radius: 2px; padding: 0 1px; }
         .pota-d-empty { padding: 30px 0; text-align: center; font-size: 12px; color: var(--text-muted); }
@@ -9634,6 +9635,7 @@ function potaStatsBodyHtml() {
 let potaDrawerTab = 'spots';
 let potaDrawerSearch = '';
 let potaDrawerMode = '';
+let potaDrawerBand = '';
 let potaDrawerSort = 'smart';
 let potaDrawerSrc = { pota: true, sota: true, rbn: false, dx: false };
 const POTA_DRAWER_FIREHOSE_MAX = 60;
@@ -9681,7 +9683,7 @@ function potaDrawerShell(d) {
     d.innerHTML = `
         <div class="hs-drawer-header">
             <div class="hs-drawer-title-row">
-                <div class="hs-drawer-title">📡 Spots <span style="font-family:var(--font-mono);font-size:13px">${escapeHtml(call)}</span></div>
+                <div class="hs-drawer-title">📡 Spots${potaData && potaData.callsign ? ` <span class="pota-call-chip">${escapeHtml(call)}</span>` : ''}</div>
                 <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
             </div>
             <div class="hs-drawer-sub">POTA · SOTA${RBN_ENABLED ? ' · RBN' : ''}${DXCLUSTER_ENABLED ? ' · DX' : ''}</div>
@@ -9701,9 +9703,11 @@ function potaDrawerShell(d) {
             </div>
             <div class="pota-d-chips" id="pota-d-chips"></div>
             <div class="pota-d-countline"><span id="pota-d-count"></span>
+                <span class="pota-d-selects">
+                <select id="pota-d-band" onchange="potaDrawerBand=this.value; potaDrawerUpdateList()"></select>
                 <select id="pota-d-sort" onchange="potaDrawerSort=this.value; potaDrawerUpdateList()">
                     <option value="smart">Smart rank</option><option value="near">Nearest</option><option value="fresh">Freshest</option>
-                </select></div>
+                </select></span></div>
             <div id="pota-d-list"></div>`;
         document.getElementById('pota-d-sort').value = potaDrawerSort;
     }
@@ -9731,6 +9735,19 @@ function potaDrawerUpdateList() {
     all.forEach(i => { if (i.mode) modeCounts[i.mode] = (modeCounts[i.mode] || 0) + 1; });
     const modes = Object.keys(modeCounts).sort((a, b) => modeCounts[b] - modeCounts[a]).slice(0, 5);
     if (potaDrawerMode && !modes.includes(potaDrawerMode)) potaDrawerMode = '';
+    // Band select: bands present, low to high. Options are only rewritten
+    // when the set changes, so a poll tick can't close an open dropdown.
+    const bandOrder = SPOTS_BAND_EDGES_MHZ.map(b => b[2]);
+    const bands = Array.from(new Set(all.map(i => i.band).filter(Boolean)))
+        .sort((a, b) => (bandOrder.indexOf(a) + 1 || 99) - (bandOrder.indexOf(b) + 1 || 99));
+    if (potaDrawerBand && !bands.includes(potaDrawerBand)) potaDrawerBand = '';
+    const bandSel = document.getElementById('pota-d-band');
+    const bandSig = bands.join(',');
+    if (bandSel.dataset.sig !== bandSig) {
+        bandSel.innerHTML = '<option value="">All bands</option>' + bands.map(b => `<option value="${b}">${b}</option>`).join('');
+        bandSel.dataset.sig = bandSig;
+    }
+    bandSel.value = potaDrawerBand;
     document.getElementById('pota-d-chips').innerHTML =
         '<span class="lbl">Source</span>'
         + srcs.map(p => `<span class="spots-filter-chip${potaDrawerSrc[p.toLowerCase()] ? ' active' : ''}" onclick="potaDrawerToggleSrc('${p.toLowerCase()}')">${p}<span class="n">${srcCounts[p] || 0}</span></span>`).join('')
@@ -9740,6 +9757,7 @@ function potaDrawerUpdateList() {
 
     let list = all.filter(i => potaDrawerSrc[i.prog.toLowerCase()]);
     if (potaDrawerMode) list = list.filter(i => i.mode === potaDrawerMode);
+    if (potaDrawerBand) list = list.filter(i => i.band === potaDrawerBand);
     if (term) list = list.filter(i => [i.call, i.ref, i.park].some(v => v.toLowerCase().includes(term)));
     const total = list.length;
 
@@ -9795,6 +9813,7 @@ function openPotaDrawer(tab) {
     potaDrawerTab = tab || 'spots';
     potaDrawerSearch = '';
     potaDrawerMode = '';
+    potaDrawerBand = '';
     potaDrawerSrc = Object.assign({ pota: true, sota: true, rbn: false, dx: false }, spotsFilter);
     const d = document.getElementById('pota-drawer');
     d.dataset.built = '';
