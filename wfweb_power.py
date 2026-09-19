@@ -66,6 +66,7 @@ import websocket
 
 RECV_TIMEOUT = 30
 RECONNECT_BACKOFF = 10
+STATUS_POLL_INTERVAL = 1.5
 
 
 def _as_int(v):
@@ -78,6 +79,7 @@ def _as_int(v):
 class WfwebPowerClient:
     def __init__(self):
         self._lock = threading.Lock()
+        self._send_lock = threading.Lock()  # serializes ws.send() across the pinger thread and _send()
         self._host = ""
         self._port = 8080
         self._use_ssl = True
@@ -158,7 +160,8 @@ class WfwebPowerClient:
         if not connected or ws is None:
             return False, "Not connected to wfweb"
         try:
-            ws.send(json.dumps(obj))
+            with self._send_lock:
+                ws.send(json.dumps(obj))
             return True, None
         except Exception as e:
             return False, str(e)
@@ -227,6 +230,7 @@ class WfwebPowerClient:
         ws = websocket.create_connection(
             f"{scheme}://{host}:{port}/", timeout=RECV_TIMEOUT, sslopt=sslopt,
         )
+        stop_pinger = threading.Event()
         try:
             with self._lock:
                 if gen != self._gen:
@@ -234,6 +238,9 @@ class WfwebPowerClient:
                 self._ws = ws
                 self._connected = True
                 self._last_error = None
+            threading.Thread(
+                target=self._status_pinger, args=(gen, stop_pinger), daemon=True,
+            ).start()
             while True:
                 with self._lock:
                     if gen != self._gen:
@@ -259,6 +266,7 @@ class WfwebPowerClient:
                         return
                 self._handle_message(msg)
         finally:
+            stop_pinger.set()
             with self._lock:
                 if self._ws is ws:
                     self._ws = None
@@ -267,6 +275,31 @@ class WfwebPowerClient:
                 ws.close()
             except Exception:
                 pass
+
+    def _status_pinger(self, gen, stop_event):
+        """wfweb's own cached frequency/mode/VFO doesn't appear to
+        free-run on its own -- confirmed live (2026-09) that a passive
+        listener with no browser tab open sees whatever value wfweb had
+        at connect time and never again, even while the operator
+        visibly retunes the rig in wfweb's own web UI at the same time.
+        wfweb's source hints at why: sendCurrentState()'s own comment
+        calls out needing an explicit requestVfoUpdate() after a LAN
+        reconnect specifically because the cache doesn't refresh on its
+        own -- something has to actively prompt it.
+
+        Sending {"cmd":"getStatus"} on a steady interval is this
+        module's best current attempt at reproducing whatever keeps the
+        browser's own tab fresh -- NOT confirmed as the real mechanism,
+        since there's no live wfweb instance in this dev environment to
+        verify against. If frequency still goes stale with this in
+        place, the actual mechanism is something else (e.g. a specific
+        VFO-read command, not the generic status request) and this
+        needs revisiting against a real capture, not another guess."""
+        while not stop_event.wait(STATUS_POLL_INTERVAL):
+            with self._lock:
+                if gen != self._gen:
+                    return
+            self._send({"cmd": "getStatus"})
 
     def _handle_message(self, msg):
         if not isinstance(msg, dict):

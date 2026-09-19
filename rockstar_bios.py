@@ -601,6 +601,11 @@ BIOS = {
         "blurb": "Canadian folk-rock singer-songwriter behind enduring hits like 'Sundown' and 'If You Could Read My Mind'.",
         "wiki": "Gordon_Lightfoot",
     },
+    "Slovak": {
+        "name": "Hillel Slovak",
+        "blurb": "Original guitarist and founding member of Red Hot Chili Peppers, whose funk-punk riffing shaped the band's earliest sound.",
+        "wiki": "Hillel_Slovak",
+    },
 }
 
 
