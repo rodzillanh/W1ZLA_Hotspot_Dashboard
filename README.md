@@ -2351,6 +2351,9 @@ untouched. It's a single-column layout with a bottom tab bar:
 - **Digital links** (button on WPSD cards with Brandmeister or
   ircDDBGateway set up) — link or unlink Brandmeister static talkgroups and
   D-STAR reflectors, with your saved favorites as one-tap chips.
+- **Notifications** (top of the Activity tab) — the same sources as the
+  desktop Notifications card in one newest-first list, with source chips and
+  an unread count that's remembered per phone.
 - **SSTV** and **Spots** (Activity tab rows, shown when those cards are
   enabled) — the SSTV picture / live preview / gallery with Listen now and
   Stop, and POTA / SOTA / DX / RBN spots with search and an optional Tune

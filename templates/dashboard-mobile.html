@@ -517,6 +517,21 @@
     .sp-tune { padding:5px 10px; border-radius:8px; border:1px solid color-mix(in srgb, var(--live) 55%, var(--border));
         background:transparent; color:var(--live); font-size:11.5px; font-weight:600; cursor:pointer; }
 
+    /* Notifications feed */
+    #notif-screen { position:fixed; inset:0; z-index:35; background:var(--bg); display:none; flex-direction:column; }
+    #notif-screen.open { display:flex; }
+    .nf-badge { margin-left:auto; min-width:20px; padding:2px 7px; border-radius:10px; background:var(--accent);
+        color:var(--accent-ink,#241a06); font-size:11px; font-weight:700; text-align:center; }
+    .nf-row { border:1px solid var(--border); border-radius:10px; background:var(--panel); padding:10px 12px; margin-bottom:8px; }
+    .nf-row.unread { border-left:3px solid var(--live); }
+    .nf-top { display:flex; align-items:center; gap:8px; }
+    .nf-ic { flex:0 0 auto; }
+    .nf-who { font-family:var(--font-mono); font-size:13px; font-weight:600; flex:1; min-width:0;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .nf-time { font-family:var(--font-mono); font-size:11px; color:var(--text-dim); flex:0 0 auto; }
+    .nf-text { margin-top:4px; font-size:12.5px; color:var(--text-muted); word-break:break-word; }
+    .nf-extra { margin-top:3px; font-size:11px; color:var(--text-dim); }
+
     /* confirm-tap modal (reuses the PIN modal's box) */
     #confirm-modal { position:fixed; inset:0; z-index:61; background:rgba(4,6,10,.6);
         display:none; align-items:center; justify-content:center; padding:24px; }
@@ -686,6 +701,19 @@
         </section>
 
         <section data-tab="activity">
+            {% set nf_any = settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False) or settings.get('qrz_logbook_enabled', False) or settings.get('rig_pa_alert_enabled', False) %}
+            {% if nf_any %}
+            <div class="sec-label">Notifications</div>
+            <button class="ql-entry" id="notif-entry-btn" type="button">
+                <span class="ic">🔔</span>
+                <span>
+                    <div class="tt">Notifications</div>
+                    <div class="sub" id="notif-entry-sub">Checking…</div>
+                </span>
+                <span class="nf-badge" id="notif-badge" style="display:none"></span>
+                <span class="go">›</span>
+            </button>
+            {% endif %}
             {% if settings.get('show_qrz_quick_log', False) %}
             <div class="sec-label">Quick log</div>
             <button class="ql-entry" id="ql-entry-btn" type="button">
@@ -764,6 +792,17 @@
             <span class="ttl">ASL Control</span>
         </div>
         <div class="asl-body" id="asl-body"></div>
+    </div>
+
+    <div id="notif-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="notif-close">‹ Back</button>
+            <span class="ttl">Notifications</span>
+        </div>
+        <div class="asl-body" id="notif-body">
+            <div class="sp-chips" id="nf-chips"></div>
+            <div id="nf-list"><div class="asl-empty">Loading…</div></div>
+        </div>
     </div>
 
     {% if settings.get('show_pota', False) %}
@@ -955,7 +994,7 @@
                 p.classList.toggle("active", p.getAttribute("data-tab") === currentTab);
             });
             window.scrollTo(0, 0);
-            if (currentTab === "activity") { fetchQsos(); if (document.getElementById("ql-entry-btn")) fetchQlRig(); if (document.getElementById("sstv-entry-btn")) fetchSstv(); }
+            if (currentTab === "activity") { fetchQsos(); if (document.getElementById("ql-entry-btn")) fetchQlRig(); if (document.getElementById("sstv-entry-btn")) fetchSstv(); if (document.getElementById("notif-entry-btn")) fetchNotifFeed(); }
             if (currentTab === "more") refreshNotifState();
             if (currentTab === "map") showMap();
         });
@@ -2340,6 +2379,123 @@
             toast(res && res.message ? res.message : (res && res.ok ? "Tuned" : "Failed"));
         });
         fetchSpots();
+    })();
+
+    /* ================= Notifications feed (all sources, newest first) ================= */
+    var NF_SOURCES = {
+        aprs:         { on: {{ 'true' if settings.get('aprs_inbox_enabled', False) else 'false' }}, url: "/api/aprs_inbox", key: "messages", ts: "received_at", ic: "📨", label: "APRS" },
+        hamalert:     { on: {{ 'true' if settings.get('hamalert_enabled', False) else 'false' }}, url: "/api/hamalert", key: "alerts", ts: "received_at", ic: "🔔", label: "HamAlert" },
+        fleet:        { on: {{ 'true' if settings.get('fleet_alerts_enabled', False) else 'false' }}, url: "/api/fleet_events", key: "events", ts: "at", ic: "📡", label: "Hotspots" },
+        solar:        { on: {{ 'true' if settings.get('solar_alerts_enabled', False) else 'false' }}, url: "/api/hf_alerts", key: "events", ts: "at", ic: "☀️", label: "Solar" },
+        brandmeister: { on: {{ 'true' if settings.get('brandmeister_alerts_enabled', False) else 'false' }}, url: "/api/brandmeister_lh", key: "events", ts: "at", ic: "📶", label: "Brandmeister" },
+        qrz:          { on: {{ 'true' if settings.get('qrz_logbook_enabled', False) else 'false' }}, url: "/api/qrz_confirmations", key: "events", ts: "at", ic: "✅", label: "QRZ" },
+        rig:          { on: {{ 'true' if settings.get('rig_pa_alert_enabled', False) else 'false' }}, url: "/api/rig_pa_alerts", key: "events", ts: "at", ic: "📻", label: "Rig" }
+    };
+    var nfData = {}, nfFilter = "all", nfSeenAtOpen = 0, nfTimer = null, nfRendered = "";
+    function nfSeen() { try { return parseFloat(localStorage.getItem("pd-notif-seen") || "0") || 0; } catch (e) { return 0; } }
+    function nfSetSeen(v) { try { localStorage.setItem("pd-notif-seen", String(v)); } catch (e) {} }
+    function nfOpen() { var el = document.getElementById("notif-screen"); return !!(el && el.classList.contains("open")); }
+    function nfAgo(ts) {
+        var s = Math.max(0, Date.now() / 1000 - ts);
+        if (s < 60) return Math.round(s) + "s";
+        if (s < 3600) return Math.round(s / 60) + "m";
+        if (s < 86400) return Math.round(s / 3600) + "h";
+        return Math.round(s / 86400) + "d";
+    }
+
+    function nfItems() {
+        var items = [];
+        Object.keys(NF_SOURCES).forEach(function (k) {
+            var src = NF_SOURCES[k];
+            if (!src.on) return;
+            ((nfData[k] || {})[src.key] || []).forEach(function (e) { items.push({ src: k, ts: e[src.ts] || 0, d: e }); });
+        });
+        items.sort(function (a, b) { return b.ts - a.ts; });
+        return items;
+    }
+
+    function nfRow(it, unread) {
+        var e = it.d, ic = NF_SOURCES[it.src].ic, who = "", text = "", extra = "";
+        if (it.src === "aprs") { who = csLink(e.from) + (e.to ? " → " + esc(e.to) : ""); text = esc(e.message_text || ""); extra = e.acked ? "✓ ack sent" : ""; }
+        else if (it.src === "hamalert") {
+            who = csLink(e.full_callsign || e.callsign);
+            text = esc([e.entity, e.spotter ? "via " + e.spotter : ""].filter(Boolean).join(" · "));
+            extra = esc([e.source, e.frequency ? e.frequency + (e.mode ? " " + e.mode : "") : "", e.trigger_comment].filter(Boolean).join(" · "));
+        } else if (it.src === "fleet") { who = esc(e.name); text = e.kind === "offline" ? "🔴 went offline" : "🟢 back online"; }
+        else if (it.src === "solar") { who = e.kind === "elevated" ? "Geomagnetic storm" : "Conditions normal"; text = "K-index " + Math.round(e.k_index) + (e.kind === "elevated" ? " — G1+ minor storm, HF disturbance possible" : " — back below the G1 threshold"); }
+        else if (it.src === "brandmeister") {
+            who = csLink(e.callsign) + (e.name ? " · " + esc(e.name) : "");
+            text = "Active on Brandmeister" + ([e.destination_name, e.destination_id].filter(Boolean).length ? " — " + esc([e.destination_name, e.destination_id].filter(Boolean).join(" · ")) : "");
+        } else if (it.src === "qrz") { who = csLink(e.call) + (e.band || e.mode ? " · " + esc([e.band, e.mode].filter(Boolean).join(" ")) : ""); text = "Confirmed in your QRZ logbook"; }
+        else if (it.src === "rig") {
+            var lvl = e.temp_c != null ? Math.round(e.temp_c) + "°C" : (e.pct != null ? e.pct + "%" : "");
+            who = e.kind === "high" ? "PA running hot" : "PA cooled down";
+            text = (e.kind === "high" ? "Finals temperature above the alert threshold" : "Finals temperature back below the threshold") + (lvl ? " (" + lvl + ")" : "");
+        }
+        return '<div class="nf-row' + (unread ? " unread" : "") + '"><div class="nf-top"><span class="nf-ic">' + ic + '</span><span class="nf-who">' + who +
+            '</span><span class="nf-time">' + nfAgo(it.ts) + "</span></div>" +
+            (text ? '<div class="nf-text">' + text + "</div>" : "") + (extra ? '<div class="nf-extra">' + extra + "</div>" : "") + "</div>";
+    }
+
+    function renderNotifFeed() {
+        var items = nfItems();
+        var seen = nfOpen() ? nfSeenAtOpen : nfSeen();
+        var unread = items.filter(function (i) { return i.ts > seen; }).length;
+        var sub = document.getElementById("notif-entry-sub"), badge = document.getElementById("notif-badge");
+        if (sub) sub.textContent = items.length ? "Latest " + nfAgo(items[0].ts) + " ago · " + items.length + " total" : "Nothing yet";
+        if (badge) { badge.style.display = unread ? "" : "none"; badge.textContent = unread > 99 ? "99+" : unread; }
+        if (!nfOpen()) return;
+        var counts = {};
+        items.forEach(function (i) { counts[i.src] = (counts[i.src] || 0) + 1; });
+        var keys = Object.keys(counts);
+        document.getElementById("nf-chips").innerHTML = keys.length > 1 ? keys.map(function (k) {
+            return '<button data-src="' + k + '" class="' + (nfFilter === k ? "on" : "") + '">' + NF_SOURCES[k].ic + " " + NF_SOURCES[k].label + " " + counts[k] + "</button>";
+        }).join("") : "";
+        var shown = (nfFilter === "all" || !counts[nfFilter] ? items : items.filter(function (i) { return i.src === nfFilter; })).slice(0, 100);
+        var html = shown.map(function (i) { return nfRow(i, i.ts > seen); }).join("");
+        var list = document.getElementById("nf-list");
+        var sig = html + "|" + nfFilter + "|" + keys.join(",");
+        if (sig !== nfRendered) { nfRendered = sig; list.innerHTML = html || '<div class="asl-empty">No notifications yet.</div>'; }
+    }
+
+    async function fetchNotifFeed() {
+        if (!document.getElementById("notif-entry-btn")) return;
+        await Promise.all(Object.keys(NF_SOURCES).filter(function (k) { return NF_SOURCES[k].on; }).map(function (k) {
+            return fetch(NF_SOURCES[k].url).then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (j) { if (j) nfData[k] = j; }).catch(function () {});
+        }));
+        renderNotifFeed();
+    }
+    function nfPoll() {
+        if (!nfOpen()) { nfTimer = null; return; }
+        nfTimer = setTimeout(function () { fetchNotifFeed().then(nfPoll); }, 15000);
+    }
+    (function () {
+        var eb = document.getElementById("notif-entry-btn");
+        if (!eb) return;
+        eb.onclick = function () {
+            nfSeenAtOpen = nfSeen();
+            document.getElementById("notif-screen").classList.add("open");
+            nfRendered = "";
+            renderNotifFeed();
+            fetchNotifFeed();
+            if (!nfTimer) nfPoll();
+        };
+        document.getElementById("notif-close").onclick = function () {
+            var items = nfItems();
+            if (items.length) nfSetSeen(items[0].ts);
+            document.getElementById("notif-screen").classList.remove("open");
+            renderNotifFeed();
+        };
+        document.getElementById("nf-chips").addEventListener("click", function (e) {
+            var b = e.target.closest("button[data-src]");
+            if (!b) return;
+            nfFilter = nfFilter === b.getAttribute("data-src") ? "all" : b.getAttribute("data-src");
+            nfRendered = "";
+            renderNotifFeed();
+        });
+        fetchNotifFeed();
+        setInterval(function () { if (!nfOpen()) fetchNotifFeed(); }, 60000);
     })();
 
     document.getElementById("cards").addEventListener("click", function (e) {
