@@ -130,6 +130,11 @@ SETTINGS = {
     # same "real free API, not faked" treatment as HF Conditions/
     # Satellites/Band Activity elsewhere in this script.
     "show_repeaters": True,
+    # SSTV card (v4.91) -- shows the seeded picture below; no wfweb here, so
+    # it reads as Standby/last-image, which is exactly the resting view.
+    "show_sstv": True,
+    "wfweb_host": "198.51.100.20",
+    "wfweb_port": 8282,
     # Rig control on so the POTA card screenshot shows the tap-to-tune
     # frequency chips + the reachability pill -- the actual rigctld
     # probe is monkeypatched to a fixed "reachable" reply below (there's
@@ -214,6 +219,33 @@ _write_json(os.path.join(CONFIG_DIR, "hotspots.json"), HOTSPOTS)
 _write_json(os.path.join(CONFIG_DIR, "settings.json"), SETTINGS)
 _write_json(os.path.join(CONFIG_DIR, "asl_favorites.json"), ASL_FAVORITES)
 _write_json(os.path.join(CONFIG_DIR, "qsos.json"), QSOS)
+
+
+def _seed_sstv():
+    """One stored SSTV picture (a synthetic test pattern, not a real
+    transmission) so the SSTV card renders its normal 'last image' view."""
+    from PIL import Image, ImageDraw
+    d = os.path.join(CONFIG_DIR, "sstv")
+    os.makedirs(d, exist_ok=True)
+    im = Image.new("RGB", (320, 256))
+    px = im.load()
+    for y in range(256):
+        for x in range(320):
+            px[x, y] = (int(x * 255 / 319), int(y * 255 / 255), 140)
+    dr = ImageDraw.Draw(im)
+    dr.rectangle([60, 70, 260, 190], outline=(255, 255, 255), width=3)
+    dr.text((100, 120), "CQ SSTV  W1ZLA", fill=(255, 255, 255))
+    im.save(os.path.join(d, "a1b2c3d4e5f6.png"))
+    now = time.time() - 25 * 60
+    _write_json(os.path.join(d, "index.json"), {"rejected": 0, "images": [{
+        "id": "a1b2c3d4e5f6", "ts": now, "started_at": now - 114, "mode": "MARTIN_1",
+        "label": "Martin 1", "width": 320, "height": 256, "duration_s": 114.3,
+        "freq_hz": 14230000, "quality": "good", "structure": 4.0, "contrast": 55.0,
+        "coherence": 0.91, "decoder": "own", "cleaned": False, "complete": True,
+        "offset_hz": 0, "dropped_samples": 0}]})
+
+
+_seed_sstv()
 
 # --- 2. Import app.py -- safe, background threads only ever start inside
 # main() (confirmed by reading app.py's `if __name__ == "__main__":` block
@@ -415,6 +447,7 @@ CARD_SHOTS = [
     ("qrz-quick-log-card", "qrz-quick-log-card.png"),
     ("beacons-card", "beacons-card.png"),
     ("repeaters-card", "repeaters-card.png"),
+    ("sstv-card", "sstv-card.png"),
 ]
 
 with sync_playwright() as p:
@@ -489,7 +522,9 @@ with sync_playwright() as p:
     # would on a real device. Same seeded demo state as everything above.
     mob_ctx = browser.new_context(
         viewport={"width": 390, "height": 844},
-        device_scale_factor=2, is_mobile=True, has_touch=True,
+        # 1x, not 2x: the wiki shows images at native pixel size, so a 2x
+        # phone capture rendered as a 780px-wide slab; 390 matches the viewport.
+        device_scale_factor=1, is_mobile=True, has_touch=True,
     )
     mob = mob_ctx.new_page()
     mob.goto(f"{BASE_URL}/mobile", wait_until="load")

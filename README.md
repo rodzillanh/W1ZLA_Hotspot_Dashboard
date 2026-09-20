@@ -1438,6 +1438,7 @@ miles, adjustable under Settings → Integrations) around your
 
 <!-- wiki-group: Optional Cards -->
 ## SSTV card
+<!-- wiki-image: sstv-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show SSTV card", off by
 default) — a **receive-only slow-scan TV decoder** that shows the last
@@ -1474,7 +1475,19 @@ the Rig Panel's power control uses).
   shown, and pictures that are just static, blank, or that lost audio in
   transit are discarded (counted as "rejected as noise" in the drawer). A
   header alone is not trusted — real 14.230 MHz audio produced headers
-  that decoded to pure static.
+  that decoded to pure static. The check measures how much *picture
+  structure* survives (not pixel smoothness), so a weak, speckled but real
+  picture is kept and graded Weak/Fair instead of being thrown away.
+- **Two decoders, best result kept**: Martin 1/2 and Scottie 1/2 are also
+  decoded by a built-in noise-robust demodulator that fits the line timing
+  across the whole picture (the decoder library can lose sync on a noisy
+  signal); the more coherent of the two pictures is shown, and noisy ones
+  get a light clean-up and are marked as cleaned. Other modes use the
+  library decoder.
+- **When a signal is dropped**, the card says why in its footer (with the
+  partial picture and the audio to download), and the drawer always offers
+  the audio of the last signal, so a signal that should have decoded can be
+  examined instead of guessed at.
 - **Be realistic about the band**: SSTV on 14.230 is sporadic, and a
   picture needs a signal roughly at or above the noise to be readable, so
   the card will often say "nothing decoded yet". The **Test audio stream**
@@ -1738,6 +1751,11 @@ one-line stat glance, filter chips, then a ranked spot list at a fixed
 height that scrolls — so it sits level with your other cards no matter
 what.
 
+The **☰ Browse** button opens a drawer with a **Spots** tab (every spot
+from all four feeds, with search across callsign, reference and park/summit
+name, plus source, mode and sort filters that don't disturb the card's own
+list) and a **POTA Stats** tab (your hunter stats and recent hunts).
+
 **POTA** spots come from the same live `api.pota.app/spot/activator`
 feed the Live map's "POTA spots" overlay uses, but **ranked** rather
 than newest-first: "Smart rank" (the default) surfaces parks that are
@@ -1832,6 +1850,8 @@ are just plain text instead of buttons.
 Optional dashboard card (Settings → Cards → "Show Rig Panel card", off
 by default) — a **read-only software front panel** for your radio, over
 the same [Rig control](#rig-control-rigctld) connection.
+When a wfweb host is set under Settings → Integrations, the card's title
+is a link that opens wfweb's web UI in a new tab.
 
 - **Frequency, mode, filter, VFO, split** (with the TX frequency when
   split's on)
