@@ -2660,6 +2660,24 @@ def api_quiz_question():
         return jsonify({"error": "unavailable"}), 503
     return jsonify(q)
 
+@app.route("/api/quiz_exam")
+def api_quiz_exam():
+    """A mock exam for ?class= (see license_quiz.random_exam): the question
+    list plus the published pass mark. Answers are checked client-side, same
+    as the single-question route."""
+    license_class = request.args.get("class", LICENSE_QUIZ_DEFAULT_CLASS)
+    exam = license_quiz.random_exam(license_class)
+    if not exam:
+        return jsonify({"error": "unavailable"}), 503
+    return jsonify({"class": license_class, "questions": exam,
+                    "pass": _license_exam_pass(license_class), "length": len(exam)})
+
+
+def _license_exam_pass(license_class):
+    import license_quiz as _lq
+    return _lq.EXAM_PASS.get(license_class)
+
+
 @app.route("/api/satellites")
 def api_satellites():
     """Current positions (+ ground track, for the Live map overlay) and

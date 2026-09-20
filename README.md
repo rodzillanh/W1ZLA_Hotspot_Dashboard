@@ -2356,7 +2356,9 @@ untouched. It's a single-column layout with a bottom tab bar:
   pick Technician / General / Extra, tap an answer, see the right one, keep a
   streak, and drill a single subelement or your weakest one. Progress is
   stored on the phone (the same saved stats the desktop card uses in that
-  browser).
+  browser). **Mock exam** runs a full-length practice test (35 questions for
+  Technician/General, 50 for Extra; 74% to pass) with answers revealed at the
+  end, a per-subelement breakdown and every missed question.
 - **Notifications** (top of the Activity tab) — the same sources as the
   desktop Notifications card in one newest-first list, with source chips and
   an unread count that's remembered per phone.

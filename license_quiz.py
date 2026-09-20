@@ -106,6 +106,11 @@ DEFAULT_CLASS = "extra"  # preserves pre-existing behavior for upgrades
 # license_class -> {subelement_code: display_name}, e.g. SECTION_NAMES["extra"]["E0"] == "Safety"
 SECTION_NAMES = {cls: names for cls, (_, names) in _POOL_DEFS.items()}
 
+# Published exam lengths and pass marks (74%): 35 questions / 26 correct for
+# Technician and General, 50 / 37 for Extra.
+EXAM_LENGTH = {"technician": 35, "general": 35, "extra": 50}
+EXAM_PASS = {"technician": 26, "general": 26, "extra": 37}
+
 
 class LicenseQuizPool:
     """Loads all three bundled pools once at startup and serves random
@@ -135,6 +140,37 @@ class LicenseQuizPool:
             if prefix in SECTION_NAMES.get(license_class, {}):
                 questions = [q for q in questions if str(q.get("id", "")).upper().startswith(prefix)] or questions
         return random.choice(questions)
+
+    def random_exam(self, license_class: str = DEFAULT_CLASS) -> list | None:
+        """A mock exam: EXAM_LENGTH[class] distinct questions spread across
+        the class's subelements in proportion to each one's share of the pool
+        (every subelement gets at least one). This is NOT the FCC's exact
+        per-subelement question counts -- just a fair cross-section -- and the
+        length/pass mark are the published ones (35 questions/26 to pass for
+        Technician and General, 50/37 for Extra). None if the pool is empty."""
+        questions = self._questions.get(license_class) or []
+        n = EXAM_LENGTH.get(license_class)
+        if not questions or not n:
+            return None
+        groups = {}
+        for q in questions:
+            groups.setdefault(str(q.get("id", ""))[:2].upper(), []).append(q)
+        total = sum(len(g) for g in groups.values())
+        quota = {k: max(1, int(n * len(g) / total)) for k, g in groups.items()}
+        # top up / trim to exactly n, favouring the biggest remainders
+        order = sorted(groups, key=lambda k: -(n * len(groups[k]) / total - int(n * len(groups[k]) / total)))
+        i = 0
+        while sum(quota.values()) < n:
+            quota[order[i % len(order)]] += 1
+            i += 1
+        while sum(quota.values()) > n:
+            k = max(quota, key=lambda x: quota[x])
+            quota[k] -= 1
+        exam = []
+        for k, g in groups.items():
+            exam.extend(random.sample(g, min(quota[k], len(g))))
+        random.shuffle(exam)
+        return exam
 
     def count(self, license_class: str = DEFAULT_CLASS) -> int:
         return len(self._questions.get(license_class) or [])

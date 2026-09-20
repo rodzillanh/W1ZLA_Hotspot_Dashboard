@@ -562,6 +562,23 @@
     .qz-tools { display:flex; justify-content:space-between; margin-top:16px; font-size:12px; }
     .qz-tools button { background:none; border:none; color:var(--text-dim); font-family:var(--font-ui); font-size:12px; cursor:pointer; padding:6px 2px; }
 
+    /* Mock exam */
+    .qz-prog { height:4px; border-radius:2px; background:var(--border); margin:0 0 12px; }
+    .qz-prog i { display:block; height:4px; border-radius:2px; background:var(--live); }
+    .qz-a.picked { border-color:var(--live); background:color-mix(in srgb, var(--live) 14%, var(--panel-2)); }
+    .qz-a.picked .ltr { background:var(--live); color:#04211d; }
+    .qz-result { text-align:center; padding:6px 0 4px; }
+    .qz-result .score { font-family:var(--font-mono); font-size:34px; font-weight:700; }
+    .qz-result .verdict { font-size:14px; font-weight:700; margin-top:2px; }
+    .qz-result .verdict.pass { color:var(--good, #3ecf8e); }
+    .qz-result .verdict.fail { color:var(--danger); }
+    .qz-sec { display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:12px; padding:5px 2px;
+        border-bottom:1px solid var(--border); }
+    .qz-miss { border:1px solid var(--border); border-radius:10px; background:var(--panel-2); padding:10px 12px; margin-top:8px; }
+    .qz-miss .q { font-size:13px; margin-bottom:6px; }
+    .qz-miss .yours { font-size:12px; color:var(--danger); }
+    .qz-miss .right { font-size:12px; color:var(--good, #3ecf8e); margin-top:2px; }
+
     /* confirm-tap modal (reuses the PIN modal's box) */
     #confirm-modal { position:fixed; inset:0; z-index:61; background:rgba(4,6,10,.6);
         display:none; align-items:center; justify-content:center; padding:24px; }
@@ -854,6 +871,7 @@
             </div>
             <div class="qz-tools">
                 <button id="qz-weak">Drill weakest / untried section</button>
+                <button id="qz-exam">Mock exam</button>
                 <button id="qz-reset">Reset stats</button>
             </div>
         </div>
@@ -2694,6 +2712,102 @@
             if (!ok) return;
             qzSaveStats({}); qzStreak = 0; qzBest = 0; renderQzStats();
         };
+    })();
+
+    /* ---- mock exam (real length and pass mark; a fair cross-section, not the FCC's exact per-subelement counts) ---- */
+    var qzExam = null;
+    function qzExamRender() {
+        var e = qzExam, card = document.querySelector("#quiz-screen .qz-card");
+        var it = e.items[e.idx], L = ["A", "B", "C", "D"];
+        card.innerHTML = '<div class="qz-prog"><i style="width:' + Math.round(100 * e.idx / e.items.length) + '%"></i></div>' +
+            '<div class="qz-id">Mock exam · question ' + (e.idx + 1) + " of " + e.items.length + " · pass mark " + e.pass + "/" + e.items.length + "</div>" +
+            '<div class="qz-q">' + esc(it.question) + "</div><div id=\"qz-answers\">" +
+            it.answers.map(function (a, i) {
+                return '<button class="qz-a' + (e.picks[e.idx] === i ? " picked" : "") + '" data-i="' + i + '"><span class="ltr">' + L[i] + "</span><span>" + esc(a) + "</span></button>";
+            }).join("") + '</div><button class="qz-next" id="qz-exam-next"' + (e.picks[e.idx] == null ? ' style="opacity:.55"' : "") + ">" +
+            (e.idx === e.items.length - 1 ? "Finish exam" : "Next") + "</button>" +
+            '<div class="qz-tools"><button id="qz-exam-back"' + (e.idx ? "" : " disabled") + '>‹ Previous</button><button id="qz-exam-quit">Quit exam</button></div>';
+    }
+    async function qzStartExam() {
+        var ex;
+        try { ex = await fetch("/api/quiz_exam?class=" + encodeURIComponent(qzClass)).then(function (r) { return r.json(); }); } catch (e) { ex = null; }
+        if (!ex || ex.error) { toast("Couldn't load an exam"); return; }
+        qzExam = { items: ex.questions, pass: ex.pass, idx: 0, picks: [], cls: qzClass, at: Date.now() };
+        document.getElementById("qz-stats").style.display = "none";
+        document.getElementById("qz-pips").style.display = "none";
+        qzExamRender();
+    }
+    function qzExamFinish() {
+        var e = qzExam, right = 0, bySec = {}, missed = [], st = qzStats(), names = QZ_NAMES[e.cls];
+        e.items.forEach(function (it, i) {
+            var sec = it.id.slice(0, 2), ok = e.picks[i] === it.correct;
+            if (!bySec[sec]) bySec[sec] = { r: 0, t: 0 };
+            bySec[sec].t++;
+            if (ok) { right++; bySec[sec].r++; } else missed.push({ it: it, pick: e.picks[i] });
+            if (!st[sec]) st[sec] = { correct: 0, total: 0 };
+            st[sec].total++; if (ok) st[sec].correct++;                       // exam answers count toward your progress too
+        });
+        qzSaveStats(st);
+        var pass = right >= e.pass, mins = Math.max(1, Math.round((Date.now() - e.at) / 60000)), L = ["A", "B", "C", "D"];
+        var card = document.querySelector("#quiz-screen .qz-card");
+        card.innerHTML = '<div class="qz-result"><div class="score">' + right + " / " + e.items.length + "</div>" +
+            '<div class="verdict ' + (pass ? "pass" : "fail") + '">' + (pass ? "PASS" : "Not yet") + " · " + Math.round(100 * right / e.items.length) + "% · need " + e.pass + " · " + mins + " min</div></div>" +
+            '<div class="asl-sec">By subelement</div>' + Object.keys(bySec).sort().map(function (k) {
+                return '<div class="qz-sec"><span>' + k + " " + esc(names[k] || "") + "</span><span>" + bySec[k].r + "/" + bySec[k].t + "</span></div>";
+            }).join("") +
+            (missed.length ? '<div class="asl-sec">Missed (' + missed.length + ")</div>" + missed.map(function (m) {
+                return '<div class="qz-miss"><div class="q">' + esc(m.it.id) + " · " + esc(m.it.question) + "</div>" +
+                    '<div class="yours">' + (m.pick == null ? "No answer" : "You: " + L[m.pick] + ". " + esc(m.it.answers[m.pick])) + "</div>" +
+                    '<div class="right">Right: ' + L[m.it.correct] + ". " + esc(m.it.answers[m.it.correct]) + "</div></div>";
+            }).join("") : "") +
+            '<button class="qz-next" id="qz-exam-done" style="margin-top:14px">Back to practice</button>';
+        qzExam = null;
+    }
+    function qzExamExit() {
+        qzExam = null;
+        document.getElementById("qz-stats").style.display = "";
+        document.getElementById("qz-pips").style.display = "";
+        document.querySelector("#quiz-screen .qz-card").innerHTML = '<div class="qz-id" id="qz-id"></div><div class="qz-q" id="qz-q">Loading…</div>' +
+            '<div id="qz-answers"></div><button class="qz-next" id="qz-next" style="display:none">Next question</button>';
+        document.getElementById("qz-next").onclick = qzNext;
+        document.getElementById("qz-answers").addEventListener("click", function (e) {
+            var b = e.target.closest("button.qz-a"); if (b) qzAnswer(b);
+        });
+        renderQzStats();
+        qzItem = null;
+        qzNext();
+    }
+    (function () {
+        var b = document.getElementById("qz-exam");
+        if (!b) return;
+        b.onclick = async function () {
+            var n = { technician: 35, general: 35, extra: 50 }[qzClass];
+            var ok = await confirmAction("Start a mock exam?", n + " questions across the " + QZ_LABEL[qzClass] + " pool, scored at the 74% pass mark. " +
+                "Answers are revealed at the end, and count toward your stats.", false);
+            if (ok) qzStartExam();
+        };
+        // the exam card is rebuilt per question, so use one delegated handler
+        document.querySelector("#quiz-screen .qz-card").addEventListener("click", async function (e) {
+            if (!qzExam) {
+                if (e.target.closest("#qz-exam-done")) qzExamExit();
+                return;
+            }
+            var a = e.target.closest("button.qz-a");
+            if (a) { qzExam.picks[qzExam.idx] = parseInt(a.getAttribute("data-i"), 10); qzExamRender(); return; }
+            if (e.target.closest("#qz-exam-next")) {
+                if (qzExam.idx === qzExam.items.length - 1) {
+                    var unanswered = qzExam.items.length - qzExam.picks.filter(function (p) { return p != null; }).length;
+                    if (unanswered) { var go = await confirmAction("Finish?", unanswered + " question(s) unanswered will count as wrong.", true); if (!go) return; }
+                    qzExamFinish();
+                } else { qzExam.idx++; qzExamRender(); }
+                return;
+            }
+            if (e.target.closest("#qz-exam-back") && qzExam.idx > 0) { qzExam.idx--; qzExamRender(); return; }
+            if (e.target.closest("#qz-exam-quit")) {
+                var q = await confirmAction("Quit the exam?", "Your answers so far won't be scored or saved.", true);
+                if (q) qzExamExit();
+            }
+        });
     })();
 
     document.getElementById("cards").addEventListener("click", function (e) {
