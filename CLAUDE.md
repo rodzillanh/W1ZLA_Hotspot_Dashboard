@@ -8042,6 +8042,32 @@ config for per-integration credentials; put it in
     from ever finishing (it inherits stderr); a 3x replay makes a ~3 s
     Receiving window fall between the card's 3 s polls, so test state
     transitions at 1x.
+  - **Own demodulator + coherence gate (v4.94, `sstv_demod.py`)** -- a real,
+    clearly present over-the-air Martin 1 (~+5 dB, sync pulses strong on all
+    250 lines, line clock within 12 ppm of nominal) came out of the `sstv`
+    package as streaks and was then dropped as "noise". Two independent
+    causes. (1) The package loses line sync in noise; `sstv_demod.py`
+    (numpy only) band-limits to 1000-2600 Hz, takes the analytic signal,
+    finds 1200 Hz sync pulses, robustly fits ONE (first-sync, line period)
+    pair across the picture (median start, then shrinking-tolerance least
+    squares) and reads every pixel at its computed time. `_decode_best()`
+    runs both decoders and keeps the more coherent (own only if better by
+    0.03). Covers Martin 1/2 and Scottie 1/2, validated by round-tripping
+    `sstv.encode()`; **Scottie DX did NOT validate (own error 30 vs 1.0)
+    and was removed rather than shipped**; Robot 36/PD are untouched (a weak
+    real Robot 36 is still dropped, coherence 0.25). (2) The old pixel-level
+    noise measures (row structure/correlation) are fooled by speckle. The
+    gate is now `coherence` = std(8x8 block means)/std(pixels): pure rig
+    noise 0.15-0.18 (library) / 0.19-0.24 (own); real photos down to -6 dB
+    >= 0.56; the real signal 0.44 (library) / 0.60 (own); threshold 0.35,
+    grades 0.55/0.80, pictures under 0.75 get a 3x3 median and are flagged
+    `cleaned`. Sync detection lesson: comparing 1200 Hz against a few fixed
+    tones let a 2100 Hz picture tone (on the window nulls of all the
+    comparison tones) look like a perfect sync pulse -- use energy-normalised
+    correlation against the window's TOTAL energy. Test lessons: the loss
+    test must compare image counts before/after (the control run stores a
+    picture in the same dir), and the lost-sample threshold moved because
+    the receiver now gives up sooner.
   - **Stale-body rule for the SSTV card (v4.93)**: `renderSstvCard()`
     rebuilds `#sstv-body` ONLY when a structural signature changes (so the
     <img> and drawer inputs survive polls), which means ANY value inside

@@ -64,12 +64,13 @@ import websocket
 # other card keeps working) and just report why SSTV is unavailable.
 try:
     import numpy as np
-    from PIL import Image
+    from PIL import Image, ImageFilter
     import sstv as _sstv
+    import sstv_demod
     from sstv_vis import (RATE, IMAGE_START_S, MODE_LABELS, MODE_SECONDS, detect_vis)
     LIBS_ERROR = None
 except Exception as _e:  # noqa: BLE001 -- see comment above
-    np = Image = _sstv = None
+    np = Image = ImageFilter = _sstv = sstv_demod = None
     RATE, IMAGE_START_S, MODE_LABELS, MODE_SECONDS = 48000, 0.910, {}, {}
 
     def detect_vis(*_a, **_k):
@@ -84,7 +85,7 @@ SCAN_INTERVAL = 3.0            # seconds between header scans while searching
 SCAN_WINDOW_S = 25             # audio examined per header scan
 MIN_HEADER_SCORE = 0.62        # see sstv_vis.py's verification notes
 SUPERSEDE_SCORE = 0.85         # a stronger header mid-image replaces a probably-false one
-PREVIEW_EVERY = 4.0            # seconds between partial-image previews
+PREVIEW_EVERY = 6.0            # seconds between partial-image previews (each runs a full decode)
 FINISH_MARGIN = 3.0            # seconds of audio past the nominal image length
 NOISE_STRUCTURE = 40.0         # row-to-row luma difference: real pictures 3.5-10 (synthetic, 28..0 dB),
                                # decoded real rig noise 86 -- calibrated 2026-09
@@ -92,6 +93,16 @@ NOISE_CORRELATION = 0.35       # ...AND adjacent rows this uncorrelated: measure
                                # as SSTV (Martin 1, 30..3 dB into real rig noise) the row correlation never fell below
                                # 0.71, while decoded rig noise is 0.00 -- so a busy but real picture can't be mistaken
                                # for static by the absolute-difference measure alone
+COHERENCE_MIN = 0.35           # THE noise gate: how much picture structure survives blurring to 8x8 blocks
+                               # (std of block means / std of pixels). Measured 2026-09: pure rig noise 0.15-0.18
+                               # (library decode) / 0.19-0.24 (own demodulator); real photographs sent as SSTV
+                               # down to -6 dB into rig noise >= 0.56; a real over-the-air Martin 1 that the old
+                               # pixel-smoothness gate wrongly called static: 0.44 (library) / 0.60 (own).
+                               # Pixel-level measures (structure/correlation above) are fooled by speckle;
+                               # this one is not.
+COHERENCE_FAIR, COHERENCE_GOOD = 0.55, 0.80    # quality grades
+CLEANUP_BELOW = 0.75           # noisier pictures get a light 3x3 median clean-up (and are flagged as cleaned)
+EARLY_MIN_ROWS = 24            # rows needed before the coherence check is meaningful (>= 3 blocks tall)
 MIN_CONTRAST = 6.0             # luma std-dev below this = a flat/blank decode, not a picture
 REJECT_AUDIO_MAX_S = 90        # keep at most this much audio of a rejected attempt (for diagnosis)
 MAX_GAP_FRACTION = 0.03        # reject an image whose audio lost more than 3% in transit
@@ -147,21 +158,40 @@ def image_quality(im, rows=None):
     num = (z[:-1] * z[1:]).sum(axis=1)
     den = np.sqrt((z[:-1] ** 2).sum(axis=1) * (z[1:] ** 2).sum(axis=1)) + 1e-9
     return {"structure": float(np.abs(np.diff(a, axis=0)).mean()), "contrast": float(a.std()),
-            "correlation": float((num / den).mean())}
+            "correlation": float((num / den).mean()), "coherence": coherence(a)}
+
+
+def coherence(a):
+    """Share of a picture's variation that survives blurring to 8x8 blocks:
+    std(block means) / std(pixels). Real pictures keep large-scale structure
+    even when heavily speckled (0.4-1.0); static averages away to ~0.2. `a` is
+    a 2-D luma array (or a PIL image). None if too few rows to say."""
+    if not isinstance(a, np.ndarray):
+        a = _luma(a)
+    h, w = a.shape
+    b = 8
+    h = h // b * b
+    if h < EARLY_MIN_ROWS or w < b:
+        return None
+    blocks = a[:h, :w // b * b].reshape(h // b, b, w // b, b).mean(axis=(1, 3))
+    return float(blocks.std() / (a[:h].std() + 1e-9))
 
 
 def looks_like_noise(q):
-    """True only when BOTH measures say static: big row-to-row differences
-    AND adjacent rows that don't resemble each other."""
+    """True when the picture has no large-scale structure at all (coherence
+    below COHERENCE_MIN). Falls back to the old pixel-level rule only if
+    coherence couldn't be measured."""
+    c = q.get("coherence")
+    if c is not None:
+        return c < COHERENCE_MIN
     return q["structure"] > NOISE_STRUCTURE and q.get("correlation", 0.0) < NOISE_CORRELATION
 
 
-def quality_label(structure):
-    if structure < 12:
-        return "good"
-    if structure < 25:
-        return "fair"
-    return "weak"
+def quality_label(q):
+    c = q.get("coherence")
+    if c is None:
+        return "good" if q["structure"] < 12 else ("fair" if q["structure"] < 25 else "weak")
+    return "good" if c >= COHERENCE_GOOD else ("fair" if c >= COHERENCE_FAIR else "weak")
 
 
 def _freq_shift(x, hz):
@@ -192,6 +222,33 @@ def _decode(samples, mode_name, offset_hz):
     except Exception as e:
         print(f"[sstv] decode failed: {type(e).__name__}: {e}")
         return None
+
+
+def _decode_best(samples, mode_name, offset_hz):
+    """Decode with the `sstv` package AND, for modes it supports, the noise-robust
+    demodulator in sstv_demod.py, and keep whichever picture is more coherent.
+    The package is sharper on clean signals; the own demodulator recovers line
+    timing globally and wins on weak/noisy ones (a real over-the-air Martin 1 that
+    the package turned into streaky static came out with a readable face and
+    callsign). Sets im.info['sstv_decoder'] to 'own' or 'crate'."""
+    crate = _decode(samples, mode_name, offset_hz)
+    own = None
+    if sstv_demod is not None and sstv_demod.supported(mode_name):
+        own = sstv_demod.decode(samples, mode_name, offset_hz)
+    if own is None:
+        if crate is not None:
+            crate.info["sstv_decoder"] = "crate"
+        return crate
+    if crate is None:
+        own.info["sstv_decoder"] = "own"
+        return own
+    rows = min(_rows_decoded(crate) or 10 ** 6, _rows_decoded(own) or 10 ** 6)
+    rows = min(rows, own.size[1])
+    cc, co = coherence(_luma(crate)[:rows]), coherence(_luma(own)[:rows])
+    use_own = co is not None and cc is not None and co > cc + 0.03
+    best = own if use_own else crate
+    best.info["sstv_decoder"] = "own" if use_own else "crate"
+    return best
 
 
 class SstvReceiver:
@@ -778,7 +835,7 @@ class SstvReceiver:
         arr = self._gather(a0)
         if a1 is not None:
             arr = arr[:max(0, a1 - a0)]
-        return _decode(arr, rx["mode"], rx["offset_hz"])
+        return _decode_best(arr, rx["mode"], rx["offset_hz"])
 
     def _advance_reception(self, now, rig):
         rx = self._rx
@@ -803,9 +860,9 @@ class SstvReceiver:
             if im is not None:
                 rows = _rows_decoded(im)
                 q = image_quality(im, rows)
-                if q and rows >= 10 and looks_like_noise(q):
-                    return self._abort(f"header at score {rx['score']:.2f} but the first {rows} rows look like noise "
-                                       f"(structure {q['structure']:.0f}, row correlation {q['correlation']:.2f})",
+                if q and rows >= EARLY_MIN_ROWS and q.get("coherence") is not None and looks_like_noise(q):
+                    return self._abort(f"header at score {rx['score']:.2f} but the first {rows} rows have no picture "
+                                       f"structure (coherence {q['coherence']:.2f}, needs {COHERENCE_MIN})",
                                        kind="noise", im=im)
         if elapsed >= 5 and now - rx["preview_at"] >= PREVIEW_EVERY and elapsed < rx["dur"]:
             rx["preview_at"] = now
@@ -850,7 +907,7 @@ class SstvReceiver:
             gate = self._gate
         if im is None:
             return self._count_reject(self._reject_meta(rx, "decode_failed", "the decoder returned no image"))
-        q = image_quality(im) or {"structure": 999.0, "contrast": 0.0}
+        q = image_quality(im) or {"structure": 999.0, "contrast": 0.0, "coherence": 0.0}
         gaps = self._dropped - rx["dropped0"]
         gap_frac = gaps / max(1, int(rx["dur"] * RATE))
         if gate and gap_frac > MAX_GAP_FRACTION:
@@ -860,24 +917,33 @@ class SstvReceiver:
             return self._count_reject(self._reject_meta(rx, "audio_loss", f"{gap_frac * 100:.0f}% of the audio was lost in transit"), im,
                                       self._save_reject_audio(rx))
         if gate and (looks_like_noise(q) or q["contrast"] < MIN_CONTRAST):
-            print(f"[sstv] {rx['mode']} image rejected (structure {q['structure']:.1f}, correlation {q.get('correlation', 0):.2f}, "
-                  f"contrast {q['contrast']:.1f})")
+            print(f"[sstv] {rx['mode']} image rejected (coherence {q.get('coherence') or 0:.2f}, "
+                  f"structure {q['structure']:.1f}, contrast {q['contrast']:.1f})")
             kind = "noise" if looks_like_noise(q) else "blank"
             return self._count_reject(self._reject_meta(
-                rx, kind, f"structure {q['structure']:.0f}, row correlation {q.get('correlation', 0):.2f}, contrast {q['contrast']:.0f}"),
+                rx, kind, f"coherence {q.get('coherence') or 0:.2f} (needs {COHERENCE_MIN}), contrast {q['contrast']:.0f}"),
                 im, self._save_reject_audio(rx))
+        decoder = im.info.get("sstv_decoder", "crate")
+        cleaned = False
+        if (q.get("coherence") or 0.0) < CLEANUP_BELOW:
+            # a noisy but real picture: a light 3x3 median removes the colour speckle without
+            # inventing detail (the picture is flagged as cleaned)
+            im = im.convert("RGB").filter(ImageFilter.MedianFilter(3))
+            cleaned = True
         meta = {
             "id": uuid.uuid4().hex[:12], "ts": time.time(), "started_at": rx["started_at"],
             "mode": rx["mode"], "label": MODE_LABELS.get(rx["mode"], rx["mode"]),
             "width": im.size[0], "height": im.size[1], "duration_s": rx["dur"],
-            "freq_hz": rx["freq_hz"], "quality": quality_label(q["structure"]),
+            "freq_hz": rx["freq_hz"], "quality": quality_label(q),
             "structure": round(q["structure"], 1), "contrast": round(q["contrast"], 1),
+            "coherence": round(q.get("coherence") or 0.0, 2), "decoder": decoder, "cleaned": cleaned,
             "complete": bool(im.info.get("sstv_complete", True)), "offset_hz": rx["offset_hz"],
             "dropped_samples": gaps,
         }
         try:
             self._store_image(im, meta)
-            print(f"[sstv] stored {meta['label']} image ({meta['quality']}, structure {meta['structure']})")
+            print(f"[sstv] stored {meta['label']} image ({meta['quality']}, coherence {meta['coherence']}, "
+                  f"decoder {decoder}{', cleaned' if cleaned else ''})")
         except Exception as e:
             print(f"[sstv] could not store image: {e}")
 

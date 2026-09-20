@@ -117,9 +117,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.93 "Jordison"</span>
+                <span class="release-version">v4.94 "Haley"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fix: SSTV card dropped a real, clearly present signal</span> &mdash; a genuine Martin 1 picture recorded from the rig (about +5 dB) decoded to streaks and was then thrown away as &ldquo;noise&rdquo;. Two separate causes: the decoder library loses line sync in noise, and the old noise check scored pixel smoothness, which a speckled-but-real picture fails. Both are fixed</li>
+                <li><span>SSTV: a noise-robust demodulator for Martin 1/2 and Scottie 1/2</span> &mdash; it finds the sync pulses across the whole picture, fits one line clock, and reads every pixel at its computed time instead of re-syncing line by line. Each picture is decoded both ways and the more coherent result is kept. Validated by round-tripping the library's own encoder output; Scottie DX did not validate and stays with the library. Other modes (Robot 36, PD) still use the library</li>
+                <li><span>SSTV: the noise gate measures picture structure, not pixel smoothness</span> &mdash; a picture is judged by how much of its variation survives blurring to 8&times;8 blocks. Pure rig noise scores 0.15&ndash;0.24; real photos sent at &minus;6 dB score 0.56 or more; the real over-the-air picture scores 0.60. The threshold is 0.35. Pictures below 0.75 get a light noise clean-up and are marked as cleaned, and quality grades follow the same measure</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.93 "Jordison"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>SSTV card: the audio bars are now a real level meter</span> &mdash; the bar graph on the empty (&ldquo;nothing decoded yet&rdquo;) state used to be a fixed decoration that only changed colour. It now shows the actual received audio level: one reading per second for the last 12 seconds, newest on the right, so you can see at a glance whether audio is arriving, whether the feed has gone silent, or whether it is overdriven. Hover it for the level in dBFS; the drawer's Status shows the same figure next to the sample rate</li>

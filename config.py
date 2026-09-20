@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.93"
+APP_VERSION = "4.94"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -265,6 +265,8 @@ VERSION_CODENAMES = [
                         # Starship ("Wooden Ships") (1941-2016)
     "Jordison",         # v4.93 -- Joey Jordison, co-founding drummer of
                         # Slipknot (1975-2021)
+    "Haley",            # v4.94 -- Bill Haley, Bill Haley & His Comets
+                        # ("Rock Around the Clock") (1925-1981)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 

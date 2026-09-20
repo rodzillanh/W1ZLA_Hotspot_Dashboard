@@ -626,6 +626,11 @@ BIOS = {
         "blurb": "Co-founding drummer of Slipknot, known for his blistering speed and thunderous double-bass work.",
         "wiki": "Joey_Jordison",
     },
+    "Haley": {
+        "name": "Bill Haley",
+        "blurb": "Leader of Bill Haley & His Comets, whose “Rock Around the Clock” (1954) became one of the first rock and roll records to top the charts.",
+        "wiki": "Bill_Haley",
+    },
 }
 
 
