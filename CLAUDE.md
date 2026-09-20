@@ -8116,6 +8116,9 @@ config for per-integration credentials; put it in
     if it is blocked the map falls back to plain pins after ~5 s rather than
     never appearing. `mobile_map_test.py`-style checks need `mobMap.setView`
     zoomed onto a pin before clicking it (clusters hide close pins).
+    **Recent contacts** on the Activity tab is now an entry row (`#qsos-entry-btn`,
+    summary set by `renderQsos()`) opening `#qsos-screen`, same shape as
+    Notifications; the list element keeps its `#qsos` id so `fetchQsos` is unchanged.
     **Callers + tile switch**: an active call draws a pulsing pin at the caller
     (from `/api/map_data`'s `callers` -- `is_active` entries only, polled with
     the 3 s hook while the Map tab is showing) plus a dashed polyline to the

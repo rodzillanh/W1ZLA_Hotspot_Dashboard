@@ -553,6 +553,13 @@ with sync_playwright() as p:
     mob.wait_for_timeout(1200)
     mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-activity.png"), full_page=True)
     print("wrote mobile-activity.png")
+    if mob.query_selector('[id="qsos-entry-btn"]'):
+        mob.evaluate("document.getElementById('qsos-entry-btn').click()")
+        mob.wait_for_timeout(900)
+        mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-contacts.png"))
+        print("wrote mobile-contacts.png")
+        mob.evaluate("document.getElementById('qsos-close').click()")
+        mob.wait_for_timeout(300)
 
     ql_entry = mob.query_selector('[id="ql-entry-btn"]')
     if ql_entry:

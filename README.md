@@ -2352,8 +2352,10 @@ untouched. It's a single-column layout with a bottom tab bar:
   how far from you). A small button at the right cycles the tiles: dark,
   light (OpenStreetMap) or satellite. ⌖ centres on you. Repeaters and Hotspots
   start on; your layer and tile choices are remembered on the phone.
-- **Activity** — recent logged contacts (the same `qsos.json` the Live map
-  and Recent Contacts card read), newest first. If the
+- **Activity** — a **Recent contacts** row (like Notifications, it shows a
+  one-line summary — how many are logged and the last one — and opens the
+  full list, newest first, in its own screen; the same `qsos.json` the Live
+  map and Recent Contacts card read). If the
   [QRZ Quick Log card](#qrz-quick-log-card) is enabled, a "Log a QSO" row
   opens the same freq/mode/power auto-fill and spot-matching in a
   full-screen mobile view — same one-tap submit to QRZ, same rig-network
@@ -2404,6 +2406,7 @@ untouched. It's a single-column layout with a bottom tab bar:
 <!-- wiki-image: mobile-map.png -->
 <!-- wiki-image: mobile-map-sheet.png -->
 <!-- wiki-image: mobile-activity.png -->
+<!-- wiki-image: mobile-contacts.png -->
 <!-- wiki-image: mobile-quick-log.png -->
 
 <!-- wiki-image: mobile-status-open.png -->

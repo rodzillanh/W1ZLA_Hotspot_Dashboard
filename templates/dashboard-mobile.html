@@ -624,8 +624,8 @@
     .qz-miss .right { font-size:12px; color:var(--good, #3ecf8e); margin-top:2px; }
 
     /* Band plan + Nearby */
-    #bp-screen, #near-screen { position:fixed; inset:0; z-index:35; background:var(--bg); display:none; flex-direction:column; }
-    #bp-screen.open, #near-screen.open { display:flex; }
+    #bp-screen, #near-screen, #qsos-screen { position:fixed; inset:0; z-index:35; background:var(--bg); display:none; flex-direction:column; }
+    #bp-screen.open, #near-screen.open, #qsos-screen.open { display:flex; }
     .bp-legend { display:flex; gap:8px; margin:0 2px 8px; font-size:11px; }
     .bp-lg { padding:2px 9px; border-radius:9px; font-weight:600; text-transform:uppercase; letter-spacing:.3px; font-size:10px; }
     .bp-lg.gen { background:var(--accent-dim, rgba(240,168,48,.16)); color:var(--accent); }
@@ -945,8 +945,15 @@
                 <span class="go">›</span>
             </button>
             {% endif %}
-            <div class="sec-label">Recent contacts</div>
-            <div id="qsos"><div class="empty"><p>Loading…</p></div></div>
+            <div class="sec-label">Log</div>
+            <button class="ql-entry" id="qsos-entry-btn" type="button">
+                <span class="ic">📒</span>
+                <span>
+                    <div class="tt">Recent contacts</div>
+                    <div class="sub" id="qsos-entry-sub">Loading…</div>
+                </span>
+                <span class="go">›</span>
+            </button>
         </section>
 
         <section data-tab="more">
@@ -1072,6 +1079,14 @@
         </div>
     </div>
     {% endif %}
+
+    <div id="qsos-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="qsos-close">‹ Back</button>
+            <span class="ttl">Recent contacts</span>
+        </div>
+        <div class="asl-body"><div id="qsos"><div class="empty"><p>Loading…</p></div></div></div>
+    </div>
 
     <div id="notif-screen" aria-hidden="true">
         <div class="prefs-hdr">
@@ -1547,14 +1562,19 @@
             });
     }
     function renderQsos(list) {
-        var host = document.getElementById("qsos");
+        var host = document.getElementById("qsos"), sub = document.getElementById("qsos-entry-sub");
         if (!list || !list.length) {
             host.innerHTML = '<div class="empty"><p>No logged contacts yet.</p></div>';
+            if (sub) sub.textContent = "No logged contacts yet";
             return;
         }
         var sorted = list.slice().sort(function (a, b) {
             return (b.logged_at || 0) - (a.logged_at || 0);
         }).slice(0, 40);
+        if (sub) {
+            var top = sorted[0];
+            sub.textContent = list.length + " logged" + (top.call ? " · last " + top.call + (top.logged_at ? " " + fmtAgo(top.logged_at) + " ago" : "") : "");
+        }
         host.innerHTML = sorted.map(function (q) {
             var when = q.logged_at ? fmtAgo(q.logged_at) + " ago" : (q.date || "");
             var meta = [ [q.band, q.mode].filter(Boolean).join(" "), q.name, q.grid ]
@@ -1566,6 +1586,13 @@
                    "</div>";
         }).join("");
     }
+
+    (function () {
+        var eb = document.getElementById("qsos-entry-btn");
+        if (!eb) return;
+        eb.onclick = function () { document.getElementById("qsos-screen").classList.add("open"); fetchQsos(); };
+        document.getElementById("qsos-close").onclick = function () { document.getElementById("qsos-screen").classList.remove("open"); };
+    })();
 
     /* ---- Quick Log (Activity tab sub-screen) ----
      * Same matching/submit logic as the desktop QRZ Quick Log card
