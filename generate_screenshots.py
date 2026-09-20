@@ -538,6 +538,14 @@ with sync_playwright() as p:
     mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-status.png"), full_page=True)
     print("wrote mobile-status.png")
 
+    # v4.99: the Status tab is one row per hotspot; open the first (on-air) one in place
+    mob.evaluate("document.querySelector('#cards .card .card-tap').click()")
+    mob.wait_for_timeout(600)
+    mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-status-open.png"))
+    print("wrote mobile-status-open.png")
+    mob.evaluate("document.querySelector('#cards .card .card-tap').click()")
+    mob.wait_for_timeout(300)
+
     # Activity tab + the QRZ Quick Log entry point/screen (v4.75) -- reads
     # the same monkeypatched rig_panel_poller.snapshot() already seeded
     # for the desktop Rig Panel/Quick Log screenshots above.
@@ -648,6 +656,15 @@ with sync_playwright() as p:
 
     _jsclick('.tabbar button[data-go="more"]')
     m2.wait_for_timeout(600)
+    for _btn, _close, _name, _wait in (("#near-entry-btn", "#near-close", "mobile-nearby.png", 6000),
+                                       ("#bp-entry-btn", "#bp-close", "mobile-band-plan.png", 600)):
+        _el = m2.query_selector(_btn)
+        if _el:
+            _jsclick(_btn)
+            m2.wait_for_timeout(_wait)
+            _shot(_name)
+            _jsclick(_close)
+            m2.wait_for_timeout(300)
     _q = m2.query_selector("#quiz-entry-btn")
     if _q:
         _jsclick('#quiz-entry-btn')

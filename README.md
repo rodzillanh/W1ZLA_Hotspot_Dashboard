@@ -2393,7 +2393,10 @@ untouched. It's a single-column layout with a bottom tab bar:
 <!-- wiki-image: mobile-activity.png -->
 <!-- wiki-image: mobile-quick-log.png -->
 
+<!-- wiki-image: mobile-status-open.png -->
 <!-- wiki-image: mobile-asl-control.png -->
+<!-- wiki-image: mobile-nearby.png -->
+<!-- wiki-image: mobile-band-plan.png -->
 <!-- wiki-image: mobile-digital-links.png -->
 <!-- wiki-image: mobile-notif-feed.png -->
 <!-- wiki-image: mobile-spots.png -->
