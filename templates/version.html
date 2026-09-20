@@ -117,6 +117,20 @@
 
         <div class="release">
             <div class="release-header">
+                <span class="release-version">v4.98 "Nelson"</span>
+                <span class="release-date">September 2026</span>
+                <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Pocket Dash: Nearby (uses your phone's location)</span> &mdash; More &rarr; <b>Nearby</b> lists FM repeaters, Brandmeister DMR repeaters (tap <i>Talkgroups</i> for the static talkgroups registered for that repeater), YSF (Fusion) and D-STAR repeaters, and <b>AllStar nodes with their node numbers</b>, nearest first with distance and bearing, around <b>Use my location</b> (GPS), a typed grid square or latitude/longitude, or the dashboard's station grid. Radius 10&ndash;100 mi. FM rows have a <b>Tune</b> button (rig control) and AllStar rows a <b>Connect</b> button for your ASL3 hotspot, each behind a confirmation tap. The location is remembered on that phone</li>
+                <li><span>GPS needs HTTPS</span> &mdash; browsers give a page your location only over a secure connection. On plain <code>http://</code> (a LAN IP or a Tailscale IP) the GPS button explains this and the typed location still works; serve the dashboard over HTTPS (for example Tailscale's HTTPS) to use GPS</li>
+                <li><span>Pocket Dash: Band plan</span> &mdash; More &rarr; <b>Band plan</b>, the same US HF privileges as the desktop card (its data is copied from that card, not retyped), laid out for a phone</li>
+                <li><span>New: nearby lookups</span> &mdash; <code>/api/nearby/repeaters</code> (mode filter, or only repeaters matched to an AllStar node), <code>/api/nearby/dmr</code> and <code>/api/nearby/dmr_talkgroups/&lt;id&gt;</code>. Brandmeister's device list (about 29,000 with coordinates) is cached for 6 hours; hotspots are excluded (repeaters only, seen in the last 45 days). AllStar node numbers come from AllStarLink's node database, matched to repeaters the directory flags as AllStar by callsign and frequency &mdash; a repeater with no unambiguous match is simply not listed</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
                 <span class="release-version">v4.97 "Bopper"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>

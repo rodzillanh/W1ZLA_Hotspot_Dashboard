@@ -286,6 +286,10 @@ sstv_controller.py and exact start in noise); sstv_rx.py is the wfweb-audio
                    process (like wfweb_power.py), NOT a separate container.
                    See the SSTV gotcha entry below before touching any of it.
 
+nearby.py          BrandmeisterDirectory + AslDirectory for Pocket Dash's
+                   Nearby screen (a PHONE's position, not the station's). See
+                   the "Nearby (v4.98)" gotcha below.
+
 host_stats.py, weather.py
                    Small standalone pollers (host CPU/mem, Open-Meteo).
                    host_stats.py also has is_pi_standalone() (checks
@@ -8068,6 +8072,34 @@ config for per-integration credentials; put it in
     test must compare image counts before/after (the control run stores a
     picture in the same dir), and the lost-sample threshold moved because
     the receiver now gives up sooner.
+  - **Nearby (v4.98, `nearby.py` + `/api/nearby/*`)** -- every source was
+    probed live before building. **Brandmeister**: `GET /v2/device` is ONE
+    9.7 MB JSON list (~33k devices, ~29k with lat/lng), no auth, cached 6 h.
+    Hotspots and repeaters are in the same list, so `is_repeater()` keeps
+    `pep >= 5` or a tx/rx split >= 0.3 MHz (hotspots register pep 1) and
+    drops anything not seen in 45 days -- a HEURISTIC, not a field the API
+    gives. `/v2/device/<id>/talkgroup` returns STATIC talkgroups only and is
+    often `[]` (many repeaters are configured on the repeater itself), so the
+    UI says so rather than implying none exist; `/v2/talkgroup` gives names.
+    The list endpoint takes NO query parameters (`?limit=` is a 400), and
+    `/v2/device/byCall/<call>` is a 404 -- don't guess at filters.
+    **AllStarLink** has no coordinates anywhere in bulk: `allmondb.allstarlink.org`
+    (301-redirects; 1.4 MB, `node|callsign|freq|location`) has free-text
+    towns only, and per-node stats give the SERVER's location, not the node's.
+    So node numbers are attached to repeaters from the repeater directory
+    (`group == "Allstar"`, 2,874 of them, WITH coordinates) by callsign +
+    frequency within 1.5 kHz (`match_asl_node`); ambiguous or unmatched = no
+    row, because a wrong node number connects someone to the wrong place.
+    `stats.allstarlink.org` is rate limited (429 seen from the bulk path) --
+    this module doesn't use it. **GPS is a secure-context API**: on plain
+    `http://` (LAN IP / Tailscale IP) `navigator.geolocation` is unavailable,
+    so the screen explains that and offers a typed grid square / lat,lon
+    (stored in localStorage `pd-loc`); `http://127.0.0.1` counts as secure,
+    which is why the browser test can fake a fix but can't reproduce the real
+    limitation without overriding `isSecureContext`. The band plan on mobile
+    embeds data EXTRACTED from the desktop card's markup at edit time, not
+    retyped -- if the desktop card's values change, regenerate the mobile
+    array (`BP_DATA`) the same way.
   - **Control gate (v4.95, `app._control_gate()`)** -- every action that
     changes something (ASL connect, Brandmeister/D-STAR link, rig tune, wfweb
     power, SSTV control, host reboot/power-off) goes through one guard:

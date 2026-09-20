@@ -646,6 +646,11 @@ BIOS = {
         "blurb": "J. P. Richardson, the Texas disc jockey and songwriter behind “Chantilly Lace,” killed in the 1959 plane crash that also took Buddy Holly and Ritchie Valens.",
         "wiki": "The_Big_Bopper",
     },
+    "Nelson": {
+        "name": "Ricky Nelson",
+        "blurb": "Teen idol and rockabilly pioneer (\u201cHello Mary Lou,\u201d \u201cGarden Party\u201d), killed in a 1985 plane crash.",
+        "wiki": "Ricky_Nelson",
+    },
 }
 
 

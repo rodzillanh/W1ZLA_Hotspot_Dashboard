@@ -2165,6 +2165,114 @@ def api_repeaters():
     })
 
 
+
+# ---- Pocket Dash "Nearby": relative to the PHONE's position, not the station -----------------
+import nearby as _nearby
+bm_directory = _nearby.BrandmeisterDirectory()
+asl_directory = _nearby.AslDirectory()
+NEARBY_MAX_RADIUS_MI = 250
+
+
+def _nearby_point():
+    """(lat, lon, label) from ?lat=&lon= (a phone's GPS or a typed location), else the
+    station grid; (None, None, None) if neither is usable."""
+    try:
+        lat, lon = float(request.args["lat"]), float(request.args["lon"])
+        if -90 <= lat <= 90 and -180 <= lon <= 180:
+            return lat, lon, "given"
+    except (KeyError, TypeError, ValueError):
+        pass
+    qth = grid_to_latlon(load_settings().get("station_grid", ""))
+    return (qth[0], qth[1], "station grid") if qth else (None, None, None)
+
+
+def _nearby_radius():
+    try:
+        return max(1.0, min(float(request.args.get("radius", 25)), NEARBY_MAX_RADIUS_MI))
+    except (TypeError, ValueError):
+        return 25.0
+
+
+@app.route("/api/nearby/repeaters")
+def api_nearby_repeaters():
+    """Repeaters around a point (?lat=&lon=&radius= miles, default the station grid / 25 mi),
+    nearest first, from the same directory as the Nearby Repeaters card. ?mode=FM,DMR,...
+    limits by mode; ?only=asl keeps only repeaters that advertise an AllStar node AND could be
+    matched to a node number (see nearby.match_asl_node). Capped at 100 rows."""
+    lat, lon, src = _nearby_point()
+    if lat is None:
+        return jsonify({"error": "no location", "repeaters": []}), 400
+    rows = repeater_client.get()
+    if rows is None:
+        return jsonify({"error": "unavailable", "repeaters": []}), 503
+    radius = _nearby_radius()
+    modes = {m.strip().upper() for m in request.args.get("mode", "").split(",") if m.strip()}
+    only_asl = request.args.get("only") == "asl"
+    near = []
+    for r in rows:
+        if not r.get("operational", True) or r.get("latitude") is None or r.get("longitude") is None:
+            continue
+        if modes and (r.get("mode") or "").upper() not in modes:
+            continue
+        if only_asl and (r.get("group") or "").lower() != "allstar":
+            continue
+        d, b = _haversine_bearing(lat, lon, r["latitude"], r["longitude"])
+        if d <= radius:
+            near.append((d, b, r))
+    near.sort(key=lambda t: t[0])
+    asl_db = asl_directory.by_call() if any((r.get("group") or "").lower() == "allstar" for _, _, r in near[:400]) else None
+    out, seen_nodes = [], set()
+    for d, b, r in near[:400]:
+        row = dict(r)
+        row["dist_mi"], row["bearing"] = round(d, 1), round(b)
+        if asl_db is not None and (r.get("group") or "").lower() == "allstar":
+            hit = _nearby.match_asl_node(asl_db, r.get("callsign"), r.get("frequency_hz"))
+            if hit:
+                row["asl_node"], row["asl_location"] = hit[0], hit[2]
+        if only_asl:
+            if not row.get("asl_node") or row["asl_node"] in seen_nodes:
+                continue                              # one row per node (a node can list several rows)
+            seen_nodes.add(row["asl_node"])
+        out.append(row)
+        if len(out) >= 100:
+            break
+    return jsonify({"repeaters": out, "radius_mi": radius, "point": {"lat": lat, "lon": lon, "source": src},
+                    "rig_control": bool(load_settings().get("rig_control_enabled"))})
+
+
+@app.route("/api/nearby/dmr")
+def api_nearby_dmr():
+    """Brandmeister DMR repeaters around a point (see nearby.py), nearest first, capped at 60.
+    Static talkgroups are fetched per repeater on demand via /api/nearby/dmr_talkgroups."""
+    lat, lon, src = _nearby_point()
+    if lat is None:
+        return jsonify({"error": "no location", "repeaters": []}), 400
+    rows = bm_directory.repeaters()
+    if rows is None:
+        return jsonify({"error": "unavailable", "repeaters": []}), 503
+    radius = _nearby_radius()
+    near = []
+    for r in rows:
+        d, b = _haversine_bearing(lat, lon, r["lat"], r["lng"])
+        if d <= radius:
+            near.append((d, b, r))
+    near.sort(key=lambda t: t[0])
+    out = []
+    for d, b, r in near[:60]:
+        row = dict(r)
+        row["dist_mi"], row["bearing"] = round(d, 1), round(b)
+        out.append(row)
+    return jsonify({"repeaters": out, "radius_mi": radius, "point": {"lat": lat, "lon": lon, "source": src}})
+
+
+@app.route("/api/nearby/dmr_talkgroups/<int:device_id>")
+def api_nearby_dmr_talkgroups(device_id):
+    tgs = bm_directory.talkgroups(device_id)
+    if tgs is None:
+        return jsonify({"error": "unavailable", "talkgroups": []}), 503
+    return jsonify({"talkgroups": tgs})
+
+
 _HF_BAND_LO, _HF_BAND_HI = 5_250_000, 5_450_000  # 60m -- channelized, not in wsjtx._BAND_EDGES
 
 def _hf_band_of(hz: int) -> str:

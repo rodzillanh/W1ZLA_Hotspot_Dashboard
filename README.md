@@ -2351,6 +2351,18 @@ untouched. It's a single-column layout with a bottom tab bar:
 - **Digital links** (button on WPSD cards with Brandmeister or
   ircDDBGateway set up) — link or unlink Brandmeister static talkgroups and
   D-STAR reflectors, with your saved favorites as one-tap chips.
+- **Nearby** (More tab) — repeaters around your phone: FM, Brandmeister DMR
+  (with each repeater's static talkgroups), YSF/Fusion, D-STAR, and AllStar
+  nodes with their node numbers, nearest first. Use **Use my location**
+  (GPS), type a grid square or `lat, lon`, or fall back to the dashboard's
+  station grid. FM rows can tune the rig and AllStar rows can connect your
+  ASL3 hotspot, each with a confirmation tap. **Browsers only allow GPS on
+  secure (https) pages**, so over a plain `http://` LAN or Tailscale IP use
+  the typed location, or serve the dashboard over HTTPS (Tailscale's HTTPS
+  works). Data: the repeater directory the Nearby Repeaters card uses,
+  Brandmeister's public device list, and AllStarLink's node database.
+- **Band plan** (More tab) — the desktop Band Plan card's US HF privileges
+  in a phone-sized list.
 - **License quiz** (More tab, when the License Quiz card is enabled) — the
   same question pools as the desktop card in a phone-sized practice screen:
   pick Technician / General / Extra, tap an answer, see the right one, keep a

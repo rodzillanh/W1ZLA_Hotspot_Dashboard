@@ -579,6 +579,48 @@
     .qz-miss .yours { font-size:12px; color:var(--danger); }
     .qz-miss .right { font-size:12px; color:var(--good, #3ecf8e); margin-top:2px; }
 
+    /* Band plan + Nearby */
+    #bp-screen, #near-screen { position:fixed; inset:0; z-index:35; background:var(--bg); display:none; flex-direction:column; }
+    #bp-screen.open, #near-screen.open { display:flex; }
+    .bp-legend { display:flex; gap:8px; margin:0 2px 8px; font-size:11px; }
+    .bp-lg { padding:2px 9px; border-radius:9px; font-weight:600; text-transform:uppercase; letter-spacing:.3px; font-size:10px; }
+    .bp-lg.gen { background:var(--accent-dim, rgba(240,168,48,.16)); color:var(--accent); }
+    .bp-lg.ext { background:rgba(155,89,182,.18); color:#b07cc6; }
+    .bp-cav { font-size:11.5px; color:var(--text-dim); margin:0 2px 12px; line-height:1.4; }
+    .bp-cav a { color:var(--text-muted); }
+    .bpm-row { display:flex; gap:12px; align-items:flex-start; padding:10px 12px; border:1px solid var(--border);
+        border-radius:10px; background:var(--panel); margin-bottom:8px; }
+    .bpm-band { font-family:var(--font-mono); font-weight:700; font-size:15px; width:58px; flex:0 0 auto; }
+    .bpm-body { flex:1; min-width:0; }
+    .bpm-segs { display:flex; flex-wrap:wrap; gap:4px 14px; }
+    .bpm-seg { font-family:var(--font-mono); font-size:13px; white-space:nowrap; }
+    .bpm-tag { display:inline-block; font-size:10px; font-weight:700; padding:1px 6px; border-radius:5px; margin-right:6px; }
+    .bpm-tag.cw { background:rgba(91,192,222,.16); color:var(--link, #4fd8c4); }
+    .bpm-tag.data { background:rgba(62,207,142,.16); color:var(--good, #3ecf8e); }
+    .bpm-tag.phone { background:rgba(224,176,74,.16); color:var(--caution, #e0b04a); }
+    .bpm-tag.all { background:var(--accent-dim, rgba(240,168,48,.16)); color:var(--accent); }
+    .bpm-note { margin-top:4px; font-size:11.5px; color:#b07cc6; font-family:var(--font-mono); }
+    .bpm-plain { font-size:13px; color:var(--text-muted); }
+    .nr-loc { display:flex; align-items:center; gap:8px; margin:0 0 10px; flex-wrap:wrap; }
+    .nr-loc .lbl { flex:1 1 100%; font-size:13px; }
+    .nr-loc .lbl small { display:block; color:var(--text-dim); font-size:11px; margin-top:2px; }
+    .nr-loc button, .nr-loc select { padding:9px 12px; border-radius:9px; border:1px solid var(--border); background:var(--panel);
+        color:var(--text); font-family:var(--font-ui); font-size:12.5px; font-weight:600; cursor:pointer; }
+    .nr-loc button.go { background:var(--live); color:#04211d; border-color:transparent; }
+    .nr-row { border:1px solid var(--border); border-radius:10px; background:var(--panel); padding:10px 12px; margin-bottom:8px; }
+    .nr-top { display:flex; align-items:center; gap:8px; }
+    .nr-call { font-family:var(--font-mono); font-size:14px; font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .nr-dist { font-family:var(--font-mono); font-size:12px; color:var(--text-muted); flex:0 0 auto; }
+    .nr-mid { display:flex; align-items:center; gap:10px; margin-top:5px; font-family:var(--font-mono); font-size:12.5px; flex-wrap:wrap; }
+    .nr-mid .dim { color:var(--text-dim); }
+    .nr-sub { margin-top:4px; font-size:11.5px; color:var(--text-muted); }
+    .nr-node { font-family:var(--font-mono); font-weight:700; color:var(--live); }
+    .nr-act { margin-left:auto; padding:5px 11px; border-radius:8px; border:1px solid color-mix(in srgb, var(--live) 55%, var(--border));
+        background:transparent; color:var(--live); font-size:11.5px; font-weight:600; cursor:pointer; }
+    .nr-tgs { margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); font-size:12px; }
+    .nr-tgs div { padding:2px 0; font-family:var(--font-mono); }
+    .nr-hint { font-size:11.5px; color:var(--text-dim); margin:0 2px 10px; line-height:1.4; }
+
     /* confirm-tap modal (reuses the PIN modal's box) */
     #confirm-modal { position:fixed; inset:0; z-index:61; background:rgba(4,6,10,.6);
         display:none; align-items:center; justify-content:center; padding:24px; }
@@ -806,6 +848,24 @@
                 <div class="notif-hint" id="notif-hint"></div>
             </div>
 
+            <div class="sec-label" style="margin-top:18px">Reference</div>
+            <button class="ql-entry" id="near-entry-btn" type="button">
+                <span class="ic">📍</span>
+                <span>
+                    <div class="tt">Nearby</div>
+                    <div class="sub" id="near-entry-sub">Repeaters · DMR · YSF · AllStar</div>
+                </span>
+                <span class="go">›</span>
+            </button>
+            <button class="ql-entry" id="bp-entry-btn" type="button" style="margin-top:8px">
+                <span class="ic">📻</span>
+                <span>
+                    <div class="tt">Band plan</div>
+                    <div class="sub">US amateur HF privileges</div>
+                </span>
+                <span class="go">›</span>
+            </button>
+
             {% if settings.get('show_license_quiz', False) %}
             <div class="sec-label" style="margin-top:18px">Study</div>
             <button class="ql-entry" id="quiz-entry-btn" type="button">
@@ -851,6 +911,32 @@
             <span class="ttl">ASL Control</span>
         </div>
         <div class="asl-body" id="asl-body"></div>
+    </div>
+
+    <div id="bp-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="bp-close">‹ Back</button>
+            <span class="ttl">Band plan</span>
+        </div>
+        <div class="asl-body" id="bp-body"></div>
+    </div>
+
+    <div id="near-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="near-close">‹ Back</button>
+            <span class="ttl">Nearby</span>
+        </div>
+        <div class="asl-body" id="near-body">
+            <div class="nr-loc">
+                <div class="lbl" id="nr-label">Locating…<small id="nr-sublabel"></small></div>
+                <button class="go" id="nr-gps">📍 Use my location</button>
+                <button id="nr-manual">Enter…</button>
+                <select id="nr-radius"><option value="10">10 mi</option><option value="25" selected>25 mi</option><option value="50">50 mi</option><option value="100">100 mi</option></select>
+            </div>
+            <div class="nr-hint" id="nr-hint" style="display:none"></div>
+            <div class="sp-chips" id="nr-chips"></div>
+            <div id="nr-list"><div class="asl-empty">Loading…</div></div>
+        </div>
     </div>
 
     {% if settings.get('show_license_quiz', False) %}
@@ -2580,6 +2666,203 @@
         });
         fetchNotifFeed();
         setInterval(function () { if (!nfOpen()) fetchNotifFeed(); }, 60000);
+    })();
+
+    /* ================= Band plan (data copied verbatim from the desktop card) ================= */
+    var BP_DATA = [{"band": "160m", "segs": [["all", "ALL", "1.800–2.000"]], "plain": "", "note": ""}, {"band": "80m", "segs": [["cw", "CW", "3.525–3.600"], ["phone", "PH", "3.800–4.000"]], "plain": "", "note": "↳ Extra: CW 3.500+ · PH 3.600+"}, {"band": "40m", "segs": [["cw", "CW", "7.025–7.125"], ["phone", "PH", "7.175–7.300"]], "plain": "", "note": "↳ Extra: CW 7.000+ · PH 7.125+"}, {"band": "30m", "segs": [["data", "DATA", "10.100–10.150"]], "plain": "", "note": ""}, {"band": "20m", "segs": [["cw", "CW", "14.025–14.150"], ["phone", "PH", "14.225–14.350"]], "plain": "", "note": "↳ Extra: CW 14.000+ · PH 14.150+"}, {"band": "17m", "segs": [["all", "ALL", "18.068–18.168"]], "plain": "", "note": ""}, {"band": "15m", "segs": [["cw", "CW", "21.025–21.200"], ["phone", "PH", "21.275–21.450"]], "plain": "", "note": "↳ Extra: CW 21.000+ · PH 21.200+"}, {"band": "12m", "segs": [["all", "ALL", "24.890–24.990"]], "plain": "", "note": ""}, {"band": "10m", "segs": [["all", "ALL", "28.000–29.700"]], "plain": "", "note": ""}, {"band": "6–70cm", "segs": [], "plain": "Full privileges", "note": ""}];
+    (function () {
+        var eb = document.getElementById("bp-entry-btn");
+        if (!eb) return;
+        function render() {
+            var html = '<div class="bp-legend"><span class="bp-lg gen">General</span><span class="bp-lg ext">Extra</span></div>' +
+                '<div class="bp-cav">Reference only — General range shown; the purple ↳ note is where Extra\'s segment extends further. ' +
+                'Confirm against <a href="https://www.arrl.org/general-class-band-chart" target="_blank" rel="noopener">ARRL\'s chart</a>.</div>';
+            BP_DATA.forEach(function (c) {
+                html += '<div class="bpm-row"><div class="bpm-band">' + esc(c.band) + '</div><div class="bpm-body">';
+                if (c.segs.length) {
+                    html += '<div class="bpm-segs">' + c.segs.map(function (s) {
+                        return '<span class="bpm-seg"><span class="bpm-tag ' + esc(s[0]) + '">' + esc(s[1]) + "</span>" + esc(s[2]) + "</span>";
+                    }).join("") + "</div>";
+                }
+                if (c.plain) html += '<div class="bpm-plain">' + esc(c.plain) + "</div>";
+                if (c.note) html += '<div class="bpm-note">' + esc(c.note) + "</div>";
+                html += "</div></div>";
+            });
+            html += '<div class="bp-cav">Conservative sub-bands shown; 60m (channelized) omitted. See ARRL/FCC 97.301 for full detail.</div>';
+            document.getElementById("bp-body").innerHTML = html;
+        }
+        eb.onclick = function () { render(); document.getElementById("bp-screen").classList.add("open"); };
+        document.getElementById("bp-close").onclick = function () { document.getElementById("bp-screen").classList.remove("open"); };
+    })();
+
+    /* ================= Nearby (phone location: repeaters, YSF, D-STAR, DMR, AllStar) ================= */
+    var nrLoc = null, nrMode = "fm", nrRows = [], nrSeq = 0, nrTgOpen = null;
+    var NR_TABS = [["fm", "FM"], ["dmr", "DMR"], ["ysf", "YSF"], ["dstar", "D-STAR"], ["asl", "AllStar"]];
+    function nrOpen() { var el = document.getElementById("near-screen"); return !!(el && el.classList.contains("open")); }
+    function nrLoad() { try { return JSON.parse(localStorage.getItem("pd-loc")) || null; } catch (e) { return null; } }
+    function nrSave(l) { try { localStorage.setItem("pd-loc", JSON.stringify(l)); } catch (e) {} }
+    function nrGrid(g) {                       // Maidenhead (4 or 6 chars) -> centre lat/lon
+        g = (g || "").trim();
+        if (!/^[A-Ra-r]{2}\d{2}([A-Xa-x]{2})?$/.test(g)) return null;
+        g = g.toUpperCase();
+        var lon = (g.charCodeAt(0) - 65) * 20 - 180 + parseInt(g[2], 10) * 2, lat = (g.charCodeAt(1) - 65) * 10 - 90 + parseInt(g[3], 10);
+        if (g.length >= 6) { lon += (g.charCodeAt(4) - 65) * (2 / 24) + 1 / 24; lat += (g.charCodeAt(5) - 65) * (1 / 24) + 1 / 48; }
+        else { lon += 1; lat += 0.5; }
+        return { lat: lat, lon: lon };
+    }
+    function nrParseManual(t) {
+        t = (t || "").trim();
+        var g = nrGrid(t);
+        if (g) return { lat: g.lat, lon: g.lon, label: t.toUpperCase() };
+        var m = t.match(/^(-?\d+(?:\.\d+)?)[\s,;]+(-?\d+(?:\.\d+)?)$/);
+        if (m) {
+            var la = parseFloat(m[1]), lo = parseFloat(m[2]);
+            if (Math.abs(la) <= 90 && Math.abs(lo) <= 180) return { lat: la, lon: lo, label: la.toFixed(3) + ", " + lo.toFixed(3) };
+        }
+        return null;
+    }
+    var NR_DIR = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+    function nrBearing(b) { return NR_DIR[Math.round(((b % 360) + 360) % 360 / 22.5) % 16]; }
+    function nrDist(r) { return r.dist_mi + " mi " + nrBearing(r.bearing); }
+
+    function nrShowLoc() {
+        var lbl = document.getElementById("nr-label"), sub = document.getElementById("nr-sublabel");
+        var txt = nrLoc ? (nrLoc.label || "Saved location") : "Station grid";
+        lbl.firstChild.nodeValue = "📍 " + txt;
+        sub.textContent = nrLoc ? (nrLoc.at ? "updated " + svAgo(nrLoc.at / 1000) : "") : "no phone location set — using the dashboard's station grid";
+        var es = document.getElementById("near-entry-sub");
+        if (es) es.textContent = nrLoc ? txt : "Repeaters · DMR · YSF · AllStar";
+    }
+    function nrGps() {
+        var hint = document.getElementById("nr-hint");
+        if (!navigator.geolocation || !window.isSecureContext) {
+            hint.style.display = "";
+            hint.textContent = "Your phone's GPS is only available to secure (https://) pages, and this one is plain http. Open the dashboard over HTTPS (for example with Tailscale's HTTPS) or use Enter… to type a grid square or latitude, longitude.";
+            return;
+        }
+        document.getElementById("nr-label").firstChild.nodeValue = "📍 Getting your position…";
+        navigator.geolocation.getCurrentPosition(function (p) {
+            nrLoc = { lat: p.coords.latitude, lon: p.coords.longitude, label: "My location (" + p.coords.latitude.toFixed(3) + ", " + p.coords.longitude.toFixed(3) + ")", at: Date.now(), gps: true };
+            nrSave(nrLoc); hint.style.display = "none"; nrShowLoc(); nrFetch();
+        }, function (err) {
+            hint.style.display = "";
+            hint.textContent = err && err.code === 1 ? "Location permission was denied for this page — allow it in the browser's site settings, or use Enter…" : "Couldn't get a position fix — try again outdoors, or use Enter…";
+            nrShowLoc();
+        }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 120000 });
+    }
+
+    async function nrFetch() {
+        var seq = ++nrSeq, list = document.getElementById("nr-list");
+        var radius = document.getElementById("nr-radius").value;
+        var q = "radius=" + encodeURIComponent(radius) + (nrLoc ? "&lat=" + nrLoc.lat + "&lon=" + nrLoc.lon : "");
+        var url = { fm: "/api/nearby/repeaters?mode=FM&", dmr: "/api/nearby/dmr?", ysf: "/api/nearby/repeaters?mode=FUSION&",
+                    dstar: "/api/nearby/repeaters?mode=D-STAR&", asl: "/api/nearby/repeaters?only=asl&" }[nrMode] + q;
+        list.innerHTML = '<div class="asl-empty">Loading…</div>';
+        var j;
+        try { var r = await fetch(url); j = await r.json(); if (!r.ok && !j.error) j = { error: "failed" }; } catch (e) { j = { error: "failed" }; }
+        if (seq !== nrSeq) return;
+        if (j.error) {
+            list.innerHTML = '<div class="asl-empty">' + (j.error === "no location" ? "Set a location first (Use my location, or Enter…)." : "Couldn't load this list right now.") + "</div>";
+            return;
+        }
+        nrRows = j.repeaters || [];
+        nrTgOpen = null;
+        nrRender(j);
+    }
+
+    function nrRender(meta) {
+        var list = document.getElementById("nr-list");
+        if (!nrRows.length) { list.innerHTML = '<div class="asl-empty">Nothing found within ' + esc(String((meta || {}).radius_mi || "")) + " miles — try a bigger radius.</div>"; return; }
+        list.innerHTML = nrRows.map(function (r, i) {
+            var call = r.callsign || "?";
+            if (nrMode === "dmr") {
+                return '<div class="nr-row" data-i="' + i + '"><div class="nr-top"><span class="nr-call">' + csLink(call) + '</span><span class="nr-dist">' + nrDist(r) + "</span></div>" +
+                    '<div class="nr-mid"><span>' + (r.tx ? r.tx.toFixed(4) : "") + " MHz</span><span>CC" + esc(r.colorcode == null ? "?" : r.colorcode) + '</span><span class="dim">' + esc(r.city || "") + "</span>" +
+                    '<button class="nr-act" data-tg="' + i + '">Talkgroups</button></div><div id="nr-tg-' + i + '"></div></div>';
+            }
+            var mhz = r.frequency_hz ? (r.frequency_hz / 1e6).toFixed(4).replace(/0+$/, "").replace(/\.$/, "") : "";
+            var off = r.offset_hz ? (r.offset_hz > 0 ? "+" : "−") + Math.abs(r.offset_hz / 1e6).toFixed(r.offset_hz % 100000 ? 3 : 1) : "";
+            var tone = r.tone ? "T" + r.tone : "";
+            if (nrMode === "asl") {
+                return '<div class="nr-row" data-i="' + i + '"><div class="nr-top"><span class="nr-call">' + csLink(call) + '</span><span class="nr-dist">' + nrDist(r) + "</span></div>" +
+                    '<div class="nr-mid"><span class="nr-node">Node ' + esc(r.asl_node) + "</span><span>" + mhz + " " + off + '</span><button class="nr-act" data-asl="' + esc(r.asl_node) + '">Connect…</button></div>' +
+                    '<div class="nr-sub">' + esc(r.asl_location || r.city || "") + "</div></div>";
+            }
+            var tune = (nrMode === "fm" && (window.SPOTS_RIG) && r.frequency_hz) ? '<button class="nr-act" data-tune="' + i + '">▶ Tune</button>' : "";
+            return '<div class="nr-row" data-i="' + i + '"><div class="nr-top"><span class="nr-call">' + csLink(call) + '</span><span class="nr-dist">' + nrDist(r) + "</span></div>" +
+                '<div class="nr-mid"><span>' + mhz + '</span><span>' + off + '</span><span>' + esc(tone) + "</span>" + tune + "</div>" +
+                '<div class="nr-sub">' + esc(r.city || "") + "</div></div>";
+        }).join("");
+    }
+
+    function nrChips() {
+        document.getElementById("nr-chips").innerHTML = NR_TABS.map(function (t) {
+            return '<button data-m="' + t[0] + '" class="' + (t[0] === nrMode ? "on" : "") + '">' + t[1] + "</button>";
+        }).join("");
+    }
+
+    (function () {
+        var eb = document.getElementById("near-entry-btn");
+        if (!eb) return;
+        nrLoc = nrLoad();
+        var savedR = null; try { savedR = localStorage.getItem("pd-loc-radius"); } catch (e) {}
+        if (savedR) document.getElementById("nr-radius").value = savedR;
+        nrShowLoc(); nrChips();
+        eb.onclick = function () {
+            document.getElementById("near-screen").classList.add("open");
+            nrShowLoc(); nrFetch();
+            // a saved GPS fix older than 15 minutes is refreshed quietly when we're allowed to
+            if (nrLoc && nrLoc.gps && Date.now() - nrLoc.at > 900000 && navigator.geolocation && window.isSecureContext) nrGps();
+        };
+        document.getElementById("near-close").onclick = function () { document.getElementById("near-screen").classList.remove("open"); };
+        document.getElementById("nr-gps").onclick = nrGps;
+        document.getElementById("nr-manual").onclick = function () {
+            var t = window.prompt("Grid square (e.g. FN43ig) or latitude, longitude (e.g. 43.21, -71.01):", "");
+            if (t === null) return;
+            var p = nrParseManual(t);
+            if (!p) { toast("Couldn't read that as a grid square or lat, lon"); return; }
+            nrLoc = { lat: p.lat, lon: p.lon, label: p.label, at: Date.now(), gps: false };
+            nrSave(nrLoc); document.getElementById("nr-hint").style.display = "none"; nrShowLoc(); nrFetch();
+        };
+        document.getElementById("nr-radius").onchange = function () { try { localStorage.setItem("pd-loc-radius", this.value); } catch (e) {} nrFetch(); };
+        document.getElementById("nr-chips").addEventListener("click", function (e) {
+            var b = e.target.closest("button[data-m]"); if (!b) return;
+            nrMode = b.getAttribute("data-m"); nrChips(); nrFetch();
+        });
+        document.getElementById("nr-list").addEventListener("click", async function (e) {
+            var tg = e.target.closest("button[data-tg]");
+            if (tg) {
+                var i = parseInt(tg.getAttribute("data-tg"), 10), box = document.getElementById("nr-tg-" + i), r = nrRows[i];
+                if (box.innerHTML) { box.innerHTML = ""; return; }
+                box.innerHTML = '<div class="nr-tgs">Loading…</div>';
+                var j; try { j = await fetch("/api/nearby/dmr_talkgroups/" + encodeURIComponent(r.id)).then(function (x) { return x.json(); }); } catch (er) { j = { error: 1 }; }
+                if (j.error) { box.innerHTML = '<div class="nr-tgs">Couldn\'t load talkgroups.</div>'; return; }
+                box.innerHTML = '<div class="nr-tgs">' + (j.talkgroups.length ? j.talkgroups.map(function (t) {
+                    return "<div>TG " + esc(t.talkgroup) + (t.slot && t.slot !== "0" ? " · TS" + esc(t.slot) : "") + (t.name ? " — " + esc(t.name) : "") + "</div>";
+                }).join("") : "<div>No static talkgroups registered with Brandmeister (they may be set on the repeater itself, or used on demand).</div>") + "</div>";
+                return;
+            }
+            var tb = e.target.closest("button[data-tune]");
+            if (tb) {
+                var rr = nrRows[parseInt(tb.getAttribute("data-tune"), 10)];
+                var ok = await confirmAction("Tune the rig?", "Tune to " + (rr.frequency_hz / 1e6).toFixed(4) + " MHz FM for " + rr.callsign + "?", false);
+                if (!ok) return;
+                var res = await apiControl("/api/rig_tune", { freq_hz: rr.frequency_hz, mode: "FM" });
+                toast(res && res.message ? res.message : (res && res.ok ? "Tuned" : "Failed"));
+                return;
+            }
+            var ab = e.target.closest("button[data-asl]");
+            if (ab) {
+                var node = ab.getAttribute("data-asl");
+                var asl = (lastData || []).filter(function (h) { return h.type === "asl3" && h.status !== "Offline"; });
+                if (!asl.length) { toast("No online ASL3 hotspot to connect from"); return; }
+                var hs = asl[0];
+                var go = await confirmAction("Connect?", "Connect node " + node + " to " + hs.name + (asl.length > 1 ? " (first of " + asl.length + " ASL3 hotspots)" : "") + "?", false);
+                if (!go) return;
+                var out = await apiControl("/api/asl_connect", { id: hs.id, node: node, action: "connect" });
+                toast(out && out.message ? out.message : (out && out.success ? "Connected" : "Failed"));
+            }
+        });
     })();
 
     /* ================= License quiz ================= */
