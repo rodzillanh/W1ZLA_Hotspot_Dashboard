@@ -123,10 +123,17 @@ class LicenseQuizPool:
             except (OSError, json.JSONDecodeError):
                 self._questions[license_class] = []
 
-    def random_question(self, license_class: str = DEFAULT_CLASS) -> dict | None:
+    def random_question(self, license_class: str = DEFAULT_CLASS, section: str | None = None) -> dict | None:
+        """A random question from a class's pool. `section` (e.g. "E5") limits
+        it to that subelement -- used by the mobile quiz to drill a weak
+        section; an unknown/empty section just means the whole pool."""
         questions = self._questions.get(license_class) or []
         if not questions:
             return None
+        if section:
+            prefix = str(section).strip().upper()
+            if prefix in SECTION_NAMES.get(license_class, {}):
+                questions = [q for q in questions if str(q.get("id", "")).upper().startswith(prefix)] or questions
         return random.choice(questions)
 
     def count(self, license_class: str = DEFAULT_CLASS) -> int:

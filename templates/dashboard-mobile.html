@@ -532,6 +532,36 @@
     .nf-text { margin-top:4px; font-size:12.5px; color:var(--text-muted); word-break:break-word; }
     .nf-extra { margin-top:3px; font-size:11px; color:var(--text-dim); }
 
+    /* License quiz */
+    #quiz-screen { position:fixed; inset:0; z-index:35; background:var(--bg); display:none; flex-direction:column; }
+    #quiz-screen.open { display:flex; }
+    .qz-stats { display:flex; gap:14px; font-family:var(--font-mono); font-size:12px; color:var(--text-muted); margin:0 2px 10px; flex-wrap:wrap; }
+    .qz-stats b { color:var(--text); }
+    .qz-pips { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 14px; }
+    .qz-pip { font-family:var(--font-mono); font-size:11px; padding:5px 8px; border-radius:7px; border:1px solid var(--border);
+        background:var(--panel); color:var(--text-dim); cursor:pointer; }
+    .qz-pip[data-level=good] { color:var(--good, #3ecf8e); border-color:color-mix(in srgb, var(--good, #3ecf8e) 55%, var(--border)); }
+    .qz-pip[data-level=fair] { color:var(--caution, #e0b04a); border-color:color-mix(in srgb, var(--caution, #e0b04a) 55%, var(--border)); }
+    .qz-pip[data-level=poor] { color:var(--danger); border-color:color-mix(in srgb, var(--danger) 55%, var(--border)); }
+    .qz-pip.sel { outline:2px solid var(--live); outline-offset:1px; }
+    .qz-card { border:1px solid var(--border); border-radius:12px; background:var(--panel); padding:14px; }
+    .qz-id { font-family:var(--font-mono); font-size:11px; color:var(--text-dim); margin-bottom:8px; }
+    .qz-q { font-size:15px; line-height:1.45; color:var(--text); margin-bottom:14px; }
+    .qz-a { display:flex; align-items:flex-start; gap:10px; width:100%; text-align:left; padding:12px; margin-bottom:8px;
+        border:1px solid var(--border); border-radius:10px; background:var(--panel-2); color:var(--text);
+        font-family:var(--font-ui); font-size:14px; line-height:1.4; cursor:pointer; }
+    .qz-a .ltr { flex:0 0 auto; width:22px; height:22px; border-radius:50%; background:var(--border); color:var(--text-muted);
+        font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+    .qz-a.correct { border-color:var(--good, #3ecf8e); background:color-mix(in srgb, var(--good, #3ecf8e) 16%, var(--panel-2)); }
+    .qz-a.correct .ltr { background:var(--good, #3ecf8e); color:#04211d; }
+    .qz-a.wrong { border-color:var(--danger); background:color-mix(in srgb, var(--danger) 16%, var(--panel-2)); }
+    .qz-a.wrong .ltr { background:var(--danger); color:#fff; }
+    .qz-a.dim { opacity:.5; }
+    .qz-next { width:100%; margin-top:6px; padding:13px 0; border:none; border-radius:10px; background:var(--live);
+        color:#04211d; font-family:var(--font-ui); font-size:14px; font-weight:700; cursor:pointer; }
+    .qz-tools { display:flex; justify-content:space-between; margin-top:16px; font-size:12px; }
+    .qz-tools button { background:none; border:none; color:var(--text-dim); font-family:var(--font-ui); font-size:12px; cursor:pointer; padding:6px 2px; }
+
     /* confirm-tap modal (reuses the PIN modal's box) */
     #confirm-modal { position:fixed; inset:0; z-index:61; background:rgba(4,6,10,.6);
         display:none; align-items:center; justify-content:center; padding:24px; }
@@ -759,6 +789,18 @@
                 <div class="notif-hint" id="notif-hint"></div>
             </div>
 
+            {% if settings.get('show_license_quiz', False) %}
+            <div class="sec-label" style="margin-top:18px">Study</div>
+            <button class="ql-entry" id="quiz-entry-btn" type="button">
+                <span class="ic">🎓</span>
+                <span>
+                    <div class="tt">License quiz</div>
+                    <div class="sub" id="quiz-entry-sub">Technician · General · Extra</div>
+                </span>
+                <span class="go">›</span>
+            </button>
+            {% endif %}
+
             <div class="sec-label" style="margin-top:18px">This connection</div>
             <div class="net-line" id="net-line">Checking…</div>
 
@@ -793,6 +835,30 @@
         </div>
         <div class="asl-body" id="asl-body"></div>
     </div>
+
+    {% if settings.get('show_license_quiz', False) %}
+    <div id="quiz-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="quiz-close">‹ Back</button>
+            <span class="ttl">License quiz</span>
+        </div>
+        <div class="asl-body" id="quiz-body">
+            <div class="sp-chips" id="qz-classes"></div>
+            <div class="qz-stats" id="qz-stats"></div>
+            <div class="qz-pips" id="qz-pips"></div>
+            <div class="qz-card">
+                <div class="qz-id" id="qz-id"></div>
+                <div class="qz-q" id="qz-q">Loading…</div>
+                <div id="qz-answers"></div>
+                <button class="qz-next" id="qz-next" style="display:none">Next question</button>
+            </div>
+            <div class="qz-tools">
+                <button id="qz-weak">Drill weakest / untried section</button>
+                <button id="qz-reset">Reset stats</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <div id="notif-screen" aria-hidden="true">
         <div class="prefs-hdr">
@@ -2496,6 +2562,138 @@
         });
         fetchNotifFeed();
         setInterval(function () { if (!nfOpen()) fetchNotifFeed(); }, 60000);
+    })();
+
+    /* ================= License quiz ================= */
+    // Same localStorage keys as the desktop card, so a phone's progress and the
+    // browser's progress are the same on any one device (no accounts).
+    var QZ_NAMES = {
+        technician: { T0: "Safety", T1: "Commission's Rules", T2: "Operating Procedures", T3: "Radio Wave Propagation",
+            T4: "Amateur Radio Practices", T5: "Electrical Principles", T6: "Electronic & Electrical Components",
+            T7: "Practical Circuits", T8: "Signals & Emissions", T9: "Antennas & Feed Lines" },
+        general: { G0: "Electrical & RF Safety", G1: "Commission's Rules", G2: "Operating Procedures", G3: "Radio Wave Propagation",
+            G4: "Amateur Radio Practices", G5: "Electrical Principles", G6: "Circuit Components", G7: "Practical Circuits",
+            G8: "Signals & Emissions", G9: "Antennas & Feed Lines" },
+        extra: { E0: "Safety", E1: "Commission's Rules", E2: "Operating Procedures", E3: "Radio Wave Propagation",
+            E4: "Amateur Radio Practices", E5: "Electrical Principles", E6: "Circuit Components", E7: "Practical Circuits",
+            E8: "Signals & Emissions", E9: "Antennas & Transmission Lines" }
+    };
+    var QZ_LABEL = { technician: "Technician", general: "General", extra: "Extra" };
+    var qzClass = (function () { try { var c = localStorage.getItem("lqSelectedClass"); return QZ_NAMES[c] ? c : "extra"; } catch (e) { return "extra"; } })();
+    var qzSection = null, qzItem = null, qzAnswered = false, qzRecent = [], qzStreak = 0, qzBest = 0, qzSession = { right: 0, total: 0 };
+    function qzStats() { try { return JSON.parse(localStorage.getItem("lqSectionStats")) || {}; } catch (e) { return {}; } }
+    function qzSaveStats(s) { try { localStorage.setItem("lqSectionStats", JSON.stringify(s)); } catch (e) {} }
+
+    function qzTotals() {
+        var st = qzStats(), names = QZ_NAMES[qzClass], c = 0, t = 0;
+        Object.keys(names).forEach(function (k) { if (st[k]) { c += st[k].correct; t += st[k].total; } });
+        return { c: c, t: t };
+    }
+    function renderQzStats() {
+        var st = qzStats(), names = QZ_NAMES[qzClass], tot = qzTotals();
+        document.getElementById("qz-classes").innerHTML = Object.keys(QZ_LABEL).map(function (k) {
+            return '<button data-cls="' + k + '" class="' + (k === qzClass ? "on" : "") + '">' + QZ_LABEL[k] + "</button>";
+        }).join("");
+        document.getElementById("qz-stats").innerHTML = "<span>Answered <b>" + tot.t + "</b></span><span>Accuracy <b>" +
+            (tot.t ? Math.round(100 * tot.c / tot.t) + "%" : "—") + "</b></span><span>Streak <b>" + qzStreak + "</b> (best " + qzBest + ")</span>";
+        document.getElementById("qz-pips").innerHTML = Object.keys(names).map(function (k) {
+            var s = st[k], lvl = "";
+            if (s && s.total) { var pct = Math.round(100 * s.correct / s.total); lvl = pct >= 80 ? "good" : pct >= 50 ? "fair" : "poor"; }
+            return '<button class="qz-pip' + (qzSection === k ? " sel" : "") + '" data-sec="' + k + '"' + (lvl ? ' data-level="' + lvl + '"' : "") +
+                ' title="' + esc(names[k] + (s && s.total ? " — " + s.correct + "/" + s.total : "")) + '">' + k + "</button>";
+        }).join("");
+        var sub = document.getElementById("quiz-entry-sub");
+        if (sub) sub.textContent = QZ_LABEL[qzClass] + (tot.t ? " · " + tot.t + " answered · " + Math.round(100 * tot.c / tot.t) + "%" : " · not started");
+    }
+
+    async function qzNext() {
+        var item = null;
+        for (var tries = 0; tries < 6; tries++) {
+            try {
+                var url = "/api/quiz_question?class=" + encodeURIComponent(qzClass) + (qzSection ? "&section=" + encodeURIComponent(qzSection) : "");
+                item = await fetch(url).then(function (r) { return r.json(); });
+            } catch (e) { item = { error: true }; break; }
+            if (!item || item.error || qzRecent.indexOf(item.id) < 0) break;     // avoid an immediate repeat
+        }
+        var q = document.getElementById("qz-q");
+        if (!item || item.error) {
+            q.textContent = "The question pool isn't available right now.";
+            document.getElementById("qz-answers").innerHTML = "";
+            document.getElementById("qz-next").style.display = "none";
+            return;
+        }
+        qzItem = item; qzAnswered = false;
+        qzRecent.push(item.id); if (qzRecent.length > 25) qzRecent.shift();
+        document.getElementById("qz-id").textContent = item.id + " · " + (QZ_NAMES[qzClass][item.id.slice(0, 2)] || "");
+        q.textContent = item.question;
+        var L = ["A", "B", "C", "D"];
+        document.getElementById("qz-answers").innerHTML = item.answers.map(function (a, i) {
+            return '<button class="qz-a" data-i="' + i + '"><span class="ltr">' + L[i] + "</span><span>" + esc(a) + "</span></button>";
+        }).join("");
+        document.getElementById("qz-next").style.display = "none";
+        renderQzStats();
+    }
+
+    function qzAnswer(btn) {
+        if (qzAnswered || !qzItem) return;
+        qzAnswered = true;
+        var pick = parseInt(btn.getAttribute("data-i"), 10), right = pick === qzItem.correct;
+        document.querySelectorAll("#qz-answers .qz-a").forEach(function (a) {
+            var i = parseInt(a.getAttribute("data-i"), 10);
+            a.classList.add(i === qzItem.correct ? "correct" : (a === btn ? "wrong" : "dim"));
+        });
+        var st = qzStats(), sec = qzItem.id.slice(0, 2);
+        if (!st[sec]) st[sec] = { correct: 0, total: 0 };
+        st[sec].total++; if (right) st[sec].correct++;
+        qzSaveStats(st);
+        qzSession.total++; if (right) { qzSession.right++; qzStreak++; qzBest = Math.max(qzBest, qzStreak); } else qzStreak = 0;
+        try { if (navigator.vibrate) navigator.vibrate(right ? 15 : [30, 40, 30]); } catch (e) {}
+        document.getElementById("qz-next").style.display = "";
+        renderQzStats();
+    }
+
+    function qzWeakest() {
+        var st = qzStats(), names = QZ_NAMES[qzClass], worst = null, worstPct = 101;
+        Object.keys(names).forEach(function (k) {
+            var s = st[k] || { correct: 0, total: 0 };
+            var pct = s.total ? 100 * s.correct / s.total : -1;            // never-tried sections come first
+            if (pct < worstPct) { worstPct = pct; worst = k; }
+        });
+        return worst;
+    }
+
+    (function () {
+        var eb = document.getElementById("quiz-entry-btn");
+        if (!eb) return;
+        renderQzStats();
+        eb.onclick = function () {
+            document.getElementById("quiz-screen").classList.add("open");
+            renderQzStats();
+            if (!qzItem) qzNext();
+        };
+        document.getElementById("quiz-close").onclick = function () { document.getElementById("quiz-screen").classList.remove("open"); };
+        document.getElementById("qz-answers").addEventListener("click", function (e) {
+            var b = e.target.closest("button.qz-a"); if (b) qzAnswer(b);
+        });
+        document.getElementById("qz-next").onclick = qzNext;
+        document.getElementById("qz-classes").addEventListener("click", function (e) {
+            var b = e.target.closest("button[data-cls]");
+            if (!b || b.getAttribute("data-cls") === qzClass) return;
+            qzClass = b.getAttribute("data-cls"); qzSection = null; qzStreak = 0;
+            try { localStorage.setItem("lqSelectedClass", qzClass); } catch (er) {}
+            qzNext();
+        });
+        document.getElementById("qz-pips").addEventListener("click", function (e) {
+            var b = e.target.closest("button[data-sec]"); if (!b) return;
+            qzSection = qzSection === b.getAttribute("data-sec") ? null : b.getAttribute("data-sec");
+            qzNext();
+        });
+        document.getElementById("qz-weak").onclick = function () { qzSection = qzWeakest(); toast("Drilling " + qzSection + " · " + QZ_NAMES[qzClass][qzSection]); qzNext(); };
+        document.getElementById("qz-reset").onclick = async function () {
+            var ok = await confirmAction("Reset quiz stats?", "Clear your answered / accuracy history on this phone.", true);
+            if (!ok) return;
+            qzSaveStats({}); qzStreak = 0; qzBest = 0; renderQzStats();
+        };
     })();
 
     document.getElementById("cards").addEventListener("click", function (e) {

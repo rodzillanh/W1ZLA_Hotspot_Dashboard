@@ -2655,7 +2655,7 @@ def api_quiz_question():
     (license_quiz.random_question() returns None), same 503 as a missing
     pool file -- no separate validation needed."""
     license_class = request.args.get("class", LICENSE_QUIZ_DEFAULT_CLASS)
-    q = license_quiz.random_question(license_class)
+    q = license_quiz.random_question(license_class, request.args.get("section"))
     if q is None:
         return jsonify({"error": "unavailable"}), 503
     return jsonify(q)

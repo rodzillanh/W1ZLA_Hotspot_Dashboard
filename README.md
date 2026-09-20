@@ -2351,6 +2351,12 @@ untouched. It's a single-column layout with a bottom tab bar:
 - **Digital links** (button on WPSD cards with Brandmeister or
   ircDDBGateway set up) — link or unlink Brandmeister static talkgroups and
   D-STAR reflectors, with your saved favorites as one-tap chips.
+- **License quiz** (More tab, when the License Quiz card is enabled) — the
+  same question pools as the desktop card in a phone-sized practice screen:
+  pick Technician / General / Extra, tap an answer, see the right one, keep a
+  streak, and drill a single subelement or your weakest one. Progress is
+  stored on the phone (the same saved stats the desktop card uses in that
+  browser).
 - **Notifications** (top of the Activity tab) — the same sources as the
   desktop Notifications card in one newest-first list, with source chips and
   an unread count that's remembered per phone.
