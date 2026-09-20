@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.96 "Pickett"</span>
+                <span class="release-version">v4.97 "Bopper"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Pocket Dash: SSTV</span> &mdash; when the SSTV card is enabled, the Activity tab has a <b>Slow-scan TV</b> row. Its screen shows the state and rig frequency, the live preview while a picture is arriving (otherwise your latest picture, with mode, grade and age, flagged <i>partial</i> when it was joined mid-picture), a thumbnail gallery, why the last signal was dropped, and <b>Listen now</b> / <b>Stop</b> (each asks for a confirmation tap, since they retune the rig)</li>
+                <li><span>Pocket Dash: Spots</span> &mdash; when the Spots card is enabled, the Activity tab has a <b>Spots</b> row opening POTA and SOTA spots, plus DX cluster and RBN when those are switched on. Source chips, search across callsign / park / summit, new-to-you parks flagged, distance and bearing for POTA, callsigns link to QRZ, and (with rig control set up) a <b>Tune</b> button per spot that asks first</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.96 "Pickett"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fix: SSTV card decoded for ~20 seconds, then dropped a clear signal</span> &mdash; diagnosed from a downloaded recording: a picture was already in progress when listening began (or the rig was tuned onto it), so its header had been missed, and the loud picture content was mistaken for a header of the wrong mode (&ldquo;PD 120&rdquo;). That decoded to static and was dropped at the 20-second check. Every SSTV line carries a sync pulse at its mode's own line period, so the receiver now identifies the mode from the sync train itself (periods measured from the encoder for all 17 modes)</li>

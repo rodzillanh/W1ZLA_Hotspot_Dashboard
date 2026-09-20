@@ -641,6 +641,11 @@ BIOS = {
         "blurb": "“The Wicked Pickett,” the Alabama-born soul shouter behind “In the Midnight Hour” and “Mustang Sally.”",
         "wiki": "Wilson_Pickett",
     },
+    "Bopper": {
+        "name": "The Big Bopper",
+        "blurb": "J. P. Richardson, the Texas disc jockey and songwriter behind “Chantilly Lace,” killed in the 1959 plane crash that also took Buddy Holly and Ritchie Valens.",
+        "wiki": "The_Big_Bopper",
+    },
 }
 
 

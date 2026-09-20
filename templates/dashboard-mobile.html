@@ -470,6 +470,53 @@
         background:var(--panel-2); color:var(--text); font-size:12px; cursor:pointer; }
     .dv-chips button:disabled { opacity:.35; }
 
+    /* SSTV screen */
+    #sstv-screen { position:fixed; inset:0; z-index:35; background:var(--bg); display:none; flex-direction:column; }
+    #sstv-screen.open { display:flex; }
+    .sv-state { display:flex; align-items:center; gap:8px; font-size:13px; margin:2px 2px 4px; }
+    .sv-dot { width:8px; height:8px; border-radius:50%; background:var(--text-dim); flex:0 0 auto; }
+    .sv-dot.live { background:var(--live); animation:pulse 1.9s ease-out infinite; }
+    .sv-sub { font-family:var(--font-mono); font-size:11px; color:var(--text-dim); margin:0 2px 12px; }
+    .sv-frame { width:100%; aspect-ratio:5 / 4; background:var(--panel); border:1px solid var(--border);
+        border-radius:10px; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+    .sv-frame img { width:100%; height:100%; object-fit:contain; display:block; }
+    .sv-frame .none { color:var(--text-dim); font-size:12.5px; padding:0 18px; text-align:center; }
+    .sv-cap { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); margin:8px 2px 0; }
+    .sv-note { font-size:11.5px; color:var(--text-muted); margin:10px 2px 0; }
+    .sv-btns { display:flex; gap:8px; margin-top:14px; }
+    .sv-btns button { flex:1; padding:12px 0; border-radius:10px; border:1px solid var(--border);
+        background:var(--panel-2); color:var(--text); font-family:var(--font-ui); font-size:13px; font-weight:600; cursor:pointer; }
+    .sv-btns button.go { background:var(--live); color:#04211d; border-color:transparent; }
+    .sv-btns button:disabled { opacity:.35; }
+    .sv-gal { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+    .sv-gal button { padding:0; border:1px solid var(--border); border-radius:8px; background:var(--panel);
+        overflow:hidden; cursor:pointer; aspect-ratio:5 / 4; }
+    .sv-gal button.sel { border-color:var(--live); }
+    .sv-gal img { width:100%; height:100%; object-fit:cover; display:block; }
+
+    /* Spots screen */
+    #spots-screen { position:fixed; inset:0; z-index:35; background:var(--bg); display:none; flex-direction:column; }
+    #spots-screen.open { display:flex; }
+    .sp-chips { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:10px; }
+    .sp-chips button { padding:7px 12px; border-radius:16px; border:1px solid var(--border); background:var(--panel);
+        color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer; }
+    .sp-chips button.on { background:var(--live-dim, rgba(79,216,196,.14)); color:var(--live);
+        border-color:color-mix(in srgb, var(--live) 55%, var(--border)); }
+    #sp-search { width:100%; padding:10px 12px; border-radius:9px; border:1px solid var(--border);
+        background:var(--panel); color:var(--text); font-family:var(--font-ui); font-size:14px; margin-bottom:12px; }
+    .sp-row { border:1px solid var(--border); border-radius:10px; background:var(--panel); padding:10px 12px; margin-bottom:8px; }
+    .sp-top { display:flex; align-items:center; gap:8px; }
+    .sp-call { font-family:var(--font-mono); font-size:14px; font-weight:600; flex:1; min-width:0;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .sp-tag { font-family:var(--font-mono); font-size:9px; letter-spacing:.06em; padding:2px 6px; border-radius:5px;
+        border:1px solid var(--border); color:var(--text-muted); flex:0 0 auto; }
+    .sp-new { color:var(--accent); border-color:color-mix(in srgb, var(--accent) 55%, var(--border)); }
+    .sp-mid { display:flex; align-items:center; gap:8px; margin-top:5px; font-family:var(--font-mono); font-size:12px; color:var(--text); }
+    .sp-mid .age { margin-left:auto; color:var(--text-dim); }
+    .sp-sub { margin-top:4px; font-size:11.5px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .sp-tune { padding:5px 10px; border-radius:8px; border:1px solid color-mix(in srgb, var(--live) 55%, var(--border));
+        background:transparent; color:var(--live); font-size:11.5px; font-weight:600; cursor:pointer; }
+
     /* confirm-tap modal (reuses the PIN modal's box) */
     #confirm-modal { position:fixed; inset:0; z-index:61; background:rgba(4,6,10,.6);
         display:none; align-items:center; justify-content:center; padding:24px; }
@@ -650,6 +697,28 @@
                 <span class="go">›</span>
             </button>
             {% endif %}
+            {% if settings.get('show_pota', False) %}
+            <div class="sec-label">Spots</div>
+            <button class="ql-entry" id="spots-entry-btn" type="button">
+                <span class="ic">📡</span>
+                <span>
+                    <div class="tt">Spots</div>
+                    <div class="sub" id="spots-entry-sub">POTA · SOTA{% if settings.get('dxcluster_enabled', False) %} · DX{% endif %}{% if settings.get('rbn_enabled', False) %} · RBN{% endif %}</div>
+                </span>
+                <span class="go">›</span>
+            </button>
+            {% endif %}
+            {% if settings.get('show_sstv', False) %}
+            <div class="sec-label">SSTV</div>
+            <button class="ql-entry" id="sstv-entry-btn" type="button">
+                <span class="ic">🖼️</span>
+                <span>
+                    <div class="tt">Slow-scan TV</div>
+                    <div class="sub" id="sstv-entry-sub">Checking…</div>
+                </span>
+                <span class="go">›</span>
+            </button>
+            {% endif %}
             <div class="sec-label">Recent contacts</div>
             <div id="qsos"><div class="empty"><p>Loading…</p></div></div>
         </section>
@@ -696,6 +765,42 @@
         </div>
         <div class="asl-body" id="asl-body"></div>
     </div>
+
+    {% if settings.get('show_pota', False) %}
+    <div id="spots-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="spots-close">‹ Back</button>
+            <span class="ttl">Spots</span>
+        </div>
+        <div class="asl-body" id="spots-body">
+            <div class="sp-chips" id="sp-chips"></div>
+            <input id="sp-search" type="search" placeholder="Search callsign, park or summit" autocomplete="off" autocapitalize="characters">
+            <div id="sp-list"><div class="asl-empty">Loading…</div></div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if settings.get('show_sstv', False) %}
+    <div id="sstv-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="sstv-close">‹ Back</button>
+            <span class="ttl">SSTV</span>
+        </div>
+        <div class="asl-body" id="sstv-body">
+            <div class="sv-state"><span class="sv-dot" id="sv-dot"></span><span id="sv-state">Checking…</span></div>
+            <div class="sv-sub" id="sv-sub"></div>
+            <div class="sv-frame" id="sv-frame"><span class="none">Nothing decoded yet.</span></div>
+            <div class="sv-cap" id="sv-cap"></div>
+            <div class="sv-note" id="sv-note"></div>
+            <div class="sv-btns">
+                <button class="go" id="sv-listen">Listen now</button>
+                <button id="sv-stop">Stop</button>
+            </div>
+            <div class="asl-sec" id="sv-gal-title" style="display:none">Recent pictures</div>
+            <div class="sv-gal" id="sv-gal"></div>
+        </div>
+    </div>
+    {% endif %}
 
     <div id="dv-screen" aria-hidden="true">
         <div class="prefs-hdr">
@@ -850,7 +955,7 @@
                 p.classList.toggle("active", p.getAttribute("data-tab") === currentTab);
             });
             window.scrollTo(0, 0);
-            if (currentTab === "activity") { fetchQsos(); if (document.getElementById("ql-entry-btn")) fetchQlRig(); }
+            if (currentTab === "activity") { fetchQsos(); if (document.getElementById("ql-entry-btn")) fetchQlRig(); if (document.getElementById("sstv-entry-btn")) fetchSstv(); }
             if (currentTab === "more") refreshNotifState();
             if (currentTab === "map") showMap();
         });
@@ -1961,6 +2066,281 @@
         toast(r && r.message ? r.message : (r && r.success ? "Done" : "Failed"));
         if (r && r.success) { if (kind.indexOf("ddb") === 0) setTimeout(loadDdb, 800); else setTimeout(dvRefresh, 1200); }
     });
+
+    /* ================= SSTV ================= */
+    var sstvData = null, sstvSel = null, sstvTimer = null, sstvShown = "";
+
+    function svMmss(s) { s = Math.max(0, Math.round(s || 0)); return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2); }
+    function svAgo(ts) {
+        var s = Math.max(0, Date.now() / 1000 - ts);
+        if (s < 60) return Math.round(s) + "s ago";
+        if (s < 3600) return Math.round(s / 60) + "m ago";
+        if (s < 86400) return Math.round(s / 3600) + "h ago";
+        return Math.round(s / 86400) + "d ago";
+    }
+    function svFreq(hz) { return hz ? (hz / 1e6).toFixed(3) + " MHz" : "unknown"; }
+    function svOpen() { var el = document.getElementById("sstv-screen"); return !!(el && el.classList.contains("open")); }
+
+    function svView() {
+        if (!sstvData) return null;
+        var rx = sstvData.rx || {}, ctl = sstvData.ctl || {}, cfg = sstvData.config || {};
+        if (!rx.libs_ok) return "error";
+        if (!cfg.host_set) return "setup";
+        if (rx.receiving) return "receiving";
+        if (ctl.state === "active") return "listening";
+        return "standby";
+    }
+
+    async function fetchSstv() {
+        if (!document.getElementById("sstv-entry-btn")) return;
+        try { sstvData = await fetch("/api/sstv").then(function (r) { return r.json(); }); } catch (e) { return; }
+        renderSstv();
+    }
+
+    function renderSstv() {
+        var entry = document.getElementById("sstv-entry-sub");
+        var v = svView();
+        if (!sstvData || !v) return;
+        var rx = sstvData.rx || {}, ctl = sstvData.ctl || {}, cfg = sstvData.config || {}, last = rx.last;
+        var rig = rx.rig || {};
+        var stateTxt = {
+            error: "SSTV decoder isn't available on this install",
+            setup: "Set your wfweb host in Settings → Integrations",
+            receiving: "Receiving " + ((rx.receiving || {}).label || "a picture") +
+                ((rx.receiving || {}).joined ? " (joined mid-picture) · " + svMmss((rx.receiving || {}).elapsed_s) + " so far"
+                    : " · " + svMmss((rx.receiving || {}).elapsed_s) + " of " + svMmss((rx.receiving || {}).total_s)),
+            listening: "Listening for SSTV",
+            standby: "Standby" + (cfg.auto ? "" : " · auto-listen is off")
+        }[v];
+        if (entry) entry.textContent = (v === "receiving" || v === "listening" ? stateTxt : (last ? "Last picture " + svAgo(last.ts) + " · " + last.label : stateTxt));
+        if (!svOpen()) return;
+
+        document.getElementById("sv-state").textContent = stateTxt;
+        document.getElementById("sv-dot").className = "sv-dot" + (v === "receiving" || v === "listening" ? " live" : "");
+        document.getElementById("sv-sub").textContent = "Rig " + svFreq(rig.freq_hz) + (rig.mode ? " · " + rig.mode : "") +
+            (v === "standby" && (ctl.target || {}).freq_hz ? " · target " + svFreq(ctl.target.freq_hz) : "");
+
+        // picture: live preview while receiving, else the selected/last picture
+        var frame = document.getElementById("sv-frame"), cap = document.getElementById("sv-cap");
+        var imgs = sstvData.images || [];
+        var pick = null, src = "", capTxt = "";
+        if (v === "receiving") {
+            src = "/api/sstv/preview.png";
+            capTxt = "Live preview";
+        } else {
+            pick = imgs.filter(function (i) { return i.id === sstvSel; })[0] || imgs[0] || last;
+            if (pick) {
+                src = "/api/sstv/image/" + encodeURIComponent(pick.id) + ".png";
+                capTxt = pick.label + " · " + pick.quality + " · " + svAgo(pick.ts) + (pick.complete === false ? " · partial" : "");
+            }
+        }
+        if (src) {
+            var key = v === "receiving" ? "prev" : src;
+            var img = frame.querySelector("img");
+            if (!img) { frame.innerHTML = "<img>"; img = frame.querySelector("img"); sstvShown = ""; }
+            if (v === "receiving") img.src = src + "?t=" + Date.now();
+            else if (sstvShown !== key) img.src = src;
+            sstvShown = key;
+        } else {
+            frame.innerHTML = '<span class="none">Nothing decoded yet.</span>';
+            sstvShown = "";
+        }
+        cap.textContent = capTxt;
+
+        var lr = rx.last_reject, note = "";
+        if (lr && (!last || lr.ts > last.ts)) {
+            var why = { noise: "too weak to decode", audio_loss: "audio dropouts", blank: "no usable picture",
+                decode_failed: "couldn't be decoded", timeout: "never completed", midpicture: "joined mid-picture" }[lr.kind] || "dropped";
+            note = "Heard " + lr.label + " · " + why + " · " + svAgo(lr.ts);
+        } else if (v === "standby" && ctl.reason) {
+            note = ctl.reason;
+        }
+        document.getElementById("sv-note").textContent = note;
+
+        var canControl = v !== "error" && v !== "setup";
+        var on = v === "receiving" || v === "listening";
+        document.getElementById("sv-listen").style.display = on ? "none" : "";
+        document.getElementById("sv-stop").style.display = on ? "" : "none";
+        document.getElementById("sv-listen").disabled = !canControl;
+        document.getElementById("sv-stop").disabled = !canControl;
+
+        var gal = document.getElementById("sv-gal");
+        var sig = imgs.map(function (i) { return i.id; }).join(",") + "|" + (pick ? pick.id : "");
+        if (gal.getAttribute("data-sig") !== sig) {
+            gal.setAttribute("data-sig", sig);
+            gal.innerHTML = imgs.map(function (i) {
+                return '<button data-id="' + esc(i.id) + '"' + (pick && pick.id === i.id ? ' class="sel"' : "") +
+                    ' title="' + esc(i.label + " · " + i.quality) + '"><img loading="lazy" src="/api/sstv/image/' + encodeURIComponent(i.id) + '.png"></button>';
+            }).join("");
+        }
+        document.getElementById("sv-gal-title").style.display = imgs.length ? "" : "none";
+    }
+
+    function svPoll() {
+        if (!svOpen()) { sstvTimer = null; return; }
+        fetchSstv().then(function () { sstvTimer = setTimeout(svPoll, 2000); });
+    }
+    (function () {
+        var eb = document.getElementById("sstv-entry-btn");
+        if (!eb) return;
+        eb.onclick = function () {
+            document.getElementById("sstv-screen").classList.add("open");
+            renderSstv();
+            if (!sstvTimer) svPoll();
+        };
+        document.getElementById("sstv-close").onclick = function () {
+            document.getElementById("sstv-screen").classList.remove("open");
+        };
+        document.getElementById("sv-gal").addEventListener("click", function (e) {
+            var b = e.target.closest("button[data-id]");
+            if (!b) return;
+            sstvSel = b.getAttribute("data-id");
+            document.getElementById("sv-gal").removeAttribute("data-sig");
+            renderSstv();
+        });
+        async function ctrl(action, title, text) {
+            var ok = await confirmAction(title, text, false);
+            if (!ok) return;
+            var r = await apiControl("/api/sstv/control", { action: action });
+            toast(r && r.message ? r.message : (r && r.ok ? "Done" : "Failed"));
+            setTimeout(fetchSstv, 800);
+        }
+        document.getElementById("sv-listen").onclick = function () {
+            var t = ((sstvData || {}).ctl || {}).target || {};
+            ctrl("listen_now", "Listen for SSTV?", "Tune the rig to " + svFreq(t.freq_hz) + " " + (t.mode || "") +
+                " and listen for pictures. The rig's frequency is restored when you stop.");
+        };
+        document.getElementById("sv-stop").onclick = function () {
+            ctrl("stop", "Stop listening?", "Stop SSTV and put the rig back where it was.");
+        };
+        fetchSstv();
+    })();
+
+    /* ================= Spots (POTA / SOTA / DX cluster / RBN) ================= */
+    var SPOTS_RIG = {{ 'true' if settings.get('rig_control_enabled', False) else 'false' }};
+    var SPOTS_HAS_DX = {{ 'true' if settings.get('dxcluster_enabled', False) else 'false' }};
+    var SPOTS_HAS_RBN = {{ 'true' if settings.get('rbn_enabled', False) else 'false' }};
+    var spData = { POTA: [], SOTA: [], DX: [], RBN: [] };
+    var spOn = { POTA: true, SOTA: true, DX: false, RBN: false };
+    var spTimer = null, spRendered = "";
+
+    function spOpen() { var el = document.getElementById("spots-screen"); return !!(el && el.classList.contains("open")); }
+    function spAgeSec(iso, epoch) {
+        var t = epoch != null ? epoch * 1000 : Date.parse(iso && (iso.endsWith("Z") || iso.indexOf("+") >= 0) ? iso : (iso || "") + "Z");
+        return isNaN(t) ? 99999 : Math.max(0, (Date.now() - t) / 1000);
+    }
+    function spAgeStr(s) { return s < 60 ? Math.round(s) + "s" : s < 3600 ? Math.round(s / 60) + "m" : Math.floor(s / 3600) + "h" + Math.round((s % 3600) / 60) + "m"; }
+    var SP_DIR = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+
+    function spNormalize() {
+        var rows = [];
+        spData.POTA.forEach(function (s) {
+            rows.push({ src: "POTA", call: s.activator, freq_hz: s.freq_hz, mode: s.mode, ref: s.reference, name: s.park_name,
+                age: spAgeSec(s.spot_time, null), isNew: !!s.new_to_you, qso: s.qso_count,
+                dist: s.dist_mi != null && s.bearing != null ? Math.round(s.dist_mi) + " mi " + SP_DIR[Math.round(((s.bearing % 360) + 360) % 360 / 22.5) % 16] : "" });
+        });
+        spData.SOTA.forEach(function (s) {
+            var mhz = parseFloat(s.frequency);
+            rows.push({ src: "SOTA", call: s.callsign, freq_hz: isNaN(mhz) ? null : Math.round(mhz * 1e6), mode: s.mode,
+                ref: s.summit_code, name: s.summit_name, age: spAgeSec(null, s.spotted_at), isNew: false, dist: "" });
+        });
+        spData.DX.forEach(function (s) {
+            rows.push({ src: "DX", call: s.call, freq_hz: s.freq_hz, mode: s.mode || "", ref: "", name: s.comment || "",
+                age: spAgeSec(null, s.last_seen), isNew: false, dist: "", spotter: s.spotter });
+        });
+        spData.RBN.forEach(function (s) {
+            rows.push({ src: "RBN", call: s.call, freq_hz: s.freq_hz, mode: s.mode, ref: "", name: (s.snr_db != null ? s.snr_db + " dB" : "") +
+                (s.speed ? " · " + s.speed + " " + (s.speed_unit || "") : ""), age: spAgeSec(null, s.last_seen), isNew: false, dist: "", spotter: s.spotter });
+        });
+        return rows;
+    }
+
+    function renderSpots() {
+        if (!spOpen()) return;
+        var chips = document.getElementById("sp-chips");
+        var srcs = ["POTA", "SOTA"].concat(SPOTS_HAS_DX ? ["DX"] : []).concat(SPOTS_HAS_RBN ? ["RBN"] : []);
+        chips.innerHTML = srcs.map(function (k) {
+            return '<button data-src="' + k + '" class="' + (spOn[k] ? "on" : "") + '">' + k + " " + spData[k].length + "</button>";
+        }).join("");
+        var q = (document.getElementById("sp-search").value || "").trim().toUpperCase();
+        var rows = spNormalize().filter(function (r) {
+            if (!spOn[r.src] || !r.call) return false;
+            if (!q) return true;
+            return (r.call + " " + (r.ref || "") + " " + (r.name || "")).toUpperCase().indexOf(q) >= 0;
+        });
+        rows.sort(function (a, b) { return (b.isNew - a.isNew) || (a.age - b.age); });
+        var shown = rows.slice(0, 80);
+        var html = shown.map(function (r, i) {
+            var mhz = r.freq_hz ? (r.freq_hz / 1e6).toFixed(3) : "";
+            var tune = (SPOTS_RIG && r.freq_hz)
+                ? '<button class="sp-tune" data-i="' + i + '">▶ Tune</button>' : "";
+            var sub = [r.ref, r.name, r.dist, r.spotter ? "by " + r.spotter : ""].filter(Boolean).join(" · ");
+            return '<div class="sp-row"><div class="sp-top"><span class="sp-call">' + csLink(r.call) + "</span>" +
+                (r.isNew ? '<span class="sp-tag sp-new">NEW</span>' : "") + '<span class="sp-tag">' + r.src + "</span></div>" +
+                '<div class="sp-mid"><span>' + mhz + " MHz</span><span>" + esc(r.mode || "") + "</span>" + tune +
+                '<span class="age">' + spAgeStr(r.age) + "</span></div>" +
+                (sub ? '<div class="sp-sub">' + esc(sub) + "</div>" : "") + "</div>";
+        }).join("");
+        var list = document.getElementById("sp-list");
+        var sig = html + "|" + rows.length;
+        if (sig !== spRendered) {
+            spRendered = sig;
+            list.innerHTML = html || '<div class="asl-empty">No spots match.</div>';
+            list._rows = shown;
+        }
+    }
+
+    async function fetchSpots() {
+        if (!document.getElementById("spots-entry-btn")) return;
+        var jobs = [
+            fetch("/api/pota").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { spData.POTA = (j && j.spots) || []; }).catch(function () {}),
+            fetch("/api/sota_spots").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { spData.SOTA = (j && j.spots) || []; }).catch(function () {})
+        ];
+        if (SPOTS_HAS_DX) jobs.push(fetch("/api/dxcluster_spots").then(function (r) { return r.json(); }).then(function (j) { spData.DX = (j && j.spots) || []; }).catch(function () {}));
+        if (SPOTS_HAS_RBN) jobs.push(fetch("/api/rbn_spots").then(function (r) { return r.json(); }).then(function (j) { spData.RBN = (j && j.spots) || []; }).catch(function () {}));
+        await Promise.all(jobs);
+        var sub = document.getElementById("spots-entry-sub");
+        if (sub) sub.textContent = spData.POTA.length + " POTA · " + spData.SOTA.length + " SOTA" +
+            (SPOTS_HAS_DX ? " · " + spData.DX.length + " DX" : "") + (SPOTS_HAS_RBN ? " · " + spData.RBN.length + " RBN" : "");
+        spRendered = "";
+        renderSpots();
+    }
+    function spPoll() {
+        if (!spOpen()) { spTimer = null; return; }
+        spTimer = setTimeout(function () { fetchSpots().then(spPoll); }, 20000);
+    }
+    (function () {
+        var eb = document.getElementById("spots-entry-btn");
+        if (!eb) return;
+        eb.onclick = function () {
+            document.getElementById("spots-screen").classList.add("open");
+            renderSpots();
+            fetchSpots();
+            if (!spTimer) spPoll();
+        };
+        document.getElementById("spots-close").onclick = function () {
+            document.getElementById("spots-screen").classList.remove("open");
+        };
+        document.getElementById("sp-chips").addEventListener("click", function (e) {
+            var b = e.target.closest("button[data-src]");
+            if (!b) return;
+            spOn[b.getAttribute("data-src")] = !spOn[b.getAttribute("data-src")];
+            spRendered = "";
+            renderSpots();
+        });
+        document.getElementById("sp-search").addEventListener("input", function () { spRendered = ""; renderSpots(); });
+        document.getElementById("sp-list").addEventListener("click", async function (e) {
+            var b = e.target.closest("button.sp-tune");
+            if (!b) return;
+            var r = (this._rows || [])[parseInt(b.getAttribute("data-i"), 10)];
+            if (!r) return;
+            var ok = await confirmAction("Tune the rig?", "Tune to " + (r.freq_hz / 1e6).toFixed(3) + " MHz " + (r.mode || "") + " for " + r.call + "?", false);
+            if (!ok) return;
+            var res = await apiControl("/api/rig_tune", { freq_hz: r.freq_hz, mode: (r.mode || "").replace(/[^A-Za-z0-9]/g, "") });
+            toast(res && res.message ? res.message : (res && res.ok ? "Tuned" : "Failed"));
+        });
+        fetchSpots();
+    })();
 
     document.getElementById("cards").addEventListener("click", function (e) {
         var b = e.target.closest(".asl-ctrl-open");
