@@ -563,11 +563,6 @@ with sync_playwright() as p:
         mob.click('[id="ql-close"]')
         mob.wait_for_timeout(300)
 
-    mob.click('.tabbar button[data-go="map"]')
-    mob.wait_for_timeout(3500)  # lazy Leaflet init + tile load
-    mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-map.png"))
-    print("wrote mobile-map.png")
-
     mob.click('.tabbar button[data-go="more"]')
     mob.wait_for_timeout(900)
     mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-notifications.png"), full_page=True)
@@ -665,6 +660,18 @@ with sync_playwright() as p:
             _shot(_name)
             _jsclick(_close)
             m2.wait_for_timeout(300)
+    # Pocket Dash Map: hotspots + nearby repeaters around a saved location, the
+    # caller pin/line for a call in progress, then a hotspot's bottom sheet.
+    m2.evaluate("""localStorage.setItem('pd-loc', JSON.stringify({lat: 43.208, lon: -71.538,
+        label: 'My location', at: Date.now() - 12000, gps: true}))""")
+    m2.evaluate("document.querySelectorAll('[id$=\"-screen\"].open').forEach(e => e.classList.remove('open'))")
+    _jsclick('.tabbar button[data-go="map"]')
+    m2.wait_for_timeout(7000)  # lazy Leaflet init, tiles, and the live repeater directory
+    _shot("mobile-map.png")
+    if m2.evaluate("typeof openMapSheet === 'function' && (lastData || []).some(h => h.lat != null)"):
+        m2.evaluate("openMapSheet('hs:' + (lastData.find(h => h.is_active && h.lat != null) || lastData.find(h => h.lat != null)).id)")
+        m2.wait_for_timeout(900)
+        _shot("mobile-map-sheet.png")
     _q = m2.query_selector("#quiz-entry-btn")
     if _q:
         _jsclick('#quiz-entry-btn')

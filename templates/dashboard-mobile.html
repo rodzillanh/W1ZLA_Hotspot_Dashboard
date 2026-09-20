@@ -14,6 +14,9 @@
     <meta name="apple-mobile-web-app-title" content="Pocket Dash">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js" defer></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" defer></script>
     <style>
     /* ------------------------------------------------------------------ *
      * Pocket Dash -- lightweight mobile companion (mobile-dashboard-
@@ -705,13 +708,71 @@
         left:0; right:0;
     }
     #map { width:100%; height:100%; background:var(--panel-2); }
-    #map-contacts-toggle {
-        position:absolute; top:10px; right:10px; z-index:600;
-        padding:7px 11px; border-radius:8px; cursor:pointer;
-        font-family:var(--font-ui); font-size:11.5px; font-weight:600;
-        border:1px solid var(--border); background:var(--panel); color:var(--text-muted);
+    #map-top {
+        position:absolute; left:0; right:0; top:0; z-index:600; padding:10px 12px 0;
+        display:flex; flex-direction:column; gap:7px; pointer-events:none;
     }
-    #map-contacts-toggle.on { color:#ff3fa4; border-color:#ff3fa4; }
+    #map-top > * { pointer-events:auto; }
+    .mp-chips { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
+    .mp-chips::-webkit-scrollbar { display:none; }
+    .mp-chip {
+        flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; padding:7px 11px;
+        border-radius:18px; border:1px solid var(--border); background:color-mix(in srgb, var(--panel) 92%, transparent);
+        color:var(--text-muted); font:600 12px var(--font-ui); cursor:pointer; min-height:34px;
+    }
+    .mp-chip .n { font-family:var(--font-mono); font-size:10.5px; opacity:.8; }
+    .mp-chip.on { color:var(--text); border-color:color-mix(in srgb, var(--live) 55%, var(--border)); background:var(--live-dim); }
+    .mp-chip.sm { padding:4px 9px; min-height:28px; font-size:11px; }
+    .mp-chip i { width:8px; height:8px; border-radius:2px; display:inline-block; }
+    .mp-chip:focus-visible, .mp-fab:focus-visible, #map-sheet button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    #map-loc {
+        align-self:flex-start; padding:5px 10px; border-radius:14px; font-size:11px; color:var(--text-muted);
+        background:color-mix(in srgb, var(--panel) 92%, transparent); border:1px solid var(--border);
+    }
+    #map-loc b { color:var(--text); font-weight:600; }
+    #map-loc button { background:none; border:0; color:var(--live); font:600 11px var(--font-ui); padding:0; cursor:pointer; }
+    .mp-fab {
+        position:absolute; right:10px; bottom:110px; z-index:600; width:44px; height:44px; border-radius:50%;
+        border:1px solid color-mix(in srgb, #5aa9ff 60%, var(--border)); background:var(--panel); color:#7db8ff; font-size:19px; cursor:pointer;
+    }
+    .mp-fab2 { bottom:162px; border-color:var(--border); color:var(--text); font:700 10px var(--font-mono); letter-spacing:.03em; }
+    .caller-pin { width:18px; height:18px; border-radius:50%; background:var(--live); border:2px solid var(--bg); box-shadow:0 0 0 0 rgba(79,216,196,.6); animation:callerPing 1.6s ease-out infinite; }
+    @keyframes callerPing { 0% { box-shadow:0 0 0 0 rgba(79,216,196,.55); } 100% { box-shadow:0 0 0 16px rgba(79,216,196,0); } }
+    @media (prefers-reduced-motion:reduce) { .caller-pin { animation:none; } }
+    .leaflet-bottom.leaflet-right .leaflet-control-zoom { margin-right:10px; margin-bottom:14px; }
+    .leaflet-bar a { width:44px; height:40px; line-height:40px; }
+    .me-dot { width:22px; height:22px; border-radius:50%; background:rgba(90,169,255,.25); position:relative; }
+    .me-dot::after { content:""; position:absolute; left:5px; top:5px; width:12px; height:12px; border-radius:50%; background:#5aa9ff; border:2px solid #fff; box-sizing:border-box; }
+    .mk { width:16px; height:16px; border:2px solid var(--bg); box-shadow:0 0 0 1px var(--border); border-radius:3px; }
+    .mk.dia { transform:rotate(45deg); width:13px; height:13px; margin:1.5px; }
+    .mk-spot { width:0; height:0; border-left:9px solid transparent; border-right:9px solid transparent; border-bottom:16px solid #3ddc84; margin:2px; }
+    .mk-spot.fresh { filter:drop-shadow(0 0 4px currentColor); animation:pulse 1.6s ease-in-out infinite; }
+    .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background:color-mix(in srgb, var(--live) 28%, transparent); }
+    .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
+        background:var(--panel-2); color:var(--text); border:1px solid var(--border); font-family:var(--font-mono); font-weight:700;
+    }
+    #map-sheet {
+        position:absolute; left:0; right:0; bottom:0; z-index:700; background:var(--panel); border-top:1px solid var(--border);
+        border-radius:18px 18px 0 0; padding:12px 16px 16px; visibility:hidden; transform:translateY(110%);
+        transition:transform .22s ease, visibility 0s .22s; box-shadow:0 -10px 30px rgba(0,0,0,.4);
+    }
+    #map-sheet.open { visibility:visible; transform:none; transition:transform .22s ease; }
+    section[data-tab="map"].sheet-open .mp-fab, section[data-tab="map"].sheet-open .leaflet-bottom.leaflet-right { transform:translateY(-190px); }
+    .mp-fab, .leaflet-bottom.leaflet-right { transition:transform .22s ease; }
+    .ms-grab { width:36px; height:4px; border-radius:2px; background:var(--border); margin:0 auto 10px; order:-1; }
+    .ms-x { position:absolute; right:8px; top:6px; width:40px; height:40px; border:0; background:none; color:var(--text-dim); font-size:18px; cursor:pointer; }
+    .ms1 { display:flex; align-items:baseline; gap:8px; padding-right:34px; }
+    .ms-call { font-family:var(--font-mono); font-size:17px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .ms-kind { font-family:var(--font-mono); font-size:9.5px; letter-spacing:.06em; padding:2px 6px; border-radius:5px; border:1px solid var(--border); color:var(--text-muted); flex:0 0 auto; }
+    .ms-dist { margin-left:auto; font-family:var(--font-mono); font-size:12px; color:var(--text-muted); white-space:nowrap; }
+    .ms2 { margin-top:6px; font-family:var(--font-mono); font-size:13px; }
+    .ms2.live { color:var(--live); }
+    .ms-node { color:#5aa9ff; }
+    .ms3 { margin-top:4px; font-size:12px; color:var(--text-muted); }
+    .ms-btns { display:flex; gap:8px; margin-top:12px; }
+    .ms-btns button { flex:1; padding:12px 0; border-radius:10px; border:1px solid var(--border); background:var(--panel-2); color:var(--text); font:600 13px var(--font-ui); cursor:pointer; }
+    .ms-btns button.go { background:var(--live); color:#04211d; border-color:transparent; }
+    @media (prefers-reduced-motion:reduce) { #map-sheet { transition:none; } .mk-spot.fresh { animation:none; } }
     .leaflet-container { background:var(--panel-2); font-family:var(--font-ui); }
     .leaflet-popup-content-wrapper, .leaflet-popup-tip {
         background:var(--panel); color:var(--text); border:1px solid var(--border);
@@ -827,7 +888,14 @@
 
         <section data-tab="map">
             <div id="map"></div>
-            <button id="map-contacts-toggle" hidden>◉ Contacts</button>
+            <div id="map-top">
+                <div class="mp-chips" id="map-layers"></div>
+                <div class="mp-chips" id="map-kinds"></div>
+                <div id="map-loc"></div>
+            </div>
+            <button type="button" class="mp-fab" id="map-center" aria-label="Centre on my location">⌖</button>
+            <button type="button" class="mp-fab mp-fab2" id="map-style" aria-label="Map style"></button>
+            <div id="map-sheet" role="dialog" aria-label="Selected station"></div>
         </section>
 
         <section data-tab="activity">
@@ -1225,7 +1293,7 @@
                 clearStale();
                 renderFleet(data);
                 renderCards(data);
-                if (currentTab === "map") renderMapMarkers();
+                if (currentTab === "map") { mapFetchCallers(); renderMapHotspots(); mapChips(); }
                 maybeShowFocus();
                 var aslBody = document.getElementById("asl-body");
                 if (document.getElementById("asl-screen").classList.contains("open") &&
@@ -1945,60 +2013,103 @@
         _toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2200);
     }
 
-    /* ---- map tab (lazy Leaflet) ---- */
+    /* ---- map tab (lazy Leaflet): hotspots, nearby repeaters, spots, contacts, and where you are ---- */
     var mobMap = null, mobMarkers = {};
-
-    var mobContacts = [];  // L.marker[] for recent QSOs
-    var showMapContacts = (function () {
-        try { return localStorage.getItem("pd-map-contacts") === "1"; } catch (e) { return false; }
+    var hsLayer = null, repCluster = null, spotLayer = null, qsoLayer = null, meLayer = null;
+    var MAP_KINDS = { fm: ["FM", "#4fd8c4"], dmr: ["DMR", "#b07cc6"], ysf: ["YSF", "#f0c419"], dstar: ["D-STAR", "#ff8a7a"], asl: ["AllStar", "#5aa9ff"] };
+    var mapOn = (function () {
+        var o = { hs: true, rep: true, spots: false, qso: false };
+        try {
+            var s = JSON.parse(localStorage.getItem("pd-map-layers"));
+            if (s) { Object.keys(o).forEach(function (k) { if (typeof s[k] === "boolean") o[k] = s[k]; }); }
+            else if (localStorage.getItem("pd-map-contacts") === "1") o.qso = true;
+        } catch (e) {}
+        return o;
     })();
+    var mapKindOn = { fm: true, dmr: true, ysf: true, dstar: true, asl: true };
+    var mapRep = [], mapRepKey = "", mapRepAt = 0, mapRepPoint = null, mapSpots = [], mapSpotsAt = 0, mapQsos = [];
+    var mapSel = null, mapFitted = false, mapTimer = null;
+    var mapCallers = [], callerLayer = null, mapTiles = {}, mapTileCur = null;
+    var MAP_STYLES = { dark: ["DARK", "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}", 16],
+                       light: ["LIGHT", "https://tile.openstreetmap.org/{z}/{x}/{y}.png", 19],
+                       sat: ["SAT", "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", 17] };
+    var mapStyle = (function () { try { var v = localStorage.getItem("pd-map-style"); return MAP_STYLES[v] ? v : "dark"; } catch (e) { return "dark"; } })();
+    function mapSetStyle(k) {
+        mapStyle = k; try { localStorage.setItem("pd-map-style", k); } catch (e) {}
+        if (mobMap) {
+            if (mapTileCur) mobMap.removeLayer(mapTileCur);
+            mapTileCur = mapTiles[k] || (mapTiles[k] = L.tileLayer(MAP_STYLES[k][1], { maxNativeZoom: MAP_STYLES[k][2], maxZoom: 19 }));
+            mapTileCur.addTo(mobMap).bringToBack();
+        }
+        var b = document.getElementById("map-style");
+        b.textContent = MAP_STYLES[k][0]; b.setAttribute("aria-label", "Map style: " + MAP_STYLES[k][0].toLowerCase() + " (tap to change)");
+    }
+
+    function mapSaveOn() { try { localStorage.setItem("pd-map-layers", JSON.stringify(mapOn)); } catch (e) {} }
+    function mapMe() { var l = nrLoad(); return l && l.lat != null ? { lat: l.lat, lon: l.lon, gps: !!l.gps, at: l.at } : null; }
+    function mapRadius() { var r = 25; try { r = parseFloat(localStorage.getItem("pd-loc-radius")) || 25; } catch (e) {} return r; }
+    function mapHav(a, b) {
+        var R = 3958.8, q = Math.PI / 180, dl = (b.lat - a.lat) * q, dn = (b.lon - a.lon) * q;
+        var h = Math.sin(dl / 2) * Math.sin(dl / 2) + Math.cos(a.lat * q) * Math.cos(b.lat * q) * Math.sin(dn / 2) * Math.sin(dn / 2);
+        var y = Math.sin(dn) * Math.cos(b.lat * q), x = Math.cos(a.lat * q) * Math.sin(b.lat * q) - Math.sin(a.lat * q) * Math.cos(b.lat * q) * Math.cos(dn);
+        return { mi: 2 * R * Math.asin(Math.sqrt(h)), brg: (Math.atan2(y, x) / q + 360) % 360 };
+    }
+    function mapAway(p) {                      // "31 mi S" from you (or the station grid when no location is set)
+        var from = mapMe() || mapRepPoint;
+        if (!from || p.lat == null) return "";
+        var d = mapHav(from, p);
+        return (d.mi < 10 ? d.mi.toFixed(1) : Math.round(d.mi)) + " mi " + nrBearing(d.brg);
+    }
 
     function showMap() {
-        if (typeof L === "undefined") { setTimeout(showMap, 200); return; }
+        if (typeof L === "undefined" || (typeof L.markerClusterGroup === "undefined" && (window._mapWait = (window._mapWait || 0) + 1) < 25)) { setTimeout(showMap, 200); return; }
         if (!mobMap) {
-            mobMap = L.map("map", { maxZoom: 19, attributionControl: false })
+            mobMap = L.map("map", { maxZoom: 19, attributionControl: false, zoomControl: false })
                 .setView([39.5, -98.35], 3);
-            L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-                { maxNativeZoom: 16, maxZoom: 19 }).addTo(mobMap);
+            L.control.zoom({ position: "bottomright" }).addTo(mobMap);
+            mapSetStyle(mapStyle);
+            callerLayer = L.layerGroup().addTo(mobMap);
+            hsLayer = L.layerGroup().addTo(mobMap);
+            repCluster = (L.markerClusterGroup ? L.markerClusterGroup({ maxClusterRadius: 38, showCoverageOnHover: false, spiderfyOnMaxZoom: true }) : L.layerGroup()).addTo(mobMap);
+            spotLayer = L.layerGroup().addTo(mobMap);
+            qsoLayer = L.layerGroup().addTo(mobMap);
+            meLayer = L.layerGroup().addTo(mobMap);
+            mobMap.on("click", closeMapSheet);
         }
-        var tgl = document.getElementById("map-contacts-toggle");
-        tgl.hidden = false;
-        tgl.classList.toggle("on", showMapContacts);
-        tgl.onclick = toggleMapContacts;
+        mapChips();
         setTimeout(function () {
             mobMap.invalidateSize();
-            renderMapMarkers(true);
-            if (showMapContacts) loadMapContacts();
+            renderMapMarkers();
+            renderMapMe();
+            if (!mapFitted) { mapFitted = true; mapCenter(true); }
+            mapRefreshData();
+            mapFetchCallers();
+            if (!mapTimer) mapTimer = setInterval(function () { if (currentTab === "map") mapRefreshData(); }, 60000);
         }, 60);
     }
 
-    function toggleMapContacts() {
-        showMapContacts = !showMapContacts;
-        try { localStorage.setItem("pd-map-contacts", showMapContacts ? "1" : "0"); } catch (e) {}
-        document.getElementById("map-contacts-toggle").classList.toggle("on", showMapContacts);
-        if (showMapContacts) loadMapContacts();
-        else { mobContacts.forEach(function (m) { mobMap.removeLayer(m); }); mobContacts = []; }
+    function mapChips() {
+        var n = { hs: (lastData || []).filter(function (h) { return h.lat != null && h.lon != null; }).length, rep: mapRep.length, spots: mapSpots.length, qso: mapQsos.length };
+        var L4 = [["hs", "Hotspots"], ["rep", "Repeaters"], ["spots", "Spots"], ["qso", "Contacts"]];
+        var setHtml = function (id, html) { var el = document.getElementById(id); if (el._h !== html) { el._h = html; el.innerHTML = html; } };  // untouched chips keep their nodes (a tap mid-refresh isn't lost)
+        setHtml("map-layers", L4.map(function (l) {
+            return '<button type="button" class="mp-chip' + (mapOn[l[0]] ? " on" : "") + '" data-l="' + l[0] + '" aria-pressed="' + mapOn[l[0]] + '">' + l[1] + ' <span class="n">' + n[l[0]] + "</span></button>";
+        }).join(""));
+        setHtml("map-kinds", mapOn.rep ? Object.keys(MAP_KINDS).map(function (k) {
+            return '<button type="button" class="mp-chip sm' + (mapKindOn[k] ? " on" : "") + '" data-k="' + k + '" aria-pressed="' + mapKindOn[k] + '"><i style="background:' + MAP_KINDS[k][1] + '"></i>' + MAP_KINDS[k][0] + "</button>";
+        }).join("") : "");
+        var me = mapMe();
+        setHtml("map-loc", me ? "📍 <b>" + (me.gps ? "My location" : "Saved location") + "</b>" + (me.at ? " · " + svAgo(me.at / 1000) + " ago" : "")
+                              : '📍 <b>No location</b> · <button type="button" id="map-loc-set">Use my location</button>');
     }
 
-    function loadMapContacts() {
-        if (!mobMap) return;
-        fetch("/api/qsos").then(function (r) { return r.json(); }).then(function (list) {
-            mobContacts.forEach(function (m) { mobMap.removeLayer(m); });
-            mobContacts = [];
-            (list || []).slice().sort(function (a, b) {
-                return (b.logged_at || 0) - (a.logged_at || 0);
-            }).filter(function (q) {
-                return q.lat != null && q.lon != null;
-            }).slice(0, 10).forEach(function (q) {
-                var when = q.logged_at ? fmtAgo(q.logged_at) + " ago" : (q.date || "");
-                var m = L.circleMarker([q.lat, q.lon], {
-                    radius: 6, color: "#ff3fa4", weight: 2, fillColor: "#ff3fa4", fillOpacity: 0.55,
-                }).addTo(mobMap).bindTooltip(
-                    (q.call || "?") + " · " + [q.band, q.mode].filter(Boolean).join(" ") +
-                    (when ? " · " + when : ""));
-                mobContacts.push(m);
-            });
-        }).catch(function () {});
+    function mapPinIcon(kind, extra) {
+        var col = MAP_KINDS[kind] ? MAP_KINDS[kind][1] : "#888";
+        return L.divIcon({ className: "", html: '<div class="mk ' + (kind === "dmr" ? "dia" : "sq") + '" style="background:' + col + '"></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
+    }
+    function mapSpotIcon(sp) {
+        var col = sp.src === "POTA" ? "#3ddc84" : "#ff9f6b";
+        return L.divIcon({ className: "", html: '<div class="mk-spot' + (sp.fresh ? " fresh" : "") + '" style="border-bottom-color:' + col + '"></div>', iconSize: [20, 20], iconAnchor: [10, 12] });
     }
 
     function _pinIcon(state) {
@@ -2009,40 +2120,277 @@
         });
     }
 
-    function renderMapMarkers(fit) {
-        if (!mobMap || !lastData) return;
-        var seen = {}, pts = [];
-        lastData.forEach(function (hs) {
+    function renderMapCallers() {
+        if (!mobMap) return;
+        callerLayer.clearLayers();
+        if (!mapOn.hs) return;
+        mapCallers.forEach(function (c) {
+            if (!c.is_active) return;
+            var hs = (lastData || []).filter(function (h) { return h.id === c.node_id && h.lat != null; })[0];
+            if (hs) L.polyline([[hs.lat, hs.lon], [c.lat, c.lon]], { color: "#4fd8c4", weight: 2, opacity: 0.75, dashArray: "6 6", interactive: false }).addTo(callerLayer);
+            var m = L.marker([c.lat, c.lon], { icon: L.divIcon({ className: "", html: '<div class="caller-pin"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), title: c.call });
+            m.on("click", function (e) { L.DomEvent.stopPropagation(e); openMapSheet("caller:" + c.call); });
+            m.addTo(callerLayer);
+        });
+    }
+
+    async function mapFetchCallers() {
+        try {
+            var j = await fetch("/api/map_data").then(function (r) { return r.json(); });
+            mapCallers = (j && j.callers) || [];
+        } catch (e) { return; }
+        renderMapCallers();
+    }
+
+    function renderMapHotspots() {
+        if (!mobMap) return;
+        renderMapCallers();
+        hsLayer.clearLayers(); mobMarkers = {};
+        if (mapOn.hs) (lastData || []).forEach(function (hs) {
             if (hs.lat == null || hs.lon == null) return;
             var off = hs.status === "Offline";
             var state = off ? "offline" : (hs.is_active ? "live" : "idle");
-            var pos = [hs.lat, hs.lon];
-            seen[hs.id] = true;
-            pts.push(pos);
-            if (mobMarkers[hs.id]) {
-                mobMarkers[hs.id].setLatLng(pos).setIcon(_pinIcon(state));
-            } else {
-                mobMarkers[hs.id] = L.marker(pos, { icon: _pinIcon(state) }).addTo(mobMap);
-            }
-            var line = off ? "Offline"
-                : (hs.is_active && hs.active_call ? "Active: " + esc(hs.active_call)
-                   : (hs.active_call ? "Last: " + esc(hs.active_call) : "Idle"));
-            mobMarkers[hs.id].bindPopup(
-                '<b>' + esc(hs.name) + '</b><br><span class="mp-state">' + line + '</span>' +
-                '<br><span class="mp-link" data-jump="' + esc(hs.id) + '">Open details →</span>');
+            var m = L.marker([hs.lat, hs.lon], { icon: _pinIcon(state), keyboard: true, title: hs.name });
+            m.on("click", function (e) { L.DomEvent.stopPropagation(e); openMapSheet("hs:" + hs.id); });
+            m.addTo(hsLayer); mobMarkers[hs.id] = m;
         });
-        Object.keys(mobMarkers).forEach(function (id) {
-            if (!seen[id]) { mobMap.removeLayer(mobMarkers[id]); delete mobMarkers[id]; }
-        });
-        if (fit && pts.length) mobMap.fitBounds(pts, { padding: [40, 40], maxZoom: 12 });
     }
 
-    document.getElementById("map").addEventListener("click", function (e) {
-        var j = e.target.closest("[data-jump]");
-        if (!j) return;
-        switchToTab("status");
-        showFocus(j.getAttribute("data-jump"));
+    function renderMapMarkers() {
+        if (!mobMap) return;
+        renderMapHotspots();
+        repCluster.clearLayers();
+        if (mapOn.rep) {
+            var ms = [];
+            mapRep.forEach(function (r) {
+                if (!mapKindOn[r.kind]) return;
+                var m = L.marker([r.lat, r.lon], { icon: mapPinIcon(r.kind), title: r.call });
+                m.on("click", function (e) { L.DomEvent.stopPropagation(e); openMapSheet("rep:" + r.key); });
+                ms.push(m);
+            });
+            if (repCluster.addLayers) repCluster.addLayers(ms); else ms.forEach(function (x) { x.addTo(repCluster); });
+        }
+        spotLayer.clearLayers();
+        if (mapOn.spots) mapSpots.forEach(function (sp) {
+            var m = L.marker([sp.lat, sp.lon], { icon: mapSpotIcon(sp), title: sp.call });
+            m.on("click", function (e) { L.DomEvent.stopPropagation(e); openMapSheet("spot:" + sp.key); });
+            m.addTo(spotLayer);
+        });
+        qsoLayer.clearLayers();
+        if (mapOn.qso) mapQsos.forEach(function (q) {
+            var when = q.logged_at ? fmtAgo(q.logged_at) + " ago" : (q.date || "");
+            L.circleMarker([q.lat, q.lon], { radius: 6, color: "#ff3fa4", weight: 2, fillColor: "#ff3fa4", fillOpacity: 0.55 })
+                .bindTooltip((q.call || "?") + " · " + [q.band, q.mode].filter(Boolean).join(" ") + (when ? " · " + when : "")).addTo(qsoLayer);
+        });
+    }
+
+    function renderMapMe() {
+        if (!mobMap) return;
+        meLayer.clearLayers();
+        var me = mapMe();
+        if (!me) return;
+        L.circle([me.lat, me.lon], { radius: mapRadius() * 1609.34, color: "#5aa9ff", weight: 1.2, opacity: 0.55, dashArray: "6 5", fillColor: "#5aa9ff", fillOpacity: 0.04, interactive: false }).addTo(meLayer);
+        L.marker([me.lat, me.lon], { icon: L.divIcon({ className: "", html: '<div class="me-dot"></div>', iconSize: [22, 22], iconAnchor: [11, 11] }), interactive: false, keyboard: false }).addTo(meLayer);
+    }
+
+    function mapCenter(quiet) {
+        var me = mapMe();
+        if (me && mobMap) {
+            mobMap.fitBounds(L.latLng(me.lat, me.lon).toBounds(mapRadius() * 1609.34 * 2), { padding: [10, 10] });
+            if (!quiet) toast("Centred on your location");
+            return;
+        }
+        var pts = (lastData || []).filter(function (h) { return h.lat != null && h.lon != null; }).map(function (h) { return [h.lat, h.lon]; });
+        if (pts.length && mobMap) mobMap.fitBounds(pts, { padding: [40, 40], maxZoom: 12 });
+        if (!quiet && !me) mapGps();
+    }
+
+    function mapGps() {
+        if (!navigator.geolocation || !window.isSecureContext) {
+            toast("GPS needs https — set a location under Nearby → Enter…");
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(function (p) {
+            var l = { lat: p.coords.latitude, lon: p.coords.longitude, label: "My location (" + p.coords.latitude.toFixed(3) + ", " + p.coords.longitude.toFixed(3) + ")", at: Date.now(), gps: true };
+            nrSave(l); nrLoc = l;
+            mapChips(); renderMapMe(); mapCenter(true); mapRefreshData(true);
+        }, function (err) {
+            toast(err && err.code === 1 ? "Location permission was denied for this page" : "Couldn't get a position fix");
+        }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 120000 });
+    }
+
+    async function mapFetchRep(force) {
+        var me = mapMe(), radius = mapRadius();
+        var key = (me ? me.lat.toFixed(3) + "," + me.lon.toFixed(3) : "station") + "|" + radius;
+        if (!force && key === mapRepKey && Date.now() - mapRepAt < 300000) return;
+        var q = "radius=" + radius + (me ? "&lat=" + me.lat + "&lon=" + me.lon : "");
+        var urls = { fm: "/api/nearby/repeaters?mode=FM&", ysf: "/api/nearby/repeaters?mode=FUSION&", dstar: "/api/nearby/repeaters?mode=D-STAR&",
+                     asl: "/api/nearby/repeaters?only=asl&", dmr: "/api/nearby/dmr?" };
+        var out = [];
+        await Promise.all(Object.keys(urls).map(function (k) {
+            return fetch(urls[k] + q).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+                if (!j) return;
+                if (j.point && j.point.source === "station grid") mapRepPoint = { lat: j.point.lat, lon: j.point.lon };
+                (j.repeaters || []).forEach(function (r) {
+                    var lat = k === "dmr" ? r.lat : r.latitude, lon = k === "dmr" ? r.lng : r.longitude;
+                    if (lat == null || lon == null) return;
+                    out.push({ key: k + ":" + (r.id != null ? r.id : r.callsign + (r.asl_node || "")), kind: k, call: r.callsign || "?", lat: lat, lon: lon,
+                               freq_hz: k === "dmr" ? (r.tx ? Math.round(r.tx * 1e6) : null) : r.frequency_hz, offset_hz: r.offset_hz, tone: r.tone,
+                               cc: r.colorcode, city: r.city || "", node: r.asl_node, id: r.id, aslLoc: r.asl_location });
+                });
+            }).catch(function () {});
+        }));
+        // an AllStar repeater is also an FM one -- show it once, as AllStar (the one with the node number)
+        var aslKeys = {};
+        out.forEach(function (r) { if (r.kind === "asl") aslKeys[r.call + "|" + r.freq_hz] = 1; });
+        out = out.filter(function (r) { return !(r.kind === "fm" && aslKeys[r.call + "|" + r.freq_hz]); });
+        mapRep = out; mapRepKey = key; mapRepAt = Date.now();
+    }
+
+    async function mapFetchSpots() {
+        if (Date.now() - mapSpotsAt < 55000) return;
+        var out = [];
+        await Promise.all([
+            fetch("/api/pota").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+                ((j && j.spots) || []).forEach(function (s) {
+                    if (s.lat == null || s.lon == null) return;
+                    var age = spAgeSec(s.spot_time, null);
+                    out.push({ key: "p" + out.length, src: "POTA", call: s.activator, lat: s.lat, lon: s.lon, freq_hz: s.freq_hz, mode: s.mode, ref: s.reference,
+                               name: s.park_name, age: age, fresh: age < 600, isNew: !!s.new_to_you });
+                });
+            }).catch(function () {}),
+            fetch("/api/sota_spots").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+                ((j && j.spots) || []).forEach(function (s) {
+                    if (s.lat == null || s.lon == null) return;
+                    var mhz = parseFloat(s.frequency), age = spAgeSec(null, s.spotted_at);
+                    out.push({ key: "s" + out.length, src: "SOTA", call: s.callsign, lat: s.lat, lon: s.lon, freq_hz: isNaN(mhz) ? null : Math.round(mhz * 1e6),
+                               mode: s.mode, ref: s.summit_code, name: s.summit_name, age: age, fresh: age < 600, isNew: false });
+                });
+            }).catch(function () {})
+        ]);
+        mapSpots = out; mapSpotsAt = Date.now();
+    }
+
+    async function mapFetchQsos() {
+        try {
+            var list = await fetch("/api/qsos").then(function (r) { return r.json(); });
+            mapQsos = (list || []).slice().sort(function (a, b) { return (b.logged_at || 0) - (a.logged_at || 0); })
+                .filter(function (q) { return q.lat != null && q.lon != null; }).slice(0, 10);
+        } catch (e) {}
+    }
+
+    async function mapRefreshData(force) {
+        var jobs = [];
+        if (mapOn.rep) jobs.push(mapFetchRep(force));
+        if (mapOn.spots) jobs.push(mapFetchSpots());
+        if (mapOn.qso && (force || !mapQsos.length)) jobs.push(mapFetchQsos());
+        await Promise.all(jobs);
+        mapChips();
+        renderMapMarkers();
+    }
+
+    /* ---- the bottom sheet a tapped pin opens ---- */
+    var mapSheetEl = document.getElementById("map-sheet");
+    var mapSection = document.querySelector('section[data-tab="map"]');
+    function closeMapSheet() { mapSel = null; mapSheetEl.classList.remove("open"); mapSection.classList.remove("sheet-open"); }
+    function mapFind(id) {
+        var t = id.split(":")[0], rest = id.slice(t.length + 1);
+        if (t === "hs") return { t: t, o: (lastData || []).filter(function (h) { return h.id === rest; })[0] };
+        if (t === "rep") return { t: t, o: mapRep.filter(function (r) { return r.key === rest; })[0] };
+        if (t === "spot") return { t: t, o: mapSpots.filter(function (s) { return s.key === rest; })[0] };
+        if (t === "caller") return { t: t, o: mapCallers.filter(function (c) { return c.call === rest && c.is_active; })[0] };
+        return { t: t, o: null };
+    }
+    function openMapSheet(id) {
+        var f = mapFind(id), o = f.o, h = "";
+        if (!o) return;
+        mapSel = id;
+        if (f.t === "hs") {
+            var off = o.status === "Offline";
+            var line = off ? "Offline" : (o.is_active && o.active_call ? "● ON AIR · " + esc(o.active_call) : (o.active_call ? "Last: " + esc(o.active_call) : "Idle"));
+            h = '<div class="ms1"><span class="ms-call">' + esc(o.name) + '</span><span class="ms-kind">HOTSPOT</span><span class="ms-dist">' + esc(mapAway({ lat: o.lat, lon: o.lon })) + '</span></div>' +
+                '<div class="ms2' + (o.is_active && !off ? " live" : "") + '">' + line + '</div>' +
+                '<div class="ms-btns"><button type="button" class="go" data-a="details" data-id="' + esc(o.id) + '">Open details</button></div>';
+        } else if (f.t === "rep") {
+            var col = MAP_KINDS[o.kind][1], mhz = o.freq_hz ? (o.freq_hz / 1e6).toFixed(o.kind === "dmr" ? 4 : 3).replace(/0+$/, "").replace(/\.$/, "") : "";
+            var off2 = o.offset_hz ? (o.offset_hz > 0 ? "+" : "−") + Math.abs(o.offset_hz / 1e6).toFixed(o.offset_hz % 100000 ? 3 : 1) : "";
+            var mid = mhz + (off2 ? " " + off2 : "") + (o.tone ? " T" + o.tone : "") + (o.kind === "dmr" ? " · CC" + (o.cc == null ? "?" : o.cc) : "") +
+                      (o.kind === "asl" ? ' · <b class="ms-node">Node ' + esc(o.node) + "</b>" : "");
+            var btns = "";
+            if (o.kind === "fm" && SPOTS_RIG && o.freq_hz) btns += '<button type="button" class="go" data-a="tune">▶ Tune ' + mhz + "</button>";
+            if (o.kind === "dmr") btns += '<button type="button" data-a="tgs">Talkgroups</button>';
+            if (o.kind === "asl") btns += '<button type="button" class="go" data-a="connect">Connect node ' + esc(o.node) + "…</button>";
+            h = '<div class="ms1"><span class="ms-call">' + csLink(o.call) + '</span><span class="ms-kind" style="color:' + col + '">' + MAP_KINDS[o.kind][0].toUpperCase() + '</span><span class="ms-dist">' + esc(mapAway(o)) + '</span></div>' +
+                '<div class="ms2">' + mid + '</div><div class="ms3">' + esc(o.aslLoc || o.city) + '</div>' +
+                (btns ? '<div class="ms-btns">' + btns + "</div>" : "") + '<div id="ms-tgbox"></div>';
+        } else if (f.t === "caller") {
+            h = '<div class="ms1"><span class="ms-call">' + csLink(o.call) + '</span><span class="ms-kind" style="color:var(--live)">ON AIR</span><span class="ms-dist">' + esc(mapAway(o)) + '</span></div>' +
+                '<div class="ms2 live">' + esc(o.name || "") + '</div><div class="ms3">' + esc(o.location || "") + (o.node ? " · heard on " + esc(o.node) : "") + "</div>";
+        } else if (f.t === "spot") {
+            var mhz2 = o.freq_hz ? (o.freq_hz / 1e6).toFixed(3) : "";
+            h = '<div class="ms1"><span class="ms-call">' + csLink(o.call) + '</span><span class="ms-kind" style="color:' + (o.src === "POTA" ? "#3ddc84" : "#ff9f6b") + '">' + o.src + (o.isNew ? " · NEW" : "") + '</span><span class="ms-dist">' + esc(mapAway(o)) + '</span></div>' +
+                '<div class="ms2">' + mhz2 + " MHz " + esc(o.mode || "") + '</div><div class="ms3">' + esc([o.ref, o.name].filter(Boolean).join(" · ")) + " · spotted " + spAgeStr(o.age) + ' ago</div>' +
+                (SPOTS_RIG && o.freq_hz ? '<div class="ms-btns"><button type="button" class="go" data-a="tunespot">▶ Tune ' + mhz2 + "</button></div>" : "");
+        }
+        mapSheetEl.innerHTML = '<button type="button" class="ms-x" data-a="close" aria-label="Close">✕</button><div class="ms-grab"></div>' + h;
+        mapSheetEl.classList.add("open"); mapSection.classList.add("sheet-open");
+        if (mobMap) setTimeout(function () { mobMap.panInside([o.lat, o.lon], { paddingTopLeft: [20, 130], paddingBottomRight: [20, 250] }); }, 30);
+    }
+
+    mapSheetEl.addEventListener("click", async function (e) {
+        var b = e.target.closest("button[data-a]");
+        if (!b) return;
+        var a = b.getAttribute("data-a"), f = mapSel ? mapFind(mapSel) : { o: null }, o = f.o;
+        if (a === "close") { closeMapSheet(); return; }
+        if (a === "details") { var hid = b.getAttribute("data-id"); closeMapSheet(); switchToTab("status"); showFocus(hid); return; }
+        if (!o) return;
+        if (a === "tgs") {
+            var box = document.getElementById("ms-tgbox");
+            if (box.innerHTML) { box.innerHTML = ""; return; }
+            box.innerHTML = '<div class="nr-tgs">Loading…</div>';
+            var j; try { j = await fetch("/api/nearby/dmr_talkgroups/" + encodeURIComponent(o.id)).then(function (x) { return x.json(); }); } catch (er) { j = { error: 1 }; }
+            if (j.error) { box.innerHTML = '<div class="nr-tgs">Couldn\'t load talkgroups.</div>'; return; }
+            box.innerHTML = '<div class="nr-tgs">' + (j.talkgroups.length ? j.talkgroups.map(function (t) {
+                return "<div>TG " + esc(t.talkgroup) + (t.slot && t.slot !== "0" ? " · TS" + esc(t.slot) : "") + (t.name ? " — " + esc(t.name) : "") + "</div>";
+            }).join("") : "<div>No static talkgroups registered with Brandmeister (they may be set on the repeater itself, or used on demand).</div>") + "</div>";
+            return;
+        }
+        if (a === "tune" || a === "tunespot") {
+            var isSpot = a === "tunespot", mode = isSpot ? (o.mode || "").replace(/[^A-Za-z0-9]/g, "") : "FM";
+            var okT = await confirmAction("Tune the rig?", "Tune to " + (o.freq_hz / 1e6).toFixed(isSpot ? 3 : 4) + " MHz " + mode + " for " + o.call + "?", false);
+            if (!okT) return;
+            var rs = await apiControl("/api/rig_tune", { freq_hz: o.freq_hz, mode: mode });
+            toast(rs && rs.message ? rs.message : (rs && rs.ok ? "Tuned" : "Failed"));
+            return;
+        }
+        if (a === "connect") {
+            var asl = (lastData || []).filter(function (h2) { return h2.type === "asl3" && h2.status !== "Offline"; });
+            if (!asl.length) { toast("No online ASL3 hotspot to connect from"); return; }
+            var hs = asl[0];
+            var go = await confirmAction("Connect?", "Connect node " + o.node + " to " + hs.name + (asl.length > 1 ? " (first of " + asl.length + " ASL3 hotspots)" : "") + "?", false);
+            if (!go) return;
+            var out = await apiControl("/api/asl_connect", { id: hs.id, node: o.node, action: "connect" });
+            toast(out && out.message ? out.message : (out && out.success ? "Connected" : "Failed"));
+        }
     });
+
+    document.getElementById("map-layers").addEventListener("click", function (e) {
+        var b = e.target.closest("[data-l]"); if (!b) return;
+        var l = b.getAttribute("data-l"); mapOn[l] = !mapOn[l]; mapSaveOn();
+        closeMapSheet(); mapChips(); renderMapMarkers();
+        if (mapOn[l]) mapRefreshData(l === "qso");
+    });
+    document.getElementById("map-kinds").addEventListener("click", function (e) {
+        var b = e.target.closest("[data-k]"); if (!b) return;
+        var k = b.getAttribute("data-k"); mapKindOn[k] = !mapKindOn[k];
+        closeMapSheet(); mapChips(); renderMapMarkers();
+    });
+    document.getElementById("map-center").onclick = function () { mapCenter(false); };
+    document.getElementById("map-style").onclick = function () {
+        var ks = Object.keys(MAP_STYLES); mapSetStyle(ks[(ks.indexOf(mapStyle) + 1) % ks.length]);
+    };
+    mapSetStyle(mapStyle);
+    document.getElementById("map-loc").addEventListener("click", function (e) { if (e.target.id === "map-loc-set") mapGps(); });
 
     /* ---- glanceable focus screen (push-tap landing) ---- */
     var _focusPending = (function () {

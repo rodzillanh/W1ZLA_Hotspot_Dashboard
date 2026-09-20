@@ -2336,10 +2336,22 @@ untouched. It's a single-column layout with a bottom tab bar:
   show talkgroup / mode / RSSI / BER; ASL3 cards show the linked-node list
   (the keyed node pulsing); openSPOT 4 cards show the active profile and, on
   battery, the charge level. Callsigns are tappable and open a QRZ lookup.
-- **Map** — a Leaflet map (loaded only when you first open the tab) with a
-  pin per hotspot that has map coordinates set, colored by state (cyan and
-  pulsing = a call in progress, grey = idle, red = offline). Tap a pin for a
-  popup, then "Open details" to jump to that hotspot on the Status tab.
+- **Map** — a Leaflet map (loaded only when you first open the tab) around
+  where you are: a blue dot and a ring for your Nearby radius (the same saved
+  location as Nearby — GPS on https, or a typed grid square), and a chip row
+  to turn layers on and off — **Hotspots** (cyan and pulsing = a call in
+  progress, grey = idle, red = offline), **Repeaters** (FM, DMR, YSF, D-STAR
+  and AllStar, filterable by kind; crowded pins merge into a count badge),
+  **Spots** (POTA and SOTA, fresh ones ringed, new-to-you flagged) and
+  **Contacts** (your last logged QSOs). Tap a pin and a sheet slides up with
+  its distance and bearing from you and the actions that fit it: Tune (FM
+  repeaters and spots), Talkgroups (DMR), Connect node (AllStar) — each still
+  asks for a confirmation tap — or "Open details" for one of your hotspots.
+  A hotspot with a call in progress also gets a pulsing pin at the caller's
+  location with a dashed line back to the hotspot (tap it for who, where, and
+  how far from you). A small button at the right cycles the tiles: dark,
+  light (OpenStreetMap) or satellite. ⌖ centres on you. Repeaters and Hotspots
+  start on; your layer and tile choices are remembered on the phone.
 - **Activity** — recent logged contacts (the same `qsos.json` the Live map
   and Recent Contacts card read), newest first. If the
   [QRZ Quick Log card](#qrz-quick-log-card) is enabled, a "Log a QSO" row
@@ -2390,6 +2402,7 @@ untouched. It's a single-column layout with a bottom tab bar:
   offline.
 
 <!-- wiki-image: mobile-map.png -->
+<!-- wiki-image: mobile-map-sheet.png -->
 <!-- wiki-image: mobile-activity.png -->
 <!-- wiki-image: mobile-quick-log.png -->
 

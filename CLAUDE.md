@@ -8090,6 +8090,40 @@ config for per-integration credentials; put it in
     card first (`[data-hid=X] .card-tap`). The link chips mirror the desktop
     Hotspot Status card's but are computed by `chipsFor()` here -- another
     intentionally-duplicated pair (desktop `computeDvChips()`), keep in sync.
+  - **Pocket Dash Map, "what's around me" (unreleased, after v4.99)** --
+    mockup-approved (a published Artifact) with decisions: Hotspots AND
+    Repeaters start on, crowded repeater pins merge into count badges, and a
+    tapped pin pans into view above its sheet. No new backend: pins come from
+    the Nearby endpoints (`/api/nearby/repeaters?mode=...|only=asl`,
+    `/api/nearby/dmr`) and the existing `/api/pota` + `/api/sota_spots` (both
+    already carry `lat`/`lon`), all fetched by the map itself -- do NOT rely on
+    the Spots/Nearby screens having loaded, `spData`/`nrRows` are only filled
+    when those screens are used. Location is `pd-loc` (same key Nearby writes),
+    layer choices `pd-map-layers` (the old `pd-map-contacts` flag migrates to the
+    Contacts layer). Details that bit or would bite: (1) `L.circle().getBounds()`
+    needs the circle ON a map (`_map.layerPointToLatLng`) -- use
+    `L.latLng().toBounds(meters)` to fit before adding anything. (2)
+    leaflet.markercluster needs `MarkerCluster.Default.css` too, not just
+    `MarkerCluster.css`, or badges render as unsized squares. (3) The 3 s poll
+    only rebuilds the HOTSPOT layer (`renderMapHotspots`); rebuilding the
+    cluster group each poll would collapse a spiderfied cluster under the
+    user's finger, and `mapChips()` skips the DOM write when the HTML is
+    unchanged for the same reason (a chip replaced between touchstart and click
+    loses the tap). (4) An AllStar repeater is also in the FM list (same
+    callsign+frequency) -- `mapFetchRep` drops the FM copy so one location is
+    one pin. (5) Connect uses the first online ASL3 hotspot and names it in the
+    confirm, same as the Nearby screen. The cluster plugin loads from the CDN;
+    if it is blocked the map falls back to plain pins after ~5 s rather than
+    never appearing. `mobile_map_test.py`-style checks need `mobMap.setView`
+    zoomed onto a pin before clicking it (clusters hide close pins).
+    **Callers + tile switch**: an active call draws a pulsing pin at the caller
+    (from `/api/map_data`'s `callers` -- `is_active` entries only, polled with
+    the 3 s hook while the Map tab is showing) plus a dashed polyline to the
+    hotspot matched by `node_id`; both belong to the Hotspots layer chip. The
+    tile button cycles dark (Esri Dark Gray, native z16) / light (OSM) / satellite
+    (Esri Imagery, native z17), stored in `pd-map-style`; each tile layer is built
+    once and swapped, and `maxNativeZoom` differs per style so pins still work
+    zoomed past the tiles' own limit.
   - **Nearby (v4.98, `nearby.py` + `/api/nearby/*`)** -- every source was
     probed live before building. **Brandmeister**: `GET /v2/device` is ONE
     9.7 MB JSON list (~33k devices, ~29k with lat/lng), no auth, cached 6 h.
