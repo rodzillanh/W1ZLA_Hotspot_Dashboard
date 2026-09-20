@@ -346,7 +346,21 @@
     }
     .asl-node-row button { border-color:var(--danger); color:var(--danger); background:transparent; }
     .asl-fav-row button, .asl-qc button { background:var(--live); color:#04211d; border-color:transparent; }
-    .asl-qc { display:flex; gap:8px; }
+    .asl-fav-row .btns, .asl-qc .btns { display:flex; gap:6px; flex:0 0 auto; }
+    .asl-fav-row button.alt, .asl-qc button.alt { background:transparent; color:var(--live);
+        border-color:color-mix(in srgb, var(--live) 55%, var(--border)); }
+    .asl-mode { font-family:var(--font-mono); font-size:9px; letter-spacing:.06em; padding:2px 6px;
+        border-radius:5px; border:1px solid var(--border); color:var(--text-muted); flex:0 0 auto; }
+    .asl-mode.localmon { color:var(--live); border-color:color-mix(in srgb, var(--live) 55%, var(--border)); }
+    .asl-mode.monitor { color:var(--caution,#e0b04a); border-color:color-mix(in srgb, var(--caution,#e0b04a) 55%, var(--border)); }
+    .asl-all { display:block; width:100%; margin-top:22px; padding:10px 0; background:none;
+        border:1px dashed var(--border); border-radius:9px; color:var(--text-dim);
+        font-family:var(--font-ui); font-size:12px; cursor:pointer; }
+    .asl-all:disabled { opacity:.35; }
+    .asl-qc { display:flex; flex-wrap:wrap; gap:8px; }
+    .asl-qc input { flex:1 1 100%; }
+    .asl-qc .btns { flex:1 1 100%; }
+    .asl-qc .btns button { flex:1; }
     .asl-qc input {
         flex:1; padding:10px 12px; border-radius:9px; border:1px solid var(--border);
         background:var(--panel); color:var(--text); font-family:var(--font-mono); font-size:14px;
@@ -1836,8 +1850,10 @@
         var linksHtml = '<div class="asl-sec">Linked nodes</div>' + (nodes.length
             ? nodes.map(function (n) {
                 var label = n.callsign || n.node;
+                var mode = { L: ["LOCAL MON", "localmon"], R: ["MONITOR", "monitor"], C: ["CONNECTING", ""] }[n.mode];
                 return '<div class="asl-node-row' + (n.keyed ? " keyed" : "") + '">' +
                        '<span class="nd"></span><span class="who">' + esc(label) + "</span>" +
+                       (mode ? '<span class="asl-mode ' + mode[1] + '">' + mode[0] + "</span>" : "") +
                        '<button data-act="disconnect" data-node="' + esc(n.node) + '">Disconnect</button></div>';
             }).join("")
             : '<div class="asl-empty">Nothing linked right now.</div>');
@@ -1845,20 +1861,24 @@
         var qcHtml = '<div class="asl-sec">Quick connect</div>' +
             '<div class="asl-qc"><input id="asl-qc-node" type="text" inputmode="numeric" ' +
             'placeholder="Node number">' +
-            '<button data-act="connect" data-qc="1">Connect</button></div>';
+            '<div class="btns"><button data-act="connect" data-qc="1">Connect</button>' +
+            '<button class="alt" data-act="monitor" data-qc="1" title="Listen only">Monitor</button>' +
+            '<button class="alt" data-act="localmonitor" data-qc="1" title="Listen only, not relayed to your other links">Local</button></div></div>';
 
         var favHtml = "";
         if (aslFavs.length) {
             favHtml = '<div class="asl-sec">Favorites</div>' + aslFavs.map(function (f) {
                 return '<div class="asl-fav-row"><span class="who">' + esc(f.label || ("Node " + f.node)) +
                        '<span class="sub"> · ' + esc(f.node) + "</span></span>" +
-                       '<button data-act="connect" data-node="' + esc(f.node) + '">Connect</button></div>';
+                       '<div class="btns"><button data-act="connect" data-node="' + esc(f.node) + '">Connect</button>' +
+                       '<button class="alt" data-act="monitor" data-node="' + esc(f.node) + '">Monitor</button></div></div>';
             }).join("");
         }
 
         var offHtml = offline ? '<div class="asl-offline">' + esc(hs.name) +
             " is offline right now — link changes are disabled until it responds.</div>" : "";
-        host.innerHTML = fromHtml + offHtml + linksHtml + qcHtml + favHtml;
+        var allHtml = nodes.length ? '<button class="asl-all" data-act="disconnect_all">Disconnect all links…</button>' : "";
+        host.innerHTML = fromHtml + offHtml + linksHtml + qcHtml + favHtml + allHtml;
         if (offline) host.querySelectorAll("button[data-act], #asl-qc-node").forEach(function (el) { el.disabled = true; });
         var sel = document.getElementById("asl-from-sel");
         if (sel) sel.onchange = function () { aslCtrlId = this.value; renderAslScreen(); };
@@ -1873,14 +1893,22 @@
             node = (document.getElementById("asl-qc-node") || {}).value || "";
             node = node.replace(/\D/g, "");
         }
+        if (act === "disconnect_all") node = "0";
         if (!node) { toast("Enter a node number"); return; }
         var hsNow = aslHotspots().filter(function (h) { return h.id === aslCtrlId; })[0] || {};
         var who = "node " + node;
         (hsNow.asl_linked_nodes || []).concat(aslFavs.map(function (f) { return { node: f.node, callsign: f.label }; }))
             .forEach(function (n) { if (String(n.node) === String(node) && n.callsign) who = n.callsign + " (node " + node + ")"; });
-        var verb = act === "disconnect" ? "Disconnect" : "Connect";
-        var ok = await confirmAction(verb + "?", verb + " " + who + (act === "disconnect" ? " from " : " to ") +
-            (hsNow.name || "this hotspot") + "?", act === "disconnect");
+        var hsName = hsNow.name || "this hotspot";
+        var ok;
+        if (act === "disconnect_all") {
+            ok = await confirmAction("Disconnect ALL links?", "This drops every link on " + hsName +
+                " (node " + (hsNow.asl_node || "?") + "), including permanent ones. They will not come back by themselves.", true);
+        } else {
+            var verb = { connect: "Connect", monitor: "Monitor", localmonitor: "Local monitor", disconnect: "Disconnect" }[act] || "Connect";
+            ok = await confirmAction(verb + "?", verb + " " + who + (act === "disconnect" ? " from " : act === "connect" ? " to " : " on ") +
+                hsName + "?" + (act === "monitor" || act === "localmonitor" ? " Listen only." : ""), act === "disconnect");
+        }
         if (!ok) return;
         b.disabled = true;
         var r = await apiControl("/api/asl_connect", { id: aslCtrlId, node: node, action: act });

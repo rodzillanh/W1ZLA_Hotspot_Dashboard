@@ -2338,8 +2338,11 @@ untouched. It's a single-column layout with a bottom tab bar:
   README, the notification controls below, and a **This connection** line
   showing how the dashboard sees your phone (LAN, Tailscale or other) and
   whether control actions are allowed from it.
-- **Control safety** — connecting or disconnecting an ASL node asks for a
-  confirmation tap first. Control actions (from the phone and the desktop)
+- **ASL Control** (button on each ASL3 card) — Connect, Monitor and Local
+  monitor for any node number or favorite, Disconnect per link, and a
+  separate, more heavily confirmed Disconnect all.
+- **Control safety** — every ASL link change asks for a confirmation tap
+  first. Control actions (from the phone and the desktop)
   are only accepted from your LAN, loopback or Tailscale addresses
   (editable under Settings → General), and are refused for a hotspot that is
   offline.
