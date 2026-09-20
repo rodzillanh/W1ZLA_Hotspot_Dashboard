@@ -115,8 +115,49 @@
     .card {
         position:relative; background:var(--panel);
         border:1px solid var(--border); border-radius:12px;
-        padding:13px 13px 13px 15px; margin-bottom:11px; overflow:hidden;
+        padding:0; margin-bottom:8px; overflow:hidden;
     }
+    /* Status rows (v4.99): one line per hotspot, opens in place into the full card */
+    .card-tap {
+        display:block; width:100%; text-align:left; background:none; border:0; color:inherit;
+        font:inherit; cursor:pointer; padding:11px 12px 10px 15px; min-height:56px;
+        -webkit-tap-highlight-color:transparent;
+    }
+    .card-tap:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; border-radius:12px; }
+    .rw1 { display:flex; align-items:center; gap:8px; min-width:0; }
+    .rw-dot { width:8px; height:8px; border-radius:50%; background:var(--text-dim); flex:0 0 auto; }
+    .card.active .rw-dot, .card.friend .rw-dot { background:var(--live); animation:pulse 1.6s ease-in-out infinite; }
+    .card.friend .rw-dot { background:var(--accent); }
+    .card.offline .rw-dot { background:var(--danger); }
+    .rw-act {
+        margin-left:auto; font-size:12px; text-align:right; white-space:nowrap; overflow:hidden;
+        text-overflow:ellipsis; min-width:0; color:var(--text-dim);
+    }
+    .rw-act .call { font-family:var(--font-mono); font-weight:700; color:var(--live); }
+    .card.friend .rw-act .call { color:var(--accent); }
+    .rw-act .warn { color:var(--danger); }
+    .rw-act .tm { font-family:var(--font-mono); color:var(--live); margin-left:6px; }
+    .rw-chev { flex:0 0 auto; width:14px; text-align:center; color:var(--text-dim); transition:transform .2s ease; }
+    .card.open .rw-chev { transform:rotate(90deg); }
+    .rw2 { display:flex; align-items:center; gap:6px; margin-top:7px; padding-left:16px; min-width:0; }
+    .rw-chips { display:flex; flex-wrap:wrap; gap:5px; flex:1; min-width:0; }
+    .rw-chip {
+        display:inline-flex; align-items:center; gap:4px; padding:2px 7px 2px 6px; border-radius:20px;
+        font-size:10.5px; background:var(--panel-2); border:1px solid var(--border);
+        color:var(--text-muted); white-space:nowrap;
+    }
+    .card.active .rw-chip, .card.friend .rw-chip, .card.away .rw-chip { background:rgba(0,0,0,.18); }
+    .rw-chip i { width:5px; height:5px; border-radius:50%; background:var(--text-dim); }
+    .rw-chip.on { color:var(--text); }
+    .rw-chip.on i { background:var(--live); }
+    .rw-chip b { font-family:var(--font-mono); font-size:10px; }
+    .rw-hl { font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); white-space:nowrap; }
+    .card-more { display:grid; grid-template-rows:0fr; transition:grid-template-rows .24s ease; }
+    .card.open .card-more { grid-template-rows:1fr; }
+    .card-more > div { overflow:hidden; }
+    .card-inner { padding:0 13px 13px 15px; border-top:1px solid var(--border-soft); }
+    .card-inner .card-ident { margin-top:9px; }
+    @media (prefers-reduced-motion:reduce) { .card-more, .rw-chev { transition:none; } .rw-dot { animation:none !important; } }
     .card::before {
         content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
         background:var(--border);
@@ -1220,6 +1261,54 @@
               (onAir > 0 ? ' <span class="sep">·</span> <span class="on-air">' + onAir + " on air</span>" : "");
     }
 
+    /* ---- Status rows: which cards are open survives the 3 s re-render ---- */
+    var openCards = (function () {
+        try { return JSON.parse(sessionStorage.getItem("pd-open-cards")) || {}; } catch (e) { return {}; }
+    })();
+    function saveOpenCards() { try { sessionStorage.setItem("pd-open-cards", JSON.stringify(openCards)); } catch (e) {} }
+
+    function fmtUptimeShort(raw) {
+        if (!raw || raw === "Unknown") return "";
+        var d = /(\d+)\s*day/.exec(raw), h = /(\d+)\s*hour/.exec(raw), mi = /(\d+)\s*minute/.exec(raw), p = [];
+        if (d) p.push(d[1] + "d");
+        if (h) p.push(h[1] + "h");
+        if (!d && mi) p.push(mi[1] + "m");
+        return p.length ? p.join(" ") : "";
+    }
+
+    /* the digital-voice / link chips shown under each row (same idea as the desktop Hotspot Status card) */
+    function chipsFor(hs) {
+        var c = [];
+        if (hs.type === "asl3") {
+            var n = hs.asl_linked_nodes || [], k = n.filter(function (x) { return x.keyed; }).length;
+            c.push(["ASL", n.length ? n.length + " linked" + (k ? " · " + k + " keyed" : "") : "no links", n.length > 0]);
+            if (hs.dvswitch_enabled) c.push(["DVSw", hs.dvswitch_live ? "active" : "idle", !!hs.dvswitch_live]);
+        } else if (hs.type !== "openspot4") {
+            if (hs.brandmeister_id) {
+                var t = hs.bm_static_tgs || [];
+                c.push(["DMR", t.length ? t.map(function (x) { return "TG " + x.talkgroup; }).join(", ") : "not linked", t.length > 0]);
+            }
+            if (hs.ircddb_enabled) c.push(["D-STAR", hs.ircddb_reflector || "not linked", !!hs.ircddb_reflector]);
+            if (hs.ysf_status_enabled) c.push(["YSF", hs.ysf_reflector || "not linked", !!hs.ysf_reflector]);
+            if (hs.p25_status_enabled) c.push(["P25", hs.p25_reflector ? "TG " + hs.p25_reflector : "not linked", !!hs.p25_reflector]);
+            if (hs.nxdn_status_enabled) c.push(["NXDN", hs.nxdn_reflector ? "TG " + hs.nxdn_reflector : "not linked", !!hs.nxdn_reflector]);
+        }
+        return c;
+    }
+
+    function rowActivity(hs, isAway, isOffline, isFav) {
+        if (isAway) return "💤 away · <span data-ts=\"" + (hs.offline_since || "") + "\" data-kind=\"ago\"></span>";
+        if (isOffline) return '<span class="warn">⚠ offline <span data-ts="' + (hs.offline_since || "") + '" data-kind="ago"></span></span>';
+        if (hs.is_active) {
+            return (isFav ? "⭐ " : "📡 ") + '<span class="call">' + esc(hs.active_call || "?") + "</span>" +
+                   '<span class="tm" data-ts="' + (hs.tx_start || "") + '" data-kind="tx"></span>';
+        }
+        if (hs.active_call != null) {
+            return esc(hs.active_call) + ' · <span data-ts="' + (hs.last_heard || "") + '" data-kind="ago"></span> ago';
+        }
+        return "Listening";
+    }
+
     function renderCards(data) {
         var host = document.getElementById("cards");
         if (!data.length) {
@@ -1229,7 +1318,12 @@
                 '<a href="/setup">Open settings</a></div>';
             return;
         }
-        host.innerHTML = data.map(cardHtml).join("");
+        // on-air hotspots float to the top; everything else keeps the dashboard's own order
+        var ordered = data.map(function (h, i) { return [h, i]; }).sort(function (a, b) {
+            var aa = a[0].is_active && a[0].status !== "Offline" ? 0 : 1, bb = b[0].is_active && b[0].status !== "Offline" ? 0 : 1;
+            return (aa - bb) || (a[1] - b[1]);
+        }).map(function (x) { return x[0]; });
+        host.innerHTML = ordered.map(cardHtml).join("");
         tickTimers();  // fill [data-ts] spans now, not up to 1s later on the next interval
         // keep the long-press outline on across a poll re-render (PR 6)
         if (_lpHid && document.getElementById("lp-sheet").classList.contains("open")) {
@@ -1304,19 +1398,31 @@
               }).join("") + "</div>"
             : "";
 
-        return '<div class="card ' + cls + '" data-hid="' + esc(hs.id) + '">' +
-               '<div class="card-head">' +
-                 '<span class="card-name">' + esc(hs.name) + "</span>" +
-                 '<span class="type-badge">' + typeLabel + "</span>" +
-                 chip +
-               "</div>" +
+        var chipRow = isAway || isOffline ? [] : chipsFor(hs);
+        var health = isAway ? "portable" : isOffline ? "" :
+            [hs.temperature && hs.temperature !== "N/A" ? hs.temperature : "", fmtUptimeShort(hs.uptime)].filter(Boolean).join(" · ");
+        var open = !!openCards[hs.id];
+        var chipsHtml = chipRow.map(function (c) {
+            return '<span class="rw-chip' + (c[2] ? " on" : "") + '"><i></i><b>' + esc(c[0]) + "</b> " + esc(c[1]) + "</span>";
+        }).join("");
+        var row2 = (chipsHtml || health)
+            ? '<div class="rw2"><div class="rw-chips">' + chipsHtml + '</div><span class="rw-hl">' + esc(health) + "</span></div>" : "";
+        return '<div class="card ' + cls + (open ? " open" : "") + '" data-hid="' + esc(hs.id) + '">' +
+               '<button class="card-tap" type="button" aria-expanded="' + (open ? "true" : "false") + '" aria-controls="cm-' + esc(hs.id) + '">' +
+                 '<div class="rw1"><span class="rw-dot"></span>' +
+                   '<span class="card-name">' + esc(hs.name) + "</span>" +
+                   '<span class="type-badge">' + typeLabel + "</span>" +
+                   '<span class="rw-act">' + rowActivity(hs, isAway, isOffline, isFav) + "</span>" +
+                   '<span class="rw-chev">›</span></div>' + row2 +
+               "</button>" +
+               '<div class="card-more" id="cm-' + esc(hs.id) + '"><div><div class="card-inner">' +
                identLine +
                '<div class="card-body">' + body + "</div>" +
                extra + recent +
                (isAsl ? '<button class="asl-ctrl-open">🎛️ ASL Control</button>' : "") +
                ((!isAsl && hs.type !== "openspot4" && (hs.brandmeister_id || hs.ircddb_enabled))
                    ? '<button class="asl-ctrl-open dv-open">📡 Digital links</button>' : "") +
-               "</div>";
+               "</div></div></div></div>";
     }
 
     function callerSub(hs) {
@@ -2008,6 +2114,20 @@
     var _lpTimer = null, _lpHid = null, _lpStartY = 0;
     var cardsEl = document.getElementById("cards");
 
+    var _lpFired = false;
+    cardsEl.addEventListener("click", function (e) {
+        var tap = e.target.closest(".card-tap");
+        if (!tap) return;
+        if (_lpFired) { _lpFired = false; return; }
+        var card = tap.closest(".card[data-hid]");
+        if (!card) return;
+        var id = card.getAttribute("data-hid"), open = !card.classList.contains("open");
+        card.classList.toggle("open", open);
+        tap.setAttribute("aria-expanded", open ? "true" : "false");
+        if (open) openCards[id] = 1; else delete openCards[id];
+        saveOpenCards();
+    });
+
     cardsEl.addEventListener("touchstart", function (e) {
         var card = e.target.closest(".card[data-hid]");
         if (!card || e.touches.length !== 1) return;
@@ -2015,6 +2135,7 @@
         var hid = card.getAttribute("data-hid");
         _lpTimer = setTimeout(function () {
             _lpTimer = null;
+            _lpFired = true;
             _lpHid = hid;
             card.classList.add("lp-armed");
             var nm = card.querySelector(".card-name");
@@ -2033,6 +2154,7 @@
 
     cardsEl.addEventListener("touchend", function () {
         if (_lpTimer) { clearTimeout(_lpTimer); _lpTimer = null; }
+        if (_lpFired) setTimeout(function () { _lpFired = false; }, 400);   // the click that follows a long-press is swallowed; don't let the flag linger
     });
 
     function closeLpSheet() {

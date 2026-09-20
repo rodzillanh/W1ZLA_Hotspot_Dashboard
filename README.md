@@ -2326,8 +2326,13 @@ It polls the same `/api/data` and `/api/qsos` the desktop dashboard uses and
 keeps none of its own state — the main dashboard at `/` is completely
 untouched. It's a single-column layout with a bottom tab bar:
 
-- **Status** — one card per hotspot, same online / idle / last-heard /
-  offline / away states as the desktop, reflowed for one column. WPSD cards
+- **Status** — one compact row per hotspot: state, what it's doing right
+  now (caller and live timer while on air), and its link chips (DMR / D-STAR /
+  YSF / P25 / NXDN, ASL linked and keyed, DVSwitch). Tap a row to open it in
+  place into the full card; tap again to fold it. On-air hotspots float to
+  the top and the rest keep the dashboard's order; nothing opens by itself, and
+  which rows are open is remembered for the tab. Same online / idle /
+  last-heard / offline / away states as the desktop. WPSD cards
   show talkgroup / mode / RSSI / BER; ASL3 cards show the linked-node list
   (the keyed node pulsing); openSPOT 4 cards show the active profile and, on
   battery, the charge level. Callsigns are tappable and open a QRZ lookup.

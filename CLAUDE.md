@@ -8072,6 +8072,24 @@ config for per-integration credentials; put it in
     test must compare image counts before/after (the control run stores a
     picture in the same dir), and the lost-sample threshold moved because
     the receiver now gives up sooner.
+  - **Pocket Dash Status rows (v4.99)** -- mockup-approved (a published
+    Artifact), decisions from the user: no auto-open of an active call; on-air
+    hotspots float to the top (`renderCards()` sorts on `is_active && status !==
+    "Offline"`, stable otherwise, so the dashboard's order is the tiebreak). The
+    outer element stays `.card[data-hid]` on purpose -- the long-press mute
+    sheet, `.asl-ctrl-open` / `.dv-open` handlers and `showFocus()` all key off
+    it -- with a `.card-tap` button (the row) and a `.card-more` grid
+    (`grid-template-rows: 0fr -> 1fr`, so the expand animates without measuring
+    heights). Open state lives in `openCards` (sessionStorage `pd-open-cards`)
+    because `renderCards()` rebuilds `#cards` every poll; a card rendered with
+    `.open` starts open with no transition, so a refresh never re-animates.
+    Callsigns are plain text in the row (a link inside the tap target would
+    navigate instead of toggling); they're links again in the opened body.
+    `_lpFired` swallows the click that follows a long-press. Buttons inside a
+    folded card are clipped to zero height, so browser tests must open the
+    card first (`[data-hid=X] .card-tap`). The link chips mirror the desktop
+    Hotspot Status card's but are computed by `chipsFor()` here -- another
+    intentionally-duplicated pair (desktop `computeDvChips()`), keep in sync.
   - **Nearby (v4.98, `nearby.py` + `/api/nearby/*`)** -- every source was
     probed live before building. **Brandmeister**: `GET /v2/device` is ONE
     9.7 MB JSON list (~33k devices, ~29k with lat/lng), no auth, cached 6 h.

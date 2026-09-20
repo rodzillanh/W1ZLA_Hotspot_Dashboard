@@ -117,6 +117,19 @@
 
         <div class="release">
             <div class="release-header">
+                <span class="release-version">v4.99 "Wolf"</span>
+                <span class="release-date">September 2026</span>
+                <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Pocket Dash: the Status tab is one line per hotspot</span> &mdash; each hotspot is a compact row: state dot, name, what it is doing right now (the caller and a live timer while on air, last heard when idle, <i>away</i> for a portable that is not connected) and the digital-voice / link chips under it (DMR talkgroups, D-STAR reflector, YSF, P25, NXDN; ASL linked and keyed counts, DVSwitch), with temperature and uptime on the right. <b>Tap a row and it opens in place into the full card</b> (caller and location, stats, recent callers, linked nodes, the ASL Control / Digital links buttons); tap again to fold it. Several can be open at once, and which are open survives the 3-second refresh and a reload in the same tab</li>
+                <li><span>On-air hotspots float to the top</span> &mdash; hotspots with a call in progress sort above the rest; everything else keeps the dashboard's own order. Nothing opens by itself</li>
+                <li><span>Same state colours</span> &mdash; cyan tint for on air, gold for a favourite, red for offline, dimmed for a portable that is away. Long-press still opens the mute sheet without also toggling the row</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
                 <span class="release-version">v4.98 "Nelson"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>

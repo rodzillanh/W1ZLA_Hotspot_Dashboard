@@ -651,6 +651,11 @@ BIOS = {
         "blurb": "Teen idol and rockabilly pioneer (\u201cHello Mary Lou,\u201d \u201cGarden Party\u201d), killed in a 1985 plane crash.",
         "wiki": "Ricky_Nelson",
     },
+    "Wolf": {
+        "name": "Howlin\u2019 Wolf",
+        "blurb": "Chester Burnett, the towering Chicago blues singer and harmonica player behind \u201cSmokestack Lightnin\u2019\u201d and \u201cBack Door Man,\u201d a foundation of British and American rock.",
+        "wiki": "Howlin%27_Wolf",
+    },
 }
 
 
