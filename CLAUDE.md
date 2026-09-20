@@ -8084,6 +8084,34 @@ config for per-integration credentials; put it in
     route means calling `_control_gate(hotspot_id)` at its top. Pocket Dash
     already had ASL Control and a PIN before this -- only the confirm tap,
     offline refusal and network check were new.
+  - **Joining a picture in progress (v4.96, `sstv_demod.identify_by_sync()`)**
+    -- diagnosed from a real `sstv_last_signal.wav`, not theory: a loud,
+    "clear" recording that decoded for ~20 s then vanished was a Scottie 2
+    picture already running when listening started. The "header" that
+    started the reception (`PD_120`, score 0.63) was picture content
+    imitating a leader tone; the audio had no header at all, but a 1200 Hz
+    sync pulse every 277.7 ms from t=0.16 s. So: (1) `LINE_PERIODS_MS` --
+    sync spacing per mode, MEASURED by encoding a random picture in every
+    mode with `sstv.encode()` (1 ms resolution; matches the published line
+    times, all 17 distinguishable at a 1.2% tolerance); (2)
+    `identify_by_sync()` needs >= 10-12 pulses one period apart (or two,
+    allowing a missed pulse) before naming a mode -- pure rig noise
+    identifies nothing; (3) at 8 s into any reception `_advance_reception`
+    checks the sync train against the header's mode and, if it disagrees,
+    `_join_midpicture()` switches to a joined reception (own-supported
+    modes) or drops it with kind `midpicture` (others); (4) when idle and no
+    header is found, `_scan_for_midpicture()` does the same from the sync
+    train alone. Joined receptions decode with `sstv_demod.decode_joined()`
+    (line timing from the sync pulses; only lines actually heard are kept,
+    cropped to the last line that had a pulse -- otherwise the noise after
+    the transmission becomes black rows; < 24 lines isn't stored), end when
+    the sync train stops, and are stored labelled "(from mid-picture)" with
+    `complete: false`. The receiver reaches back to the oldest buffered audio
+    (<= ~30 s) so lines before a late false header aren't lost. That real
+    recording was itself weak (partial picture coherence 0.50, "weak") --
+    "audio sounds clear" does not mean the demodulator sees a strong signal.
+    Requires the audio to stop being sync-regular to end a join, so a station
+    that keeps sending picture after picture is one long reception.
   - **Stale-body rule for the SSTV card (v4.93)**: `renderSstvCard()`
     rebuilds `#sstv-body` ONLY when a structural signature changes (so the
     <img> and drawer inputs survive polls), which means ANY value inside

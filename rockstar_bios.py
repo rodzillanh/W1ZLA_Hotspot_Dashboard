@@ -636,6 +636,11 @@ BIOS = {
         "blurb": "Alabama soul singer whose 1966 ballad “When a Man Loves a Woman” topped the US pop and R&B charts.",
         "wiki": "Percy_Sledge",
     },
+    "Pickett": {
+        "name": "Wilson Pickett",
+        "blurb": "“The Wicked Pickett,” the Alabama-born soul shouter behind “In the Midnight Hour” and “Mustang Sally.”",
+        "wiki": "Wilson_Pickett",
+    },
 }
 
 

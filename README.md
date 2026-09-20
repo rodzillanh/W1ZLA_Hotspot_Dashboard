@@ -1484,6 +1484,13 @@ the Rig Panel's power control uses).
   signal); the more coherent of the two pictures is shown, and noisy ones
   get a light clean-up and are marked as cleaned. Other modes use the
   library decoder.
+- **Joining a picture in progress**: an SSTV header is sent only once, so if
+  you start listening (or tune onto a station) partway through a picture, the
+  header is gone. Every line carries a sync pulse at its mode's own period, so
+  the card identifies the mode from those alone and, for Martin 1/2 and
+  Scottie 1/2, decodes the lines it heard (labelled "from mid-picture"). Other
+  modes can't be read from the middle: the card says the start was missed and
+  waits for the next picture.
 - **When a signal is dropped**, the card says why in its footer (with the
   partial picture and the audio to download), and the drawer always offers
   the audio of the last signal, so a signal that should have decoded can be

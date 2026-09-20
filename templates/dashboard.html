@@ -11025,7 +11025,8 @@ function sstvMeta(k, v, note) {
 // silently falling back to "nothing decoded yet". Only when it is newer than the last picture.
 function sstvRejectText(lr) {
     const why = { noise: 'too weak to decode', audio_loss: 'audio dropouts', blank: 'no usable picture',
-        decode_failed: "couldn't be decoded", timeout: 'never completed' }[lr.kind] || 'dropped';
+        decode_failed: "couldn't be decoded", timeout: 'never completed',
+        midpicture: 'joined mid-picture (that mode cannot be read from the middle)' }[lr.kind] || 'dropped';
     return 'Heard ' + escapeHtml(lr.label) + ' at ' + sstvClock(lr.ts) + ' · ' + why +
         (lr.has_image ? ' · <a href="/api/sstv/rejected.png?t=' + Math.round(lr.ts) + '" target="_blank" rel="noopener" title="See what was received before it was dropped">view</a>' : '') +
         (lr.has_audio ? ' · <a href="/api/sstv/rejected.wav?t=' + Math.round(lr.ts) + '" title="Download the audio of this attempt (for diagnosis)">audio</a>' : '');
@@ -11071,7 +11072,7 @@ function renderSstvCard() {
         error: 'Unavailable', setup: 'Setup' }[view] || '…';
     let sub = '';
     if (view === 'resting' || view === 'empty') sub = sstvRigText(rig) + ' · SSTV listening';
-    else if (view === 'receiving') sub = sstvRigText(rig) + ' · header detected ' + sstvClock(recv.started_at);
+    else if (view === 'receiving') sub = sstvRigText(rig) + ' · ' + (recv.joined ? 'joined mid-picture ' : 'header detected ') + sstvClock(recv.started_at);
     else if (view === 'standby') sub = (cfg.auto ? 'Will tune to ' + sstvFreq((ctl.target || {}).freq_hz) + ' ' + ((ctl.target || {}).mode || '') + ' · ' : '') + 'rig is on ' + sstvRigText(rig);
     document.getElementById('sstv-sub').textContent = sub;
 
@@ -11188,8 +11189,8 @@ function sstvUpdateLive(fromPoll) {
     if (recv) {
         const bar = document.getElementById('sstv-prog-bar');
         const txt = document.getElementById('sstv-prog-txt');
-        if (bar) bar.style.width = Math.round((recv.progress || 0) * 100) + '%';
-        if (txt) txt.textContent = sstvMmss(recv.elapsed_s) + ' of ' + sstvMmss(recv.total_s);
+        if (bar) bar.style.width = recv.joined ? '0%' : Math.round((recv.progress || 0) * 100) + '%';
+        if (txt) txt.textContent = recv.joined ? sstvMmss(recv.elapsed_s) + ' so far (joined mid-picture)' : sstvMmss(recv.elapsed_s) + ' of ' + sstvMmss(recv.total_s);
         const img = document.getElementById('sstv-preview-img');
         if (img && fromPoll) img.src = '/api/sstv/preview.png?t=' + Date.now();
     }
@@ -11338,7 +11339,7 @@ function renderSstvDrawer() {
         row('Audio', rx.audio_ok ? ((rx.sample_rate || 48000) / 1000) + ' kHz' + (rx.dropped_samples ? ' · ' + rx.dropped_samples + ' samples lost' : ' · clean') + '<span id="sstv-d-level"></span>' : sstvNoAudioReason(rx)) +
         row('Rig', escapeHtml(sstvRigText(rx.rig))) +
         row('Rejected as noise', String(rx.rejected_total || 0)) +
-        (rx.last_signal ? `<div class="sstv-set-row"><div class="lbl">Audio of the last signal<div class="hint">${escapeHtml(rx.last_signal.label)} at ${sstvClock(rx.last_signal.ts)} &middot; ${({ stored: 'picture kept', noise: 'dropped as too weak', audio_loss: 'dropped: audio dropouts', blank: 'dropped: no usable picture', decode_failed: "couldn't decode", timeout: 'never completed', interrupted: 'interrupted', dropped: 'dropped' })[rx.last_signal.outcome] || rx.last_signal.outcome} &middot; ${rx.last_signal.seconds} s</div></div><a class="sstv-btn" style="text-decoration:none;color:var(--text)" href="/api/sstv/last_signal.wav?t=${Math.round(rx.last_signal.ts)}" title="Download this signal's audio as a WAV (for diagnosis)">Download</a></div>` : '') +
+        (rx.last_signal ? `<div class="sstv-set-row"><div class="lbl">Audio of the last signal<div class="hint">${escapeHtml(rx.last_signal.label)} at ${sstvClock(rx.last_signal.ts)} &middot; ${({ stored: 'picture kept', noise: 'dropped as too weak', audio_loss: 'dropped: audio dropouts', blank: 'dropped: no usable picture', midpicture: 'dropped: joined mid-picture', decode_failed: "couldn't decode", timeout: 'never completed', interrupted: 'interrupted', dropped: 'dropped' })[rx.last_signal.outcome] || rx.last_signal.outcome} &middot; ${rx.last_signal.seconds} s</div></div><a class="sstv-btn" style="text-decoration:none;color:var(--text)" href="/api/sstv/last_signal.wav?t=${Math.round(rx.last_signal.ts)}" title="Download this signal's audio as a WAV (for diagnosis)">Download</a></div>` : '') +
         (rx.last_reject ? `<div class="sstv-note" style="padding:0 0 8px">Last: ${sstvRejectText(rx.last_reject)}<br>${escapeHtml(rx.last_reject.detail || '')}${rx.last_reject.dropped_samples ? ' · ' + rx.last_reject.dropped_samples + ' samples lost' : ''} · offset ${rx.last_reject.offset_hz >= 0 ? '+' : ''}${rx.last_reject.offset_hz} Hz · header score ${rx.last_reject.score}</div>` : '') +
         `<div style="padding-top:10px">${btns}</div>`;
     if (statusHtml !== sstvDrawerSigs.status) {

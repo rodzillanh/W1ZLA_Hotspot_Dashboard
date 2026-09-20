@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.95 "Sledge"</span>
+                <span class="release-version">v4.96 "Pickett"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Fix: SSTV card decoded for ~20 seconds, then dropped a clear signal</span> &mdash; diagnosed from a downloaded recording: a picture was already in progress when listening began (or the rig was tuned onto it), so its header had been missed, and the loud picture content was mistaken for a header of the wrong mode (&ldquo;PD 120&rdquo;). That decoded to static and was dropped at the 20-second check. Every SSTV line carries a sync pulse at its mode's own line period, so the receiver now identifies the mode from the sync train itself (periods measured from the encoder for all 17 modes)</li>
+                <li><span>SSTV: join a picture partway through</span> &mdash; for Martin 1/2 and Scottie 1/2 the receiver now decodes from the sync pulses alone and keeps the lines it heard, labelled <i>&ldquo;(from mid-picture)&rdquo;</i> and marked incomplete. It works whether a false header fired or no header was found at all. Other modes (Robot, PD, &hellip;) can't be read from the middle, so the card says <i>&ldquo;Robot 36 is on the air but its start was missed&rdquo;</i> and waits for the next picture instead of failing silently</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.95 "Sledge"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Control actions are only accepted from trusted networks</span> &mdash; link/unlink, ASL connect/disconnect, Brandmeister and D-STAR links, rig tuning, wfweb power, SSTV Listen/Stop and host reboot/power-off are refused unless the request comes from your LAN, loopback or Tailscale (<code>100.64.0.0/10</code>). The address is the connection's real source (forwarded-for headers are ignored, since any client can forge them). Settings &rarr; General &rarr; &ldquo;Networks allowed to send control actions&rdquo; lets you change the list</li>

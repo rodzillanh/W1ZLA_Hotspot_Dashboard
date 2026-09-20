@@ -285,7 +285,8 @@ class SstvReceiver:
         self._parts = []            # [(abs_start_sample, int16 ndarray)]
         self._total = 0             # absolute samples appended so far
         self._scanned_upto = 0
-        self._last_scan = 0.0
+        self._last_scan = 0
+        self._midpic_quiet_until = 0.0
         self._rx = None             # in-progress reception (analyzer thread only)
         self._pub_rx = None         # public copy of _rx for status(), under _lock
         self._preview_png = None
@@ -773,8 +774,45 @@ class SstvReceiver:
                 if det:
                     print(f"[sstv] {det['mode']} header detected (score {det['score']:.2f}, offset {det['offset_hz']:+d} Hz)")
                     self._begin_reception(det, rig)
+                else:
+                    self._scan_for_midpicture(now, rig)
         else:
             self._advance_reception(now, rig)
+
+    def _scan_for_midpicture(self, now, rig):
+        """No header, but is a picture already in progress? Every SSTV line
+        carries a sync pulse at its mode's own period, so a regular train of
+        them identifies the mode without the (already missed) VIS header.
+        Modes the own demodulator reads are decoded from the middle; others
+        are reported once so the card explains why nothing appears."""
+        if sstv_demod is None or now < self._midpic_quiet_until or not self._parts:
+            return
+        a0 = max(self._parts[0][0], self._total - SCAN_WINDOW_S * RATE, self._scanned_upto)
+        if self._total - a0 < 10 * RATE:
+            return
+        seg = self._gather(a0)
+        ident = sstv_demod.identify_by_sync(seg, 0.0, min_pulses=12)
+        if not ident:
+            return
+        mode = ident["mode"]
+        print(f"[sstv] no header, but the sync pulses say a {mode} picture is in progress ({ident['n']} lines)")
+        if sstv_demod.supported(mode):
+            spec = sstv_demod.MODES[mode]
+            self._begin_reception({"mode": mode, "start_abs": a0, "score": 0.0, "offset_hz": 0}, rig)
+            rx = self._rx
+            rx["joined"] = {"first_s": ident["first_s"], "seen_at": now}
+            rx["dur"] = spec["height"] * spec["line_ms"] / 1000.0
+            rx["early_done"] = rx["sync_checked"] = True
+            rx["join_check_at"] = now
+            self._publish_rx(0.0)
+            return
+        self._midpic_quiet_until = now + MODE_SECONDS.get(mode, 120)
+        note = {"mode": mode, "start_abs": a0, "score": 0.0, "offset_hz": 0, "freq_hz": rig.get("freq_hz"),
+                "dropped0": self._dropped}
+        self._count_reject(self._reject_meta(
+            note, "midpicture", f"{MODE_LABELS.get(mode, mode)} is on the air but its start was missed -- "
+                                f"waiting for the next picture"), None, self._save_reject_audio(note))
+        self._note_signal(note, "midpicture")
 
     def _scan_for_header(self, now, rig, min_score=MIN_HEADER_SCORE, after_abs=None):
         if not self._parts:
@@ -815,6 +853,7 @@ class SstvReceiver:
                     "elapsed_s": round(min(elapsed, rx["dur"]), 1), "total_s": rx["dur"],
                     "progress": round(min(1.0, elapsed / rx["dur"]), 3),
                     "started_at": rx["started_at"], "freq_hz": rx["freq_hz"],
+                    "joined": bool(rx.get("joined")),
                 }
 
     def _abort(self, reason, count=True, kind="noise", im=None):
@@ -826,6 +865,11 @@ class SstvReceiver:
             self._count_reject()
         if rx is not None:
             self._note_signal(rx, kind if count else "interrupted")
+            if not rx.get("joined") and rx["mode"] in MODE_SECONDS:
+                # its header WAS seen, so the rest of this picture isn't "a picture whose start
+                # was missed" -- don't re-announce it from its sync pulses
+                left = MODE_SECONDS[rx["mode"]] - (self._total - rx["start_abs"]) / RATE
+                self._midpic_quiet_until = max(self._midpic_quiet_until, time.time() + max(0.0, left) + 5.0)
         self._rx = None
         with self._lock:
             self._pub_rx = None
@@ -835,7 +879,44 @@ class SstvReceiver:
         arr = self._gather(a0)
         if a1 is not None:
             arr = arr[:max(0, a1 - a0)]
+        j = rx.get("joined")
+        if j:
+            im = sstv_demod.decode_joined(arr, rx["mode"], rx["offset_hz"], j["first_s"])
+            if im is not None:
+                im.info["sstv_decoder"] = "own"
+                im.info["sstv_complete"] = False
+            return im
         return _decode_best(arr, rx["mode"], rx["offset_hz"])
+
+    def _join_midpicture(self, rx, ident, arr):
+        """The sync pulses say a DIFFERENT mode is on the air than the header
+        claimed: the header was a false hit inside a picture that was already
+        in progress (or the VIS was misread). Modes the own demodulator can
+        read are decoded from the sync train (a partial picture); others are
+        reported and dropped so the next picture's real header can be caught."""
+        mode = ident["mode"]
+        print(f"[sstv] sync pulses say {mode} ({ident['n']} regular lines), not {rx['mode']}: "
+              f"joined mid-picture")
+        if not (sstv_demod is not None and sstv_demod.supported(mode)):
+            return self._abort(
+                f"joined {MODE_LABELS.get(mode, mode)} partway through a picture -- that mode can't be "
+                f"decoded from the middle, so waiting for the next one", kind="midpicture")
+        spec = sstv_demod.MODES[mode]
+        # The false header may sit late in the picture; the sync train started earlier, so
+        # reach back to the oldest audio still buffered to recover those lines too.
+        avail0 = self._parts[0][0] if self._parts else rx["start_abs"]
+        if avail0 < rx["start_abs"]:
+            wide = self._gather(avail0)[:int(60 * RATE)]
+            wide_id = sstv_demod.identify_by_sync(wide, rx["offset_hz"])
+            if wide_id and wide_id["mode"] == mode:
+                rx["start_abs"] = avail0
+                ident = wide_id
+        rx["joined"] = {"first_s": ident["first_s"], "seen_at": time.time()}
+        rx["mode"] = mode
+        rx["dur"] = spec["height"] * spec["line_ms"] / 1000.0       # upper bound; ends when the sync train stops
+        rx["early_done"] = True
+        rx["join_check_at"] = time.time()
+        return None
 
     def _advance_reception(self, now, rig):
         rx = self._rx
@@ -843,6 +924,25 @@ class SstvReceiver:
         self._publish_rx(elapsed)
         if rig.get("transmitting"):
             return self._abort("rig started transmitting", count=False)
+        if sstv_demod is not None and not rx.get("sync_checked") and elapsed >= 8.0:
+            rx["sync_checked"] = True
+            span = self._gather(rx["start_abs"])[:int(min(elapsed, 30.0) * RATE)]
+            ident = sstv_demod.identify_by_sync(span, rx["offset_hz"])
+            if ident and ident["mode"] != rx["mode"]:
+                if self._join_midpicture(rx, ident, span) is None and self._rx is None:
+                    return
+        rx = self._rx
+        if rx is None:
+            return
+        if rx.get("joined") and now - rx["join_check_at"] >= 3.0:
+            rx["join_check_at"] = now
+            # the picture is over when the sync train stops
+            j = rx["joined"]
+            period = sstv_demod.MODES[rx["mode"]]["line_ms"] / 1000.0
+            tail = self._gather(self._total - int(max(4 * period, 2.0) * RATE))
+            if elapsed > 15 and len(sstv_demod.sync_pulses(tail, rx["offset_hz"])) == 0:
+                rx["dur"] = max(1.0, elapsed - max(4 * period, 2.0))
+                return self._finalize(rx)
         # early sanity check: a probably-false header is dropped as soon as the
         # first rows are clearly just noise, freeing the receiver for a real one
         if not rx["early_done"] and elapsed >= min(20.0, 0.25 * rx["dur"]):
@@ -932,7 +1032,9 @@ class SstvReceiver:
             cleaned = True
         meta = {
             "id": uuid.uuid4().hex[:12], "ts": time.time(), "started_at": rx["started_at"],
-            "mode": rx["mode"], "label": MODE_LABELS.get(rx["mode"], rx["mode"]),
+            "mode": rx["mode"],
+            "label": MODE_LABELS.get(rx["mode"], rx["mode"]) + (" (from mid-picture)" if rx.get("joined") else ""),
+            "joined": bool(rx.get("joined")),
             "width": im.size[0], "height": im.size[1], "duration_s": rx["dur"],
             "freq_hz": rx["freq_hz"], "quality": quality_label(q),
             "structure": round(q["structure"], 1), "contrast": round(q["contrast"], 1),

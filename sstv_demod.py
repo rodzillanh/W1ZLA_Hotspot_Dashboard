@@ -142,6 +142,17 @@ def _fit_timing(dom, times, first_guess_s, period_s, n_lines):
     return float(t0), float(T), int(keep.sum())
 
 
+def _scan_starts(spec):
+    """Scan start times relative to the sync pulse CENTRE, per channel."""
+    scan, gap, sync = spec["scan_ms"] / 1000.0, spec["gap_ms"] / 1000.0, spec["sync_ms"] / 1000.0
+    if spec["sync_first"]:
+        base = sync / 2 + gap                # first scan begins after the sync pulse + its porch
+        return {c: base + i * (scan + gap) for i, c in enumerate(spec["order"])}
+    # Scottie: [gap][G][gap][B][sync][gap][R] -- no gap between B and the sync pulse
+    b_start = -sync / 2 - scan
+    return {"B": b_start, "G": b_start - gap - scan, "R": sync / 2 + gap}
+
+
 def prepare(samples, offset_hz=0.0):
     """The expensive, mode-independent part: FM track + envelope + sync-dominance curve for audio that
     STARTS at the first image sample. Returns a dict or None. Reused across renders/timing trials."""
@@ -185,14 +196,7 @@ def render(prep, mode_name, timing=None, core=(0.0, 1.0)):
         else:
             fit = _fit_timing(prep["dom"], prep["times"], guess, line, H)
             t0, T = (guess, line) if fit is None else (fit[0], fit[1])     # no sync evidence: nominal timing
-        # scan start times relative to the sync pulse CENTRE, per channel
-        if spec["sync_first"]:
-            base = sync / 2 + gap            # first scan begins after the sync pulse + its porch
-            starts = {c: base + i * (scan + gap) for i, c in enumerate(spec["order"])}
-        else:
-            # Scottie: [gap][G][gap][B][sync][gap][R] -- no gap between B and the sync pulse
-            b_start = -sync / 2 - scan
-            starts = {"B": b_start, "G": b_start - gap - scan, "R": sync / 2 + gap}
+        starts = _scan_starts(spec)
         Cf, Cw, n = prep["Cf"], prep["Cw"], prep["n"]
         img = np.zeros((H, W, 3), dtype=np.float64)
         ch_index = {"R": 0, "G": 1, "B": 2}
@@ -225,3 +229,132 @@ def decode(samples, mode_name, offset_hz=0.0):
     if len(samples) < RATE * min(spec["line_ms"] / 1000.0 * spec["height"], 20):
         return None
     return render(prepare(samples, offset_hz), mode_name)
+
+
+# --------------------------------------------------------------------------
+# Joining a picture that is already in progress
+#
+# A VIS header is only sent once, at the start. If the receiver starts
+# listening (or the rig is tuned onto a station) partway through a picture,
+# the header was never heard -- and worse, loud picture content can imitate a
+# header (real case, 2026-09: a Scottie 2 picture in progress read as a
+# "PD 120" header at 0.63, decoded to static and was dropped, although the
+# audio was perfectly clear). But every line of every mode carries a 1200 Hz
+# sync pulse at that mode's own line period, so the sync train alone says
+# which mode is on the air and where every line starts.
+
+# Sync-pulse spacing per mode in milliseconds, MEASURED by encoding a random
+# picture in each mode with `sstv.encode()` and timing the pulses (1 ms
+# resolution), not recalled -- they agree with the published line times.
+LINE_PERIODS_MS = {
+    "ROBOT_36": 150.0, "ROBOT_72": 300.0, "MARTIN_2": 227.0, "MARTIN_1": 446.5,
+    "WRASSE_SC2_180": 711.0, "SCOTTIE_2": 278.0, "SCOTTIE_1": 428.0, "SCOTTIE_DX": 1050.0,
+    "PD_50": 388.0, "PD_290": 937.0, "PD_120": 508.5, "PD_180": 754.0, "PD_240": 1000.0,
+    "PD_160": 804.5, "PD_90": 703.0, "PASOKON_P3": 409.5, "PASOKON_P5": 614.0,
+}
+
+
+def sync_pulses(x, offset_hz=0.0):
+    """Centre times (s) of the 1200 Hz sync pulses in `x`, at most one per 30 ms."""
+    x = np.asarray(x, dtype=np.float32)
+    if abs(offset_hz) >= 10 and len(x) >= 2:
+        z = _analytic(x) * np.exp(-2j * np.pi * offset_hz * np.arange(len(x), dtype=np.float32) / RATE)
+        x = z.real.astype(np.float32)
+    dom, times = _sync_dominance(x)
+    if dom is None:
+        return []
+    out = []
+    i, n = 0, len(dom)
+    while i < n:
+        if dom[i] > 0.5:
+            j = i
+            while j < n and dom[j] > 0.5:
+                j += 1
+            out.append(float(times[i:j].mean()))
+            i = j + 30
+        else:
+            i += 1
+    return out
+
+
+def identify_by_sync(samples, offset_hz=0.0, min_pulses=10):
+    """Which SSTV mode is on the air, judged only by the spacing of its sync
+    pulses. Returns {"mode", "first_s", "n", "score"} or None. A mode is
+    reported only when at least `min_pulses` pulses sit one line period apart
+    (allowing a missed pulse), so noise and picture content don't match."""
+    try:
+        pulses = sync_pulses(samples, offset_hz)
+        if len(pulses) < min_pulses:
+            return None
+        d = np.diff(pulses)
+        best = None
+        for name, ms in LINE_PERIODS_MS.items():
+            P = ms / 1000.0
+            one = np.abs(d / P - 1.0) < 0.012
+            two = np.abs(d / (2 * P) - 1.0) < 0.012          # one pulse missed
+            n_ok = int(one.sum() + two.sum())
+            score = n_ok / len(d)
+            if best is None or score > best[0]:
+                best = (score, name, int(one.sum()), P)
+        score, name, n1, P = best
+        if score < 0.6 or n1 < min_pulses - 2:
+            return None
+        # first pulse of the first regular chain
+        idx = next((k for k in range(len(d)) if abs(d[k] / P - 1.0) < 0.012), 0)
+        return {"mode": name, "first_s": pulses[idx], "n": n1 + 1, "score": round(score, 2), "period_s": P}
+    except Exception as e:
+        print(f"[sstv] sync identification failed: {type(e).__name__}: {e}")
+        return None
+
+
+def decode_joined(samples, mode_name, offset_hz=0.0, first_pulse_s=0.0):
+    """Decode the part of a picture that was heard, for audio that starts
+    MID-picture: line timing comes from the sync pulses alone (the first
+    pulse at/after `first_pulse_s` is taken as line 0). Returns an RGB image
+    with only the lines actually heard (never padded with black) or None."""
+    try:
+        spec = MODES.get(mode_name)
+        if spec is None:
+            return None
+        prep = prepare(samples, offset_hz)
+        if prep is None:
+            return None
+        H = spec["height"]
+        line = spec["line_ms"] / 1000.0
+        audio_s = prep["n"] / RATE
+        n_avail = int((audio_s - first_pulse_s) / line) + 2
+        fit = _fit_timing(prep["dom"], prep["times"], first_pulse_s, line, min(n_avail, H))
+        t0, T = (first_pulse_s, line) if fit is None else (fit[0], fit[1])
+        starts = _scan_starts(spec)
+        scan = spec["scan_ms"] / 1000.0
+        # lines whose every scan lies inside the audio we actually have
+        first = 0
+        while t0 + first * T + min(starts.values()) < 0.05:
+            first += 1
+        last = first
+        while last < H and t0 + last * T + max(starts.values()) + scan <= audio_s - 0.02:
+            last += 1
+        # ...and only up to the last line that really had a sync pulse: after the
+        # transmission ends the audio goes on (noise), and reading it would append
+        # black rows to the picture
+        dom, times = prep["dom"], prep["times"]
+        seen, misses = first, 0
+        for k in range(first, last):
+            c = t0 + k * T
+            lo, hi = np.searchsorted(times, c - 0.03), np.searchsorted(times, c + 0.03)
+            if hi > lo and dom[lo:hi].max() > 0.5:
+                seen, misses = k + 1, 0
+            else:
+                misses += 1
+                if misses >= 3:                 # the train has ended; a stray noise peak later doesn't extend it
+                    break
+        last = min(last, seen)
+        if last - first < 24:                  # too few lines to be worth showing
+            return None
+        im = render(prep, mode_name, timing=(t0, T))
+        if im is None:
+            return None
+        return im.crop((0, first, im.size[0], last))
+    except Exception as e:
+        print(f"[sstv] joined decode failed: {type(e).__name__}: {e}")
+        return None
