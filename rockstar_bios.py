@@ -631,6 +631,11 @@ BIOS = {
         "blurb": "Leader of Bill Haley & His Comets, whose “Rock Around the Clock” (1954) became one of the first rock and roll records to top the charts.",
         "wiki": "Bill_Haley",
     },
+    "Sledge": {
+        "name": "Percy Sledge",
+        "blurb": "Alabama soul singer whose 1966 ballad “When a Man Loves a Woman” topped the US pop and R&B charts.",
+        "wiki": "Percy_Sledge",
+    },
 }
 
 

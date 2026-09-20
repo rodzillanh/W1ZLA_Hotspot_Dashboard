@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "4.94"
+APP_VERSION = "4.95"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -267,6 +267,8 @@ VERSION_CODENAMES = [
                         # Slipknot (1975-2021)
     "Haley",            # v4.94 -- Bill Haley, Bill Haley & His Comets
                         # ("Rock Around the Clock") (1925-1981)
+    "Sledge",           # v4.95 -- Percy Sledge, soul singer ("When a Man
+                        # Loves a Woman") (1940-2015)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
 
@@ -1776,7 +1778,17 @@ DEFAULT_SETTINGS = {
     # caller are unaffected. The mobile app prompts for it once per
     # session; it is never sent to that page, only checked here.
     "control_pin": "",
+    # Networks allowed to send CONTROL actions (link/unlink, tune, power,
+    # reboot). Blank = CONTROL_TRUSTED_NETS_DEFAULT: loopback, private LAN
+    # ranges and Tailscale's 100.64.0.0/10. Comma/space separated CIDRs.
+    "control_trusted_nets": "",
 }
+
+# Default trusted networks for control actions: loopback, RFC 1918 LAN
+# ranges, link-local, and Tailscale's CGNAT range (only devices on the
+# owner's tailnet get an address there). IPv6 loopback/ULA/link-local too.
+CONTROL_TRUSTED_NETS_DEFAULT = ("127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, "
+                                "169.254.0.0/16, 100.64.0.0/10, ::1/128, fc00::/7, fe80::/10")
 
 # --- Fleet activity ---
 # Bucket width (minutes) per selectable time span, chosen so every option

@@ -11095,7 +11095,7 @@ function renderSstvCard() {
     // countdown and the live preview are updated in place by
     // sstvUpdateLive(), so the <img> isn't torn down every poll.
     const sig = [view, last && last.id, recv && recv.label, !!rx.has_preview, ctl.reason, ctl.reason_at, cfg.auto,
-        cfg.idle_minutes, rx.audio_ok, rx.dropped_samples, rx.today, rx.rejected_total, rx.sample_rate,
+        cfg.idle_minutes, rx.audio_ok, rx.connected, rx.error, (rx.rig || {}).mode, (rx.rig || {}).power_state, (rx.rig || {}).lan_connected, rx.dropped_samples, rx.today, rx.rejected_total, rx.sample_rate,
         ctl.idle_remaining_s == null].join('|');
     if (sig !== sstvCardSig) {
         sstvCardSig = sig;
@@ -11104,6 +11104,16 @@ function renderSstvCard() {
     sstvUpdateLive(true);
 }
 
+// Why audio isn't arriving -- three different situations that used to all
+// read "no audio arriving": wfweb unreachable, reachable but not streaming
+// (e.g. wfweb switched to a non-audio mode such as FreeDV), or rig powered off.
+function sstvNoAudioReason(rx) {
+    const rig = rx.rig || {};
+    if (!rx.connected) return 'not connected to wfweb' + (rx.error ? ': ' + escapeHtml(rx.error) : '');
+    if (rig.power_state === false) return 'connected, but the rig is powered off';
+    if (rig.lan_connected === false) return 'connected, but wfweb has lost the rig';
+    return 'connected, but wfweb isn\'t streaming audio' + (rig.mode ? ' (rig mode: ' + escapeHtml(rig.mode) + ')' : '') + ' — check its mode';
+}
 function sstvFrame(inner, cls) { return `<div class="sstv-frame ${cls || ''}">${inner}</div>`; }
 function sstvEmptyFrame(title, subtxt) {
     return sstvFrame(`<div class="sstv-empty"><b>${title}</b><span>${subtxt}</span></div>`);
@@ -11142,7 +11152,7 @@ function sstvBodyHtml(view, rx, ctl, cfg, last, recv) {
         return sstvEmptyFrame('Nothing decoded yet', 'Waiting for an SSTV header') + `<div class="sstv-meta">
             ${sstvMeta('Listening since', rx.listening_since ? sstvClock(rx.listening_since) : '—')}
             <div><div class="sstv-k">Audio</div><div class="sstv-eq ${rx.audio_ok ? 'ok' : ''}" id="sstv-eq">${bars}</div>
-                <div class="sstv-note">${rx.audio_ok ? ((rx.sample_rate || 48000) / 1000) + ' kHz · ' + drop : 'no audio arriving'}</div></div>
+                <div class="sstv-note">${rx.audio_ok ? ((rx.sample_rate || 48000) / 1000) + ' kHz · ' + drop : sstvNoAudioReason(rx)}</div></div>
             ${sstvMeta('Images today', String(rx.today || 0))}
             <div class="sstv-actions"><button class="sstv-linkbtn quiet" onclick="sstvControl('stop')">Stop</button></div>
         </div>`;
@@ -11325,7 +11335,7 @@ function renderSstvDrawer() {
         row('State', stateTxt) +
         (ctl.state !== 'active' ? `<div class="sstv-note" style="padding:0 0 8px">${escapeHtml(sstvStandbyText(ctl, cfg))}</div>` : '') +
         row('wfweb', rx.connected ? 'connected' : 'not connected') +
-        row('Audio', rx.audio_ok ? ((rx.sample_rate || 48000) / 1000) + ' kHz' + (rx.dropped_samples ? ' · ' + rx.dropped_samples + ' samples lost' : ' · clean') + '<span id="sstv-d-level"></span>' : 'not receiving') +
+        row('Audio', rx.audio_ok ? ((rx.sample_rate || 48000) / 1000) + ' kHz' + (rx.dropped_samples ? ' · ' + rx.dropped_samples + ' samples lost' : ' · clean') + '<span id="sstv-d-level"></span>' : sstvNoAudioReason(rx)) +
         row('Rig', escapeHtml(sstvRigText(rx.rig))) +
         row('Rejected as noise', String(rx.rejected_total || 0)) +
         (rx.last_signal ? `<div class="sstv-set-row"><div class="lbl">Audio of the last signal<div class="hint">${escapeHtml(rx.last_signal.label)} at ${sstvClock(rx.last_signal.ts)} &middot; ${({ stored: 'picture kept', noise: 'dropped as too weak', audio_loss: 'dropped: audio dropouts', blank: 'dropped: no usable picture', decode_failed: "couldn't decode", timeout: 'never completed', interrupted: 'interrupted', dropped: 'dropped' })[rx.last_signal.outcome] || rx.last_signal.outcome} &middot; ${rx.last_signal.seconds} s</div></div><a class="sstv-btn" style="text-decoration:none;color:var(--text)" href="/api/sstv/last_signal.wav?t=${Math.round(rx.last_signal.ts)}" title="Download this signal's audio as a WAV (for diagnosis)">Download</a></div>` : '') +

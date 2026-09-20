@@ -2335,7 +2335,14 @@ untouched. It's a single-column layout with a bottom tab bar:
   full-screen mobile view — same one-tap submit to QRZ, same rig-network
   requirement as the desktop card.
 - **More** — links back to the full dashboard, Settings, changelog and
-  README, plus the notification controls below.
+  README, the notification controls below, and a **This connection** line
+  showing how the dashboard sees your phone (LAN, Tailscale or other) and
+  whether control actions are allowed from it.
+- **Control safety** — connecting or disconnecting an ASL node asks for a
+  confirmation tap first. Control actions (from the phone and the desktop)
+  are only accepted from your LAN, loopback or Tailscale addresses
+  (editable under Settings → General), and are refused for a hotspot that is
+  offline.
 
 <!-- wiki-image: mobile-map.png -->
 <!-- wiki-image: mobile-activity.png -->

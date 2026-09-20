@@ -983,6 +983,8 @@ def api_settings_post():
         settings["push_vapid_contact"] = contact or "mailto:admin@example.com"
     if "control_pin" in data:
         settings["control_pin"] = "".join(ch for ch in str(data["control_pin"]) if ch.isdigit())[:12]
+    if "control_trusted_nets" in data:
+        settings["control_trusted_nets"] = str(data["control_trusted_nets"]).strip()[:500]
     save_settings(settings)
     _settings_txn.__exit__(None, None, None)
     # Rebuilds below intentionally happen AFTER releasing the lock -- they
@@ -1708,6 +1710,7 @@ def setup():
     setup_settings = load_settings()
     setup_cameras  = load_cameras()
     return render_template("setup.html", hotspots=setup_hotspots,
+                           control_nets_default=config.CONTROL_TRUSTED_NETS_DEFAULT,
                            settings=_with_effective_pages(setup_settings), favorites=load_favorites(),
                            big_clock_p1=_card_shown_on_page(setup_settings, "big_clock_position", 1),
                            big_clock_p2=_card_shown_on_page(setup_settings, "big_clock_position", 2),
@@ -1920,8 +1923,9 @@ def host_reboot():
     otherwise deny it."""
     if not HOST_CAN_POWER_CONTROL:
         return jsonify({"success": False, "message": "Not available on this deployment"}), 403
-    if not _control_pin_ok():
-        return _pin_refused()
+    blocked = _control_gate()
+    if blocked:
+        return blocked
     ok, message = _run_power_command(["systemctl", "reboot"])
     return jsonify({"success": ok, "message": "Rebooting now" if ok else message})
 
@@ -1932,8 +1936,9 @@ def host_poweroff():
     someone physically restores power."""
     if not HOST_CAN_POWER_CONTROL:
         return jsonify({"success": False, "message": "Not available on this deployment"}), 403
-    if not _control_pin_ok():
-        return _pin_refused()
+    blocked = _control_gate()
+    if blocked:
+        return blocked
     ok, message = _run_power_command(["systemctl", "poweroff"])
     return jsonify({"success": ok, "message": "Powering off now" if ok else message})
 
@@ -2245,6 +2250,9 @@ def api_rig_tune():
     (WFView's built-in one, or a standalone rigctld) at the clicked
     spot's frequency, and optionally its mode. Short-lived connection --
     see rigctl.py."""
+    blocked = _control_gate()
+    if blocked:
+        return blocked
     settings = load_settings()
     if not settings.get("rig_control_enabled"):
         return jsonify({"ok": False, "message": "Rig control is turned off"}), 400
@@ -2314,6 +2322,9 @@ def api_wfweb_power():
 def api_wfweb_power_action():
     """Power on/off or LAN disconnect/reconnect via wfweb's own native
     WebSocket protocol -- see wfweb_power.py."""
+    blocked = _control_gate()
+    if blocked:
+        return blocked
     settings = load_settings()
     if not settings.get("wfweb_power_enabled"):
         return jsonify({"ok": False, "message": "wfweb power control is turned off"}), 400
@@ -2420,6 +2431,9 @@ def api_sstv_rejected_audio():
 def api_sstv_control():
     """'Listen now' / 'Stop' (which restores the rig's previous frequency
     when that setting is on) / 'Clear' from the SSTV card and drawer."""
+    blocked = _control_gate()
+    if blocked:
+        return blocked
     data = request.json or {}
     action = data.get("action")
     if action == "listen_now":
@@ -2838,6 +2852,78 @@ def test_openspot4():
     return jsonify({"success": ok, "message": message})
 
 
+def _client_ip() -> str:
+    """The address the request really came from (the TCP peer). Deliberately
+    NOT X-Forwarded-For -- any client can send that header, so trusting it
+    would let anyone claim to be on the LAN."""
+    ip = request.remote_addr or ""
+    return ip[7:] if ip.lower().startswith("::ffff:") else ip
+
+
+def _trusted_networks():
+    import ipaddress
+    raw = (load_settings().get("control_trusted_nets") or "").strip() or config.CONTROL_TRUSTED_NETS_DEFAULT
+    nets = []
+    for part in raw.replace(",", " ").split():
+        try:
+            nets.append(ipaddress.ip_network(part, strict=False))
+        except ValueError:
+            continue                      # a typo'd entry must not disable the whole list
+    return nets
+
+
+def _network_info() -> dict:
+    """What the dashboard sees for this request: address, a friendly network
+    name, and whether control actions are allowed from it."""
+    import ipaddress
+    ip = _client_ip()
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return {"ip": ip, "network": "Unknown", "trusted": False}
+    if addr.is_loopback:
+        name = "This device"
+    elif addr.version == 4 and addr in ipaddress.ip_network("100.64.0.0/10"):
+        name = "Tailscale"
+    elif addr.is_private or addr.is_link_local:
+        name = "LAN"
+    else:
+        name = "Other network"
+    return {"ip": ip, "network": name, "trusted": any(addr in n for n in _trusted_networks())}
+
+
+def _hotspot_offline(hotspot_id) -> bool:
+    if not hotspot_id:
+        return False
+    st = monitor.snapshot().get(hotspot_id)
+    return bool(st) and st.get("status") == "Offline"
+
+
+def _control_gate(hotspot_id=None):
+    """Guard for every action that changes something (link/unlink, tune,
+    power, reboot). Returns None to proceed, or a ready (response, status)
+    to return. Order: network first (a refused network never learns whether
+    a PIN exists), then the mobile PIN, then a hotspot that isn't
+    reachable (an offline hotspot can only time out, slowly)."""
+    info = _network_info()
+    if not info["trusted"]:
+        return jsonify({"success": False, "ok": False, "untrusted_network": True,
+                        "message": f"Control actions aren't allowed from this network ({info['ip']})"}), 403
+    if not _control_pin_ok():
+        return _pin_refused()
+    if _hotspot_offline(hotspot_id):
+        return jsonify({"success": False, "ok": False, "offline": True,
+                        "message": "That hotspot is offline right now"}), 409
+    return None
+
+
+@app.route("/api/whoami")
+def api_whoami():
+    """How the dashboard sees the caller -- shown on the mobile More tab so
+    the network check can be verified from a phone on Wi-Fi and on cellular."""
+    return jsonify(_network_info())
+
+
 def _control_pin_ok() -> bool:
     """True unless a control PIN is set AND this is a Pocket Dash mobile
     request (X-Pocket-Dash header) that didn't send a matching
@@ -2869,12 +2955,13 @@ def api_asl_connect():
     DTMF-simulated `rpt fun <node> *3<remotenode>` form, which requires
     replicating app_rpt's digit-collection state machine and proved
     unreliable in practice."""
-    if not _control_pin_ok():
-        return _pin_refused()
     data       = request.json or {}
     hotspot_id = data.get("id", "").strip()
     node       = data.get("node", "").strip()
     action     = data.get("action", "").strip()
+    blocked = _control_gate(hotspot_id)
+    if blocked:
+        return blocked
 
     hotspot = next((h for h in load_hotspots() if h.get("id") == hotspot_id), None)
     if hotspot is None or hotspot.get("type") != "asl3":
@@ -2930,6 +3017,9 @@ def api_brandmeister_talkgroup():
     made available")."""
     data       = request.json or {}
     hotspot_id = data.get("id", "").strip()
+    blocked = _control_gate(hotspot_id)
+    if blocked:
+        return blocked
     action     = data.get("action", "").strip()
 
     hotspot = next((h for h in load_hotspots() if h.get("id") == hotspot_id), None)
@@ -3017,6 +3107,9 @@ def api_ircddb_link():
     the wire protocol."""
     data       = request.json or {}
     hotspot_id = data.get("id", "").strip()
+    blocked = _control_gate(hotspot_id)
+    if blocked:
+        return blocked
     hotspot    = _ircddb_hotspot(hotspot_id)
     if hotspot is None:
         return jsonify({"success": False, "message": "ircDDBGateway not configured for this hotspot"}), 400
@@ -3043,6 +3136,9 @@ def api_ircddb_unlink():
     (one of the drawer's per-link Unlink buttons)."""
     data       = request.json or {}
     hotspot_id = data.get("id", "").strip()
+    blocked = _control_gate(hotspot_id)
+    if blocked:
+        return blocked
     hotspot    = _ircddb_hotspot(hotspot_id)
     if hotspot is None:
         return jsonify({"success": False, "message": "ircDDBGateway not configured for this hotspot"}), 400

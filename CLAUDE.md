@@ -8068,6 +8068,22 @@ config for per-integration credentials; put it in
     test must compare image counts before/after (the control run stores a
     picture in the same dir), and the lost-sample threshold moved because
     the receiver now gives up sooner.
+  - **Control gate (v4.95, `app._control_gate()`)** -- every action that
+    changes something (ASL connect, Brandmeister/D-STAR link, rig tune, wfweb
+    power, SSTV control, host reboot/power-off) goes through one guard:
+    network first, then the mobile PIN (`X-Pocket-Dash` only), then an
+    offline hotspot (409). Trusted networks default to loopback, RFC 1918,
+    link-local and Tailscale `100.64.0.0/10` (`control_trusted_nets`
+    overrides). The source is `request.remote_addr` ONLY -- never
+    `X-Forwarded-For`, which any client can forge. Consequence: behind a
+    reverse proxy every request looks like the proxy's (usually private)
+    address and passes -- the check assumes direct access (LAN/Tailscale).
+    A Tailscale subnet router/exit node that SNATs would also rewrite the
+    address; `/api/whoami` (shown on Pocket Dash's More tab) exists so this
+    can be checked from a phone rather than assumed. Adding a new write
+    route means calling `_control_gate(hotspot_id)` at its top. Pocket Dash
+    already had ASL Control and a PIN before this -- only the confirm tap,
+    offline refusal and network check were new.
   - **Stale-body rule for the SSTV card (v4.93)**: `renderSstvCard()`
     rebuilds `#sstv-body` ONLY when a structural signature changes (so the
     <img> and drawer inputs survive polls), which means ANY value inside

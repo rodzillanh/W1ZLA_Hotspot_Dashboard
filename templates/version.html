@@ -117,9 +117,22 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v4.94 "Haley"</span>
+                <span class="release-version">v4.95 "Sledge"</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Control actions are only accepted from trusted networks</span> &mdash; link/unlink, ASL connect/disconnect, Brandmeister and D-STAR links, rig tuning, wfweb power, SSTV Listen/Stop and host reboot/power-off are refused unless the request comes from your LAN, loopback or Tailscale (<code>100.64.0.0/10</code>). The address is the connection's real source (forwarded-for headers are ignored, since any client can forge them). Settings &rarr; General &rarr; &ldquo;Networks allowed to send control actions&rdquo; lets you change the list</li>
+                <li><span>Offline hotspots refuse link changes</span> &mdash; an offline hotspot can only time out slowly, so ASL, Brandmeister and D-STAR changes are refused up front with &ldquo;That hotspot is offline right now&rdquo;. Pocket Dash disables the buttons and says why</li>
+                <li><span>Pocket Dash: confirmation tap</span> &mdash; connecting or disconnecting an ASL node asks first, naming the node and the hotspot, so a mistap on a phone doesn't reach a real net</li>
+                <li><span>Pocket Dash: &ldquo;This connection&rdquo;</span> &mdash; the More tab shows how the dashboard sees your phone (LAN, Tailscale or other) and whether control is allowed, so you can check it on Wi-Fi and on cellular</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v4.94 "Haley"</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Fix: SSTV card dropped a real, clearly present signal</span> &mdash; a genuine Martin 1 picture recorded from the rig (about +5 dB) decoded to streaks and was then thrown away as &ldquo;noise&rdquo;. Two separate causes: the decoder library loses line sync in noise, and the old noise check scored pixel smoothness, which a speckled-but-real picture fails. Both are fixed</li>

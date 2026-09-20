@@ -440,6 +440,18 @@
     .pin-box .row .go { background:var(--accent); color:var(--accent-ink,#241a06); border-color:transparent; }
     .pin-box .row .no { background:var(--panel-2); color:var(--text-dim); }
 
+    /* confirm-tap modal (reuses the PIN modal's box) */
+    #confirm-modal { position:fixed; inset:0; z-index:61; background:rgba(4,6,10,.6);
+        display:none; align-items:center; justify-content:center; padding:24px; }
+    #confirm-modal.open { display:flex; }
+    .pin-box .row .danger { background:var(--danger); color:#fff; border-color:transparent; }
+    .asl-offline { padding:10px 12px; border-radius:9px; font-size:12px; color:var(--danger);
+        border:1px solid color-mix(in srgb, var(--danger) 40%, var(--border)); margin-bottom:10px; }
+    .asl-node-row button:disabled, .asl-fav-row button:disabled, .asl-qc button:disabled { opacity:.35; }
+    .net-line { font-size:12px; color:var(--text-muted); padding:2px 2px 0; }
+    .net-line b { color:var(--text); font-weight:600; }
+    .net-line.bad b { color:var(--danger); }
+
     /* ---------------- tab bar ---------------- */
     .tabbar {
         position:fixed; left:0; right:0; bottom:0; z-index:20;
@@ -620,6 +632,9 @@
                 <div class="notif-hint" id="notif-hint"></div>
             </div>
 
+            <div class="sec-label" style="margin-top:18px">This connection</div>
+            <div class="net-line" id="net-line">Checking…</div>
+
             <div class="sec-label" style="margin-top:18px">Links</div>
             <div class="link-list">
                 <a href="/">Open full dashboard <span class="r">↗</span></a>
@@ -682,6 +697,17 @@
         </div>
     </div>
     {% endif %}
+
+    <div id="confirm-modal" aria-hidden="true">
+        <div class="pin-box">
+            <h3 id="confirm-title">Confirm</h3>
+            <p id="confirm-text"></p>
+            <div class="row">
+                <button class="no" id="confirm-no">Cancel</button>
+                <button class="go" id="confirm-yes">Confirm</button>
+            </div>
+        </div>
+    </div>
 
     <div id="pin-modal" aria-hidden="true">
         <div class="pin-box">
@@ -1729,6 +1755,37 @@
         return { success: false, message: "PIN rejected" };
     }
 
+    // Confirmation tap before anything that changes a link -- a mistap on a
+    // phone is easy, and these actions reach real repeaters/nets.
+    var _confirmResolve = null;
+    function confirmAction(title, text, danger) {
+        document.getElementById("confirm-title").textContent = title;
+        document.getElementById("confirm-text").textContent = text;
+        var yes = document.getElementById("confirm-yes");
+        yes.className = danger ? "danger" : "go";
+        document.getElementById("confirm-modal").classList.add("open");
+        return new Promise(function (res) { _confirmResolve = res; });
+    }
+    function _closeConfirm(v) {
+        document.getElementById("confirm-modal").classList.remove("open");
+        var r = _confirmResolve; _confirmResolve = null;
+        if (r) r(v);
+    }
+    document.getElementById("confirm-yes").onclick = function () { _closeConfirm(true); };
+    document.getElementById("confirm-no").onclick = function () { _closeConfirm(false); };
+
+    // How the dashboard sees this phone (LAN / Tailscale / other) -- control
+    // actions are refused server-side from anything else.
+    function loadNetLine() {
+        fetch("/api/whoami").then(function (r) { return r.json(); }).then(function (w) {
+            var el = document.getElementById("net-line");
+            el.className = "net-line" + (w.trusted ? "" : " bad");
+            el.innerHTML = "The dashboard sees you as <b>" + esc(w.ip) + "</b> (" + esc(w.network) + ") · " +
+                (w.trusted ? "control actions allowed" : "<b>control actions are blocked from here</b>");
+        }).catch(function () { document.getElementById("net-line").textContent = "Couldn't check."; });
+    }
+    loadNetLine();
+
     var aslCtrlId = null;
 
     document.getElementById("cards").addEventListener("click", function (e) {
@@ -1774,6 +1831,7 @@
                 esc(hs.name) + " · node " + esc(hs.asl_node || "?") + "</div>";
         }
 
+        var offline = hs.status === "Offline";
         var nodes = hs.asl_linked_nodes || [];
         var linksHtml = '<div class="asl-sec">Linked nodes</div>' + (nodes.length
             ? nodes.map(function (n) {
@@ -1798,7 +1856,10 @@
             }).join("");
         }
 
-        host.innerHTML = fromHtml + linksHtml + qcHtml + favHtml;
+        var offHtml = offline ? '<div class="asl-offline">' + esc(hs.name) +
+            " is offline right now — link changes are disabled until it responds.</div>" : "";
+        host.innerHTML = fromHtml + offHtml + linksHtml + qcHtml + favHtml;
+        if (offline) host.querySelectorAll("button[data-act], #asl-qc-node").forEach(function (el) { el.disabled = true; });
         var sel = document.getElementById("asl-from-sel");
         if (sel) sel.onchange = function () { aslCtrlId = this.value; renderAslScreen(); };
     }
@@ -1813,6 +1874,14 @@
             node = node.replace(/\D/g, "");
         }
         if (!node) { toast("Enter a node number"); return; }
+        var hsNow = aslHotspots().filter(function (h) { return h.id === aslCtrlId; })[0] || {};
+        var who = "node " + node;
+        (hsNow.asl_linked_nodes || []).concat(aslFavs.map(function (f) { return { node: f.node, callsign: f.label }; }))
+            .forEach(function (n) { if (String(n.node) === String(node) && n.callsign) who = n.callsign + " (node " + node + ")"; });
+        var verb = act === "disconnect" ? "Disconnect" : "Connect";
+        var ok = await confirmAction(verb + "?", verb + " " + who + (act === "disconnect" ? " from " : " to ") +
+            (hsNow.name || "this hotspot") + "?", act === "disconnect");
+        if (!ok) return;
         b.disabled = true;
         var r = await apiControl("/api/asl_connect", { id: aslCtrlId, node: node, action: act });
         b.disabled = false;

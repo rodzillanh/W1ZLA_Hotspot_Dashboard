@@ -461,6 +461,17 @@
                 </label>
                 <input type="text" inputmode="numeric" id="control-pin" value="{{ settings.get('control_pin', '') }}">
             </div>
+            <div>
+                <label>Networks allowed to send control actions
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (link/unlink, tune, power, reboot &mdash; from the mobile app and the desktop alike.
+                        Comma-separated CIDRs. Blank = your LAN ranges plus Tailscale
+                        <code>100.64.0.0/10</code>. Anything else, including the open internet, is refused.
+                        The address is the connection's real source; forwarded-for headers are ignored.)
+                    </span>
+                </label>
+                <input type="text" id="control-trusted-nets" placeholder="{{ control_nets_default }}" value="{{ settings.get('control_trusted_nets', '') }}">
+            </div>
         </div>
         <div class="toggle-group">
             <div class="toggle-row">
@@ -2585,6 +2596,7 @@ function saveAppearance() {
             beta_courtesy_tone: document.getElementById('courtesy-tone-toggle').classList.contains('on'),
             beta_spotlight_dimming: document.getElementById('spotlight-dimming-toggle').classList.contains('on'),
             control_pin: document.getElementById('control-pin').value,
+            control_trusted_nets: document.getElementById('control-trusted-nets').value,
         })
     }).then(() => {
         const el = document.getElementById('appearance-status');
