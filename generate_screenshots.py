@@ -60,6 +60,7 @@ HOTSPOT_WPSD_ACTIVE = {
     "ip": "198.51.100.10", "name": "W1ZLA Home", "type": "wpsd",
     "user": "pi-star", "pass": "demo", "enabled": True,
     "lat": "43.2162", "lon": "-71.0132",
+    "brandmeister_id": "3100486",     # gives Pocket Dash's "Digital links" screen something to show
 }
 HOTSPOT_WPSD_IDLE = {
     "ip": "198.51.100.11", "name": "Mobile Hotspot", "type": "wpsd",
@@ -133,6 +134,10 @@ SETTINGS = {
     # SSTV card (v4.91) -- shows the seeded picture below; no wfweb here, so
     # it reads as Standby/last-image, which is exactly the resting view.
     "show_sstv": True,
+    # Pocket Dash notification feed sources that need no network/credentials
+    # (their events are canned in the phone capture below, not real).
+    "fleet_alerts_enabled": True,
+    "solar_alerts_enabled": True,
     "wfweb_host": "198.51.100.20",
     "wfweb_port": 8282,
     # Rig control on so the POTA card screenshot shows the tap-to-tune
@@ -273,6 +278,7 @@ wpsd_active = models.HotspotStatus(
     caller_location="Portland, ME", tx_start=now - 12,
     talkgroup="31665", color_code="1", timeslot="2",
     ber="0.1%", rssi="-72 dBm / -6", mode="DMR",
+    bm_static_tgs=[{"talkgroup": "31665", "slot": 2}, {"talkgroup": "3100", "slot": 1}],
     frequency="433.750 MHz", duplex="Simplex",
     hotspot_callsign="W1ZLA (3100486)", hotspot_location="Barrington, NH",
     history=[
@@ -575,6 +581,81 @@ with sync_playwright() as p:
     mob.wait_for_timeout(2500)
     mob.screenshot(path=os.path.join(OUTPUT_DIR, "mobile-focus.png"))
     print("wrote mobile-focus.png")
+
+    # --- Pocket Dash screens added in v4.95-v4.97: ASL Control, Digital
+    # links, Notifications, Spots, SSTV, License quiz. The notification feed's
+    # events are CANNED here (route interception) -- the demo has no real
+    # sources -- everything else is the same seeded/live data as above.
+    import json as _json
+    _now = time.time()
+    _canned = {
+        "/api/fleet_events": {"events": [
+            {"name": "Mobile Hotspot", "kind": "offline", "at": _now - 540},
+            {"name": "W1ZLA Hub", "kind": "online", "at": _now - 7200}]},
+        "/api/hf_alerts": {"events": [{"kind": "elevated", "k_index": 5.0, "at": _now - 3100}]},
+        "/api/rig_pa_alerts": {"events": [{"kind": "high", "temp_c": 78, "at": _now - 20000}]},
+    }
+
+    def _canned_route(route):
+        path = "/" + route.request.url.split("/", 3)[3].split("?")[0]
+        if path in _canned:
+            route.fulfill(status=200, content_type="application/json", body=_json.dumps(_canned[path]))
+        else:
+            route.continue_()
+
+    mob_ctx2 = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1, is_mobile=True, has_touch=True)
+    m2 = mob_ctx2.new_page()
+    m2.route("**/api/*", _canned_route)
+    m2.goto(f"{BASE_URL}/mobile", wait_until="load")
+    m2.wait_for_timeout(2500)
+
+    def _jsclick(sel):
+        # plain DOM click: a just-closed full-screen overlay can still be
+        # mid-transition and make Playwright's actionability wait time out
+        m2.evaluate("sel => document.querySelector(sel).click()", sel)
+
+    def _shot(name, full=False):
+        m2.screenshot(path=os.path.join(OUTPUT_DIR, name), full_page=full)
+        print(f"wrote {name}")
+
+    _asl = m2.query_selector(".card .asl-ctrl-open:not(.dv-open)")
+    if _asl:
+        _jsclick('.card .asl-ctrl-open:not(.dv-open)')
+        m2.wait_for_timeout(900)
+        _shot("mobile-asl-control.png")
+        _jsclick("#asl-close")
+        m2.wait_for_timeout(300)
+    _dv = m2.query_selector(".dv-open")
+    if _dv:
+        _jsclick('.dv-open')
+        m2.wait_for_timeout(1200)
+        _shot("mobile-digital-links.png")
+        _jsclick("#dv-close")
+        m2.wait_for_timeout(300)
+
+    _jsclick('.tabbar button[data-go="activity"]')
+    m2.wait_for_timeout(1500)
+    for _btn, _close, _name, _wait in (("#notif-entry-btn", "#notif-close", "mobile-notif-feed.png", 900),
+                                       ("#spots-entry-btn", "#spots-close", "mobile-spots.png", 3500),
+                                       ("#sstv-entry-btn", "#sstv-close", "mobile-sstv.png", 1500)):
+        _el = m2.query_selector(_btn)
+        if _el:
+            _jsclick(_btn)
+            m2.wait_for_timeout(_wait)
+            _shot(_name)
+            _jsclick(_close)
+            m2.wait_for_timeout(300)
+
+    _jsclick('.tabbar button[data-go="more"]')
+    m2.wait_for_timeout(600)
+    _q = m2.query_selector("#quiz-entry-btn")
+    if _q:
+        _jsclick('#quiz-entry-btn')
+        m2.wait_for_timeout(1200)
+        m2.evaluate("document.querySelector('#qz-answers .qz-a[data-i=\"' + qzItem.correct + '\"]').click()")
+        m2.wait_for_timeout(400)
+        _shot("mobile-quiz.png")
+    mob_ctx2.close()
 
     mob_ctx.close()
 
