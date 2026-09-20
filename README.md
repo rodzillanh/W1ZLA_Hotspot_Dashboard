@@ -2341,7 +2341,10 @@ untouched. It's a single-column layout with a bottom tab bar:
 - **ASL Control** (button on each ASL3 card) — Connect, Monitor and Local
   monitor for any node number or favorite, Disconnect per link, and a
   separate, more heavily confirmed Disconnect all.
-- **Control safety** — every ASL link change asks for a confirmation tap
+- **Digital links** (button on WPSD cards with Brandmeister or
+  ircDDBGateway set up) — link or unlink Brandmeister static talkgroups and
+  D-STAR reflectors, with your saved favorites as one-tap chips.
+- **Control safety** — every link change asks for a confirmation tap
   first. Control actions (from the phone and the desktop)
   are only accepted from your LAN, loopback or Tailscale addresses
   (editable under Settings → General), and are refused for a hotspot that is

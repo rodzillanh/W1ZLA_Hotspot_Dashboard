@@ -454,6 +454,22 @@
     .pin-box .row .go { background:var(--accent); color:var(--accent-ink,#241a06); border-color:transparent; }
     .pin-box .row .no { background:var(--panel-2); color:var(--text-dim); }
 
+    /* Digital links screen (Brandmeister TGs + D-STAR reflectors) */
+    #dv-screen { position:fixed; inset:0; z-index:35; background:var(--bg); display:none; flex-direction:column; }
+    #dv-screen.open { display:flex; }
+    .dv-form { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 4px; }
+    .dv-form input, .dv-form select {
+        padding:10px 12px; border-radius:9px; border:1px solid var(--border); background:var(--panel);
+        color:var(--text); font-family:var(--font-mono); font-size:14px; min-width:0; }
+    .dv-form input { flex:1 1 90px; }
+    .dv-form button { flex:1 1 100%; padding:10px 0; border-radius:9px; border:none; background:var(--live);
+        color:#04211d; font-family:var(--font-ui); font-size:13px; font-weight:600; cursor:pointer; }
+    .dv-form button:disabled { opacity:.35; }
+    .dv-chips { display:flex; flex-wrap:wrap; gap:7px; margin-top:8px; }
+    .dv-chips button { padding:7px 11px; border-radius:16px; border:1px solid var(--border);
+        background:var(--panel-2); color:var(--text); font-size:12px; cursor:pointer; }
+    .dv-chips button:disabled { opacity:.35; }
+
     /* confirm-tap modal (reuses the PIN modal's box) */
     #confirm-modal { position:fixed; inset:0; z-index:61; background:rgba(4,6,10,.6);
         display:none; align-items:center; justify-content:center; padding:24px; }
@@ -681,6 +697,14 @@
         <div class="asl-body" id="asl-body"></div>
     </div>
 
+    <div id="dv-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="dv-close">‹ Back</button>
+            <span class="ttl">Digital links</span>
+        </div>
+        <div class="asl-body" id="dv-body"></div>
+    </div>
+
     {% if settings.get('show_qrz_quick_log', False) %}
     <div id="ql-screen" aria-hidden="true">
         <div class="prefs-hdr">
@@ -848,7 +872,9 @@
                 renderCards(data);
                 if (currentTab === "map") renderMapMarkers();
                 maybeShowFocus();
-                if (document.getElementById("asl-screen").classList.contains("open")) renderAslScreen();
+                var aslBody = document.getElementById("asl-body");
+                if (document.getElementById("asl-screen").classList.contains("open") &&
+                    !(aslBody && aslBody.contains(document.activeElement) && document.activeElement.tagName === "INPUT")) renderAslScreen();
             })
             .catch(function () { markStale(); })
             .finally(function () { setTimeout(fetchData, POLL_MS); });
@@ -974,6 +1000,8 @@
                '<div class="card-body">' + body + "</div>" +
                extra + recent +
                (isAsl ? '<button class="asl-ctrl-open">🎛️ ASL Control</button>' : "") +
+               ((!isAsl && hs.type !== "openspot4" && (hs.brandmeister_id || hs.ircddb_enabled))
+                   ? '<button class="asl-ctrl-open dv-open">📡 Digital links</button>' : "") +
                "</div>";
     }
 
@@ -1801,6 +1829,138 @@
     loadNetLine();
 
     var aslCtrlId = null;
+
+    /* ================= Digital links: Brandmeister TGs + D-STAR reflectors ================= */
+    var dvId = null, dvBmFavs = [], dvDdbFavs = [], dvDdb = null;
+
+    document.getElementById("cards").addEventListener("click", function (e) {
+        var b = e.target.closest(".dv-open");
+        if (!b) return;
+        var card = b.closest(".card[data-hid]");
+        if (card) openDvScreen(card.getAttribute("data-hid"));
+    });
+    document.getElementById("dv-close").onclick = function () {
+        document.getElementById("dv-screen").classList.remove("open");
+        dvId = null;
+    };
+    function dvHotspot() {
+        return (lastData || []).filter(function (h) { return h.id === dvId; })[0] || null;
+    }
+    async function openDvScreen(hid) {
+        dvId = hid; dvDdb = null;
+        var hs = dvHotspot() || {};
+        try { dvBmFavs = await fetch("/api/bm_tg_favorites").then(function (r) { return r.json(); }); } catch (e) { dvBmFavs = []; }
+        try { dvDdbFavs = await fetch("/api/ircddb_favorites").then(function (r) { return r.json(); }); } catch (e) { dvDdbFavs = []; }
+        renderDvScreen();
+        document.getElementById("dv-screen").classList.add("open");
+        if (hs.ircddb_enabled) loadDdb();
+    }
+    async function loadDdb() {
+        var id = dvId;
+        try { dvDdb = await fetch("/api/ircddb_status/" + encodeURIComponent(id)).then(function (r) { return r.json(); }); }
+        catch (e) { dvDdb = { connected: false }; }
+        if (dvId === id) renderDvScreen();
+    }
+    async function dvRefresh() {
+        try { lastData = await fetch("/api/data").then(function (r) { return r.json(); }); } catch (e) {}
+        renderDvScreen();
+    }
+    function dvAddr(name, mod) {
+        name = (name || "").trim().toUpperCase(); mod = (mod || "").trim().toUpperCase().slice(0, 1);
+        return mod ? name + " " + mod : name;
+    }
+
+    function renderDvScreen() {
+        var host = document.getElementById("dv-body");
+        var hs = dvHotspot();
+        if (!hs) { host.innerHTML = '<div class="asl-empty">Hotspot not found.</div>'; return; }
+        var offline = hs.status === "Offline";
+        var html = '<div class="asl-sec">Controlling</div><div class="asl-empty">' + esc(hs.name) + "</div>";
+        if (offline) html += '<div class="asl-offline">' + esc(hs.name) + " is offline right now — link changes are disabled until it responds.</div>";
+
+        if (hs.brandmeister_id) {
+            var tgs = hs.bm_static_tgs || [];
+            html += '<div class="asl-sec">DMR · Brandmeister static talkgroups</div>';
+            html += tgs.length ? tgs.map(function (t) {
+                return '<div class="asl-node-row"><span class="nd"></span><span class="who">TG ' + esc(t.talkgroup) +
+                    (t.slot ? " · TS" + esc(t.slot) : "") + '</span><button data-dv="bm-unlink" data-tg="' + esc(t.talkgroup) +
+                    '" data-slot="' + esc(t.slot == null ? 0 : t.slot) + '">Unlink</button></div>';
+            }).join("") : '<div class="asl-empty">No static talkgroups.</div>';
+            html += '<div class="dv-form"><input id="dv-bm-tg" type="text" inputmode="numeric" placeholder="Talkgroup">' +
+                '<select id="dv-bm-slot"><option value="2">TS2</option><option value="1">TS1</option></select>' +
+                '<button data-dv="bm-link">Link talkgroup</button></div>';
+            if (dvBmFavs.length) html += '<div class="dv-chips">' + dvBmFavs.map(function (f) {
+                var have = tgs.some(function (t) { return String(t.talkgroup) === String(f.tg) && String(t.slot) === String(f.slot); });
+                return '<button data-dv="bm-link" data-tg="' + esc(f.tg) + '" data-slot="' + esc(f.slot) + '"' + (have ? " disabled" : "") + ">" +
+                    esc(f.label ? f.label + " · " : "") + "TG " + esc(f.tg) + " TS" + esc(f.slot) + "</button>";
+            }).join("") + "</div>";
+        }
+
+        if (hs.ircddb_enabled) {
+            html += '<div class="asl-sec">D-STAR · reflector</div>';
+            if (dvDdb === null) {
+                html += '<div class="asl-empty">Checking…</div>';
+            } else if (!dvDdb.connected) {
+                html += '<div class="asl-empty">Can\'t reach ircDDBGateway on this hotspot right now.</div>';
+            } else {
+                html += '<div class="asl-empty">' + (dvDdb.reflector ? "Linked to <b>" + esc(dvDdb.reflector) + "</b>" : "Not linked") + "</div>";
+                (dvDdb.links || []).forEach(function (l) {
+                    html += '<div class="asl-node-row"><span class="nd"></span><span class="who">' + esc(l.callsign) + " · " +
+                        esc(l.protocol) + " · " + (l.direction === "outgoing" ? "out" : "in") + '</span>' +
+                        '<button data-dv="ddb-unlink" data-refl="' + esc(l.callsign) + '" data-proto="' + esc(l.protocol_index) + '">Unlink</button></div>';
+                });
+                html += '<div class="dv-form"><input id="dv-ddb-name" type="text" placeholder="REF030" maxlength="7" style="text-transform:uppercase">' +
+                    '<input id="dv-ddb-mod" type="text" placeholder="Mod" maxlength="1" style="flex:0 0 64px;text-transform:uppercase">' +
+                    '<button data-dv="ddb-link">Link reflector</button></div>';
+                if (dvDdbFavs.length) html += '<div class="dv-chips">' + dvDdbFavs.map(function (f) {
+                    var have = (dvDdb.links || []).some(function (l) { return l.callsign === f.reflector && l.linked; });
+                    return '<button data-dv="ddb-link" data-refl="' + esc(f.reflector) + '"' + (have ? " disabled" : "") + ">" +
+                        esc(f.label ? f.label + " · " : "") + esc(f.reflector) + "</button>";
+                }).join("") + "</div>";
+            }
+        }
+        host.innerHTML = html;
+        if (offline) host.querySelectorAll("button[data-dv], input, select").forEach(function (el) { el.disabled = true; });
+    }
+
+    document.getElementById("dv-body").addEventListener("click", async function (e) {
+        var b = e.target.closest("button[data-dv]");
+        if (!b) return;
+        var kind = b.getAttribute("data-dv"), hs = dvHotspot() || {}, path, body, q;
+        if (kind === "bm-link") {
+            var tg = b.getAttribute("data-tg") || (document.getElementById("dv-bm-tg") || {}).value || "";
+            var slot = b.getAttribute("data-slot") || (document.getElementById("dv-bm-slot") || {}).value || "2";
+            tg = tg.replace(/\D/g, "");
+            if (!tg) { toast("Enter a talkgroup"); return; }
+            q = "Link TG " + tg + " (TS" + slot + ") to " + hs.name + "?";
+            path = "/api/brandmeister_talkgroup"; body = { id: dvId, action: "link", tg: tg, slot: slot };
+        } else if (kind === "bm-unlink") {
+            var tg2 = b.getAttribute("data-tg"), slot2 = b.getAttribute("data-slot");
+            q = "Unlink TG " + tg2 + (slot2 && slot2 !== "0" ? " (TS" + slot2 + ")" : "") + " from " + hs.name + "?";
+            path = "/api/brandmeister_talkgroup"; body = { id: dvId, action: "unlink", tg: tg2, slot: slot2 };
+        } else if (kind === "ddb-link") {
+            var refl = b.getAttribute("data-refl");
+            if (!refl) {
+                var nm = (document.getElementById("dv-ddb-name") || {}).value, md = (document.getElementById("dv-ddb-mod") || {}).value;
+                if (!(nm || "").trim() || !(md || "").trim()) { toast("Enter a reflector and a module"); return; }
+                refl = dvAddr(nm, md);
+            }
+            q = "Link " + refl + " to " + hs.name + "?";
+            path = "/api/ircddb_link"; body = { id: dvId, reflector: refl, reconnect: 0 };
+        } else if (kind === "ddb-unlink") {
+            var r2 = b.getAttribute("data-refl");
+            q = "Unlink " + r2 + " from " + hs.name + "?";
+            path = "/api/ircddb_unlink"; body = { id: dvId, reflector: r2, protocol: b.getAttribute("data-proto") };
+        } else return;
+        var un = kind.indexOf("unlink") >= 0;
+        var ok = await confirmAction(un ? "Unlink?" : "Link?", q, un);
+        if (!ok) return;
+        b.disabled = true;
+        var r = await apiControl(path, body);
+        b.disabled = false;
+        toast(r && r.message ? r.message : (r && r.success ? "Done" : "Failed"));
+        if (r && r.success) { if (kind.indexOf("ddb") === 0) setTimeout(loadDdb, 800); else setTimeout(dvRefresh, 1200); }
+    });
 
     document.getElementById("cards").addEventListener("click", function (e) {
         var b = e.target.closest(".asl-ctrl-open");
