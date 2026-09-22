@@ -656,6 +656,11 @@ BIOS = {
         "blurb": "Chester Burnett, the towering Chicago blues singer and harmonica player behind \u201cSmokestack Lightnin\u2019\u201d and \u201cBack Door Man,\u201d a foundation of British and American rock.",
         "wiki": "Howlin%27_Wolf",
     },
+    "Nico": {
+        "name": "Nico",
+        "blurb": "German singer and model whose deep, deadpan voice fronted three songs on The Velvet Underground & Nico and later solo records like Chelsea Girl.",
+        "wiki": "Nico",
+    },
 }
 
 

@@ -157,6 +157,45 @@
            undifferentiated list of 17 toggles. Deliberately smaller/dimmer
            than .section-title so it doesn't compete with the real section
            heading above it. */
+        /* --- Settings declutter: Integrations accordion + Cards sub-tabs.
+           Both are built client-side from the existing markup (see the
+           "declutter" script at the end of the page), so no form/field/save
+           logic is touched. --- */
+        .cfg-search { position: relative; margin-bottom: 14px; }
+        .cfg-search input[type="text"] { width: 100%; box-sizing: border-box; padding: 8px 12px 8px 32px; }
+        .cfg-search .ic { position: absolute; left: 11px; top: 8px; color: var(--text-dim); font-size: 13px; pointer-events: none; }
+        .cfg-grp { margin-top: 16px; }
+        .cfg-grp:first-child { margin-top: 0; }
+        .cfg-grp-h { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .07em; color: var(--text-dim); padding: 4px 2px; cursor: pointer; user-select: none; }
+        .cfg-grp-h .cnt { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0; text-transform: none; }
+        .cfg-grp-h .chev { margin-left: auto; transition: transform .15s; }
+        .cfg-grp.closed .chev { transform: rotate(-90deg); }
+        .cfg-grp.closed .cfg-acc { display: none; }
+        .cfg-acc { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; overflow: hidden; margin-top: 4px; }
+        .acc-row + .acc-row { border-top: 1px solid var(--border); }
+        .acc-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; user-select: none; }
+        .acc-head:hover { background: var(--panel-2); }
+        .acc-name { font-size: 13.5px; font-weight: 500; color: var(--text); white-space: nowrap; }
+        .acc-hint { font-size: 11.5px; color: var(--text-dim); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .acc-pill { font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+            border: 1px solid var(--border); color: var(--text-dim); background: var(--panel-2); white-space: nowrap; }
+        .acc-pill.on { color: var(--live); border-color: color-mix(in srgb, var(--live) 40%, var(--border)); background: var(--live-dim); }
+        .acc-chev { color: var(--text-dim); font-size: 10px; transition: transform .15s; }
+        .acc-row.open .acc-chev { transform: rotate(90deg); }
+        .acc-row.open > .acc-head { background: var(--panel-2); }
+        .acc-row > .section { display: none; border: none; border-radius: 0; margin: 0; background: var(--panel-2); padding: 12px 14px 14px; }
+        .acc-row.open > .section { display: block; }
+        .acc-row > .section > .section-title { display: none; }
+        .cfg-empty { padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px; display: none; }
+        .cards-subtabs { display: flex; gap: 4px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 3px; margin-bottom: 14px; }
+        .cards-sub-btn { flex: 1; text-align: center; font-size: 12px; font-weight: 600; padding: 6px 0; border-radius: 6px; color: var(--text-muted); cursor: pointer; user-select: none; }
+        .cards-sub-btn.on { background: var(--live-dim); color: var(--live); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live) 40%, var(--border)); }
+        .toggle-subhead.collapsible { cursor: pointer; user-select: none; }
+        .toggle-subhead.collapsible::after { content: "\25BE"; float: right; transition: transform .15s; }
+        .toggle-subhead.collapsed::after { transform: rotate(-90deg); }
+        .toggle-row.cfg-hidden { display: none; }
+
         .toggle-subhead {
             font-size: 11px;
             font-weight: 600;
@@ -4361,6 +4400,187 @@ if (location.hash) {
     const btn = document.getElementById('tab-btn-' + tabName);
     if (btn) switchTab(tabName, btn);
 }
+</script>
+<script>
+/* Settings declutter. Builds, from the EXISTING markup, (1) the
+   Integrations tab's grouped accordion with status pills + search and
+   (2) the Cards tab's three sub-tabs + toggle search. Sections are only
+   moved/hidden -- every input id, onclick and save function is untouched.
+   Runs in its own late script so all the page's let/const are already
+   initialized (same TDZ caution as the /setup#tab deep-link block). */
+(function () {
+    const val = id => { const e = document.getElementById(id); return !!(e && String(e.value || '').trim()); };
+    const tog = id => { const e = document.getElementById(id); return !!(e && e.classList.contains('on')); };
+    const chk = id => { const e = document.getElementById(id); return !!(e && e.checked); };
+    // [title prefix, group, kind, status()] -- kind 'toggle' shows On/Off, 'cfg' shows Configured/Not set up.
+    // "Configured" means the fields are filled in, NOT that the service was reached.
+    const DEFS = [
+        ['QRZ.com lookup',          'Callsign lookup & logging', 'cfg',    () => val('qrz-username') && val('qrz-password')],
+        ['QRZ Logbook sync',        'Callsign lookup & logging', 'cfg',    () => val('qrz-logbook-key')],
+        ['RadioID.net lookup',      'Callsign lookup & logging', 'toggle', () => tog('radioid-toggle')],
+        ['WSJT-X live QSO logging', 'Callsign lookup & logging', 'toggle', () => tog('wsjtx-toggle')],
+        ['HamAlert',                'Callsign lookup & logging', 'cfg',    () => val('hamalert-username')],
+        ['Rig control',             'Radio & rig',               'toggle', () => tog('rig-enabled-toggle')],
+        ['wfweb power',             'Radio & rig',               'toggle', () => tog('wfweb-pwr-enabled-toggle')],
+        ['DigiPi',                  'Radio & rig',               'cfg',    () => val('digipi-ip')],
+        ['Parks on the Air',        'Spots & propagation',       'cfg',    () => val('pota-callsign')],
+        ['PSK Reporter',            'Spots & propagation',       'cfg',    () => val('psk-callsign')],
+        ['Reverse Beacon Network',  'Spots & propagation',       'toggle', () => chk('rbn-enabled')],
+        ['DX Cluster',              'Spots & propagation',       'toggle', () => chk('dxcluster-enabled')],
+        ['Nearby Repeaters',        'Spots & propagation',       'cfg',    () => val('repeaters-radius')],
+        ['APRS.fi live position',   'Spots & propagation',       'cfg',    () => val('aprs-key')],
+        ['Brandmeister',            'Alerts & automation',       'cfg',    () => val('bm-api-key')],
+        ['APRS favorite alerts',    'Alerts & automation',       'cfg',    () => val('aprsmsg-callsign')],
+        ['Home Assistant',          'Alerts & automation',       'cfg',    () => val('mqtt-host')],
+    ];
+    const GROUP_ORDER = ['Callsign lookup & logging', 'Radio & rig', 'Spots & propagation', 'Alerts & automation', 'Other'];
+
+    function initIntegrations() {
+        const panel = document.getElementById('panel-integrations');
+        if (!panel) return;
+        const secs = Array.from(panel.querySelectorAll(':scope > .section'));
+        const rows = [];
+        secs.forEach(sec => {
+            const t = sec.querySelector('.section-title');
+            if (!t) return;
+            const hintEl = t.querySelector('span');
+            const hint = hintEl ? hintEl.textContent.replace(/\s+/g, ' ').trim().replace(/^(optional|free)\s*[—-]\s*/i, '') : '';
+            const name = (t.childNodes[0] ? t.childNodes[0].textContent : t.textContent).trim();
+            const def = DEFS.find(d => name.startsWith(d[0]));
+            const row = document.createElement('div');
+            row.className = 'acc-row';
+            row.innerHTML = '<div class="acc-head"><span class="acc-name"></span><span class="acc-hint"></span>'
+                + '<span class="acc-pill"></span><span class="acc-chev">▶</span></div>';
+            row.querySelector('.acc-name').textContent = name;
+            row.querySelector('.acc-hint').textContent = hint;
+            row.querySelector('.acc-head').addEventListener('click', () => row.classList.toggle('open'));
+            panel.insertBefore(row, sec);
+            row.appendChild(sec);   // moves the whole existing section (form + buttons) inside
+            rows.push({ row, def, group: def ? def[1] : 'Other', name, hint, sec });
+        });
+        const search = document.createElement('div');
+        search.className = 'cfg-search';
+        search.innerHTML = '<span class="ic">⌕</span><input type="text" placeholder="Find an integration…" autocomplete="off">';
+        const host = document.createElement('div');
+        const empty = document.createElement('div');
+        empty.className = 'cfg-empty'; empty.textContent = 'No integration matches that.';
+        panel.insertBefore(search, panel.firstChild);
+        panel.insertBefore(host, search.nextSibling);
+        panel.insertBefore(empty, host.nextSibling);
+        const groups = {};
+        GROUP_ORDER.forEach(g => {
+            if (!rows.some(r => r.group === g)) return;
+            const el = document.createElement('div');
+            el.className = 'cfg-grp';
+            el.innerHTML = '<div class="cfg-grp-h"><span class="ttl"></span><span class="cnt"></span><span class="chev">▾</span></div><div class="cfg-acc"></div>';
+            el.querySelector('.ttl').textContent = g;
+            el.querySelector('.cfg-grp-h').addEventListener('click', () => el.classList.toggle('closed'));
+            host.appendChild(el);
+            groups[g] = el;
+        });
+        rows.forEach(r => groups[r.group].querySelector('.cfg-acc').appendChild(r.row));
+
+        function refresh() {
+            rows.forEach(r => {
+                const pill = r.row.querySelector('.acc-pill');
+                let on = false;
+                const kind = r.def ? r.def[2] : 'cfg';
+                if (r.def) { try { on = !!r.def[3](); } catch (e) {} }
+                pill.className = 'acc-pill' + (on ? ' on' : '');
+                pill.textContent = kind === 'toggle' ? (on ? 'On' : 'Off') : (on ? 'Configured' : 'Not set up');
+            });
+            Object.keys(groups).forEach(g => {
+                const mine = rows.filter(r => r.group === g && r.row.style.display !== 'none');
+                const n = mine.filter(r => r.row.querySelector('.acc-pill.on')).length;
+                groups[g].querySelector('.cnt').textContent = n + ' of ' + mine.length + ' on';
+            });
+        }
+        function applySearch() {
+            const q = search.querySelector('input').value.trim().toLowerCase();
+            let shown = 0;
+            rows.forEach(r => {
+                const hit = !q || (r.name + ' ' + r.hint + ' ' + r.sec.textContent).toLowerCase().includes(q);
+                r.row.style.display = hit ? '' : 'none';
+                if (hit) shown++;
+            });
+            Object.keys(groups).forEach(g => {
+                const any = rows.some(r => r.group === g && r.row.style.display !== 'none');
+                groups[g].style.display = any ? '' : 'none';
+                if (q && any) groups[g].classList.remove('closed');
+            });
+            empty.style.display = shown ? 'none' : 'block';
+            if (q && shown <= 3) rows.forEach(r => { if (r.row.style.display !== 'none') r.row.classList.add('open'); });
+            refresh();
+        }
+        search.querySelector('input').addEventListener('input', applySearch);
+        // toggles/inputs anywhere in the panel can change a status -- recompute after the handler runs
+        ['input', 'change', 'click'].forEach(ev => panel.addEventListener(ev, () => setTimeout(refresh, 0)));
+        refresh();
+    }
+
+    function initCards() {
+        const panel = document.getElementById('panel-cards');
+        if (!panel) return;
+        const secs = Array.from(panel.querySelectorAll(':scope > .section'));
+        const byTitle = t => secs.find(s => { const e = s.querySelector('.section-title'); return e && e.textContent.trim().startsWith(t); });
+        const SUBS = [
+            ['show',   'Show / hide',    [byTitle('Optional dashboard cards')]],
+            ['layout', 'Layout & pages', [byTitle('Card order'), byTitle('Multi-page cards')]],
+            ['extras', 'Card extras',    [byTitle('Tracked satellites')]],
+        ];
+        const bar = document.createElement('div');
+        bar.className = 'cards-subtabs';
+        const search = document.createElement('div');
+        search.className = 'cfg-search';
+        search.innerHTML = '<span class="ic">⌕</span><input type="text" placeholder="Find a card or setting…" autocomplete="off">';
+        panel.insertBefore(bar, panel.firstChild);
+        panel.insertBefore(search, bar.nextSibling);
+        function show(key) {
+            SUBS.forEach(s => s[2].forEach(sec => { if (sec) sec.style.display = (s[0] === key) ? '' : 'none'; }));
+            bar.querySelectorAll('.cards-sub-btn').forEach(b => b.classList.toggle('on', b.dataset.k === key));
+            search.style.display = key === 'show' ? '' : 'none';
+            try { localStorage.setItem('setupCardsSub', key); } catch (e) {}
+        }
+        SUBS.forEach(s => {
+            const b = document.createElement('div');
+            b.className = 'cards-sub-btn'; b.dataset.k = s[0]; b.textContent = s[1];
+            b.addEventListener('click', () => show(s[0]));
+            bar.appendChild(b);
+        });
+        // collapsible + searchable toggle groups inside "Optional dashboard cards"
+        const showSec = byTitle('Optional dashboard cards');
+        const heads = showSec ? Array.from(showSec.querySelectorAll('.toggle-subhead')) : [];
+        const rowsOf = h => {
+            const out = [];
+            for (let n = h.nextElementSibling; n && !n.classList.contains('toggle-subhead'); n = n.nextElementSibling)
+                if (n.classList.contains('toggle-row')) out.push(n);
+            return out;
+        };
+        function applyFilter() {
+            const q = search.querySelector('input').value.trim().toLowerCase();
+            heads.forEach(h => {
+                const collapsed = !q && h.classList.contains('collapsed');
+                let any = false;
+                rowsOf(h).forEach(r => {
+                    const hit = !q || r.textContent.toLowerCase().includes(q);
+                    r.classList.toggle('cfg-hidden', collapsed || !hit);
+                    if (hit) any = true;
+                });
+                h.style.display = (q && !any) ? 'none' : '';
+            });
+        }
+        heads.forEach(h => {
+            h.classList.add('collapsible');
+            h.addEventListener('click', () => { h.classList.toggle('collapsed'); applyFilter(); });
+        });
+        search.querySelector('input').addEventListener('input', applyFilter);
+        let start = 'show';
+        try { const k = localStorage.getItem('setupCardsSub'); if (SUBS.some(s => s[0] === k)) start = k; } catch (e) {}
+        show(start);
+    }
+    initIntegrations();
+    initCards();
+})();
 </script>
 <script>
 /* Reached from the Pocket Dash mobile app (?m=1): point "back to

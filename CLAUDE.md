@@ -8265,6 +8265,37 @@ config for per-integration credentials; put it in
     progress/countdown/preview updated in place so the <img> isn't torn
     down every poll.
 
+- **Settings declutter (v5.0) -- Integrations became a grouped accordion,
+  Cards got three sub-tabs, both built CLIENT-SIDE from the existing
+  markup (mockup-approved: "A + three sub-tabs").** A late, separate
+  `<script>` at the end of `setup.html` (after the deep-link block, same
+  TDZ caution) moves each `#panel-integrations > .section` into an
+  `.acc-row` (its `.section-title` hidden; name/hint lifted into the row
+  head) and groups rows via the `DEFS` table (title prefix -> group, kind,
+  status fn). Integrations went from ~4,774px to ~908px collapsed. No
+  input id, onclick or save function changed -- the sections are only
+  MOVED, so every save still reads the same elements.
+  - **Status pills say "Configured", not "Connected"** -- they only check
+    that the relevant fields/toggle are filled in (`val()`/`tog()`/`chk()`
+    over the existing element ids), never that the service was reached.
+    Recomputed on any input/change/click in the panel (after the handler,
+    via `setTimeout 0`). A section whose title isn't in `DEFS` lands in an
+    "Other" group with a "Not set up" pill rather than disappearing -- when
+    adding a new integration section, add a `DEFS` row too, or it will
+    always read "Not set up".
+  - **Cards tab**: `Optional dashboard cards` -> Show / hide; `Card order`
+    + `Multi-page cards` -> Layout & pages; `Tracked satellites` -> Card
+    extras (chosen sub-tab remembered in `localStorage.setupCardsSub`).
+    Sections are matched by title text, so renaming one of those titles
+    silently drops it out of its sub-tab. The toggle list gained search +
+    collapsible subheads only; the mockup's finer by-purpose regrouping
+    and 2-column grid were NOT built -- option rows (selects/inputs) are
+    interleaved with the toggle rows in that markup, so regrouping means
+    restructuring the template, not just wrapping it.
+  - The Card order board renders no rows until a card/hotspot is
+    enabled, so it looks empty on a fresh config -- that's pre-existing,
+    not caused by the sub-tabs.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
