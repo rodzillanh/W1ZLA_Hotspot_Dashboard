@@ -11,7 +11,7 @@ import re
 # onward -- earlier releases (pre-v3.49) were never retroactively named.
 # To cut a new named release: bump APP_VERSION and append the next name
 # here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "5.0"
+APP_VERSION = "5.1"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -278,8 +278,54 @@ VERSION_CODENAMES = [
                         # blues ("Smokestack Lightnin'") (1910-1976)
     "Nico",             # v5.0 -- Nico, German singer/model, Velvet
                         # Underground's "Chelsea Girl" voice (1938-1988)
+    "Buckingham",       # v5.1 -- Lindsey Buckingham, Fleetwood Mac
+                        # guitarist/songwriter ("Go Your Own Way") (1949-2025)
 ]
 APP_CODENAME = VERSION_CODENAMES[-1]
+
+# Short, end-user-facing highlights for the returning-user "what's new"
+# digest toast (v5.1, see dashboard.html's #whats-new-toast and
+# dashboard()'s use of digest_since() below) -- a SEPARATE, hand-curated
+# list from version.html's own changelog, deliberately. That changelog is
+# written for developers reading this file (full paragraphs, "confirmed
+# live" verification notes, etc.) -- nowhere near what a friendly one-line
+# toast should say. Not every version needs an entry here; a purely
+# internal fix has nothing worth announcing. When a release genuinely adds
+# something a RETURNING user would want to know about, append one short,
+# plain-language line here -- same "append one more entry" discipline as
+# VERSION_CODENAMES above, just a smaller, more selective list.
+DIGEST_HIGHLIGHTS = [
+    ("4.90", ["The Spots card gained a full-height Browse drawer with search and filters"]),
+    ("5.0",  ["Settings' Integrations and Cards tabs are now searchable and collapsible"]),
+    ("5.1",  ["Onboarding is now an inline welcome card instead of a blocking popup"]),
+]
+
+
+def _version_tuple(v):
+    """('4.91' -> (4, 91)) for plain tuple comparison. This app's own
+    version strings are always consistently written (never '4.9' one
+    release and '4.90' the next), so this is safe without needing real
+    semver parsing -- re-check this assumption if that ever changes."""
+    try:
+        return tuple(int(p) for p in str(v).split("."))
+    except (ValueError, AttributeError):
+        return (0,)
+
+
+def digest_since(last_seen_version):
+    """Highlight strings for every DIGEST_HIGHLIGHTS entry newer than
+    last_seen_version, oldest first, capped by the caller. Returns []
+    for a blank/unrecognized last_seen_version -- that's "no known
+    baseline", not "show everything ever" (see dashboard()'s own guard,
+    which never calls this with a blank value in the first place)."""
+    if not last_seen_version:
+        return []
+    since = _version_tuple(last_seen_version)
+    out = []
+    for ver, highlights in DIGEST_HIGHLIGHTS:
+        if _version_tuple(ver) > since:
+            out.extend(highlights)
+    return out
 
 # --- Storage ---
 CONFIG_DIR   = os.environ.get("CONFIG_DIR", "/app/data")
@@ -1653,6 +1699,18 @@ DEFAULT_SETTINGS = {
     # "simplify" by changing this default without re-reading that
     # special case, or existing installs will start seeing the tour.
     "onboarding_tour_seen": True,
+    # Baseline for the returning-user "what's new" digest toast (v5.1) --
+    # see DIGEST_HIGHLIGHTS/digest_since() below and dashboard()'s own use
+    # of them. Blank on BOTH a fresh install and an existing install
+    # upgrading to this version (the key is simply absent from an older
+    # settings.json, same merge-in-a-default behavior as any other new
+    # setting) -- deliberately NOT special-cased the way
+    # onboarding_tour_seen is, since blank already means the right thing
+    # either way here: "no known baseline yet, so don't try to summarize
+    # everything since the beginning of time -- just start tracking from
+    # now." dashboard() sets this to config.APP_VERSION on every visit
+    # where it doesn't already match.
+    "last_seen_version": "",
     # Explicit relative-order tiebreak for the "extra card" drag list
     # (Settings -> Cards). Each *_position field only ever records "how
     # many hotspot rows precede this card" -- a real, reported bug: two+

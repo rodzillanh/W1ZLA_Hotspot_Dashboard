@@ -1145,10 +1145,26 @@ def dashboard():
                             and _card_shown_on_page(settings, "big_clock_position", 2))
     notifications_dup_on_p2 = (_card_shown_on_page(settings, "notifications_position", 1)
                                 and _card_shown_on_page(settings, "notifications_position", 2))
+    # Returning-user "what's new" digest (v5.1) -- see config.digest_since()
+    # and CLAUDE.md's "first five minutes" entry. A blank last_seen_version
+    # (fresh install OR an existing install's first visit after upgrading
+    # to this version -- see that settings key's own DEFAULT_SETTINGS
+    # comment) means "no known baseline", so nothing is shown; the
+    # baseline is just recorded for next time instead. Only writes
+    # settings.json when the value is actually changing, not on every
+    # single page load once it's already current.
+    last_seen_version = settings.get("last_seen_version", "")
+    digest_highlights = config.digest_since(last_seen_version)[:5]
+    if last_seen_version != config.APP_VERSION:
+        with settings_transaction():
+            txn_settings = load_settings()
+            txn_settings["last_seen_version"] = config.APP_VERSION
+            save_settings(txn_settings)
     return render_template("dashboard.html", settings=_with_effective_pages(settings),
                             big_clock_dup_on_p2=big_clock_dup_on_p2,
                             notifications_dup_on_p2=notifications_dup_on_p2,
-                            has_dashboard2=_has_dashboard2_content(settings, hotspots, cameras))
+                            has_dashboard2=_has_dashboard2_content(settings, hotspots, cameras),
+                            digest_highlights=digest_highlights)
 
 @app.route("/mobile")
 def dashboard_mobile():
@@ -2826,6 +2842,130 @@ def api_starlink_train():
     if data is None:
         return jsonify({"error": "unavailable"}), 503
     return jsonify(data)
+
+def _whats_available_groups(settings, hotspots):
+    """Server-computed catalog for /whats-available (v5.1) -- the
+    permanent, searchable "here's everything this app can do" reference
+    the welcome card's "See everything" link points at (see CLAUDE.md's
+    "first five minutes" entry). "on" is computed the same way as
+    templates/setup.html's Integrations accordion status pills: whether
+    the relevant setting/toggle is filled in, NOT whether the service was
+    actually reached. A couple of items (ircDDBGateway, DVSwitch) are
+    per-hotspot fields, not global settings, so they need `hotspots` too."""
+    g = lambda k, default=False: settings.get(k, default)
+    return [
+        ("Ham radio integrations", [
+            ("QRZ / RadioID lookup", "Show the caller's real name and location, not just a callsign",
+             bool(g("qrz_username")) or g("radioid_enabled", True), "/setup#integrations"),
+            ("Brandmeister talkgroups", "Link/unlink a static TG right from a WPSD hotspot's card",
+             bool(g("brandmeister_api_key")), "/setup?item=brandmeister#integrations"),
+            ("ircDDBGateway (D-STAR)", "Link/unlink a D-STAR reflector right from a WPSD hotspot's card",
+             any(h.get("ircddb_enabled") for h in hotspots), "/setup#hotspots"),
+            ("APRS + APRS messaging", "Live position lookups, plus alerts when a favorite comes on the air",
+             bool(g("aprs_api_key")) or bool(g("aprs_msg_callsign")), "/setup#integrations"),
+            ("PSK Reporter", "See where your own signal was actually heard",
+             bool(g("psk_reporter_callsign")), "/setup?item=psk_reporter#integrations"),
+            ("WSJT-X live logging", "Plot each FT8/FT4 QSO on the map the instant you log it",
+             g("wsjtx_enabled"), "/setup?item=wsjtx#integrations"),
+            ("HamAlert", "Alerts for your own DXCC/callsign/band triggers",
+             g("hamalert_enabled"), "/setup?item=hamalert#integrations"),
+            ("DigiPi", "APRS/Direwolf packet activity from a DigiPi hotspot",
+             g("digipi_enabled"), "/setup?item=digipi#integrations"),
+        ]),
+        ("Spots & propagation", [
+            ("Spots card", "POTA + SOTA, plus opt-in RBN and DX cluster firehoses, one merged list",
+             g("show_pota"), "/setup?item=pota#cards"),
+            ("Reverse Beacon Network", "A live CW/RTTY skimmer feed, feeds the Spots card's RBN filter",
+             g("rbn_enabled"), "/setup?item=rbn#integrations"),
+            ("DX Cluster", "A classic packet DX cluster, feeds the Spots card's DX filter",
+             g("dxcluster_enabled"), "/setup?item=dxcluster#integrations"),
+            ("Beacons", "The NCDXF/IARU international beacon ladder, live",
+             g("show_beacons"), "/setup?item=beacons#cards"),
+            ("Nearby Repeaters", "hearham.com's open worldwide repeater directory",
+             g("show_repeaters"), "/setup?item=repeaters#cards"),
+            ("HF Conditions", "Solar/band propagation data, no API key needed",
+             g("show_hf_conditions"), "/setup?item=hf_conditions#cards"),
+            ("Band Activity", "Live WSPR spot activity near your station",
+             g("show_wspr_activity"), "/setup?item=band_activity#cards"),
+        ]),
+        ("Radio control", [
+            ("Rig Panel", "Live SWR/ALC/power meters and VFO/mode via rigctld",
+             g("show_rig_panel"), "/setup?item=rig_panel#cards"),
+            ("HF Favorites", "A tap-to-tune memory bank of your favorite frequencies",
+             g("show_hf_favorites"), "/setup?item=hf_favorites#cards"),
+            ("QRZ Quick Log", "Hand-log a QSO that didn't come from a spot",
+             g("show_qrz_quick_log"), "/setup?item=qrz_quick_log#cards"),
+            ("wfweb power / LAN control", "A power icon and LAN row on the Rig Panel card",
+             g("wfweb_power_enabled"), "/setup?item=wfweb#integrations"),
+            ("ASL Favorites & Control", "Connect, disconnect, and monitor ASL3 links from the dashboard",
+             g("show_asl_favorites"), "/setup?item=asl_favorites#cards"),
+        ]),
+        ("Fleet monitoring", [
+            ("Hotspot Status", "One line per hotspot — status, activity, digital-voice mode",
+             g("show_fleet_status"), "/setup?item=fleet_status#cards"),
+            ("Hotspot Activity", "A chart of your fleet's call activity over time",
+             g("show_fleet_activity"), "/setup?item=fleet_activity#cards"),
+            ("DVSwitch", "Analog_Bridge live RX/TX state and vocoder health for AllStarLink",
+             g("show_dvswitch"), "/setup?item=dvswitch#cards"),
+        ]),
+        ("Notifications", [
+            ("Notifications card",
+             "APRS messages, HamAlert, fleet events, solar alerts, Brandmeister favorites, "
+             "QRZ confirmations, and rig PA temperature — one merged feed",
+             any(g(k) for k in ("aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled",
+                                 "solar_alerts_enabled", "brandmeister_alerts_enabled",
+                                 "qrz_logbook_enabled", "rig_pa_alert_enabled")),
+             "/setup#integrations"),
+        ]),
+        ("Extras", [
+            ("Big Ass Clock", "Digital, analog, or TIX-style clock with an optional second timezone",
+             g("show_big_clock"), "/setup?item=big_clock#cards"),
+            ("Band Plan", "General/Extra HF privileges reference, no API",
+             g("show_band_plan"), "/setup?item=band_plan#cards"),
+            ("License Quiz", "One random Technician/General/Extra practice question, rotating",
+             g("show_license_quiz"), "/setup?item=license_quiz#cards"),
+            ("Satellites", "Pass predictions plus a live ground-track overlay on the map",
+             g("show_satellites"), "/setup?item=satellites#cards"),
+            ("QSO Stats", "Band/mode breakdown and a 14-day activity sparkline from your own logbook",
+             g("show_qso_stats"), "/setup?item=qso_stats#cards"),
+            ("Recent Contacts", "Your most recently logged QSOs, newest first",
+             g("show_recent_contacts"), "/setup?item=recent_contacts#cards"),
+            ("Top 5 Activity", "The 5 busiest callsigns on your own fleet recently",
+             g("show_top_activity"), "/setup?item=top_activity#cards"),
+            ("Flights Overhead", "Aircraft currently passing near your station",
+             g("show_flights_overhead"), "/setup?item=flights_overhead#cards"),
+            ("SSTV", "Decode a slow-scan picture from a live transmission",
+             g("show_sstv"), "/setup?item=sstv#cards"),
+            ("Weather", "Current conditions and a 7-day forecast for your location",
+             bool(g("weather_location")), "/setup#general"),
+        ]),
+        ("Cameras", [
+            ("RTSP / Wyze / Bambu A1", "Live camera feeds alongside your hotspot cards",
+             g("show_cameras"), "/setup#cameras"),
+        ]),
+        ("Mobile companion", [
+            ("Pocket Dash", "A lightweight phone-first view of this whole dashboard",
+             None, "/mobile"),
+        ]),
+    ]
+
+@app.route("/whats-available")
+def whats_available_page():
+    settings = load_settings()
+    hotspots = load_hotspots()
+    groups = _whats_available_groups(settings, hotspots)
+    # Precompute each group's "N of M on" count here rather than in Jinja --
+    # `on` is None (not False) for something like Pocket Dash that isn't a
+    # toggle at all (always available), so a naive count would misleadingly
+    # read "0 of 1 on" for a group made up entirely of non-toggles. `total`
+    # only counts items where `on` is actually True/False; a group with
+    # nothing toggleable (total == 0) gets no count badge at all.
+    group_counts = []
+    for name, items in groups:
+        total = sum(1 for _, _, on, _ in items if on is not None)
+        on_count = sum(1 for _, _, on, _ in items if on)
+        group_counts.append((name, items, on_count, total))
+    return render_template("whats_available.html", settings=settings, groups=group_counts)
 
 @app.route("/version")
 def version_page():

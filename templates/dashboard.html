@@ -361,47 +361,40 @@
         .empty-state-secondary a { color: var(--link); text-decoration: none; }
         .empty-state-secondary a:hover { text-decoration: underline; }
 
-        /* One-time "here's what's available" tour, shown once a hotspot
-           exists (see ONBOARDING_TOUR_SEEN/checkOnboarding() in JS) --
-           reopenable anytime from Settings -> General. */
-        .tour-overlay {
-            display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
-            align-items: center; justify-content: center; z-index: 2000;
+        /* Inline "welcome" card (replaces the old full-screen tour modal, see
+           CLAUDE.md's "first five minutes" entry) -- shown once, the first
+           time a hotspot's ever been added (see ONBOARDING_TOUR_SEEN/
+           checkOnboarding() in JS), inline in the card grid rather than a
+           blocking overlay, so the real hotspot card is visible at the same
+           time. Reopenable anytime from Settings -> General. Reuses
+           .empty-state-card's own grid-column:1/-1 + order:-1 trick so it
+           always floats to the front of the grid regardless of the other
+           cards' saved order. */
+        .welcome-card {
+            display: none; grid-column: 1 / -1; order: -1; position: relative;
+            background: linear-gradient(135deg, color-mix(in srgb, var(--live) 7%, var(--card-bg)), var(--card-bg));
+            border: 1px solid color-mix(in srgb, var(--live) 30%, var(--card-border));
+            border-radius: 14px; padding: 18px 20px;
         }
-        .tour-overlay.visible { display: flex; }
-        .tour-panel {
-            background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px;
-            max-width: 620px; width: 92%; max-height: 82vh; overflow-y: auto;
-            padding: 26px 28px 22px; box-shadow: 0 20px 60px rgba(0,0,0,.4);
+        .welcome-card-x {
+            position: absolute; top: 12px; right: 12px; width: 24px; height: 24px;
+            display: flex; align-items: center; justify-content: center; border-radius: 6px;
+            color: var(--text-dim); cursor: pointer; font-size: 13px;
         }
-        .tour-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px; }
-        .tour-header h2 { font-size: 18px; font-weight: 600; }
-        .tour-close {
-            background: none; border: none; color: var(--text-dim); font-size: 18px;
-            cursor: pointer; line-height: 1; padding: 2px 6px;
+        .welcome-card-x:hover { background: var(--panel-2); color: var(--text); }
+        .welcome-card-h { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
+        .welcome-card-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 13px; }
+        .welcome-sugg-row { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 13px; }
+        .welcome-sugg {
+            background: var(--panel-2); border: 1px solid var(--card-border); border-radius: 8px;
+            padding: 9px 13px; flex: 1; min-width: 180px; text-decoration: none; display: block;
         }
-        .tour-close:hover { color: var(--text); }
-        .tour-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 20px; }
-        .tour-group { margin-bottom: 18px; }
-        .tour-group-title {
-            font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px;
-            color: var(--text-dim); margin-bottom: 8px;
-        }
-        .tour-item {
-            display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
-            padding: 7px 0; border-bottom: 1px solid var(--card-border); font-size: 12.5px;
-        }
-        .tour-item:last-child { border-bottom: none; }
-        .tour-item-name { color: var(--text); font-weight: 500; flex-shrink: 0; }
-        .tour-item-desc { color: var(--text-muted); flex: 1; }
-        .tour-footer {
-            margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--card-border);
-            display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--text-dim);
-        }
-        .tour-footer button {
-            background: var(--accent-dim); color: var(--accent); border: none; border-radius: 6px;
-            padding: 7px 16px; font-size: 12.5px; font-weight: 600; cursor: pointer;
-        }
+        .welcome-sugg:hover { border-color: color-mix(in srgb, var(--live) 45%, var(--card-border)); }
+        .welcome-sugg .n { font-size: 12.5px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+        .welcome-sugg .d { font-size: 11px; color: var(--text-dim); line-height: 1.4; }
+        .welcome-card-foot { font-size: 12px; }
+        .welcome-card-foot a { color: var(--link); text-decoration: none; }
+        .welcome-card-foot a:hover { text-decoration: underline; }
         /* Colored top rail keyed off the SAME state modifier classes JS
            already applies to the card root (.active/.favorite/.offline) --
            no JS change needed, just a ::before per existing state class. */
@@ -1520,6 +1513,31 @@
             font-size: 12px; color: var(--text); max-width: 90vw; z-index: 6000;
             transition: opacity .16s, transform .16s; }
         #rig-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        /* Returning-user "what's new" digest (v5.1) -- see config.
+           DIGEST_HIGHLIGHTS/digest_since() and dashboard()'s own use of
+           them. Rendered server-side (Jinja) only when there's genuinely
+           something to show, so there's no flash-of-empty-toast on a
+           normal page load -- pure CSS/no-JS-required to dismiss (a plain
+           .remove()). z-index sits below the drawer backdrop (1000/1001)
+           on purpose -- it's a one-time, low-priority nudge, not something
+           that should float above an intentionally-opened drawer. */
+        .whats-new-toast { position: fixed; top: 70px; right: 20px; z-index: 900; width: 280px;
+            background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+            padding: 12px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+        .whats-new-toast .wn-head { display: flex; align-items: center; gap: 6px; font-size: 12.5px;
+            font-weight: 600; margin-bottom: 8px; }
+        .whats-new-toast .wn-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+        .whats-new-toast ul { list-style: none; display: flex; flex-direction: column; gap: 6px;
+            margin: 0 0 10px; padding: 0 0 0 12px; }
+        .whats-new-toast li { font-size: 11.5px; color: var(--text-muted); line-height: 1.45; position: relative; }
+        .whats-new-toast li::before { content: "+"; position: absolute; left: -12px; color: var(--live);
+            font-family: var(--font-mono); }
+        .whats-new-toast .wn-foot { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
+        .whats-new-toast .wn-foot a { color: var(--link); text-decoration: none; }
+        .whats-new-toast .wn-foot a:hover { text-decoration: underline; }
+        .whats-new-toast .wn-x { color: var(--text-dim); cursor: pointer; font-size: 11px; padding: 2px 4px; }
+        .whats-new-toast .wn-x:hover { color: var(--text); }
+        @media (max-width: 640px) { .whats-new-toast { left: 16px; right: 16px; width: auto; top: 60px; } }
         #rig-toast.ok { border-color: color-mix(in srgb, var(--good) 55%, var(--border)); }
         #rig-toast.err { border-color: color-mix(in srgb, var(--danger) 55%, var(--border)); }
         @media (prefers-reduced-motion: reduce) { .pota-tune-chip.pending { animation: none; } }
@@ -3314,6 +3332,17 @@
     </div>
 </div>
 
+{% if digest_highlights %}
+<div class="whats-new-toast" id="whats-new-toast">
+    <div class="wn-head"><span class="wn-dot"></span>{{ digest_highlights | length }}
+        thing{{ 's' if digest_highlights | length != 1 else '' }}
+        {{ 'are' if digest_highlights | length != 1 else 'is' }} new since you were last here</div>
+    <ul>{% for h in digest_highlights %}<li>{{ h }}</li>{% endfor %}</ul>
+    <div class="wn-foot"><a href="/version">See the full changelog →</a>
+        <span class="wn-x" onclick="document.getElementById('whats-new-toast').remove()">✕</span></div>
+</div>
+{% endif %}
+
 <!-- Dashboard tab -->
 <div id="panel-dashboard" class="tab-panel active">
     <div class="cards-grid" id="cards-outer">
@@ -3326,6 +3355,17 @@
             <div class="empty-state-secondary">
                 Migrating from another install? <a href="/setup#backup">Restore from a backup file</a> instead.
             </div>
+        </div>
+        <!-- Inline welcome card, shown once the very first time a hotspot
+             exists (see ONBOARDING_TOUR_SEEN/checkOnboarding() in JS below) --
+             replaces the old full-screen tour modal so the real hotspot card
+             stays visible at the same time. Content is entirely built by
+             renderWelcomeCard() since it depends on which hotspot type was
+             actually added; this container just needs to already exist here
+             so checkOnboarding() has somewhere to fill/reveal. -->
+        <div class="welcome-card" id="welcome-card">
+            <div class="welcome-card-x" onclick="dismissWelcomeCard()">✕</div>
+            <div id="welcome-card-body"></div>
         </div>
         {% if settings.get('show_fleet_status', False) %}
         <div class="metrics-card" id="fleet-status-card"
@@ -4174,50 +4214,6 @@
      z-index) rather than replacing it. See confirmAslDisconnectAll(). -->
 <div class="asl-discall-confirm-backdrop" id="asl-discall-confirm-backdrop" onclick="cancelAslDisconnectAll()">
     <div class="asl-discall-confirm-box" id="asl-discall-confirm-box" onclick="event.stopPropagation()"></div>
-</div>
-
-<!-- One-time "what's available" feature tour -- see checkOnboarding()/
-     dismissOnboardingTour() in the script below. Reopenable anytime from
-     Settings -> General ("Show feature tour again"). -->
-<div class="tour-overlay" id="tour-overlay">
-    <div class="tour-panel">
-        <div class="tour-header">
-            <h2>Welcome — here's what's available</h2>
-            <button class="tour-close" onclick="dismissOnboardingTour()">✕</button>
-        </div>
-        <div class="tour-sub">
-            You're set up and monitoring your fleet. Everything below is optional and
-            off by default — this won't show again, but you can reopen it anytime from
-            Settings → General.
-        </div>
-        <div class="tour-group">
-            <div class="tour-group-title">Ham radio integrations</div>
-            <div class="tour-item"><span class="tour-item-name">QRZ / RadioID lookup</span><span class="tour-item-desc">Show the active caller's name and location, not just their callsign</span></div>
-            <div class="tour-item"><span class="tour-item-name">APRS + APRS messaging</span><span class="tour-item-desc">Live position lookups, plus alerts when a favorite comes on the air</span></div>
-            <div class="tour-item"><span class="tour-item-name">PSK Reporter</span><span class="tour-item-desc">See where your own signal was actually heard</span></div>
-            <div class="tour-item"><span class="tour-item-name">WSJT-X live logging</span><span class="tour-item-desc">Plot each FT8/FT4 QSO on the map the instant you log it</span></div>
-        </div>
-        <div class="tour-group">
-            <div class="tour-group-title">Extra dashboard cards</div>
-            <div class="tour-item"><span class="tour-item-name">Hotspot activity</span><span class="tour-item-desc">A chart of your fleet's call activity over time</span></div>
-            <div class="tour-item"><span class="tour-item-name">HF Conditions / Band Activity</span><span class="tour-item-desc">Solar propagation data and live WSPR band activity</span></div>
-            <div class="tour-item"><span class="tour-item-name">Big Ass Clock</span><span class="tour-item-desc">Digital, analog, or TIX-style clock with a second timezone</span></div>
-            <div class="tour-item"><span class="tour-item-name">License Quiz</span><span class="tour-item-desc">One random Technician/General/Extra practice question, rotating</span></div>
-        </div>
-        <div class="tour-group">
-            <div class="tour-group-title">Live map overlays</div>
-            <div class="tour-item"><span class="tour-item-name">Grey line / Aurora oval</span><span class="tour-item-desc">Day-night terminator and NOAA auroral activity</span></div>
-            <div class="tour-item"><span class="tour-item-name">POTA spots / PSK Reporter</span><span class="tour-item-desc">Current park activations and your own propagation reach</span></div>
-        </div>
-        <div class="tour-group">
-            <div class="tour-group-title">Cameras</div>
-            <div class="tour-item"><span class="tour-item-name">RTSP / Wyze / Bambu A1</span><span class="tour-item-desc">Live MJPEG camera feeds alongside your hotspot cards</span></div>
-        </div>
-        <div class="tour-footer">
-            <span>All optional — enable any of it in Settings</span>
-            <button onclick="dismissOnboardingTour()">Got it</button>
-        </div>
-    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
@@ -5087,29 +5083,76 @@ function computeCardOrders(hotspotCount, sentinels) {
 }
 
 // --- fresh-install empty state + one-time feature tour ---
-// tourShownThisPageLoad guards against re-showing the tour every 3s poll
-// cycle after the user dismisses it -- the persistent server-side flag
-// (ONBOARDING_TOUR_SEEN, flipped via /api/settings on dismiss) is what
-// stops it from ever showing again on a LATER page load; this one is
-// just so closing it doesn't get instantly reopened by the next refresh().
-let tourShownThisPageLoad = false;
+// welcomeShownThisPageLoad guards against re-showing the welcome card every
+// 3s poll cycle after the user dismisses it -- the persistent server-side
+// flag (ONBOARDING_TOUR_SEEN, flipped via /api/settings on dismiss -- kept
+// its original settings-key name, "tour", even though the UI it gates
+// isn't a tour/modal anymore, same "don't rename a settings key for zero
+// functional gain" precedent as beta_courtesy_tone elsewhere in this file)
+// is what stops it from ever showing again on a LATER page load; this one
+// is just so closing it doesn't get instantly reopened by the next refresh().
+let welcomeShownThisPageLoad = false;
 
-function checkOnboarding(hotspotCount) {
+// Suggestions shown in the welcome card, keyed by the FIRST hotspot's own
+// `type` -- reasonable since this card only ever appears the very first
+// time a hotspot exists at all, so there's normally exactly one type to
+// react to. [name, blurb, link] -- most links carry a `?item=<slug>#tab`
+// that deep-links straight to that ONE setting on the Settings page
+// (opens/expands it, scrolls it into view, flashes it -- see setup.html's
+// openItemDeepLink()/CARD_TOGGLE_IDS), not just the tab in general. A real,
+// reported complaint about the earlier plain-tab links: "it just kinda
+// dumps you into a list of integrations with no direction as to 'what do
+// I do now'". Bundled suggestions with no single matching setting (QRZ +
+// RadioID is two separate rows) keep the plain tab link.
+const WELCOME_SUGGESTIONS = {
+    wpsd: [
+        ['QRZ / RadioID lookup', "Show the caller's real name and location, not just a callsign", '/setup#integrations'],
+        ['Brandmeister talkgroups', 'Link/unlink a static TG right from the card', '/setup?item=brandmeister#integrations'],
+        ['Hotspot Activity', "A chart of who's been keying up, over time", '/setup?item=fleet_activity#cards'],
+    ],
+    asl3: [
+        ['QRZ / RadioID lookup', "Show the caller's real name and location, not just a callsign", '/setup#integrations'],
+        ['ASL Favorites & Control', 'Connect, disconnect, and monitor ASL3 links from the dashboard', '/setup?item=asl_favorites#cards'],
+        ['Hotspot Activity', "A chart of who's been keying up, over time", '/setup?item=fleet_activity#cards'],
+    ],
+    openspot4: [
+        ['QRZ / RadioID lookup', "Show the caller's real name and location, not just a callsign", '/setup#integrations'],
+        ['Notifications', 'Alerts for favorites, fleet status, and solar activity, in one card', '/setup#cards'],
+        ['Hotspot Activity', "A chart of who's been keying up, over time", '/setup?item=fleet_activity#cards'],
+    ],
+};
+const WELCOME_SUGGESTIONS_DEFAULT = WELCOME_SUGGESTIONS.wpsd;
+
+function renderWelcomeCard(hotspot) {
+    const name = escapeHtml(hotspot.name || hotspot.ip || 'Your hotspot');
+    const suggestions = WELCOME_SUGGESTIONS[hotspot.type] || WELCOME_SUGGESTIONS_DEFAULT;
+    document.getElementById('welcome-card-body').innerHTML = `
+        <div class="welcome-card-h">👋 ${name} is on the map</div>
+        <div class="welcome-card-sub">A few things that pair well with this hotspot:</div>
+        <div class="welcome-sugg-row">${suggestions.map(s => `
+            <a class="welcome-sugg" href="${s[2]}"><div class="n">${escapeHtml(s[0])}</div><div class="d">${escapeHtml(s[1])}</div></a>`).join('')}
+        </div>
+        <div class="welcome-card-foot"><a href="/whats-available">See everything this app can do →</a></div>`;
+}
+
+function checkOnboarding(data) {
+    const hotspotCount = data.length;
     const emptyCard = document.getElementById('empty-state-card');
     if (emptyCard) emptyCard.style.display = hotspotCount === 0 ? 'block' : 'none';
 
-    if (hotspotCount === 0 || ONBOARDING_TOUR_SEEN || tourShownThisPageLoad) return;
+    if (hotspotCount === 0 || ONBOARDING_TOUR_SEEN || welcomeShownThisPageLoad) return;
     // Only pop up while actually looking at the Dashboard tab -- same
     // "don't do tab-specific work on a tab nobody's looking at" gate
     // refreshMap() already uses for the Live map tab.
     const panel = document.getElementById('panel-dashboard');
     if (!panel || !panel.classList.contains('active')) return;
-    tourShownThisPageLoad = true;
-    document.getElementById('tour-overlay').classList.add('visible');
+    welcomeShownThisPageLoad = true;
+    renderWelcomeCard(data[0]);
+    document.getElementById('welcome-card').style.display = 'block';
 }
 
-function dismissOnboardingTour() {
-    document.getElementById('tour-overlay').classList.remove('visible');
+function dismissWelcomeCard() {
+    document.getElementById('welcome-card').style.display = 'none';
     fetch('/api/settings', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ onboarding_tour_seen: true }),
@@ -5161,7 +5204,7 @@ function moveIfNeeded(el, targetContainer) {
 }
 function renderCards(data, page = 1, container = document.getElementById('cards'), cardsOuter = document.getElementById('cards-outer')) {
     const pageData = data.filter(hs => (hs.dashboard_page || 1) === page);
-    if (page === 1) checkOnboarding(data.length);
+    if (page === 1) checkOnboarding(data);
     // Position is only floored at 0 here -- NOT also capped at
     // data.length. computeCardOrders() needs each sentinel's real saved
     // value to sort overflowing ones (position >= hotspotCount) relative
@@ -12938,6 +12981,7 @@ function renderSettingsDrawer() {
             <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:5px 0;cursor:pointer">
                 <input type="checkbox" ${COURTESY_TONE_ENABLED ? 'checked' : ''} onchange="toggleCourtesyToneQS()"> Courtesy tone on new activity
             </label>
+            <a href="/whats-available" style="display:block;font-size:12.5px;padding:7px 0;color:var(--link);text-decoration:none">🔍 What's available in this app →</a>
             ${mapSection}
             <div class="hs-drawer-section-title">Jump to Settings</div>
             <div class="qs-shortcut-grid">${shortcutGridHtml()}</div>

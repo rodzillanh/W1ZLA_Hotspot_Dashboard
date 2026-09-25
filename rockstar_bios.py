@@ -661,6 +661,11 @@ BIOS = {
         "blurb": "German singer and model whose deep, deadpan voice fronted three songs on The Velvet Underground & Nico and later solo records like Chelsea Girl.",
         "wiki": "Nico",
     },
+    "Buckingham": {
+        "name": "Lindsey Buckingham",
+        "blurb": "Fleetwood Mac's guitarist and songwriter, whose intricate fingerpicking and studio craft shaped Rumours-era hits like \"Go Your Own Way.\"",
+        "wiki": "Lindsey_Buckingham",
+    },
 }
 
 

@@ -61,6 +61,22 @@
     }
     a { color:var(--live); text-decoration:none; }
 
+    /* One-time "new here?" strip (v5.1) -- Pocket Dash's own version of
+       the desktop welcome card, scaled to what a phone actually has room
+       for: a single dismissible line, not a card or a modal. Dismissal
+       state is per-device localStorage (pd-welcome-seen), NOT the
+       server-side onboarding_tour_seen setting the desktop dashboard
+       uses -- same "per-viewer convenience, not synced state" posture as
+       every other Pocket Dash localStorage preference in this file (map
+       style, license quiz class, etc.). See pdInitWelcome()/pdDismissWelcome(). */
+    .pd-welcome {
+        display:flex; align-items:center; gap:8px; margin:10px 0 4px;
+        background:var(--panel-2); border:1px solid color-mix(in srgb, var(--live) 30%, var(--border));
+        border-radius:9px; padding:9px 11px; font-size:12px; color:var(--text-muted);
+    }
+    .pd-welcome a { color:var(--live); font-weight:600; }
+    .pd-welcome .x { margin-left:auto; color:var(--text-dim); padding:2px 4px; flex:0 0 auto; }
+
     /* ---------------- app bar ---------------- */
     .appbar {
         position:fixed; top:0; left:0; right:0; z-index:20;
@@ -883,6 +899,10 @@
 
     <main>
         <section data-tab="status" class="active">
+            <div class="pd-welcome" id="pd-welcome" style="display:none">
+                <span>📱 New here? <a href="/whats-available">See what Pocket Dash can do →</a></span>
+                <span class="x" onclick="pdDismissWelcome()">✕</span>
+            </div>
             <div id="cards"><div class="empty"><h2>Connecting…</h2><p>Reading fleet status.</p></div></div>
         </section>
 
@@ -1243,6 +1263,23 @@
     // script -- a plain `function fetchQlRig(){}` declared inside that
     // block would only be visible inside it.
     var fetchQlRig = function () {};
+
+    // "New here?" strip (v5.1) -- pd-welcome-seen is a per-device
+    // localStorage flag, not the desktop's server-side onboarding_tour_seen
+    // setting (see the .pd-welcome CSS comment above for why).
+    function pdInitWelcome() {
+        var el = document.getElementById("pd-welcome");
+        if (!el) return;
+        var seen = false;
+        try { seen = localStorage.getItem("pd-welcome-seen") === "1"; } catch (e) {}
+        if (!seen) el.style.display = "flex";
+    }
+    function pdDismissWelcome() {
+        var el = document.getElementById("pd-welcome");
+        if (el) el.style.display = "none";
+        try { localStorage.setItem("pd-welcome-seen", "1"); } catch (e) {}
+    }
+    pdInitWelcome();
 
     function esc(s) {
         return String(s == null ? "" : s)

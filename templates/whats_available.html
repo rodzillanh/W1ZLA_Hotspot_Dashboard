@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html data-theme="{{ 'dark' if settings.dark_mode else 'light' }}">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>What's available — {{ settings.dashboard_name }}</title>
+    <style>
+        /* Same instrument-panel token palette as dashboard.html/setup.html/
+           version.html -- see version.html's own comment on why this is a
+           pure swap-in rather than a shared stylesheet (no build step in
+           this project, each template embeds its own <style>). */
+        :root {
+            --bg: #12151a; --panel: #1a1e25; --panel-2: #20252d;
+            --card-bg: #1a1e25; --card-border: #2b313b; --border-soft: #232830;
+            --text: #eef0f2; --text-muted: #9aa2ad; --text-dim: #5b6470;
+            --accent: #ffb648; --live: #4fd8c4; --live-dim: rgba(79,216,196,.14);
+            --link: #4fd8c4; --font-mono: ui-monospace,"SF Mono","Cascadia Code",Consolas,"Roboto Mono",monospace;
+        }
+        [data-theme="light"] {
+            --bg: #eef1f4; --panel: #ffffff; --panel-2: #f4f6f9;
+            --card-bg: #ffffff; --card-border: #dde2e8; --border-soft: #e6eaef;
+            --text: #1b1f26; --text-muted: #5b6470; --text-dim: #98a1ab;
+            --accent: #c97a12; --live: #0e8f7d; --live-dim: rgba(14,143,125,.12);
+            --link: #0e8f7d;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scrollbar-width: thin; scrollbar-color: var(--card-border) transparent; }
+        html::-webkit-scrollbar { width: 10px; }
+        html::-webkit-scrollbar-track { background: transparent; }
+        html::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 5px; }
+        html::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+        body { background: var(--bg); color: var(--text);
+               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+               font-size: 14px; padding: 20px; max-width: 780px; margin: 0 auto 60px; }
+        a.back-link { color: var(--link); text-decoration: none; font-size: 13px; }
+        a.back-link:hover { text-decoration: underline; }
+        h1 { font-size: 18px; font-weight: 500; margin: 12px 0 4px; }
+        .sub { font-size: 13px; color: var(--text-muted); margin-bottom: 18px; line-height: 1.55; max-width: 620px; }
+
+        .wa-search { position: relative; margin-bottom: 16px; }
+        .wa-search input { width: 100%; box-sizing: border-box; background: var(--panel-2); color: var(--text);
+            border: 1px solid var(--card-border); border-radius: 9px; font: inherit; font-size: 13.5px;
+            padding: 10px 14px 10px 34px; }
+        .wa-search input:focus { outline: none; border-color: var(--live); }
+        .wa-search .ic { position: absolute; left: 12px; top: 11px; color: var(--text-dim); font-size: 13px; }
+
+        .wa-grp { margin-top: 18px; }
+        .wa-grp:first-of-type { margin-top: 0; }
+        .wa-grp-h { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); padding: 4px 2px;
+            cursor: pointer; user-select: none; }
+        .wa-grp-h .cnt { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0; text-transform: none; }
+        .wa-grp-h .chev { margin-left: auto; transition: transform .15s; }
+        .wa-grp.closed .chev { transform: rotate(-90deg); }
+        .wa-grp.closed .wa-acc { display: none; }
+        .wa-acc { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px;
+            overflow: hidden; margin-top: 5px; }
+        .wa-row { display: flex; align-items: center; gap: 12px; padding: 11px 14px; text-decoration: none;
+            color: inherit; }
+        .wa-row + .wa-row { border-top: 1px solid var(--border-soft); }
+        .wa-row:hover { background: var(--panel-2); }
+        .wa-name { font-size: 13.5px; font-weight: 500; white-space: nowrap; color: var(--text); }
+        .wa-hint { font-size: 11.5px; color: var(--text-dim); flex: 1; min-width: 0; }
+        .wa-pill { font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 2px 9px;
+            border-radius: 20px; border: 1px solid var(--card-border); color: var(--text-dim);
+            background: var(--panel-2); white-space: nowrap; flex-shrink: 0; }
+        .wa-pill.on { color: var(--live); border-color: color-mix(in srgb, var(--live) 40%, var(--card-border));
+            background: var(--live-dim); }
+        .wa-empty { padding: 30px 0; text-align: center; color: var(--text-muted); font-size: 12.5px; display: none; }
+        mark { background: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent);
+            border-radius: 2px; padding: 0 1px; }
+    </style>
+</head>
+<body>
+    <a class="back-link" href="/">← Back to dashboard</a>
+    <a class="back-link" href="/setup" style="margin-left:16px">⚙ Settings</a>
+    <h1>🔍 What's available</h1>
+    <div class="sub">
+        Everything this dashboard can do, in one searchable list — reachable anytime from the gear
+        icon's Quick Settings drawer, not just the one time a hotspot's first added. "On" means it's
+        already configured, not that the service was actually reached.
+    </div>
+
+    <div class="wa-search">
+        <span class="ic">⌕</span>
+        <input type="text" id="wa-search-input" placeholder="Search what this app can do…" autocomplete="off">
+    </div>
+    <div id="wa-body">
+        {% for group_name, items, on_count, total in groups %}
+        <div class="wa-grp" data-group>
+            <div class="wa-grp-h" onclick="this.parentNode.classList.toggle('closed')">
+                <span class="ttl">{{ group_name }}</span>
+                {% if total %}<span class="cnt">{{ on_count }} of {{ total }} on</span>{% endif %}
+                <span class="chev">▾</span>
+            </div>
+            <div class="wa-acc">
+                {% for name, hint, on, href in items %}
+                <a class="wa-row" data-row data-text="{{ (name ~ ' ' ~ hint) | lower }}" href="{{ href }}">
+                    <span class="wa-name">{{ name }}</span>
+                    <span class="wa-hint">{{ hint }}</span>
+                    <span class="wa-pill{{ ' on' if on else '' }}">
+                        {{ 'On' if on else ('Open →' if on is none else 'Enable →') }}
+                    </span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="wa-empty" id="wa-empty">No match for that.</div>
+
+    <script>
+        // Plain substring filter over the pre-rendered rows -- no fetch,
+        // everything's already in the DOM. Same shape as setup.html's
+        // Integrations-tab search, just standalone since this isn't
+        // embedded inside that page.
+        const input = document.getElementById('wa-search-input');
+        const groups = Array.from(document.querySelectorAll('[data-group]'));
+        const empty = document.getElementById('wa-empty');
+        function esc(s) { return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+        // Original text is stashed on first run (data-orig) so re-highlighting
+        // (or clearing it) never operates on an already-marked-up string.
+        document.querySelectorAll('.wa-name, .wa-hint').forEach(node => { node.dataset.orig = node.textContent; });
+        function paintText(node, q) {
+            const raw = node.dataset.orig;
+            if (!q) { node.textContent = raw; return; }
+            const i = raw.toLowerCase().indexOf(q);
+            node.innerHTML = i < 0 ? esc(raw)
+                : esc(raw.slice(0, i)) + '<mark>' + esc(raw.slice(i, i + q.length)) + '</mark>' + esc(raw.slice(i + q.length));
+        }
+        function applySearch() {
+            const q = input.value.trim().toLowerCase();
+            let shown = 0;
+            groups.forEach(g => {
+                let any = false;
+                g.querySelectorAll('[data-row]').forEach(row => {
+                    const hit = !q || row.dataset.text.includes(q);
+                    row.style.display = hit ? '' : 'none';
+                    if (hit) { any = true; shown++; }
+                    paintText(row.querySelector('.wa-name'), q);
+                    paintText(row.querySelector('.wa-hint'), q);
+                });
+                g.style.display = any ? '' : 'none';
+                if (q && any) g.classList.remove('closed');
+            });
+            empty.style.display = shown ? 'none' : 'block';
+        }
+        input.addEventListener('input', applySearch);
+        input.focus();
+    </script>
+</body>
+</html>

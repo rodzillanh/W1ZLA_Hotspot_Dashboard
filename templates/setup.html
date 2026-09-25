@@ -195,6 +195,16 @@
         .toggle-subhead.collapsible::after { content: "\25BE"; float: right; transition: transform .15s; }
         .toggle-subhead.collapsed::after { transform: rotate(-90deg); }
         .toggle-row.cfg-hidden { display: none; }
+        /* Brief outline on a deep-linked item (openItemDeepLink()) so
+           landing here from a suggestion tile has an obvious "this one" --
+           a plain tab landing gave no direction at all (real user
+           feedback: "just kinda dumps you into a list... what do I do now"). */
+        @keyframes itemFlash {
+            0%, 100% { box-shadow: 0 0 0 0 transparent; }
+            15%, 70% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 55%, transparent); }
+        }
+        .item-flash { animation: itemFlash 1.8s ease-out; border-radius: 8px; }
+        @media (prefers-reduced-motion: reduce) { .item-flash { animation: none; outline: 2px solid var(--live); } }
 
         .toggle-subhead {
             font-size: 11px;
@@ -551,11 +561,11 @@
     <div class="section">
         <div class="section-title">Getting started</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
-            The one-time "what's available" tour shown on the Dashboard tab after your
-            first hotspot was added. Reopen it anytime — it'll appear next time you
+            The one-time welcome card shown on the Dashboard tab after your first
+            hotspot was added. Reopen it anytime — it'll appear next time you
             visit the Dashboard tab.
         </p>
-        <button class="btn btn-info" onclick="showOnboardingTourAgain()">Show feature tour again</button>
+        <button class="btn btn-info" onclick="showWelcomeCardAgain()">Show welcome card again</button>
         <span class="status-txt" id="onboarding-status"></span>
     </div>
 
@@ -2644,7 +2654,7 @@ function saveAppearance() {
     });
 }
 
-function showOnboardingTourAgain() {
+function showWelcomeCardAgain() {
     const status = document.getElementById('onboarding-status');
     fetch('/api/settings', {
         method: 'POST',
@@ -4412,27 +4422,60 @@ if (location.hash) {
     const val = id => { const e = document.getElementById(id); return !!(e && String(e.value || '').trim()); };
     const tog = id => { const e = document.getElementById(id); return !!(e && e.classList.contains('on')); };
     const chk = id => { const e = document.getElementById(id); return !!(e && e.checked); };
-    // [title prefix, group, kind, status()] -- kind 'toggle' shows On/Off, 'cfg' shows Configured/Not set up.
-    // "Configured" means the fields are filled in, NOT that the service was reached.
+    // [title prefix, group, kind, status(), slug] -- kind 'toggle' shows On/Off,
+    // 'cfg' shows Configured/Not set up. "Configured" means the fields are
+    // filled in, NOT that the service was reached. `slug` is what a
+    // `/setup?item=<slug>#integrations` deep link (dashboard.html's welcome
+    // card, app.py's /whats-available catalog) opens+scrolls to -- see
+    // openItemDeepLink() below. A bundled/ambiguous whats-available row
+    // (e.g. "QRZ / RadioID lookup" covers two separate rows here) just has
+    // no single slug pointing at it and falls back to landing on the tab.
     const DEFS = [
-        ['QRZ.com lookup',          'Callsign lookup & logging', 'cfg',    () => val('qrz-username') && val('qrz-password')],
-        ['QRZ Logbook sync',        'Callsign lookup & logging', 'cfg',    () => val('qrz-logbook-key')],
-        ['RadioID.net lookup',      'Callsign lookup & logging', 'toggle', () => tog('radioid-toggle')],
-        ['WSJT-X live QSO logging', 'Callsign lookup & logging', 'toggle', () => tog('wsjtx-toggle')],
-        ['HamAlert',                'Callsign lookup & logging', 'cfg',    () => val('hamalert-username')],
-        ['Rig control',             'Radio & rig',               'toggle', () => tog('rig-enabled-toggle')],
-        ['wfweb power',             'Radio & rig',               'toggle', () => tog('wfweb-pwr-enabled-toggle')],
-        ['DigiPi',                  'Radio & rig',               'cfg',    () => val('digipi-ip')],
-        ['Parks on the Air',        'Spots & propagation',       'cfg',    () => val('pota-callsign')],
-        ['PSK Reporter',            'Spots & propagation',       'cfg',    () => val('psk-callsign')],
-        ['Reverse Beacon Network',  'Spots & propagation',       'toggle', () => chk('rbn-enabled')],
-        ['DX Cluster',              'Spots & propagation',       'toggle', () => chk('dxcluster-enabled')],
-        ['Nearby Repeaters',        'Spots & propagation',       'cfg',    () => val('repeaters-radius')],
-        ['APRS.fi live position',   'Spots & propagation',       'cfg',    () => val('aprs-key')],
-        ['Brandmeister',            'Alerts & automation',       'cfg',    () => val('bm-api-key')],
-        ['APRS favorite alerts',    'Alerts & automation',       'cfg',    () => val('aprsmsg-callsign')],
-        ['Home Assistant',          'Alerts & automation',       'cfg',    () => val('mqtt-host')],
+        ['QRZ.com lookup',          'Callsign lookup & logging', 'cfg',    () => val('qrz-username') && val('qrz-password'), 'qrz'],
+        ['QRZ Logbook sync',        'Callsign lookup & logging', 'cfg',    () => val('qrz-logbook-key'), 'qrz_logbook'],
+        ['RadioID.net lookup',      'Callsign lookup & logging', 'toggle', () => tog('radioid-toggle'), 'radioid'],
+        ['WSJT-X live QSO logging', 'Callsign lookup & logging', 'toggle', () => tog('wsjtx-toggle'), 'wsjtx'],
+        ['HamAlert',                'Callsign lookup & logging', 'cfg',    () => val('hamalert-username'), 'hamalert'],
+        ['Rig control',             'Radio & rig',               'toggle', () => tog('rig-enabled-toggle'), 'rig_control'],
+        ['wfweb power',             'Radio & rig',               'toggle', () => tog('wfweb-pwr-enabled-toggle'), 'wfweb'],
+        ['DigiPi',                  'Radio & rig',               'cfg',    () => val('digipi-ip'), 'digipi'],
+        ['Parks on the Air',        'Spots & propagation',       'cfg',    () => val('pota-callsign'), 'pota_callsign'],
+        ['PSK Reporter',            'Spots & propagation',       'cfg',    () => val('psk-callsign'), 'psk_reporter'],
+        ['Reverse Beacon Network',  'Spots & propagation',       'toggle', () => chk('rbn-enabled'), 'rbn'],
+        ['DX Cluster',              'Spots & propagation',       'toggle', () => chk('dxcluster-enabled'), 'dxcluster'],
+        ['Nearby Repeaters',        'Spots & propagation',       'cfg',    () => val('repeaters-radius'), 'repeaters_radius'],
+        ['APRS.fi live position',   'Spots & propagation',       'cfg',    () => val('aprs-key'), 'aprs_position'],
+        ['Brandmeister',            'Alerts & automation',       'cfg',    () => val('bm-api-key'), 'brandmeister'],
+        ['APRS favorite alerts',    'Alerts & automation',       'cfg',    () => val('aprsmsg-callsign'), 'aprs_alerts'],
+        ['Home Assistant',          'Alerts & automation',       'cfg',    () => val('mqtt-host'), 'home_assistant'],
     ];
+    // Cards tab: slug -> the toggle's own element id (from the "Optional
+    // dashboard cards" section). Simpler than Integrations' name-matching,
+    // since every card toggle already has a stable, unique id.
+    const CARD_TOGGLE_IDS = {
+        fleet_status: 'fleet-status-toggle', fleet_activity: 'fleet-activity-toggle',
+        asl_favorites: 'asl-favorites-toggle', hf_conditions: 'hf-conditions-toggle',
+        band_plan: 'band-plan-toggle', license_quiz: 'license-quiz-toggle',
+        band_activity: 'wspr-activity-toggle', big_clock: 'big-clock-toggle',
+        satellites: 'satellites-toggle', flights_overhead: 'flights-overhead-toggle',
+        recent_contacts: 'recent-contacts-toggle', qso_stats: 'qso-stats-toggle',
+        top_activity: 'top-activity-toggle', pota: 'pota-toggle',
+        hf_favorites: 'hf-favorites-toggle', rig_panel: 'rig-panel-toggle',
+        qrz_quick_log: 'qrz-quick-log-toggle', beacons: 'beacons-toggle',
+        repeaters: 'repeaters-toggle', sstv: 'sstv-toggle', dvswitch: 'dvswitch-card-toggle',
+        aprs_inbox: 'aprs-inbox-toggle', hamalert_card: 'hamalert-toggle',
+        fleet_alerts: 'fleet-alerts-toggle', digipi_card: 'digipi-toggle',
+        starlink_trains: 'starlink-trains-toggle',
+    };
+    // Briefly outlines+scrolls to a just-opened item so "what do I do now"
+    // has an obvious answer -- landing on a tab alone (the old behavior)
+    // dropped you into a long list with no indication of which row matters.
+    function flashInto(el) {
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('item-flash');
+        setTimeout(() => el.classList.remove('item-flash'), 1800);
+    }
     const GROUP_ORDER = ['Callsign lookup & logging', 'Radio & rig', 'Spots & propagation', 'Alerts & automation', 'Other'];
 
     function initIntegrations() {
@@ -4456,7 +4499,7 @@ if (location.hash) {
             row.querySelector('.acc-head').addEventListener('click', () => row.classList.toggle('open'));
             panel.insertBefore(row, sec);
             row.appendChild(sec);   // moves the whole existing section (form + buttons) inside
-            rows.push({ row, def, group: def ? def[1] : 'Other', name, hint, sec });
+            rows.push({ row, def, group: def ? def[1] : 'Other', name, hint, sec, slug: def ? def[4] : null });
         });
         const search = document.createElement('div');
         search.className = 'cfg-search';
@@ -4516,6 +4559,17 @@ if (location.hash) {
         // toggles/inputs anywhere in the panel can change a status -- recompute after the handler runs
         ['input', 'change', 'click'].forEach(ev => panel.addEventListener(ev, () => setTimeout(refresh, 0)));
         refresh();
+
+        return {
+            openBySlug(slug) {
+                const r = rows.find(r => r.slug === slug);
+                if (!r) return false;
+                if (groups[r.group]) groups[r.group].classList.remove('closed');
+                r.row.classList.add('open');
+                flashInto(r.row);
+                return true;
+            },
+        };
     }
 
     function initCards() {
@@ -4577,9 +4631,42 @@ if (location.hash) {
         let start = 'show';
         try { const k = localStorage.getItem('setupCardsSub'); if (SUBS.some(s => s[0] === k)) start = k; } catch (e) {}
         show(start);
+
+        return {
+            openToggle(slug) {
+                const id = CARD_TOGGLE_IDS[slug];
+                const toggleEl = id && document.getElementById(id);
+                if (!toggleEl) return false;
+                const row = toggleEl.closest('.toggle-row');
+                if (!row) return false;
+                show('show');
+                search.querySelector('input').value = '';
+                // Un-collapse whichever subhead group this row lives under,
+                // then re-run the filter so cfg-hidden actually clears.
+                for (let n = row.previousElementSibling; n; n = n.previousElementSibling) {
+                    if (n.classList.contains('toggle-subhead')) { n.classList.remove('collapsed'); break; }
+                }
+                applyFilter();
+                flashInto(row);
+                return true;
+            },
+        };
     }
-    initIntegrations();
-    initCards();
+    const integrationsApi = initIntegrations();
+    const cardsApi = initCards();
+
+    // Deep-link straight to one specific item, not just its tab -- e.g.
+    // /setup?item=brandmeister#integrations (dashboard.html's welcome card,
+    // app.py's /whats-available catalog). Runs after both init*() above so
+    // the accordion/toggle-group DOM it needs already exists, and after the
+    // page's own #hash tab-switch block (which already ran, earlier in the
+    // page's first <script>) has already picked the right tab.
+    (function () {
+        const item = new URLSearchParams(location.search).get('item');
+        if (!item) return;
+        if (integrationsApi && integrationsApi.openBySlug(item)) return;
+        if (cardsApi && cardsApi.openToggle(item)) return;
+    })();
 })();
 </script>
 <script>

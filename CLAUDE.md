@@ -8296,6 +8296,110 @@ config for per-integration credentials; put it in
     enabled, so it looks empty on a fresh config -- that's pre-existing,
     not caused by the sub-tabs.
 
+- **The onboarding "tour" became an inline, per-hotspot-type welcome card
+  (v5.1) -- first of a multi-step "first five minutes" rework
+  (mockup-approved), not a full rewrite of onboarding in one go.** The old
+  `.tour-overlay` was a full-screen modal listing a fixed, ~v3.48-era set
+  of features -- stale (it never grew past ~11 items while the app grew to
+  25+ cards plus Pocket Dash) and blocking (it hid the very hotspot card
+  that just got added, behind a "Got it" click). Replaced with
+  `#welcome-card`, a dismissible card inside `#cards-outer` itself, reusing
+  `.empty-state-card`'s own `grid-column:1/-1; order:-1;` trick so it
+  always floats to the front regardless of the real cards' saved order --
+  the hotspot card is visible at the same time, not hidden behind it.
+  - **Content is type-aware, not a flat list**: `WELCOME_SUGGESTIONS`
+    (keyed by `wpsd`/`asl3`/`openspot4`) picks 3 suggestions relevant to
+    the FIRST hotspot's own `type` -- Brandmeister talkgroups for WPSD,
+    ASL Favorites & Control for ASL3, Notifications for openSPOT4 (which
+    has no linked-node/talkgroup concept). Reasonable to key off just the
+    first hotspot, since this card only ever fires the very first time a
+    hotspot exists at all -- normally exactly one type to react to.
+  - **Suggestion links point at `/setup#integrations`/`/setup#cards` as an
+    interim target** -- both tabs are searchable/grouped as of the v5.0
+    Settings declutter, which makes them a reasonable stand-in, but this
+    is NOT the dedicated "what's available" reference page the full
+    mockup (`Mockups/first-five-minutes.html`) shows at the 1:30 mark.
+    That page doesn't exist yet -- don't assume `/setup#cards` is the
+    final destination if this is ever revisited.
+  - **`checkOnboarding()`'s signature changed from `(hotspotCount)` to
+    `(data)`** (the full `/api/data` array) since it now needs `data[0]`'s
+    `type`/`name`, not just a count -- its one call site
+    (`renderCards()`) already had `data` in scope. `ONBOARDING_TOUR_SEEN`/
+    the `onboarding_tour_seen` settings key/`welcomeShownThisPageLoad`
+    (renamed from `tourShownThisPageLoad`) keep the exact same semantics
+    and trigger condition as before -- only the presentation changed.
+    `dismissOnboardingTour()` -> `dismissWelcomeCard()`,
+    `showOnboardingTourAgain()` (setup.html) -> `showWelcomeCardAgain()`,
+    same POST body either way. The settings KEY itself
+    (`onboarding_tour_seen`) was deliberately NOT renamed despite no
+    longer gating a "tour" -- same "don't rename a settings key for zero
+    functional gain" precedent as `beta_courtesy_tone` elsewhere in this
+    file.
+  - Verified live end-to-end (mocked `HotspotStatus`, real
+    `test_client()`-backed server, real Playwright browser): the card
+    renders with the right header/suggestions for a WPSD hotspot, sits
+    beside the real hotspot card (not blocking it), dismissing it hides it
+    and persists `onboarding_tour_seen: true`, and it stays hidden after a
+    reload.
+  - **All three follow-on scenes from the mockup were built in the SAME
+    session, before this ever got committed** -- so this whole entry
+    describes the shipped end state, not a partial first step.
+    - **`/whats-available`** (new route + `templates/whats_available.html`)
+      is the permanent, searchable reference the welcome card's "See
+      everything" link and the Quick Settings drawer's new "What's
+      available in this app" line both point at. `_whats_available_groups()`
+      (app.py) computes each item's `on` state server-side straight from
+      `settings`/`hotspots` (the same "configured, not connected" caveat
+      as the Integrations accordion's pills) -- `on` is `None`, not
+      `False`, for something that isn't a toggle at all (Pocket Dash),
+      which the route's own group-count computation treats as "don't
+      count this group's total" rather than misreporting "0 of 1 on".
+      Groups/rows are plain server-rendered HTML with a client-side
+      substring filter (`data-text` per row, `<mark>` highlighting via a
+      stashed `data-orig` so re-filtering never operates on
+      already-marked-up text) -- no fetch, nothing dynamic beyond that.
+    - **The returning-user digest** (`config.DIGEST_HIGHLIGHTS`/
+      `digest_since()`, a new `last_seen_version` setting, `dashboard()`'s
+      own read-compare-write) is a SEPARATE, deliberately small,
+      hand-curated list from version.html's own changelog -- that
+      changelog is written for developers (full paragraphs, verification
+      notes), nowhere near what a friendly toast should say. Not every
+      version gets an entry; only ones worth telling a returning user
+      about. `last_seen_version` defaults to blank for BOTH a fresh
+      install and an existing install's first visit after upgrading to
+      v5.1 (the key is simply absent from an older settings.json) --
+      deliberately NOT special-cased the way `onboarding_tour_seen` is,
+      since blank already means the right thing either way: "no known
+      baseline, don't summarize everything since the beginning of time,
+      just start tracking from now." `#whats-new-toast` only renders
+      (Jinja) when there's genuinely something to show, capped at 5
+      highlights, dismissed with a plain `.remove()` (no persistence call
+      needed -- `dashboard()` already bumped `last_seen_version` the
+      moment it decided to render the toast, so a reload won't re-show it
+      regardless of whether the X was clicked).
+    - **Pocket Dash's strip** (`#pd-welcome` in `dashboard-mobile.html`)
+      is deliberately the smallest of the four -- a single dismissible
+      line, not a card, since a phone has no room for more. Its dismiss
+      state is `localStorage` (`pd-welcome-seen`), NOT the desktop's
+      server-side `onboarding_tour_seen` setting -- same "per-device
+      convenience, not synced state" posture as every other Pocket Dash
+      preference in that file (map style, license quiz class, etc.).
+      `pdInitWelcome()`/`pdDismissWelcome()` are declared at the script's
+      TOP LEVEL (confirmed via brace-depth check before adding them), not
+      nested inside a conditional block -- the exact strict-mode
+      block-scoping trap `fetchQlRig` was already fixed for elsewhere in
+      this same file.
+    - Verified live end-to-end together (real Playwright, both a desktop
+      and a mobile viewport in one run, not each piece in isolation):
+      the digest toast renders its real highlights and persists
+      `last_seen_version` on render, dismissing it doesn't error, the
+      reference page's 36 rows span all 8 groups with correct on/off
+      pills (including Pocket Dash's own "Open →" pill), searching
+      "brandmeister" filters to 2 rows with highlighted matches and
+      clearing the search removes every `<mark>`, the welcome card's
+      footer link points at `/whats-available`, and Pocket Dash's strip
+      shows, dismisses, and stays dismissed after a reload.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 
