@@ -5900,7 +5900,17 @@ function fleetStatusOrderedIds(data) {
 function fleetStatusVisibleSorted(data) {
     const order = fleetStatusOrderedIds(data);
     const byId = new Map(data.map(hs => [hs.id, hs]));
-    return order.map(id => byId.get(id)).filter(hs => hs && !FLEET_STATUS_HIDDEN.includes(hs.id));
+    const visible = order.map(id => byId.get(id)).filter(hs => hs && !FLEET_STATUS_HIDDEN.includes(hs.id));
+    // On-air hotspots float to the top of the CARD only -- same rule Pocket
+    // Dash's Status screen already uses. Left out of fleetStatusOrderedIds()
+    // itself (which also drives the drawer's own ▲/▼ manual reorder) so the
+    // drawer's rows stay put while you're reordering them, rather than
+    // jumping around as radio activity changes underneath you.
+    return visible.map((hs, i) => [hs, i]).sort((a, b) => {
+        const aa = a[0].is_active && a[0].status !== 'Offline' ? 0 : 1;
+        const bb = b[0].is_active && b[0].status !== 'Offline' ? 0 : 1;
+        return (aa - bb) || (a[1] - b[1]);
+    }).map(x => x[0]);
 }
 function renderFleetStatusCard(data) {
     const list = document.getElementById('fs-list');
@@ -12858,7 +12868,7 @@ function qsoLogSectionHtml() {
 // section already uses for its own stats box.
 function aboutDashboardSectionHtml() {
     const version = dashboardVersionInfo
-        ? `v${dashboardVersionInfo.app_version} "${dashboardVersionInfo.app_codename}"`
+        ? `v${dashboardVersionInfo.app_version}` + (dashboardVersionInfo.app_codename ? ` "${dashboardVersionInfo.app_codename}"` : '')
         : '—';
     const updateChip = dashboardUpdateAvailable
         ? `<a class="qs-update-chip" href="/setup#version">↑ Update available</a>`

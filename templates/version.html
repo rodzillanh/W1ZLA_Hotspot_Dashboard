@@ -90,7 +90,7 @@
         <div class="card-title">Container</div>
         <div class="info-row">
             <span class="info-label">Current build</span>
-            <span class="info-val accent">v{{ app_version }} "{{ app_codename }}"</span>
+            <span class="info-val accent">v{{ app_version }}{% if app_codename %} "{{ app_codename }}"{% endif %}</span>
         </div>
         <div class="info-row">
             <span class="info-label">Started</span>
@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v5.1 "Buckingham"</span>
+                <span class="release-version">v5.2</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Hotspot Status: on-air hotspots float to the top</span> &mdash; matching Pocket Dash's own Status screen, an actively-transmitting hotspot now jumps to the top of the card automatically. The card's own reorder/hide drawer (gear icon) is unaffected &mdash; it still shows your saved manual order, so rows don't shift under you while you're dragging</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v5.1 "Buckingham"</span>
+                <span class="release-date">September 2026</span>
+
             </div>
             <ul class="change-list">
                 <li><span>The onboarding tour is now an inline welcome card, not a full-screen modal</span> &mdash; the first time a hotspot's ever added, a dismissible card appears in the dashboard grid right alongside your real hotspot card, instead of blocking it behind a "Got it" popup. It suggests a few things relevant to the hotspot type you actually added (Brandmeister for WPSD, ASL Favorites &amp; Control for AllStarLink, Notifications for openSPOT4) rather than a flat list of everything. Settings &rarr; General's "Show welcome card again" still works the same way</li>

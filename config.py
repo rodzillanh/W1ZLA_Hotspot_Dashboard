@@ -2,16 +2,28 @@
 import os
 import re
 
-# --- Version codename ---
-# Each release gets a codename, one deceased rock & roll musician per
-# version, in the order they were used -- purely cosmetic (shown on the
-# Version info page as "Current build: <version> <codename>"), same
-# spirit as Ubuntu's animal names or Android's dessert codenames. This
-# list only covers versions from when this feature was introduced
-# onward -- earlier releases (pre-v3.49) were never retroactively named.
-# To cut a new named release: bump APP_VERSION and append the next name
-# here (VERSION_CODENAMES[-1] is always the current build's codename).
-APP_VERSION = "5.1"
+
+def _version_tuple(v):
+    """('4.91' -> (4, 91)) for plain tuple comparison. This app's own
+    version strings are always consistently written (never '4.9' one
+    release and '4.90' the next), so this is safe without needing real
+    semver parsing -- re-check this assumption if that ever changes."""
+    try:
+        return tuple(int(p) for p in str(v).split("."))
+    except (ValueError, AttributeError):
+        return (0,)
+
+
+# --- Version codename (retired as of v5.1) ---
+# Each release from v3.49 through v5.1 got a codename, one deceased rock
+# & roll musician per version, in the order they were used -- purely
+# cosmetic (shown on the Version info page as "Current build: <version>
+# <codename>"), same spirit as Ubuntu's animal names or Android's dessert
+# codenames. Retired starting with v5.2 -- releases just show a plain
+# version number now, no new names get appended here. See
+# _LAST_NAMED_VERSION below for how APP_CODENAME resolves to None past
+# this list's last entry.
+APP_VERSION = "5.2"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -281,7 +293,15 @@ VERSION_CODENAMES = [
     "Buckingham",       # v5.1 -- Lindsey Buckingham, Fleetwood Mac
                         # guitarist/songwriter ("Go Your Own Way") (1949-2025)
 ]
-APP_CODENAME = VERSION_CODENAMES[-1]
+# Retired as of v5.1 -- no new names get appended above. APP_CODENAME is
+# only ever the last entry's name for the exact run of versions that list
+# already covers (through v5.1); anything newer gets None, which every
+# render site (version.html, dashboard.html's Quick Settings drawer,
+# /api/version) already treats as "no codename to show", not an error.
+_LAST_NAMED_VERSION = "5.1"
+APP_CODENAME = (VERSION_CODENAMES[-1]
+                 if _version_tuple(APP_VERSION) <= _version_tuple(_LAST_NAMED_VERSION)
+                 else None)
 
 # Short, end-user-facing highlights for the returning-user "what's new"
 # digest toast (v5.1, see dashboard.html's #whats-new-toast and
@@ -298,18 +318,8 @@ DIGEST_HIGHLIGHTS = [
     ("4.90", ["The Spots card gained a full-height Browse drawer with search and filters"]),
     ("5.0",  ["Settings' Integrations and Cards tabs are now searchable and collapsible"]),
     ("5.1",  ["Onboarding is now an inline welcome card instead of a blocking popup"]),
+    ("5.2",  ["Hotspot Status now puts on-air hotspots at the top of the list"]),
 ]
-
-
-def _version_tuple(v):
-    """('4.91' -> (4, 91)) for plain tuple comparison. This app's own
-    version strings are always consistently written (never '4.9' one
-    release and '4.90' the next), so this is safe without needing real
-    semver parsing -- re-check this assumption if that ever changes."""
-    try:
-        return tuple(int(p) for p in str(v).split("."))
-    except (ValueError, AttributeError):
-        return (0,)
 
 
 def digest_since(last_seen_version):
