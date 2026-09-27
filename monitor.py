@@ -975,6 +975,19 @@ class FleetMonitor:
         self._fleet_events.append(event)
         storage_notifications.log_notification("fleet", event["at"], event, self._fleet_events.maxlen)
 
+    def record_health_event(self, hotspot_id: str, kind: str, temp_c: float) -> None:
+        """"warm"/"cool" events from health_history.WarmWatcher -- recorded as
+        hotspot events alongside online/offline, so they reach the same
+        Notifications source (fleet_alerts_enabled) with no extra wiring."""
+        with self._lock:
+            status = self._data.get(hotspot_id)
+            if status is None:
+                return
+            event = {"ip": status.ip, "id": hotspot_id, "name": status.name, "kind": kind,
+                     "temp_c": round(temp_c, 1), "at": time.time()}
+            self._fleet_events.append(event)
+            storage_notifications.log_notification("fleet", event["at"], event, self._fleet_events.maxlen)
+
     def _record_failure(self, hotspot_id: str) -> None:
         with self._lock:
             self._failures[hotspot_id] = self._failures.get(hotspot_id, 0) + 1

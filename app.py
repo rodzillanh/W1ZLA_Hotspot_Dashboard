@@ -61,11 +61,15 @@ from rbn import RbnListener
 from dxcluster import DxClusterListener
 from brandmeister_lastheard import BrandmeisterLastHeardListener
 from satellites import SatelliteTracker
+import health_history
+import psk_reporter as psk_reporter_mod
+from sat_alerts import SatPassAlerter, push_text as sat_push_text, in_quiet_hours as sat_in_quiet_hours, zone as tz_zone
 from starlink_trains import StarlinkTrainClient
 from flights import FlightsClient
 from adsbdb import AdsbdbClient
 from aslstats import AslStatsClient
 from rockstar_bios import get_bio as get_codename_bio
+import worked as worked_mod
 from push_notifications import PushClient, generate_vapid_keys
 from ircddbgateway import IrcddbGatewayClient
 
@@ -86,6 +90,7 @@ hf_conditions   = HfConditionsClient()
 camera_manager  = CameraStreamManager()
 license_quiz    = LicenseQuizPool()
 satellite_tracker = SatelliteTracker()
+sat_alerter = SatPassAlerter()
 starlink_train_client = StarlinkTrainClient()
 wspr_activity   = WsprActivityClient()
 flights_client  = FlightsClient()
@@ -700,6 +705,21 @@ def api_settings_post():
             pass
     if "show_satellites" in data:
         settings["show_satellites"] = bool(data["show_satellites"])
+    # Satellite pass alerts (sat_alerts.py) -- a Notifications source.
+    for key in ("sat_alerts_enabled", "sat_alert_quiet", "sat_alert_push"):
+        if key in data:
+            settings[key] = bool(data[key])
+    for key, lo, hi in (("sat_alert_lead_min", 1, 120), ("sat_alert_min_el", 0, 90),
+                        ("sat_alert_quiet_start", 0, 23), ("sat_alert_quiet_end", 0, 23)):
+        if key in data:
+            try:
+                settings[key] = max(lo, min(hi, int(data[key])))
+            except (TypeError, ValueError):
+                pass
+    # The browser's own IANA time zone, sent by the Settings page on save --
+    # quiet hours are read in it (a Docker container's clock is usually UTC).
+    if "station_tz" in data and tz_zone(str(data["station_tz"])) is not None:
+        settings["station_tz"] = str(data["station_tz"])[:64]
     if "satellites_position" in data:
         try:
             settings["satellites_position"] = max(0, int(data["satellites_position"]))
@@ -739,6 +759,8 @@ def api_settings_post():
                 "mode": str(sat.get("mode") or "").strip()[:20],
                 "downlink_mhz": _optional_float(sat.get("downlink_mhz")),
                 "uplink_mhz": _optional_float(sat.get("uplink_mhz")),
+                # Satellite pass alerts: on unless explicitly turned off
+                "alert": sat.get("alert", True) is not False,
             })
         settings["tracked_satellites"] = cleaned
     if "show_recent_contacts" in data:
@@ -816,6 +838,8 @@ def api_settings_post():
             pass
     if "show_qrz_quick_log" in data:
         settings["show_qrz_quick_log"] = bool(data["show_qrz_quick_log"])
+    if "show_worked_badges" in data:
+        settings["show_worked_badges"] = bool(data["show_worked_badges"])
     if "qrz_quick_log_position" in data:
         try:
             settings["qrz_quick_log_position"] = max(0, int(data["qrz_quick_log_position"]))
@@ -832,6 +856,25 @@ def api_settings_post():
             pass
     if "show_repeaters" in data:
         settings["show_repeaters"] = bool(data["show_repeaters"])
+    if "show_my_signal" in data:
+        settings["show_my_signal"] = bool(data["show_my_signal"])
+    if "my_signal_position" in data:
+        try:
+            settings["my_signal_position"] = max(0, int(data["my_signal_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "show_hotspot_health" in data:
+        settings["show_hotspot_health"] = bool(data["show_hotspot_health"])
+    if "hotspot_health_position" in data:
+        try:
+            settings["hotspot_health_position"] = max(0, int(data["hotspot_health_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "health_warm_c" in data:
+        try:
+            settings["health_warm_c"] = max(40, min(95, int(data["health_warm_c"])))
+        except (TypeError, ValueError):
+            pass
     if "repeaters_position" in data:
         try:
             settings["repeaters_position"] = max(0, int(data["repeaters_position"]))
@@ -906,7 +949,7 @@ def api_settings_post():
         "satellites_page", "flights_overhead_page", "recent_contacts_page",
         "qso_stats_page", "top_activity_page", "pota_page",
         "hf_favorites_page", "rig_panel_page", "dvswitch_page", "qrz_quick_log_page",
-        "beacons_page", "repeaters_page", "sstv_page",
+        "beacons_page", "repeaters_page", "sstv_page", "hotspot_health_page", "my_signal_page",
     ):
         if _page_key in data:
             try:
@@ -1324,7 +1367,7 @@ _SENTINEL_DEFS = [
     ("__wspr_activity__", "show_wspr_activity", "wspr_activity_position", "📶", "Band Activity", "WSPR activity card"),
     ("__digipi__", "digipi_enabled", "digipi_position", "📡", "DigiPi", "APRS/Direwolf card"),
     ("__big_clock__", "show_big_clock", "big_clock_position", "🕐", "Big Ass Clock", "clock card"),
-    ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled", "solar_alerts_enabled", "brandmeister_alerts_enabled", "qrz_logbook_enabled", "rig_pa_alert_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
+    ("__notifications__", ("aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled", "solar_alerts_enabled", "brandmeister_alerts_enabled", "qrz_logbook_enabled", "rig_pa_alert_enabled", "sat_alerts_enabled"), "notifications_position", "🔔", "Notifications", "APRS + HamAlert inbox card"),
     ("__satellites__", "show_satellites", "satellites_position", "🛰️", "Satellites", "pass prediction card"),
     ("__flights_overhead__", "show_flights_overhead", "flights_overhead_position", "✈️", "Flights Overhead", "nearby aircraft card"),
     ("__recent_contacts__", "show_recent_contacts", "recent_contacts_position", "📻", "Recent Contacts", "logged QSO card"),
@@ -1336,6 +1379,8 @@ _SENTINEL_DEFS = [
     ("__qrz_quick_log__", "show_qrz_quick_log", "qrz_quick_log_position", "📝", "Quick Log", "rig-panel-driven QRZ logging card"),
     ("__beacons__", "show_beacons", "beacons_position", "📡", "Beacons", "NCDXF/IARU beacon ladder card"),
     ("__repeaters__", "show_repeaters", "repeaters_position", "🗼", "Repeaters", "nearby repeater directory card"),
+    ("__my_signal__", "show_my_signal", "my_signal_position", "📶", "My Signal", "where your signal is heard card"),
+    ("__hotspot_health__", "show_hotspot_health", "hotspot_health_position", "🩺", "Hotspot Health", "uptime, temperature and reboots card"),
     ("__sstv__", "show_sstv", "sstv_position", "🖼️", "SSTV", "last decoded SSTV image card"),
 ]
 
@@ -1541,7 +1586,7 @@ def _overflow_sentinels(settings: dict, hotspots: list, cameras: list, page: int
         notif_enabled = any(settings.get(k, False) for k in (
             "aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled",
             "solar_alerts_enabled", "brandmeister_alerts_enabled",
-            "qrz_logbook_enabled", "rig_pa_alert_enabled"))
+            "qrz_logbook_enabled", "rig_pa_alert_enabled", "sat_alerts_enabled"))
         if notif_enabled and _card_has_p2_duplicate(settings, "notifications_position"):
             pos = settings.get("notifications_position_p2", 0)
             if pos >= hotspot_count:
@@ -1957,6 +2002,60 @@ def host_poweroff():
         return blocked
     ok, message = _run_power_command(["systemctl", "poweroff"])
     return jsonify({"success": ok, "message": "Powering off now" if ok else message})
+
+@app.route("/api/activity_patterns")
+def api_activity_patterns():
+    """Activity patterns heatmap data (Hotspot Activity card's drawer and
+    Pocket Dash's Activity patterns screen) -- see
+    storage_activity.hourly_patterns()."""
+    return jsonify(storage_activity.hourly_patterns())
+
+_ICS_TZ_RE = re.compile(r"^(UTC|[A-Za-z]+(?:/[A-Za-z0-9_+\-]+){1,2})$")
+
+def _ics_escape(text: str) -> str:
+    """RFC 5545 TEXT escaping: backslash, semicolon, comma, newline."""
+    return (text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,")
+                .replace("\r", "").replace("\n", "\\n"))
+
+@app.route("/api/net_reminder.ics")
+def api_net_reminder_ics():
+    """A weekly repeating calendar event for a regular net the Activity
+    patterns heatmap found -- a standard .ics file any calendar app
+    (phone or desktop) imports, with a 15-minute alert. The browser picks
+    the date of the next occurrence and its own IANA time zone; the event
+    is written in that zone (TZID) so it follows daylight-saving changes."""
+    date = request.args.get("date", "")
+    tz = request.args.get("tz", "UTC")
+    try:
+        hour = int(request.args.get("hour", ""))
+        datetime.datetime.strptime(date, "%Y%m%d")
+    except ValueError:
+        return "Bad date or hour", 400
+    if not (0 <= hour <= 23) or not _ICS_TZ_RE.match(tz):
+        return "Bad hour or time zone", 400
+    title = (request.args.get("title") or "Net").strip()[:120]
+    desc = (request.args.get("desc") or "").strip()[:400]
+    start = f"{date}T{hour:02d}0000"
+    end_dt = datetime.datetime.strptime(start, "%Y%m%dT%H%M%S") + datetime.timedelta(hours=1)
+    end = end_dt.strftime("%Y%m%dT%H%M%S")
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    if tz == "UTC":
+        dtstart, dtend = f"DTSTART:{start}Z", f"DTEND:{end}Z"
+    else:
+        dtstart, dtend = f"DTSTART;TZID={tz}:{start}", f"DTEND;TZID={tz}:{end}"
+    lines = [
+        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//W1ZLA Hotspot Dashboard//Net reminder//EN",
+        "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "BEGIN:VEVENT",
+        f"UID:{uuid.uuid4()}@hotspot-dashboard", f"DTSTAMP:{stamp}", dtstart, dtend,
+        "RRULE:FREQ=WEEKLY", f"SUMMARY:{_ics_escape(title)}",
+    ]
+    if desc:
+        lines.append(f"DESCRIPTION:{_ics_escape(desc)}")
+    lines += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_ics_escape(title)}",
+              "TRIGGER:-PT15M", "END:VALARM", "END:VEVENT", "END:VCALENDAR"]
+    body = "\r\n".join(lines) + "\r\n"
+    return Response(body, mimetype="text/calendar",
+                    headers={"Content-Disposition": 'attachment; filename="net-reminder.ics"'})
 
 @app.route("/api/activity")
 def api_activity():
@@ -2611,12 +2710,51 @@ def api_psk_reporter():
         return jsonify({"error": "unavailable"}), 503
     qth = grid_to_latlon(settings.get("station_grid", ""))
     data = dict(data)
+    # The client fetches 60 min for the My Signal card; the map overlay
+    # keeps its original 30-minute window.
+    cutoff = time.time() - psk_reporter_mod.MAP_WINDOW_SEC
+    data["spots"] = [s for s in data.get("spots", []) if s.get("heard_at") is None or s["heard_at"] >= cutoff]
     data["qth_lat"], data["qth_lon"] = qth if qth is not None else (None, None)
     return jsonify(data)
+
+@app.route("/api/my_signal")
+def api_my_signal():
+    """My Signal card: the last 60 minutes of PSK Reporter reports of
+    settings.psk_reporter_callsign, each with distance/bearing from the
+    station grid. The card filters to 15/30/60 min itself, so switching
+    windows costs no extra request (PSK Reporter rate-limits hard -- the
+    shared client caches 10 min)."""
+    settings = load_settings()
+    callsign = settings.get("psk_reporter_callsign", "").strip().upper()
+    if not callsign:
+        return jsonify({"configured": False, "spots": []})
+    data = psk_reporter.get(callsign)
+    qth = grid_to_latlon(settings.get("station_grid", ""))
+    spots = []
+    for s in (data or {}).get("spots", []):
+        s = dict(s)
+        if qth is not None and s.get("lat") is not None:
+            mi, brg = _haversine_bearing(qth[0], qth[1], s["lat"], s["lon"])
+            s["dist_mi"], s["bearing"] = round(mi), round(brg)
+        spots.append(s)
+    return jsonify({
+        "configured": True, "callsign": callsign, "ok": data is not None,
+        "fetched_at": (data or {}).get("fetched_at"),
+        "qth_lat": qth[0] if qth else None, "qth_lon": qth[1] if qth else None,
+        "spots": spots,
+    })
 
 @app.route("/api/qsos")
 def api_qsos():
     return jsonify(load_qsos())
+
+@app.route("/api/worked")
+def api_worked():
+    """Worked Before index (worked.py): one entry per base callsign with
+    QSO count, bands, confirmed bands and the last few QSOs. Local file
+    read only, cached until qsos.json changes."""
+    idx = worked_mod.get_index()
+    return jsonify({"calls": idx, "count": len(idx)})
 
 def _adif_freq_to_hz(freq_mhz_str) -> "int | None":
     """ADIF's FREQ field is a plain string in MHz (e.g. "14.074000")."""
@@ -2911,10 +3049,10 @@ def _whats_available_groups(settings, hotspots):
         ("Notifications", [
             ("Notifications card",
              "APRS messages, HamAlert, fleet events, solar alerts, Brandmeister favorites, "
-             "QRZ confirmations, and rig PA temperature — one merged feed",
+             "QRZ confirmations, rig PA temperature, and satellite passes — one merged feed",
              any(g(k) for k in ("aprs_inbox_enabled", "hamalert_enabled", "fleet_alerts_enabled",
                                  "solar_alerts_enabled", "brandmeister_alerts_enabled",
-                                 "qrz_logbook_enabled", "rig_pa_alert_enabled")),
+                                 "qrz_logbook_enabled", "rig_pa_alert_enabled", "sat_alerts_enabled")),
              "/setup#integrations"),
         ]),
         ("Extras", [
@@ -2930,8 +3068,14 @@ def _whats_available_groups(settings, hotspots):
              g("show_qso_stats"), "/setup?item=qso_stats#cards"),
             ("Recent Contacts", "Your most recently logged QSOs, newest first",
              g("show_recent_contacts"), "/setup?item=recent_contacts#cards"),
+            ("My Signal", "Where your own signal is being heard right now, from PSK Reporter, on a mini map",
+             g("show_my_signal"), "/setup?item=my_signal#cards"),
+            ("Hotspot Health", "Uptime, temperature, CPU and reboots per hotspot over 30 days",
+             g("show_hotspot_health"), "/setup?item=hotspot_health#cards"),
             ("Top 5 Activity", "The 5 busiest callsigns on your own fleet recently",
              g("show_top_activity"), "/setup?item=top_activity#cards"),
+            ("Worked Before badges", "A small tag next to callsigns you've already logged, with a click-through QSO history",
+             g("show_worked_badges", True), "/setup?item=worked_badges#cards"),
             ("Flights Overhead", "Aircraft currently passing near your station",
              g("show_flights_overhead"), "/setup?item=flights_overhead#cards"),
             ("SSTV", "Decode a slow-scan picture from a live transmission",
@@ -4270,7 +4414,7 @@ def _push_maybe(hotspot_id: str, kind: str, now: float, title: str, body: str) -
     muted_until = pref.get("muted_until")
     if muted_until and now < muted_until:
         return
-    if kind in ("offline", "online") and not pref.get("offline", True):
+    if kind in ("offline", "online", "warm") and not pref.get("offline", True):
         return
     if kind == "call" and not pref.get("call_start", False):
         return
@@ -4315,6 +4459,81 @@ def _push_alert_tick() -> None:
                            "active_call": call}
     for gone in [k for k in _push_prev if k not in snap]:
         _push_prev.pop(gone, None)
+
+
+_warm_watcher = health_history.WarmWatcher()
+
+
+def _health_loop():
+    """Hotspot health history (health_history.py): every SAMPLE_SEC, one
+    sample per hotspot from monitor.snapshot() -- no extra SSH -- plus the
+    "running warm" / "cooled down" hotspot events."""
+    # Pick up where a restart left off, so a hotspot that's still warm
+    # doesn't re-announce itself.
+    for ev in reversed(monitor.fleet_events()):
+        if ev.get("kind") in ("warm", "cool") and ev.get("id"):
+            _warm_watcher.seed(ev["id"], ev["kind"] == "warm")
+    time.sleep(60)
+    while True:
+        try:
+            settings = load_settings()
+            samples = health_history.sample_from_snapshot(load_hotspots(), monitor.snapshot())
+            health_history.record(samples)
+            warm_c = float(settings.get("health_warm_c", 70))
+            names = {h["id"]: h.get("name", h["id"]) for h in load_hotspots()}
+            for hid, kind, temp in _warm_watcher.update(samples, warm_c):
+                monitor.record_health_event(hid, kind, temp)
+                if kind == "warm" and push_client.configured:
+                    _push_maybe(hid, "warm", time.time(),
+                                f"\U0001F321 {names.get(hid, hid)} running warm", f"{temp:.0f}°C")
+        except Exception as e:  # never let this loop die
+            print(f"[health] loop error: {type(e).__name__}: {e}", flush=True)
+        time.sleep(health_history.SAMPLE_SEC)
+
+
+@app.route("/api/hotspot_health")
+def api_hotspot_health():
+    """Hotspot Health card (all enabled hotspots, `days` default 7) or one
+    hotspot's full detail for the Health drawer (`id=`, with events and
+    chart series)."""
+    settings = load_settings()
+    days = request.args.get("days", default=7, type=int)
+    hid = request.args.get("id")
+    hotspots = [h for h in load_hotspots() if h.get("enabled", True)]
+    ids = [hid] if hid else [h["id"] for h in hotspots]
+    out = health_history.summary(ids, days=days, warm_c=float(settings.get("health_warm_c", 70)), detail=bool(hid))
+    out["names"] = {h["id"]: h.get("name", h["id"]) for h in hotspots}
+    out["portable"] = [h["id"] for h in hotspots if h.get("portable")]
+    out["types"] = {h["id"]: h.get("type", "wpsd") for h in hotspots}
+    return jsonify(out)
+
+
+def _sat_alert_loop():
+    """Satellite pass alerts (sat_alerts.py): once a minute, raise an alert
+    for any qualifying pass inside the lead time, and push it to Pocket Dash
+    phones when asked. Quiet hours are enforced inside tick() itself, so they
+    cover the card and the phone alike."""
+    time.sleep(20)
+    while True:
+        try:
+            settings = load_settings()
+            qth = grid_to_latlon(settings.get("station_grid", ""))
+            new = sat_alerter.tick(settings, satellite_tracker, qth)
+            if new and settings.get("sat_alert_push", True) and push_client.configured:
+                now = time.time()
+                for ev in new:
+                    title, body = sat_push_text(ev, now)
+                    _push_dispatch(title, body, f"sat-{ev.get('norad_id')}-{int(ev['aos_epoch'])}")
+        except Exception as e:  # never let this loop die
+            print(f"[sat_alerts] loop error: {type(e).__name__}: {e}", flush=True)
+        time.sleep(60)
+
+
+@app.route("/api/sat_alerts")
+def api_sat_alerts():
+    settings = load_settings()
+    has_loc = grid_to_latlon(settings.get("station_grid", "")) is not None
+    return jsonify(sat_alerter.status(settings, has_loc))
 
 
 def _push_alert_loop():
@@ -4372,6 +4591,8 @@ def main():
     threading.Thread(target=_mqtt_publish_loop, daemon=True).start()
     threading.Thread(target=_aprs_alert_loop, daemon=True).start()
     threading.Thread(target=_push_alert_loop, daemon=True).start()
+    threading.Thread(target=_sat_alert_loop, daemon=True).start()
+    threading.Thread(target=_health_loop, daemon=True).start()
     threading.Thread(target=_qrz_logbook_loop, daemon=True).start()
     threading.Thread(target=digipi_monitor.run_forever, daemon=True).start()
     threading.Thread(target=openspot_manager.run_forever, daemon=True).start()

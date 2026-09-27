@@ -22,6 +22,27 @@ DB_PATH = os.path.join(config.CONFIG_DIR, "activity.db")
 # them would already have been pruned.
 RETENTION_SECONDS = (max(config.FLEET_ACTIVITY_HOUR_OPTIONS) + 1) * 3600
 
+# The Activity patterns heatmap (Hotspot Activity card's drawer) needs
+# weeks of history, far more than the raw log above keeps. So it reads a
+# separate compact rollup, activity_hourly: one row per hotspot per UTC
+# hour per talkgroup (`via`), kept this long. Worst case is a few thousand
+# rows per hotspot -- small enough to send the whole window to the browser,
+# which does the local-time bucketing itself.
+HOURLY_RETENTION_DAYS = 90
+
+_HOURLY_SCHEMA = """
+CREATE TABLE activity_hourly (
+    hotspot_id TEXT NOT NULL,
+    hotspot_name TEXT NOT NULL,
+    hour_ts INTEGER NOT NULL,
+    via TEXT NOT NULL DEFAULT '',
+    tx INTEGER NOT NULL DEFAULT 0,
+    secs REAL NOT NULL DEFAULT 0,
+    PRIMARY KEY (hotspot_id, hour_ts, via)
+);
+CREATE INDEX idx_hourly_ts ON activity_hourly(hour_ts);
+"""
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS activity_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,7 +85,25 @@ def _get_conn() -> sqlite3.Connection:
         # (storage.load_hotspots()'s generated id) is the real identity
         # now, used by dvswitch_sparkline()'s per-hotspot filter below.
         conn.execute("ALTER TABLE activity_log ADD COLUMN hotspot_id TEXT")
+    _ensure_hourly(conn)
     return conn
+
+
+def _ensure_hourly(conn: sqlite3.Connection) -> None:
+    """Create activity_hourly on first use and seed it from whatever the raw
+    log still holds (about two days), so the heatmap isn't blank right
+    after upgrading. Only runs when the table doesn't exist yet."""
+    exists = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='activity_hourly'").fetchone()
+    if exists:
+        return
+    conn.executescript(_HOURLY_SCHEMA)
+    conn.execute(
+        "INSERT INTO activity_hourly (hotspot_id, hotspot_name, hour_ts, via, tx, secs) "
+        "SELECT COALESCE(hotspot_id, hotspot_ip), MAX(hotspot_name), CAST(ts / 3600 AS INTEGER) * 3600, "
+        "COALESCE(via, ''), COUNT(*), COALESCE(SUM(duration), 0) "
+        "FROM activity_log WHERE hotspot_id IS NOT NULL GROUP BY 1, 3, 4")
+    conn.commit()
 
 
 def log_activity(hotspot_ip: str, hotspot_name: str, mode: str | None,
@@ -97,6 +136,16 @@ def log_activity(hotspot_ip: str, hotspot_name: str, mode: str | None,
                 (now, hotspot_ip, hotspot_name, mode, target, target_type, via, duration, hotspot_id),
             )
             conn.execute("DELETE FROM activity_log WHERE ts < ?", (now - RETENTION_SECONDS,))
+            conn.execute(
+                "INSERT INTO activity_hourly (hotspot_id, hotspot_name, hour_ts, via, tx, secs) "
+                "VALUES (?, ?, ?, ?, 1, ?) "
+                "ON CONFLICT(hotspot_id, hour_ts, via) DO UPDATE SET "
+                "tx = tx + 1, secs = secs + excluded.secs, hotspot_name = excluded.hotspot_name",
+                (hotspot_id or hotspot_ip, hotspot_name, int(now // 3600) * 3600,
+                 via or "", float(duration or 0)),
+            )
+            conn.execute("DELETE FROM activity_hourly WHERE hour_ts < ?",
+                         (now - HOURLY_RETENTION_DAYS * 86400,))
             conn.commit()
         finally:
             conn.close()
@@ -273,4 +322,33 @@ def query_activity(hours: int = 12, interval_minutes: int = 15) -> dict:
         "buckets":        buckets,
         "mode_breakdown": mode_breakdown,
         "last_activity":  last_activity,
+    }
+
+
+def hourly_patterns(days: int = HOURLY_RETENTION_DAYS) -> dict:
+    """Everything the Activity patterns heatmap needs, raw: one row per
+    hotspot/UTC-hour/talkgroup over the trailing `days`. The browser
+    converts hours to its own time zone, averages per week and looks for
+    regular nets -- doing it there keeps DST and time zones out of SQL.
+    `since` is the oldest hour ever recorded, so the drawer can say how
+    long it has been collecting."""
+    now = time.time()
+    days = max(1, min(int(days), HOURLY_RETENTION_DAYS))
+    with _lock:
+        conn = _get_conn()
+        try:
+            rows = conn.execute(
+                "SELECT hour_ts, hotspot_id, via, tx, secs FROM activity_hourly "
+                "WHERE hour_ts >= ? ORDER BY hour_ts", (now - days * 86400,)).fetchall()
+            names = dict(conn.execute(
+                "SELECT hotspot_id, MAX(hotspot_name) FROM activity_hourly GROUP BY hotspot_id").fetchall())
+            since = conn.execute("SELECT MIN(hour_ts) FROM activity_hourly").fetchone()[0]
+        finally:
+            conn.close()
+    return {
+        "rows": [[r[0], r[1], r[2], r[3], round(r[4], 1)] for r in rows],
+        "hotspots": names,
+        "since": since,
+        "now": now,
+        "retention_days": HOURLY_RETENTION_DAYS,
     }

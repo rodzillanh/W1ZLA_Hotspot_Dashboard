@@ -462,7 +462,14 @@
         .version-label { color: var(--text-muted); }
         .version-val   { font-family: monospace; font-size: 12px; color: var(--text); }
         .version-accent { color: var(--accent); font-family: inherit; font-size: 13px; }
-    </style>
+        .sat-alert-cb { font-size: 12px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .sat-alert-opts { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 9px; font-size: 13px; }
+    .sat-alert-opts label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .sat-alert-opts select { font: inherit; font-size: 12px; background: var(--input-bg, var(--panel-2)); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; }
+    .sat-alert-title { font-weight: 600; }
+    .sat-alert-title span, .sat-alert-tz { font-weight: 400; font-size: 11px; color: var(--text-dim); display: block; }
+    .sat-alert-tz b { color: var(--text-muted); }
+</style>
 </head>
 <body>
 
@@ -819,6 +826,15 @@
                      id="top-activity-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show Worked Before badges
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (a small "3×" / "5× ✓" / "new band" tag next to callsigns you've logged, on hotspot, Spots, Top 5, Recent Contacts and Notifications -- from your imported/synced QSOs)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_worked_badges', True) else '' }}"
+                     id="worked-badges-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show Spots card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (POTA + SOTA activator spots, plus opt-in RBN and DX cluster feeds -- your POTA hunter stats need a callsign under Integrations)
@@ -862,6 +878,32 @@
                 </span>
                 <div class="toggle {{ 'on' if settings.get('show_beacons', False) else '' }}"
                      id="beacons-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show My Signal card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (where your own signal is heard right now, from PSK Reporter, on a mini map -- uses your PSK Reporter callsign under Integrations; digital modes only)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_my_signal', False) else '' }}"
+                     id="my-signal-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Show Hotspot Health card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (uptime, temperature, CPU and reboots per hotspot over 30 days -- history is always kept for each hotspot's own drawer; this just adds the card)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_hotspot_health', False) else '' }}"
+                     id="hotspot-health-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Hotspot "running warm" alert at
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (°C -- a Raspberry Pi slows itself down at 80 °C; alerts arrive as hotspot events in Notifications)
+                    </span>
+                </span>
+                <input type="number" id="health-warm-c" min="40" max="95" style="width:70px" value="{{ settings.get('health_warm_c', 70) }}">
             </div>
             <div class="toggle-row">
                 <span class="toggle-label">Show Nearby Repeaters card
@@ -955,6 +997,15 @@
                 <div class="toggle {{ 'on' if settings.get('rig_pa_alert_enabled', False) else '' }}"
                      id="rig-pa-alert-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
+            <div class="toggle-row">
+                <span class="toggle-label">Satellite passes in Notifications
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (one alert per pass, a few minutes before it rises -- timing, minimum height, quiet hours and phone push under Card extras → Tracked satellites; needs your station grid square)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('sat_alerts_enabled', False) else '' }}"
+                     id="sat-alerts-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
         </div>
         <button class="btn btn-primary" onclick="saveCards()">Save cards</button>
         <span class="status-txt" id="cards-status"></span>
@@ -982,6 +1033,7 @@
                 <input type="text" placeholder="Mode" style="width:70px" value="{{ sat.mode }}" data-field="mode">
                 <input type="text" inputmode="decimal" placeholder="Down MHz" style="width:90px" value="{{ sat.downlink_mhz if sat.downlink_mhz is not none else '' }}" data-field="downlink_mhz">
                 <input type="text" inputmode="decimal" placeholder="Up MHz" style="width:90px" value="{{ sat.uplink_mhz if sat.uplink_mhz is not none else '' }}" data-field="uplink_mhz">
+                <label class="sat-alert-cb" title="Include this satellite in pass alerts"><input type="checkbox" data-field="alert" {{ 'checked' if sat.get('alert', True) else '' }}> Alert</label>
                 <button class="btn btn-danger btn-sm" onclick="this.closest('[data-sat-row]').remove()">✕</button>
             </div>
             {% endfor %}
@@ -990,6 +1042,24 @@
             <button class="btn btn-info"    onclick="addSatelliteRow()">+ Add satellite</button>
             <button class="btn btn-primary" onclick="saveSatellites()">Save tracked satellites</button>
             <span class="status-txt" id="satellites-status"></span>
+        </div>
+        <div class="sat-alert-opts">
+            <div class="sat-alert-title">Pass alerts
+                <span>turn on with "Satellite passes in Notifications" under Show / hide; only satellites ticked "Alert" above</span></div>
+            <label>Alert me
+                <select id="sat-alert-lead">
+                    {% for m in [5, 10, 15, 30] %}<option value="{{ m }}" {{ 'selected' if settings.get('sat_alert_lead_min', 10) == m else '' }}>{{ m }} min before</option>{% endfor %}
+                </select></label>
+            <label>Only passes higher than
+                <select id="sat-alert-min-el">
+                    {% for d in [10, 20, 30, 45, 60] %}<option value="{{ d }}" {{ 'selected' if settings.get('sat_alert_min_el', 30) == d else '' }}>{{ d }}°</option>{% endfor %}
+                </select></label>
+            <label><input type="checkbox" id="sat-alert-quiet" {{ 'checked' if settings.get('sat_alert_quiet', True) else '' }}> Quiet hours, no alerts from
+                <select id="sat-alert-quiet-start">{% for h in range(24) %}<option value="{{ h }}" {{ 'selected' if settings.get('sat_alert_quiet_start', 23) == h else '' }}>{{ '%02d' % h }}:00</option>{% endfor %}</select>
+                to
+                <select id="sat-alert-quiet-end">{% for h in range(24) %}<option value="{{ h }}" {{ 'selected' if settings.get('sat_alert_quiet_end', 6) == h else '' }}>{{ '%02d' % h }}:00</option>{% endfor %}</select></label>
+            <label><input type="checkbox" id="sat-alert-push" {{ 'checked' if settings.get('sat_alert_push', True) else '' }}> Also send to Pocket Dash (phones that turned on alerts)</label>
+            <div class="sat-alert-tz">Quiet hours use <b id="sat-alert-tz-name">{{ settings.get('station_tz') or 'this browser\'s time zone' }}</b>, saved from this browser when you save.</div>
         </div>
     </div>
 
@@ -1025,7 +1095,7 @@
                page 2 -- that ordinary single-page case is fully covered by
                big_clock_pos above and must not also get this second row). #}
             {% set big_clock_p2_pos = settings.get('big_clock_position_p2', 0) if (page == 2 and big_clock_has_p2_dup) else -1 %}
-            {% set notifications_pos = settings.get('notifications_position', 0) if ((settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False) or settings.get('qrz_logbook_enabled', False) or settings.get('rig_pa_alert_enabled', False)) and settings.get('notifications_page', 1) == page) else -1 %}
+            {% set notifications_pos = settings.get('notifications_position', 0) if ((settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False) or settings.get('qrz_logbook_enabled', False) or settings.get('rig_pa_alert_enabled', False) or settings.get('sat_alerts_enabled', False)) and settings.get('notifications_page', 1) == page) else -1 %}
             {% set notifications_p2_pos = settings.get('notifications_position_p2', 0) if (page == 2 and notifications_has_p2_dup) else -1 %}
             {% set satellites_pos = settings.get('satellites_position', 0) if (settings.get('show_satellites', False) and settings.get('satellites_page', 1) == page) else -1 %}
             {% set flights_overhead_pos = settings.get('flights_overhead_position', 0) if (settings.get('show_flights_overhead', False) and settings.get('flights_overhead_page', 1) == page) else -1 %}
@@ -1038,6 +1108,8 @@
             {% set qrz_quick_log_pos = settings.get('qrz_quick_log_position', 0) if (settings.get('show_qrz_quick_log', False) and settings.get('qrz_quick_log_page', 1) == page) else -1 %}
             {% set beacons_pos = settings.get('beacons_position', 0) if (settings.get('show_beacons', False) and settings.get('beacons_page', 1) == page) else -1 %}
             {% set repeaters_pos = settings.get('repeaters_position', 0) if (settings.get('show_repeaters', False) and settings.get('repeaters_page', 1) == page) else -1 %}
+            {% set my_signal_pos = settings.get('my_signal_position', 0) if (settings.get('show_my_signal', False) and settings.get('my_signal_page', 1) == page) else -1 %}
+            {% set hotspot_health_pos = settings.get('hotspot_health_position', 0) if (settings.get('show_hotspot_health', False) and settings.get('hotspot_health_page', 1) == page) else -1 %}
             {% set sstv_pos = settings.get('sstv_position', 0) if (settings.get('show_sstv', False) and settings.get('sstv_page', 1) == page) else -1 %}
             {# DVSwitch (v3.99) -- one consolidated card, shown when the
                "Show DVSwitch card" toggle (show_dvswitch, default on) is
@@ -1204,6 +1276,20 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🗼 Nearby Repeaters</span>
                     <span class="node-meta">nearby repeater directory card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == my_signal_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__my_signal__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📶 My Signal</span>
+                    <span class="node-meta">where your signal is heard card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == hotspot_health_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__hotspot_health__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🩺 Hotspot Health</span>
+                    <span class="node-meta">uptime, temperature and reboots card</span>
                 </div>
                 {% endif %}
                 {% if loop.index0 == sstv_pos %}
@@ -2693,13 +2779,19 @@ function saveCards() {
             fleet_alerts_enabled: document.getElementById('fleet-alerts-toggle').classList.contains('on'),
             solar_alerts_enabled: document.getElementById('solar-alerts-toggle').classList.contains('on'),
             show_top_activity: document.getElementById('top-activity-toggle').classList.contains('on'),
+            show_worked_badges: document.getElementById('worked-badges-toggle').classList.contains('on'),
             show_pota: document.getElementById('pota-toggle').classList.contains('on'),
             show_hf_favorites: document.getElementById('hf-favorites-toggle').classList.contains('on'),
             show_rig_panel: document.getElementById('rig-panel-toggle').classList.contains('on'),
             rig_pa_alert_enabled: document.getElementById('rig-pa-alert-toggle').classList.contains('on'),
+            sat_alerts_enabled: document.getElementById('sat-alerts-toggle').classList.contains('on'),
+            station_tz: (Intl.DateTimeFormat().resolvedOptions().timeZone || ''),
             show_qrz_quick_log: document.getElementById('qrz-quick-log-toggle').classList.contains('on'),
             show_beacons: document.getElementById('beacons-toggle').classList.contains('on'),
             show_repeaters: document.getElementById('repeaters-toggle').classList.contains('on'),
+            show_hotspot_health: document.getElementById('hotspot-health-toggle').classList.contains('on'),
+            show_my_signal: document.getElementById('my-signal-toggle').classList.contains('on'),
+            health_warm_c: parseInt(document.getElementById('health-warm-c').value, 10) || 70,
             show_sstv: document.getElementById('sstv-toggle').classList.contains('on'),
             show_dvswitch: document.getElementById('dvswitch-card-toggle').classList.contains('on'),
             brandmeister_alerts_enabled: document.getElementById('brandmeister-alerts-toggle').classList.contains('on'),
@@ -2821,7 +2913,9 @@ function saveSatellites() {
     const rows = document.querySelectorAll('#satellites-list [data-sat-row]');
     const tracked_satellites = Array.from(rows).map(r => {
         const get = field => r.querySelector(`[data-field="${field}"]`).value.trim();
+        const alertCb = r.querySelector('[data-field="alert"]');
         return {
+            alert: alertCb ? alertCb.checked : true,
             norad_id: get('norad_id'),
             name: get('name'),
             mode: get('mode'),
@@ -2832,8 +2926,19 @@ function saveSatellites() {
     fetch('/api/settings', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ tracked_satellites })
+        body: JSON.stringify({
+            tracked_satellites,
+            sat_alert_lead_min: parseInt(document.getElementById('sat-alert-lead').value, 10),
+            sat_alert_min_el: parseInt(document.getElementById('sat-alert-min-el').value, 10),
+            sat_alert_quiet: document.getElementById('sat-alert-quiet').checked,
+            sat_alert_quiet_start: parseInt(document.getElementById('sat-alert-quiet-start').value, 10),
+            sat_alert_quiet_end: parseInt(document.getElementById('sat-alert-quiet-end').value, 10),
+            sat_alert_push: document.getElementById('sat-alert-push').checked,
+            station_tz: (Intl.DateTimeFormat().resolvedOptions().timeZone || ''),
+        })
     }).then(() => {
+        const tzEl = document.getElementById('sat-alert-tz-name');
+        if (tzEl) tzEl.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
         document.getElementById('satellites-status').textContent = '✓ Saved';
         setTimeout(() => document.getElementById('satellites-status').textContent = '', 2000);
     });
@@ -2873,6 +2978,8 @@ const SENTINEL_POSITION_FIELDS = [
     ['__qrz_quick_log__', 'qrz_quick_log_position'],
     ['__beacons__', 'beacons_position'],
     ['__repeaters__', 'repeaters_position'],
+    ['__hotspot_health__', 'hotspot_health_position'],
+    ['__my_signal__', 'my_signal_position'],
     ['__sstv__', 'sstv_position'],
     ['__dvswitch__', 'dvswitch_position'],
 ];
@@ -4462,10 +4569,11 @@ if (location.hash) {
         top_activity: 'top-activity-toggle', pota: 'pota-toggle',
         hf_favorites: 'hf-favorites-toggle', rig_panel: 'rig-panel-toggle',
         qrz_quick_log: 'qrz-quick-log-toggle', beacons: 'beacons-toggle',
-        repeaters: 'repeaters-toggle', sstv: 'sstv-toggle', dvswitch: 'dvswitch-card-toggle',
+        repeaters: 'repeaters-toggle', sstv: 'sstv-toggle', dvswitch: 'dvswitch-card-toggle', hotspot_health: 'hotspot-health-toggle', my_signal: 'my-signal-toggle',
         aprs_inbox: 'aprs-inbox-toggle', hamalert_card: 'hamalert-toggle',
         fleet_alerts: 'fleet-alerts-toggle', digipi_card: 'digipi-toggle',
         starlink_trains: 'starlink-trains-toggle',
+        worked_badges: 'worked-badges-toggle',
     };
     // Briefly outlines+scrolls to a just-opened item so "what do I do now"
     // has an obvious answer -- landing on a tab alone (the old behavior)

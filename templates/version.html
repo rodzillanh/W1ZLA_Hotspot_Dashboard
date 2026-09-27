@@ -117,9 +117,25 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v5.2</span>
+                <span class="release-version">v5.3</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>"Worked before" badges</span> &mdash; a small tag next to any callsign you've already logged: <b>3&times;</b> (worked, not confirmed), <b>5&times; &#10003;</b> (confirmed on QRZ) or <b>new band</b> (worked before, never on the band they're on now). Shows on hotspot cards, the Spots card and its Browse drawer, Top 5 Activity, Recent Contacts, Notifications, QRZ Quick Log and Pocket Dash. Click one for the bands you've worked and your last few QSOs. A worked station on a new band also ranks higher in Spots' Smart rank. Matches the base callsign, so EA8/W1ABC and W1ABC/P count as W1ABC. Turn off under Settings &rarr; Cards</li>
+                <li><span>Activity patterns</span> &mdash; a new Patterns button on the Hotspot Activity card opens a day-by-hour heatmap of when your hotspots are busy (talk time or transmissions, 4 or 12 weeks, local time or UTC), with busiest hour, busiest day and quiet stretch. Hours that are busy week after week are flagged as <b>regular nets</b>, each with an "Add to calendar" link: a weekly repeating event with a 15-minute reminder. Pocket Dash shows it one day at a time. History is kept 90 days and starts filling in from this update</li>
+                <li><span>Hotspot Health card (optional)</span> &mdash; uptime, temperature, CPU and reboots per hotspot: a 7-day strip (grey for a portable hotspot that's away, which doesn't count as downtime), a temperature trend and a "warmer than last week" warning. Its drawer has 7- or 30-day charts and an event list of outages, reboots and warm spells. Every hotspot's own drawer gets a Health section too. Hotspots running warm (default 70&nbsp;&deg;C, Settings &rarr; Cards) now alert alongside the online/offline notifications, including on your phone</li>
+                <li><span>My Signal card (optional)</span> &mdash; where your own signal is being heard right now, from PSK Reporter: a mini map with a line to each station that heard you, a 15/30/60-minute switch, and per-band rows with the farthest station, modes and best SNR. The drawer lists every report and opens the Live map's PSK overlay</li>
+                <li><span>Satellite pass alerts</span> &mdash; a new Notifications source: one alert per pass, 10 minutes before it rises, for passes reaching 30&deg; or higher, with direction and frequencies. Optional push to Pocket Dash, and quiet hours (23:00&ndash;06:00 by default) that cover both. Settings under Cards &rarr; Card extras &rarr; Tracked satellites, including a per-satellite Alert checkbox</li>
+                <li><span>New dependency: tzdata</span> &mdash; time-zone data for quiet hours. update.sh and a Docker rebuild install it automatically</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v5.2</span>
+                <span class="release-date">September 2026</span>
+
             </div>
             <ul class="change-list">
                 <li><span>Hotspot Status: on-air hotspots float to the top</span> &mdash; matching Pocket Dash's own Status screen, an actively-transmitting hotspot now jumps to the top of the card automatically. The card's own reorder/hide drawer (gear icon) is unaffected &mdash; it still shows your saved manual order, so rows don't shift under you while you're dragging</li>

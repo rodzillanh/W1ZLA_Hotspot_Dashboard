@@ -23,7 +23,7 @@ def _version_tuple(v):
 # version number now, no new names get appended here. See
 # _LAST_NAMED_VERSION below for how APP_CODENAME resolves to None past
 # this list's last entry.
-APP_VERSION = "5.2"
+APP_VERSION = "5.3"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -319,6 +319,10 @@ DIGEST_HIGHLIGHTS = [
     ("5.0",  ["Settings' Integrations and Cards tabs are now searchable and collapsible"]),
     ("5.1",  ["Onboarding is now an inline welcome card instead of a blocking popup"]),
     ("5.2",  ["Hotspot Status now puts on-air hotspots at the top of the list"]),
+    ("5.3",  ["\"Worked before\" badges next to callsigns you've already logged",
+              "Hotspot Activity → Patterns: when your hotspots are busy, with regular nets you can add to your calendar",
+              "New optional cards: Hotspot Health and My Signal",
+              "Satellite pass alerts in Notifications and on your phone"]),
 ]
 
 
@@ -1407,6 +1411,33 @@ DEFAULT_SETTINGS = {
     # field, blank by default like every other not-a-credential callsign
     # setting here.
     "show_qrz_quick_log": False,
+    # Worked Before badges -- a small "3x" / "5x ✓" / "new band" tag next
+    # to callsigns across the dashboard, from qsos.json (worked.py). On by
+    # default: with an empty logbook nothing ever shows.
+    "show_worked_badges": True,
+    # Satellite pass alerts (sat_alerts.py) -- a Notifications source that
+    # fires once per pass, sat_alert_lead_min before AOS, for passes reaching
+    # sat_alert_min_el. Quiet hours cover the card and phone push alike and
+    # are read in station_tz (the browser's IANA zone, saved from Settings).
+    # Hotspot Health card (health_history.py). History is always recorded
+    # (it feeds each hotspot's drawer too); this only shows the card.
+    # health_warm_c is the "running warm" threshold, °C (a Pi starts
+    # throttling itself at 80 °C).
+    # My Signal card -- PSK Reporter reports of psk_reporter_callsign on a
+    # mini map, with a 15/30/60 min window picked on the card itself.
+    "show_my_signal": False,
+    "my_signal_position": 0,
+    "show_hotspot_health": False,
+    "hotspot_health_position": 0,
+    "health_warm_c": 70,
+    "sat_alerts_enabled": False,
+    "sat_alert_lead_min": 10,
+    "sat_alert_min_el": 30,
+    "sat_alert_quiet": True,
+    "sat_alert_quiet_start": 23,
+    "sat_alert_quiet_end": 6,
+    "sat_alert_push": True,
+    "station_tz": "",
     "qrz_quick_log_position": 0,
     "qrz_quick_log_callsign": "",
     # Beacons card (v4.76) -- NCDXF/IARU International Beacon Project

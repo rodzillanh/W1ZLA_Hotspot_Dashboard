@@ -37,11 +37,13 @@ of _fetch() without accounting for the fact that EVERY dashboard running
 this code shares one global rate budget from PSK Reporter's perspective
 per source IP, same caution as wspr.live but enforced far more strictly.
 
-`mode` is documented only as a request FILTER parameter, not confirmed
-as a default output attribute on a live response (rate-limited before
-that could be independently re-verified) -- not relied on here for that
-reason; re-verify with a real live query before ever trying to surface
-mode/read it from a response.
+`mode` and `sNR` (the My Signal card): pskdev.html lists `mode` as a
+required field of every uploaded reception record and `sNR` as optional
+(-128..127 dB), and says the query response uses the same attribute names.
+Both are read defensively -- missing or unparseable just means None, and
+the card shows "—" -- so a response without them degrades rather than
+breaks. Re-check against a real response that contains reports if either
+never shows up.
 """
 import threading
 import time
@@ -56,8 +58,10 @@ PSK_REPORTER_URL = "https://retrieve.pskreporter.info/query"
 CACHE_TTL = 600  # 10 min -- comfortably above PSK Reporter's own stated
                  # "no more than once every 5 minutes" guidance, with
                  # real margin after being rate-limited during testing.
-SPOT_WINDOW_SEC = 1800  # 30 min -- how far back a reception report can
-                        # be and still show on the map; self-ages out.
+SPOT_WINDOW_SEC = 3600  # 60 min fetched, the longest My Signal window;
+                        # the Live map overlay keeps showing the last 30
+                        # (MAP_WINDOW_SEC, filtered in app.py's route).
+MAP_WINDOW_SEC = 1800
 TIMEOUT = 15
 AGENT = "hotspot-dashboard/1.0"
 
@@ -130,9 +134,17 @@ class PskReporterClient:
                 heard_at = int(elem.get("flowStartSeconds"))
             except (TypeError, ValueError):
                 heard_at = None
+            try:
+                snr = int(elem.get("sNR"))
+            except (TypeError, ValueError):
+                snr = None
             spots.append({
                 "receiver_call": elem.get("receiverCallsign"),
+                "receiver_grid": grid,
                 "band": freq_to_band(freq_hz) if freq_hz else "",
+                "freq_hz": freq_hz,
+                "mode": (elem.get("mode") or "").strip().upper() or None,
+                "snr": snr,
                 "lat": lat, "lon": lon,
                 "heard_at": heard_at,
             })

@@ -640,8 +640,30 @@
     .qz-miss .right { font-size:12px; color:var(--good, #3ecf8e); margin-top:2px; }
 
     /* Band plan + Nearby */
-    #bp-screen, #near-screen, #qsos-screen { position:fixed; inset:0; z-index:35; background:var(--bg); display:none; flex-direction:column; }
-    #bp-screen.open, #near-screen.open, #qsos-screen.open { display:flex; }
+    /* Activity patterns (one day at a time; desktop has the full week grid) */
+    .ap-top { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px; }
+    .ap-top select { font:inherit; font-size:13px; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 8px; }
+    .ap-seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+    .ap-seg button { font:inherit; font-size:12.5px; background:var(--panel); color:var(--text-muted); border:0; padding:6px 10px; }
+    .ap-seg button + button { border-left:1px solid var(--border); }
+    .ap-seg button.on { background:var(--panel-2); color:var(--text); }
+    .ap-days { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:12px; }
+    .ap-days button { font:inherit; font-size:12px; padding:7px 0; border-radius:8px; border:1px solid var(--border); background:var(--panel); color:var(--text-muted); }
+    .ap-days button.on { background:var(--live-dim); color:var(--live); border-color:color-mix(in srgb,var(--live) 45%,var(--border)); }
+    .ap-hr { display:grid; grid-template-columns:44px 1fr 62px; gap:8px; align-items:center; padding:3px 0; font-variant-numeric:tabular-nums; }
+    .ap-hr .h { font-family:var(--font-mono); font-size:11.5px; color:var(--text-muted); }
+    .ap-hr .bar { height:12px; border-radius:3px; background:var(--panel-2); overflow:hidden; }
+    .ap-hr .bar i { display:block; height:100%; border-radius:3px; background:var(--live); }
+    .ap-hr.net .bar { box-shadow:0 0 0 2px var(--caution); }
+    .ap-hr .v { font-family:var(--font-mono); font-size:11px; color:var(--text-muted); text-align:right; }
+    .ap-hr.nodata .v { color:var(--text-dim); }
+    .ap-net { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border-soft); }
+    .ap-net .when { font-family:var(--font-mono); font-weight:600; min-width:78px; }
+    .ap-net .what { flex:1; min-width:0; font-size:12px; color:var(--text-muted); }
+    .ap-net a { font-size:12.5px; color:var(--live); text-decoration:none; white-space:nowrap; border:1px solid color-mix(in srgb,var(--live) 40%,var(--border)); border-radius:8px; padding:6px 9px; }
+    .ap-note { font-size:12px; color:var(--text-dim); margin-top:12px; }
+    #bp-screen, #near-screen, #qsos-screen, #ap-screen { position:fixed; inset:0; z-index:35; background:var(--bg); display:none; flex-direction:column; }
+    #bp-screen.open, #near-screen.open, #qsos-screen.open, #ap-screen.open { display:flex; }
     .bp-legend { display:flex; gap:8px; margin:0 2px 8px; font-size:11px; }
     .bp-lg { padding:2px 9px; border-radius:9px; font-weight:600; text-transform:uppercase; letter-spacing:.3px; font-size:10px; }
     .bp-lg.gen { background:var(--accent-dim, rgba(240,168,48,.16)); color:var(--accent); }
@@ -878,6 +900,25 @@
         font-family:var(--font-ui); cursor:pointer;
     }
     .lp-row button.cancel { background:none; color:var(--text-dim); }
+    /* Worked Before badge (same states as the desktop's .wb) + its sheet */
+    .wb { display:inline-flex; align-items:center; font-family:var(--font-mono); font-size:10px; line-height:1;
+          padding:3px 5px; border-radius:4px; border:1px solid var(--border); color:var(--text-muted);
+          background:transparent; vertical-align:middle; white-space:nowrap; font-weight:500; flex:0 0 auto;
+          font-variant-numeric:tabular-nums; margin-left:5px; cursor:pointer; }
+    .wb.cfm { color:var(--good); border-color:color-mix(in srgb,var(--good) 40%,transparent); background:var(--good-dim); }
+    .wb.newband { color:var(--caution); border-color:color-mix(in srgb,var(--caution) 40%,transparent); background:var(--caution-dim); }
+    .wb.static { cursor:inherit; padding:1px 4px; font-size:9.5px; }
+    .qso .wb { margin-left:0; }
+    #wb-sheet-body h3 { margin:0 0 2px; font-family:var(--font-mono); font-size:16px; }
+    #wb-sheet-body .wb-sum { font-size:12.5px; color:var(--text-muted); margin-bottom:8px; }
+    #wb-sheet-body .wb-bands { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; }
+    #wb-sheet-body .wb-bands span { font-family:var(--font-mono); font-size:11px; padding:3px 6px; border-radius:4px; border:1px solid var(--border); }
+    #wb-sheet-body .wb-bands span.cf { color:var(--good); border-color:color-mix(in srgb,var(--good) 45%,transparent); background:var(--good-dim); }
+    #wb-sheet-body table { width:100%; border-collapse:collapse; font-family:var(--font-mono); font-size:12.5px; font-variant-numeric:tabular-nums; }
+    #wb-sheet-body td { padding:7px 4px; border-top:1px solid var(--border-soft); }
+    #wb-sheet-body td.c { color:var(--good); text-align:right; }
+    #wb-sheet-body .wb-foot { margin:10px 0 12px; font-size:12.5px; }
+    #wb-sheet-body .wb-foot a { color:var(--live); text-decoration:none; }
     .toast {
         position:fixed; left:50%; bottom:calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 16px);
         transform:translateX(-50%); z-index:50;
@@ -919,7 +960,7 @@
         </section>
 
         <section data-tab="activity">
-            {% set nf_any = settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False) or settings.get('qrz_logbook_enabled', False) or settings.get('rig_pa_alert_enabled', False) %}
+            {% set nf_any = settings.get('aprs_inbox_enabled', False) or settings.get('hamalert_enabled', False) or settings.get('fleet_alerts_enabled', False) or settings.get('solar_alerts_enabled', False) or settings.get('brandmeister_alerts_enabled', False) or settings.get('qrz_logbook_enabled', False) or settings.get('rig_pa_alert_enabled', False) or settings.get('sat_alerts_enabled', False) %}
             {% if nf_any %}
             <div class="sec-label">Notifications</div>
             <button class="ql-entry" id="notif-entry-btn" type="button">
@@ -974,6 +1015,17 @@
                 </span>
                 <span class="go">›</span>
             </button>
+            {% if settings.get('show_fleet_activity', False) %}
+            <div class="sec-label">Hotspots</div>
+            <button class="ql-entry" id="ap-entry-btn" type="button">
+                <span class="ic">▦</span>
+                <span>
+                    <div class="tt">Activity patterns</div>
+                    <div class="sub">When your hotspots are busy, hour by hour</div>
+                </span>
+                <span class="go">›</span>
+            </button>
+            {% endif %}
         </section>
 
         <section data-tab="more">
@@ -1108,6 +1160,16 @@
         <div class="asl-body"><div id="qsos"><div class="empty"><p>Loading…</p></div></div></div>
     </div>
 
+    {% if settings.get('show_fleet_activity', False) %}
+    <div id="ap-screen" aria-hidden="true">
+        <div class="prefs-hdr">
+            <button class="back" id="ap-close">‹ Back</button>
+            <span class="ttl">Activity patterns</span>
+        </div>
+        <div class="asl-body" id="ap-body"><div class="asl-empty">Loading…</div></div>
+    </div>
+    {% endif %}
+
     <div id="notif-screen" aria-hidden="true">
         <div class="prefs-hdr">
             <button class="back" id="notif-close">‹ Back</button>
@@ -1232,6 +1294,10 @@
         </div>
     </div>
 
+    <div class="lp-sheet" id="wb-sheet" role="dialog" aria-label="Worked before">
+        <div class="lp-sheet-inner" id="wb-sheet-body"></div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <nav class="tabbar" role="tablist">
@@ -1293,6 +1359,97 @@
         return '<a class="cs-link" href="https://www.qrz.com/db/' + encodeURIComponent(c) +
             '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(c) + '</a>';
     }
+    /* ---- Worked Before badges (same /api/worked index + rules as the
+     * desktop's workedBadgeHtml(): "3×", "5× ✓", "new band") ---- */
+    var SHOW_WORKED = {{ 'true' if settings.get('show_worked_badges', True) else 'false' }};
+    var WORKED = null;
+    function workedBaseCall(call) {
+        if (!call) return "";
+        var c = String(call).trim().toUpperCase().replace(/-\d+$/, "");
+        var cands = c.split("/").filter(function (p) { return p && /^[A-Z0-9]*[0-9][A-Z0-9]*[A-Z][A-Z0-9]*$/.test(p); });
+        if (!cands.length) return "";
+        return cands.reduce(function (a, b) { return b.length > a.length ? b : a; });
+    }
+    function workedInfo(call) {
+        if (!SHOW_WORKED || !WORKED) return null;
+        var b = workedBaseCall(call);
+        return b ? (WORKED[b] || null) : null;
+    }
+    var PD_BANDS = [[1.8, 2.0, "160m"], [3.5, 4.0, "80m"], [5.06, 5.45, "60m"], [7.0, 7.3, "40m"], [10.1, 10.15, "30m"],
+        [14.0, 14.35, "20m"], [18.068, 18.168, "17m"], [21.0, 21.45, "15m"], [24.89, 24.99, "12m"], [28.0, 29.7, "10m"], [50.0, 54.0, "6m"]];
+    function pdBand(freqHz) {
+        if (!freqHz) return "";
+        var mhz = freqHz / 1e6;
+        for (var i = 0; i < PD_BANDS.length; i++) if (mhz >= PD_BANDS[i][0] && mhz <= PD_BANDS[i][1]) return PD_BANDS[i][2];
+        return "";
+    }
+    function workedIsNewBand(call, band) {
+        var w = workedInfo(call), bd = (band || "").toLowerCase();
+        return !!(w && bd && w.bands.length && w.bands.indexOf(bd) < 0);
+    }
+    // opts.band -> "new band" when worked but never on it; opts.minN ->
+    // hide below that count; opts.static -> a plain span (for text inside a
+    // tap target, like a Status row, where a button would steal the tap).
+    function wbHtml(call, opts) {
+        var w = workedInfo(call);
+        if (!w) return "";
+        opts = opts || {};
+        var tag = opts.static ? "span" : "button type=\"button\"";
+        var close = opts.static ? "span" : "button";
+        var data = opts.static ? "" : ' data-wb="' + esc(workedBaseCall(call)) + '"';
+        var st = opts.static ? " static" : "";
+        if (workedIsNewBand(call, opts.band)) return "<" + tag + ' class="wb newband' + st + '"' + data + ">new band</" + close + ">";
+        if (w.n < (opts.minN || 1)) return "";
+        return "<" + tag + ' class="wb' + (w.confirmed ? " cfm" : "") + st + '"' + data + ">" + w.n + "×" + (w.confirmed ? " ✓" : "") + "</" + close + ">";
+    }
+    function workedDateStr(q) {
+        if (q.logged_at) return new Date(q.logged_at * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+        var d = String(q.date || "");
+        return d.length === 8 ? d.slice(0, 4) + "-" + d.slice(4, 6) + "-" + d.slice(6) : (d || "—");
+    }
+    function openWorkedSheet(call) {
+        var w = WORKED && WORKED[call];
+        if (!w) return;
+        var cf = w.cfm_bands || [];
+        var bands = (w.bands || []).map(function (b) { return '<span class="' + (cf.indexOf(b) >= 0 ? "cf" : "") + '">' + esc(b) + "</span>"; }).join("");
+        var rows = (w.qsos || []).map(function (q) {
+            return "<tr><td>" + esc(workedDateStr(q)) + "</td><td>" + esc(q.band || "") + "</td><td>" + esc(q.mode || "") +
+                '</td><td class="c">' + (q.qrz_confirmed ? "✓" : "") + "</td></tr>";
+        }).join("");
+        var more = w.n > (w.qsos || []).length ? " · last " + w.qsos.length + " shown" : "";
+        document.getElementById("wb-sheet-body").innerHTML =
+            "<h3>" + esc(call) + "</h3>" +
+            '<div class="wb-sum">' + w.n + " QSO" + (w.n === 1 ? "" : "s") + (w.confirmed ? " · confirmed" : "") + more + "</div>" +
+            (bands ? '<div class="wb-bands">' + bands + "</div>" : "") +
+            "<table>" + rows + "</table>" +
+            '<div class="wb-foot"><a href="https://www.qrz.com/db/' + encodeURIComponent(call) + '" target="_blank" rel="noopener">Look up ' + esc(call) + " on QRZ →</a></div>" +
+            '<div class="lp-row"><button class="cancel" id="wb-sheet-close">Close</button></div>';
+        document.getElementById("wb-sheet").classList.add("open");
+    }
+    // Capture phase, so a badge tap never also opens/closes the card or
+    // row it sits in.
+    document.addEventListener("click", function (e) {
+        var b = e.target.closest && e.target.closest("button.wb[data-wb]");
+        if (!b) return;
+        e.stopPropagation(); e.preventDefault();
+        openWorkedSheet(b.getAttribute("data-wb"));
+    }, true);
+    document.getElementById("wb-sheet").addEventListener("click", function (e) {
+        if (e.target.id === "wb-sheet" || e.target.id === "wb-sheet-close") this.classList.remove("open");
+    });
+    function fetchWorked() {
+        if (!SHOW_WORKED) return;
+        fetch("/api/worked").then(function (r) { return r.json(); }).then(function (d) {
+            var first = WORKED === null;
+            WORKED = (d && d.calls) || {};
+            if (first) {
+                try { spRendered = ""; renderSpots(); } catch (err) {}
+                try { nfRendered = ""; renderNotifFeed(); } catch (err) {}
+            }
+        }).catch(function () {});
+    }
+    fetchWorked();
+    setInterval(fetchWorked, 60000);
     function nowSec() { return Date.now() / 1000; }
     function fmtClock(ts) {
         if (ts == null) return "";
@@ -1420,11 +1577,11 @@
         if (isAway) return "💤 away · <span data-ts=\"" + (hs.offline_since || "") + "\" data-kind=\"ago\"></span>";
         if (isOffline) return '<span class="warn">⚠ offline <span data-ts="' + (hs.offline_since || "") + '" data-kind="ago"></span></span>';
         if (hs.is_active) {
-            return (isFav ? "⭐ " : "📡 ") + '<span class="call">' + esc(hs.active_call || "?") + "</span>" +
+            return (isFav ? "⭐ " : "📡 ") + '<span class="call">' + esc(hs.active_call || "?") + "</span>" + wbHtml(hs.active_call, { static: true }) +
                    '<span class="tm" data-ts="' + (hs.tx_start || "") + '" data-kind="tx"></span>';
         }
         if (hs.active_call != null) {
-            return esc(hs.active_call) + ' · <span data-ts="' + (hs.last_heard || "") + '" data-kind="ago"></span> ago';
+            return esc(hs.active_call) + wbHtml(hs.active_call, { static: true }) + ' · <span data-ts="' + (hs.last_heard || "") + '" data-kind="ago"></span> ago';
         }
         return "Listening";
     }
@@ -1492,13 +1649,13 @@
                    '<span data-ts="' + (hs.offline_since || "") + '" data-kind="ago"></span>' +
                    " · last data may be stale</div>";
         } else if (hs.is_active) {
-            body = '<div class="line-active">📡 ACTIVE: <span class="call">' + csLink(hs.active_call) + "</span>" +
+            body = '<div class="line-active">📡 ACTIVE: <span class="call">' + csLink(hs.active_call) + "</span>" + wbHtml(hs.active_call) +
                    (isFav && hs.favorite_label ? " · " + esc(hs.favorite_label) : "") + "</div>" +
                    callerSub(hs) +
                    '<div class="timer" data-ts="' + (hs.tx_start || "") + '" data-kind="tx"></div>';
         } else if (isLastHeard) {
             body = '<div class="line-active">Last heard: <span class="call" style="color:var(--text-muted)">' +
-                   csLink(hs.active_call) + "</span></div>" +
+                   csLink(hs.active_call) + "</span>" + wbHtml(hs.active_call) + "</div>" +
                    callerSub(hs) +
                    '<div class="timer">' +
                    '<span data-ts="' + (hs.last_heard || "") + '" data-kind="ago"></span> ago</div>';
@@ -1619,6 +1776,7 @@
             return '<div class="qso">' +
                    '<span class="cs">' + csLink(q.call) + "</span>" +
                    '<span class="meta">' + esc(meta) + "</span>" +
+                   wbHtml(q.call, { minN: 2 }) +
                    '<span class="ago">' + esc(when) + "</span>" +
                    "</div>";
         }).join("");
@@ -2498,12 +2656,12 @@
             sub = hs.portable ? "Portable — not connected" : "Stopped responding";
             timer = hs.offline_since ? "for " + fmtAgo(hs.offline_since) : "";
         } else if (hs.is_active && hs.active_call) {
-            big = csLink(hs.active_call);
+            big = csLink(hs.active_call) + wbHtml(hs.active_call);
             sub = "active on " + esc(hs.name) + (hs.talkgroup ? " · TG " + esc(hs.talkgroup) : "");
             meta = [hs.caller_name, hs.caller_location].filter(Boolean).map(esc).join(" — ");
             timer = hs.tx_start ? fmtClock(hs.tx_start) : "";
         } else if (hs.active_call) {
-            big = csLink(hs.active_call);
+            big = csLink(hs.active_call) + wbHtml(hs.active_call);
             sub = "last heard on " + esc(hs.name);
             meta = [hs.caller_name, hs.caller_location].filter(Boolean).map(esc).join(" — ");
             timer = hs.last_heard ? fmtAgo(hs.last_heard) + " ago" : "";
@@ -2995,6 +3153,7 @@
             rows.push({ src: "RBN", call: s.call, freq_hz: s.freq_hz, mode: s.mode, ref: "", name: (s.snr_db != null ? s.snr_db + " dB" : "") +
                 (s.speed ? " · " + s.speed + " " + (s.speed_unit || "") : ""), age: spAgeSec(null, s.last_seen), isNew: false, dist: "", spotter: s.spotter });
         });
+        rows.forEach(function (r) { r.band = pdBand(r.freq_hz); r.nb = workedIsNewBand(r.call, r.band) ? 1 : 0; });
         return rows;
     }
 
@@ -3011,14 +3170,16 @@
             if (!q) return true;
             return (r.call + " " + (r.ref || "") + " " + (r.name || "")).toUpperCase().indexOf(q) >= 0;
         });
-        rows.sort(function (a, b) { return (b.isNew - a.isNew) || (a.age - b.age); });
+        // new park first, then a worked station on a band you've never
+        // worked them on, then freshest
+        rows.sort(function (a, b) { return (b.isNew - a.isNew) || (b.nb - a.nb) || (a.age - b.age); });
         var shown = rows.slice(0, 80);
         var html = shown.map(function (r, i) {
             var mhz = r.freq_hz ? (r.freq_hz / 1e6).toFixed(3) : "";
             var tune = (SPOTS_RIG && r.freq_hz)
                 ? '<button class="sp-tune" data-i="' + i + '">▶ Tune</button>' : "";
             var sub = [r.ref, r.name, r.dist, r.spotter ? "by " + r.spotter : ""].filter(Boolean).join(" · ");
-            return '<div class="sp-row"><div class="sp-top"><span class="sp-call">' + csLink(r.call) + "</span>" +
+            return '<div class="sp-row"><div class="sp-top"><span class="sp-call">' + csLink(r.call) + "</span>" + wbHtml(r.call, { band: r.band }) +
                 (r.isNew ? '<span class="sp-tag sp-new">NEW</span>' : "") + '<span class="sp-tag">' + r.src + "</span></div>" +
                 '<div class="sp-mid"><span>' + mhz + " MHz</span><span>" + esc(r.mode || "") + "</span>" + tune +
                 '<span class="age">' + spAgeStr(r.age) + "</span></div>" +
@@ -3093,7 +3254,8 @@
         solar:        { on: {{ 'true' if settings.get('solar_alerts_enabled', False) else 'false' }}, url: "/api/hf_alerts", key: "events", ts: "at", ic: "☀️", label: "Solar" },
         brandmeister: { on: {{ 'true' if settings.get('brandmeister_alerts_enabled', False) else 'false' }}, url: "/api/brandmeister_lh", key: "events", ts: "at", ic: "📶", label: "Brandmeister" },
         qrz:          { on: {{ 'true' if settings.get('qrz_logbook_enabled', False) else 'false' }}, url: "/api/qrz_confirmations", key: "events", ts: "at", ic: "✅", label: "QRZ" },
-        rig:          { on: {{ 'true' if settings.get('rig_pa_alert_enabled', False) else 'false' }}, url: "/api/rig_pa_alerts", key: "events", ts: "at", ic: "📻", label: "Rig" }
+        rig:          { on: {{ 'true' if settings.get('rig_pa_alert_enabled', False) else 'false' }}, url: "/api/rig_pa_alerts", key: "events", ts: "at", ic: "📻", label: "Rig" },
+        sat:          { on: {{ 'true' if settings.get('sat_alerts_enabled', False) else 'false' }}, url: "/api/sat_alerts", key: "events", ts: "at", ic: "🛰", label: "Passes" }
     };
     var nfData = {}, nfFilter = "all", nfSeenAtOpen = 0, nfTimer = null, nfRendered = "";
     function nfSeen() { try { return parseFloat(localStorage.getItem("pd-notif-seen") || "0") || 0; } catch (e) { return 0; } }
@@ -3120,17 +3282,27 @@
 
     function nfRow(it, unread) {
         var e = it.d, ic = NF_SOURCES[it.src].ic, who = "", text = "", extra = "";
-        if (it.src === "aprs") { who = csLink(e.from) + (e.to ? " → " + esc(e.to) : ""); text = esc(e.message_text || ""); extra = e.acked ? "✓ ack sent" : ""; }
+        if (it.src === "aprs") { who = csLink(e.from) + wbHtml(e.from) + (e.to ? " → " + esc(e.to) : ""); text = esc(e.message_text || ""); extra = e.acked ? "✓ ack sent" : ""; }
         else if (it.src === "hamalert") {
-            who = csLink(e.full_callsign || e.callsign);
+            who = csLink(e.full_callsign || e.callsign) + wbHtml(e.callsign, { band: e.band });
             text = esc([e.entity, e.spotter ? "via " + e.spotter : ""].filter(Boolean).join(" · "));
             extra = esc([e.source, e.frequency ? e.frequency + (e.mode ? " " + e.mode : "") : "", e.trigger_comment].filter(Boolean).join(" · "));
-        } else if (it.src === "fleet") { who = esc(e.name); text = e.kind === "offline" ? "🔴 went offline" : "🟢 back online"; }
+        } else if (it.src === "fleet") { who = esc(e.name); text = e.kind === "offline" ? "🔴 went offline" : e.kind === "warm" ? "🌡 running warm — " + Math.round(e.temp_c) + "°C" : e.kind === "cool" ? "✅ cooled down — " + Math.round(e.temp_c) + "°C" : "🟢 back online"; }
         else if (it.src === "solar") { who = e.kind === "elevated" ? "Geomagnetic storm" : "Conditions normal"; text = "K-index " + Math.round(e.k_index) + (e.kind === "elevated" ? " — G1+ minor storm, HF disturbance possible" : " — back below the G1 threshold"); }
         else if (it.src === "brandmeister") {
-            who = csLink(e.callsign) + (e.name ? " · " + esc(e.name) : "");
+            who = csLink(e.callsign) + wbHtml(e.callsign) + (e.name ? " · " + esc(e.name) : "");
             text = "Active on Brandmeister" + ([e.destination_name, e.destination_id].filter(Boolean).length ? " — " + esc([e.destination_name, e.destination_id].filter(Boolean).join(" · ")) : "");
         } else if (it.src === "qrz") { who = csLink(e.call) + (e.band || e.mode ? " · " + esc([e.band, e.mode].filter(Boolean).join(" ")) : ""); text = "Confirmed in your QRZ logbook"; }
+        else if (it.src === "sat") {
+            var nowS = Date.now() / 1000, mins = Math.round((e.aos_epoch - nowS) / 60);
+            var CP = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+            var cp = function (d) { return d == null ? "" : CP[Math.round(((d % 360) + 360) % 360 / 22.5) % 16]; };
+            who = esc(e.name || "Satellite") + " " + (nowS < e.aos_epoch ? "rises in " + Math.max(0, mins) + " min" : (e.los_epoch && nowS < e.los_epoch ? "overhead now" : "pass ended"));
+            text = esc([e.max_elevation != null ? "Max " + Math.round(e.max_elevation) + "°" : "",
+                        [cp(e.aos_azimuth), cp(e.los_azimuth)].filter(Boolean).join(" → "),
+                        "AOS " + new Date(e.aos_epoch * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                        e.downlink_mhz ? Number(e.downlink_mhz).toFixed(3) + (e.mode ? " " + e.mode : "") : ""].filter(Boolean).join(" · "));
+        }
         else if (it.src === "rig") {
             var lvl = e.temp_c != null ? Math.round(e.temp_c) + "°C" : (e.pct != null ? e.pct + "%" : "");
             who = e.kind === "high" ? "PA running hot" : "PA cooled down";
@@ -3200,6 +3372,145 @@
         });
         fetchNotifFeed();
         setInterval(function () { if (!nfOpen()) fetchNotifFeed(); }, 60000);
+    })();
+
+    /* ================= Activity patterns (one day at a time) =================
+     * Same data and rules as the desktop Hotspot Activity -> Patterns drawer
+     * (dashboard.html's apCompute(); keep the two in sync by hand): average
+     * per week over 12 weeks, in this phone's time zone, and a "regular net"
+     * is an hour at least 2x its usual level in 3 of every 4 weeks. */
+    (function () {
+        var eb = document.getElementById("ap-entry-btn");
+        if (!eb) return;
+        var DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        var data = null, fetchedAt = 0;
+        var st = { hs: "all", m: "time", day: (new Date().getDay() + 6) % 7 };
+        function pad(n) { return String(n).padStart(2, "0"); }
+        function fmtT(s) { return s >= 3600 ? (s / 3600).toFixed(1) + " h" : s >= 60 ? Math.round(s / 60) + " min" : Math.round(s) + " s"; }
+        function fmtV(v) { return st.m === "time" ? fmtT(v) : (v >= 10 ? Math.round(v) : v.toFixed(1)) + " tx"; }
+        function dh(ts) { var d = new Date(ts * 1000); return [(d.getDay() + 6) % 7, d.getHours()]; }
+        function compute() {
+            var now = data.now, nowHour = Math.floor(now / 3600) * 3600;
+            var since = data.since == null ? nowHour : data.since;
+            var start = Math.max(nowHour - 12 * 7 * 86400 + 3600, since);
+            var nWeeks = Math.floor((nowHour + 3600 - start) / (7 * 86400));
+            function z() { return DAYS.map(function () { return [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]; }); }
+            var sum = z(), cover = z(), weekly = [], viaBy = {}, hsBy = {}, t, i, w;
+            for (w = 0; w < nWeeks; w++) weekly.push(z());
+            for (t = start; t <= nowHour; t += 3600) { var c0 = dh(t); cover[c0[0]][c0[1]]++; }
+            data.rows.forEach(function (r) {
+                if (r[0] < start || (st.hs !== "all" && r[1] !== st.hs)) return;
+                var v = st.m === "time" ? r[4] : r[3];
+                if (!v) return;
+                var c = dh(r[0]), k = c[0] + ":" + c[1];
+                sum[c[0]][c[1]] += v;
+                var wk = Math.floor((r[0] - start) / (7 * 86400));
+                if (wk < nWeeks) weekly[wk][c[0]][c[1]] += v;
+                if (r[2]) { var kv = k + "|" + r[1]; viaBy[kv] = viaBy[kv] || {}; viaBy[kv][r[2]] = (viaBy[kv][r[2]] || 0) + v; }
+                hsBy[k] = hsBy[k] || {}; hsBy[k][r[1]] = (hsBy[k][r[1]] || 0) + v;
+            });
+            var avg = sum.map(function (row, d) { return row.map(function (v, h) { return cover[d][h] ? v / cover[d][h] : null; }); });
+            var nets = [];
+            if (nWeeks >= 4) {
+                var floor = st.m === "time" ? 180 : 4;
+                for (var d = 0; d < 7; d++) for (var h = 0; h < 24; h++) {
+                    var hits = 0;
+                    for (w = 0; w < nWeeks; w++) {
+                        var o = [];
+                        for (i = 0; i < 7; i++) if (i !== d) o.push(weekly[w][i][h]);
+                        o.sort(function (a, b) { return a - b; });
+                        if (weekly[w][d][h] >= Math.max(o[2] + o[3], floor)) hits++;
+                    }
+                    if (hits / nWeeks >= 0.75) {
+                        var top = function (obj) { return obj ? Object.keys(obj).sort(function (a, b) { return obj[b] - obj[a]; })[0] : ""; };
+                        var nh = top(hsBy[d + ":" + h]);
+                        nets.push({ d: d, h: h, hits: hits, n: nWeeks, v: avg[d][h] || 0, hs: nh, via: top(viaBy[d + ":" + h + "|" + nh]) });
+                    }
+                }
+                nets.sort(function (a, b) { return (b.hits - a.hits) || (b.v - a.v); });
+            }
+            return { avg: avg, nets: nets.slice(0, 4), since: since, nWeeks: nWeeks };
+        }
+        function hsName(id) { return (data.hotspots && data.hotspots[id]) || id; }
+        function nextDate(d, h) {
+            var now = new Date();
+            for (var i = 0; i < 8; i++) {
+                var c = new Date(now.getTime() + i * 86400000);
+                if ((c.getDay() + 6) % 7 !== d || (i === 0 && h <= now.getHours())) continue;
+                return c.getFullYear() + pad(c.getMonth() + 1) + pad(c.getDate());
+            }
+            return "";
+        }
+        function calHref(n) {
+            var q = new URLSearchParams({
+                date: nextDate(n.d, n.h), hour: n.h,
+                tz: (Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"),
+                title: ["Net", n.via ? "TG " + n.via : "", hsName(n.hs)].filter(Boolean).join(" · "),
+                desc: "Regular activity found by the Hotspot Activity heatmap: busy in " + n.hits + " of the last " + n.n + " weeks."
+            });
+            return "/api/net_reminder.ics?" + q.toString();
+        }
+        function render() {
+            var body = document.getElementById("ap-body");
+            if (!data) return;
+            var c = compute();
+            var ids = Object.keys(data.hotspots || {});
+            var html = '<div class="ap-top"><select id="ap-hs" aria-label="Hotspot"><option value="all">All hotspots</option>' +
+                ids.map(function (id) { return '<option value="' + esc(id) + '"' + (st.hs === id ? " selected" : "") + ">" + esc(hsName(id)) + "</option>"; }).join("") +
+                '</select><div class="ap-seg"><button data-m="time" class="' + (st.m === "time" ? "on" : "") + '">Talk time</button>' +
+                '<button data-m="tx" class="' + (st.m === "tx" ? "on" : "") + '">Transmissions</button></div></div>';
+            html += '<div class="ap-days">' + DAYS.map(function (d, i) {
+                return '<button data-day="' + i + '" class="' + (st.day === i ? "on" : "") + '">' + d + "</button>";
+            }).join("") + "</div>";
+            var row = c.avg[st.day];
+            var max = Math.max.apply(null, row.map(function (v) { return v || 0; })) || 0;
+            var netH = {};
+            c.nets.forEach(function (n) { if (n.d === st.day) netH[n.h] = true; });
+            if (!max) {
+                html += '<div class="asl-empty">No transmissions on a ' + DAYS[st.day] + " yet in the last 12 weeks.</div>";
+            } else {
+                for (var h = 0; h < 24; h++) {
+                    var v = row[h];
+                    html += '<div class="ap-hr' + (v == null ? " nodata" : "") + (netH[h] ? " net" : "") + '"><span class="h">' + pad(h) + ':00</span>' +
+                        '<span class="bar"><i style="width:' + (v ? Math.max(2, v / max * 100) : 0) + '%"></i></span>' +
+                        '<span class="v">' + (v == null ? "—" : v ? fmtV(v) : "") + "</span></div>";
+                }
+            }
+            html += '<div class="sec-label" style="margin-top:14px">Regular nets</div>';
+            if (c.nWeeks < 4) {
+                var days = Math.max(1, Math.round((data.now - c.since) / 86400));
+                html += '<div class="asl-empty">Needs 4 weeks of history to spot a net that repeats every week — ' + days + " day" + (days === 1 ? "" : "s") + " so far.</div>";
+            } else if (!c.nets.length) {
+                html += '<div class="asl-empty">Nothing repeats reliably enough to call a regular net.</div>';
+            } else {
+                html += c.nets.map(function (n) {
+                    return '<div class="ap-net"><span class="when">' + DAYS[n.d] + " " + pad(n.h) + ':00</span><span class="what">' +
+                        esc([n.via ? "TG " + n.via : "", hsName(n.hs)].filter(Boolean).join(" on ")) + "<br>busy in " + n.hits + " of " + n.n + " weeks</span>" +
+                        '<a href="' + calHref(n) + '" download="net-reminder.ics">📅 Add</a></div>';
+                }).join("");
+            }
+            html += '<div class="ap-note">Average per week over the last 12 weeks, in this phone\'s time zone. The full week grid is on the desktop dashboard\'s Hotspot Activity card.</div>';
+            body.innerHTML = html;
+        }
+        function load() {
+            if (data && Date.now() - fetchedAt < 5 * 60000) { render(); return; }
+            fetch("/api/activity_patterns").then(function (r) { return r.json(); }).then(function (d) {
+                data = d; fetchedAt = Date.now(); render();
+            }).catch(function () {
+                document.getElementById("ap-body").innerHTML = '<div class="asl-empty">Couldn\'t load activity history.</div>';
+            });
+        }
+        eb.onclick = function () { document.getElementById("ap-screen").classList.add("open"); load(); };
+        document.getElementById("ap-close").onclick = function () { document.getElementById("ap-screen").classList.remove("open"); };
+        document.getElementById("ap-body").addEventListener("click", function (e) {
+            var b = e.target.closest("button");
+            if (!b) return;
+            if (b.hasAttribute("data-m")) { st.m = b.getAttribute("data-m"); render(); }
+            else if (b.hasAttribute("data-day")) { st.day = +b.getAttribute("data-day"); render(); }
+        });
+        document.getElementById("ap-body").addEventListener("change", function (e) {
+            if (e.target.id === "ap-hs") { st.hs = e.target.value; render(); }
+        });
     })();
 
     /* ================= Band plan (data copied verbatim from the desktop card) ================= */

@@ -1342,6 +1342,37 @@
             font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
             color: var(--accent); background: var(--accent-dim); padding: 1px 6px; border-radius: 8px;
         }
+        /* Worked Before badge (worked.py / /api/worked). Plain text tag in
+           the band-badge style, deliberately NO status dot: a dot/chip on
+           this dashboard means "live right now", and this is history. */
+        .wb { display: inline-flex; align-items: center; gap: 3px; font-family: var(--font-mono);
+              font-size: 10px; line-height: 1; padding: 2px 5px; border-radius: 4px;
+              border: 1px solid var(--border); color: var(--text-muted); background: transparent;
+              cursor: pointer; vertical-align: middle; white-space: nowrap; flex-shrink: 0;
+              font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: 0; text-transform: none; }
+        .wb:hover { border-color: var(--text-muted); color: var(--text); }
+        .wb:focus-visible { outline: 2px solid var(--live); outline-offset: 1px; }
+        .wb.cfm { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); background: var(--good-dim); }
+        .wb.newband { color: var(--caution); border-color: color-mix(in srgb, var(--caution) 40%, transparent); background: var(--caution-dim); }
+        .wb-last { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+        .wb-last b { color: var(--good); font-weight: 600; }
+        #wb-pop { position: absolute; z-index: 2000; width: 290px; max-width: calc(100vw - 24px);
+                  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+                  box-shadow: 0 10px 30px rgba(0,0,0,.35); padding: 12px; font-size: 12px; color: var(--text); }
+        #wb-pop[hidden] { display: none; }
+        #wb-pop h3 { margin: 0 0 2px; font-family: var(--font-mono); font-size: 14px; }
+        #wb-pop .wb-sum { color: var(--text-muted); margin-bottom: 6px; }
+        #wb-pop .wb-bands { display: flex; gap: 4px; flex-wrap: wrap; margin: 4px 0 8px; }
+        #wb-pop .wb-bands span { font-family: var(--font-mono); font-size: 10px; padding: 2px 5px; border-radius: 3px;
+                                 border: 1px solid var(--border); color: var(--text); }
+        #wb-pop .wb-bands span.cf { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, transparent); background: var(--good-dim); }
+        #wb-pop table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+        #wb-pop td { padding: 4px 3px; border-top: 1px solid var(--border-soft); }
+        #wb-pop tr.wb-q { cursor: pointer; }
+        #wb-pop tr.wb-q:hover td { background: var(--panel-2); }
+        #wb-pop td.c { color: var(--good); text-align: right; }
+        #wb-pop .wb-foot { margin-top: 8px; font-size: 11px; color: var(--text-dim); }
+        #wb-pop .wb-foot a { color: var(--link); text-decoration: none; }
         .qso-confirmed {
             font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
             color: var(--good); background: var(--good-dim); padding: 1px 6px; border-radius: 8px;
@@ -2923,6 +2954,118 @@
         .hs-tg-nokey a:hover { text-decoration: underline; }
         .hs-update-note { font-size: 11.5px; color: var(--text-dim); background: var(--panel-2); border-radius: 6px; padding: 8px 10px; line-height: 1.5; margin-top: 4px; }
         .hs-update-note b { color: var(--accent); }
+        /* My Signal card (PSK Reporter reports of your own call) */
+        .btn-link-live { font: inherit; font-size: 12px; border: 1px solid color-mix(in srgb, var(--live) 45%, var(--border)); color: var(--live); background: transparent; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+        .ms-map { height: 170px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-soft); background: #1c1f24; position: relative; }
+        .ms-map .leaflet-control-attribution { font-size: 9px; }
+        .ms-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        .ms-seg button { font: inherit; font-family: var(--font-mono); font-size: 11px; background: transparent; color: var(--text-muted); border: 0; padding: 3px 7px; cursor: pointer; }
+        .ms-seg button + button { border-left: 1px solid var(--border); }
+        .ms-seg button.on { background: var(--panel-2); color: var(--text); }
+        .ms-bands { margin-top: 8px; font-variant-numeric: tabular-nums; }
+        .ms-band { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 4px 6px; margin: 0 -6px; border-radius: 6px; cursor: pointer; }
+        .ms-band + .ms-band { border-top: 1px solid var(--border-soft); }
+        .ms-band:hover { background: var(--panel-2); }
+        .ms-band.on { background: var(--live-dim); }
+        .ms-band .b { font-family: var(--font-mono); font-weight: 700; font-size: 12.5px; }
+        .ms-band .far { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ms-band .far b { color: var(--text); font-family: var(--font-mono); font-weight: 600; }
+        .ms-band .n { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); text-align: right; white-space: nowrap; }
+        .ms-foot { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+        .ms-empty { text-align: center; padding: 18px 8px; color: var(--text-muted); font-size: 12.5px; }
+        .ms-empty b { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
+        table.ms-rep { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+        table.ms-rep th { text-align: left; font-weight: 500; color: var(--text-dim); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; padding: 4px; border-bottom: 1px solid var(--border); }
+        table.ms-rep td { padding: 5px 4px; border-bottom: 1px solid var(--border-soft); font-family: var(--font-mono); }
+        table.ms-rep .r { text-align: right; }
+        /* Hotspot Health (health_history.py) -- card, drawer, and the
+           Health section in each hotspot's own drawer */
+        .hh-row { padding: 8px 0; border-bottom: 1px solid var(--border-soft); cursor: pointer; }
+        .hh-row:last-child { border-bottom: none; }
+        .hh-row:hover .hh-name { color: var(--live); }
+        .hh-top { display: flex; align-items: center; gap: 8px; }
+        .hh-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex: 0 0 auto; }
+        .hh-dot.off { background: var(--danger); }
+        .hh-dot.away { background: var(--text-dim); }
+        .hh-name { font-weight: 600; font-size: 13px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hh-pct { font-family: var(--font-mono); font-size: 12px; }
+        .hh-strip { display: flex; gap: 1px; height: 10px; margin: 5px 0 4px; }
+        .hh-strip i { flex: 1; min-width: 0; border-radius: 1px; background: var(--good); opacity: .75; }
+        .hh-strip i.off { background: var(--danger); opacity: 1; }
+        .hh-strip i.away { background: var(--text-dim); opacity: .45; }
+        .hh-strip i.none { background: var(--panel-2); opacity: 1; }
+        .hh-meta { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-muted); min-width: 0; }
+        .hh-meta .temp { font-family: var(--font-mono); color: var(--text); }
+        .hh-meta .warn { color: var(--caution); }
+        .hh-meta .note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .hh-meta svg { flex: 0 0 auto; }
+        .hh-foot { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-dim); margin-top: 2px; }
+        #hotspot-health-card .hh-list { max-height: 300px; overflow-y: auto; padding-right: 8px; margin-right: -8px;
+            scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+        .hh-empty { font-size: 12px; color: var(--text-dim); padding: 8px 0; }
+        .hh-stat3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+        .hh-stat3 > div { background: var(--panel-2); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+        .hh-stat3 .k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); }
+        .hh-stat3 .v { font-family: var(--font-mono); font-size: 14px; font-weight: 600; }
+        .hh-chart { background: var(--panel-2); border-radius: 8px; padding: 6px; }
+        .hh-chart svg { display: block; width: 100%; height: auto; }
+        .hh-ev { display: flex; gap: 10px; align-items: baseline; font-size: 12.5px; padding: 6px 0; border-bottom: 1px solid var(--border-soft); }
+        .hh-ev:last-child { border-bottom: none; }
+        .hh-ev .when { font-family: var(--font-mono); color: var(--text-muted); min-width: 104px; font-size: 11.5px; }
+        .hh-tag { font-family: var(--font-mono); font-size: 10px; padding: 1px 6px; border-radius: 4px; }
+        .hh-tag.off { color: var(--danger); background: var(--danger-dim); }
+        .hh-tag.rb, .hh-tag.warm { color: var(--caution); background: var(--caution-dim); }
+        .hh-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0 2px; }
+        .hh-controls select { font: inherit; font-size: 12px; background: var(--panel-2); color: var(--text);
+            border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; }
+        /* Activity patterns drawer (Hotspot Activity card -> Patterns) */
+        .ap-open-btn { color: var(--live); }
+        #ap-drawer { width: min(600px, 96vw); }
+        .ap-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+        .ap-controls select { font: inherit; font-size: 12px; background: var(--panel-2); color: var(--text);
+            border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; }
+        .ap-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        .ap-seg button { font: inherit; font-size: 11px; background: transparent; color: var(--text-muted);
+            border: 0; padding: 4px 8px; cursor: pointer; }
+        .ap-seg button + button { border-left: 1px solid var(--border); }
+        .ap-seg button.on { background: var(--panel-2); color: var(--text); }
+        .ap-grid { display: grid; grid-template-columns: 30px repeat(24, minmax(0, 1fr)) 46px; gap: 2px;
+            font-variant-numeric: tabular-nums; }
+        .ap-grid .dl { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); display: flex; align-items: center; }
+        .ap-grid .cell { aspect-ratio: 1 / 1.1; border-radius: 2px; background: var(--panel-2); }
+        .ap-grid .cell:hover { outline: 2px solid var(--text); outline-offset: -1px; }
+        .ap-grid .cell.net { box-shadow: inset 0 0 0 2px var(--caution); }
+        .ap-grid .cell.nodata { background: transparent; box-shadow: inset 0 0 0 1px var(--border-soft); }
+        .ap-grid .rt { display: flex; align-items: center; gap: 3px; font-family: var(--font-mono); font-size: 9.5px;
+            color: var(--text-muted); padding-left: 3px; white-space: nowrap; }
+        .ap-grid .rt i, .ap-grid .colbar i { display: block; background: color-mix(in oklab, var(--live) 70%, var(--panel-2)); }
+        .ap-grid .rt i { height: 5px; border-radius: 0 2px 2px 0; }
+        .ap-grid .colbar { height: 22px; display: flex; align-items: flex-end; }
+        .ap-grid .colbar i { width: 100%; border-radius: 2px 2px 0 0; }
+        .ap-grid .hl { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); }
+        .ap-scale { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; font-size: 11px; color: var(--text-muted); }
+        .ap-scale .ramp { display: flex; gap: 2px; }
+        .ap-scale .ramp span { width: 16px; height: 9px; border-radius: 2px; }
+        .ap-scale .netkey { display: inline-flex; align-items: center; gap: 5px; margin-left: 10px; }
+        .ap-scale .netkey span { width: 11px; height: 11px; border-radius: 2px; box-shadow: inset 0 0 0 2px var(--caution); }
+        .ap-ins { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+        .ap-ins > div { background: var(--panel-2); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+        .ap-ins .k { font-size: 10px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-dim); }
+        .ap-ins .v { font-family: var(--font-mono); font-size: 14px; font-weight: 600; margin-top: 2px; }
+        .ap-ins .s { font-size: 11.5px; color: var(--text-muted); }
+        .ap-net { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-soft); }
+        .ap-net:last-child { border-bottom: none; }
+        .ap-net .when { font-family: var(--font-mono); font-weight: 600; font-size: 13px; min-width: 88px; }
+        .ap-net .what { flex: 1; min-width: 0; font-size: 12px; color: var(--text-muted); }
+        .ap-net a { font-size: 11.5px; color: var(--live); text-decoration: none; white-space: nowrap;
+            border: 1px solid color-mix(in srgb, var(--live) 40%, var(--border)); border-radius: 6px; padding: 3px 8px; }
+        .ap-net a:hover { background: var(--live-dim); }
+        .ap-foot { margin-top: 14px; font-size: 11px; color: var(--text-dim); }
+        #ap-tip { position: fixed; z-index: 2100; pointer-events: none; background: var(--panel); border: 1px solid var(--border);
+            border-radius: 6px; padding: 6px 9px; font-size: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.3); }
+        #ap-tip[hidden] { display: none; }
+        #ap-tip b { font-family: var(--font-mono); }
+        #ap-tip .t2 { color: var(--text-muted); font-size: 11px; }
         .hs-empty-note { font-size: 12px; color: var(--text-dim); padding: 4px 0; }
 
         /* --- card drawer Settings block -- per-field instant save (POSTs
@@ -3387,6 +3530,8 @@
                             onclick="setFleetChartMode('per-hotspot')">Per-hotspot</button>
                     <button class="fleet-mode-btn active" data-mode="aggregate"
                             onclick="setFleetChartMode('aggregate')">Aggregate</button>
+                    <button class="fleet-mode-btn ap-open-btn" onclick="openActivityPatternsDrawer()"
+                            title="When are your hotspots busy? Day-by-hour heatmap">▦ Patterns</button>
                 </div>
             </div>
             <div class="fleet-stats-grid">
@@ -3433,7 +3578,7 @@
             <span class="asl-fav-status-txt" id="asl-fav-status"></span>
         </div>
         {% endif %}
-        {% set notif_source_count = (1 if settings.get('aprs_inbox_enabled', False) else 0) + (1 if settings.get('hamalert_enabled', False) else 0) + (1 if settings.get('fleet_alerts_enabled', False) else 0) + (1 if settings.get('solar_alerts_enabled', False) else 0) + (1 if settings.get('brandmeister_alerts_enabled', False) else 0) + (1 if settings.get('qrz_logbook_enabled', False) else 0) + (1 if settings.get('rig_pa_alert_enabled', False) else 0) %}
+        {% set notif_source_count = (1 if settings.get('aprs_inbox_enabled', False) else 0) + (1 if settings.get('hamalert_enabled', False) else 0) + (1 if settings.get('fleet_alerts_enabled', False) else 0) + (1 if settings.get('solar_alerts_enabled', False) else 0) + (1 if settings.get('brandmeister_alerts_enabled', False) else 0) + (1 if settings.get('qrz_logbook_enabled', False) else 0) + (1 if settings.get('rig_pa_alert_enabled', False) else 0) + (1 if settings.get('sat_alerts_enabled', False) else 0) %}
         {% if notif_source_count > 0 %}
         <div class="metrics-card" id="notifications-card"
              style="order:{{ settings.get('notifications_position', 0) }}">
@@ -3463,6 +3608,9 @@
                 {% endif %}
                 {% if settings.get('rig_pa_alert_enabled', False) %}
                 <span class="source-pill" data-filter="rig" onclick="toggleNotifFilter('rig')">📻 PA temp<span class="conn-dot" id="rig-pa-conn-dot"></span></span>
+                {% endif %}
+                {% if settings.get('sat_alerts_enabled', False) %}
+                <span class="source-pill" data-filter="sat" onclick="toggleNotifFilter('sat')">🛰 Passes<span class="conn-dot" id="sat-alert-conn-dot"></span></span>
                 {% endif %}
             </div>
             <div class="ha-diag" id="hamalert-diag" style="display:none"></div>
@@ -3796,6 +3944,32 @@
             <div class="bcn-now" id="bcn-now"></div>
             <div class="bcn-list" id="bcn-list"></div>
             <div class="bcn-foot">Who you can actually hear right now is a live propagation read.</div>
+        </div>
+        {% endif %}
+        {% if settings.get('show_my_signal', False) %}
+        <div class="metrics-card" id="my-signal-card"
+             style="order:{{ settings.get('my_signal_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name" id="ms-title" title="Where your own signal is being heard, from PSK Reporter (digital modes only). Updates every 10 minutes at most -- PSK Reporter's rate limit.">📶 My Signal</div>
+                <span style="display:flex;gap:6px;align-items:center">
+                    <span class="ms-seg" id="ms-win" role="group" aria-label="Time window">
+                        <button data-w="15" onclick="setMySignalWindow(15)">15m</button><button data-w="30" onclick="setMySignalWindow(30)">30m</button><button data-w="60" onclick="setMySignalWindow(60)">60m</button>
+                    </span>
+                    <button class="fleet-mode-btn" onclick="openMySignalDrawer()" title="Everyone who heard you">☰</button>
+                </span>
+            </div>
+            <div id="ms-body"><div class="ms-empty">Loading…</div></div>
+        </div>
+        {% endif %}
+        {% if settings.get('show_hotspot_health', False) %}
+        <div class="metrics-card" id="hotspot-health-card"
+             style="order:{{ settings.get('hotspot_health_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name" title="Uptime, temperature and reboots per hotspot. Tap a hotspot for its full 30-day history.">🩺 Hotspot Health</div>
+                <button class="fleet-mode-btn" onclick="openHealthDrawer()">☰ Details</button>
+            </div>
+            <div class="hh-list" id="hh-list"><div class="hh-empty">Loading…</div></div>
+            <div class="hh-foot"><span>7 days ago</span><span>now</span></div>
         </div>
         {% endif %}
         {% if settings.get('show_repeaters', False) %}
@@ -4206,6 +4380,9 @@
 <div class="hs-drawer" id="hf-fav-drawer"></div>
 <div class="hs-drawer" id="rig-panel-drawer"></div>
 <div class="hs-drawer" id="fleet-status-drawer"></div>
+<div class="hs-drawer" id="ap-drawer"></div>
+<div class="hs-drawer" id="health-drawer"></div>
+<div class="hs-drawer" id="my-signal-drawer"></div>
 <div class="hs-drawer" id="sstv-drawer"></div>
 
 <!-- ASL Control's "Disconnect all links on this node" confirm dialog
@@ -4333,6 +4510,14 @@ const RIG_PANEL_PAGE         = {{ settings.get('rig_panel_page', 1) }};
 const QRZ_QUICK_LOG_PAGE     = {{ settings.get('qrz_quick_log_page', 1) }};
 const BEACONS_PAGE           = {{ settings.get('beacons_page', 1) }};
 const REPEATERS_PAGE         = {{ settings.get('repeaters_page', 1) }};
+const HOTSPOT_HEALTH_PAGE    = {{ settings.get('hotspot_health_page', 1) }};
+const MY_SIGNAL_PAGE         = {{ settings.get('my_signal_page', 1) }};
+const SHOW_MY_SIGNAL         = {{ 'true' if settings.get('show_my_signal', False) else 'false' }};
+const MY_SIGNAL_POSITION     = {{ settings.get('my_signal_position', 0) }};
+const SHOW_HOTSPOT_HEALTH    = {{ 'true' if settings.get('show_hotspot_health', False) else 'false' }};
+const HOTSPOT_HEALTH_POSITION = {{ settings.get('hotspot_health_position', 0) }};
+const HEALTH_WARM_C          = {{ settings.get('health_warm_c', 70) }};
+const HEALTH_TEMP_UNIT       = "{{ settings.get('weather_unit', 'F') }}";
 const SSTV_PAGE              = {{ settings.get('sstv_page', 1) }};
 const DVSWITCH_PAGE          = {{ settings.get('dvswitch_page', 1) }};
 const DASHBOARD2_NAME        = {{ settings.get('dashboard2_name', 'Dashboard 2') | tojson }};
@@ -4389,6 +4574,7 @@ const SOLAR_ALERTS_POLL_MS = 60000;  // hf_conditions.py's own cache is 1hr -- n
 const SHOW_BRANDMEISTER_ALERTS = {{ 'true' if settings.get('brandmeister_alerts_enabled', False) else 'false' }};
 const BRANDMEISTER_ALERTS_POLL_MS = 10000;  // same cadence class as APRS_INBOX_POLL_MS/HAMALERT_POLL_MS
 const SHOW_QRZ_CONFIRM = {{ 'true' if settings.get('qrz_logbook_enabled', False) else 'false' }};
+const SHOW_SAT_ALERTS = {{ 'true' if settings.get('sat_alerts_enabled', False) else 'false' }};
 const SHOW_RIG_PA_ALERTS = {{ 'true' if settings.get('rig_pa_alert_enabled', False) else 'false' }};
 const QRZ_CONFIRM_POLL_MS = 60000;  // qrz_logbook.py's own sync runs every 30 min -- this just re-reads its in-memory event log
 const SHOW_NOTIFICATIONS = SHOW_APRS_INBOX || SHOW_HAMALERT || SHOW_FLEET_ALERTS || SHOW_SOLAR_ALERTS || SHOW_BRANDMEISTER_ALERTS || SHOW_QRZ_CONFIRM || SHOW_RIG_PA_ALERTS;
@@ -4419,6 +4605,7 @@ const RECENT_CONTACTS_POLL_MS = 20000;  // same cadence as the map's own fetchQs
 const SHOW_QSO_STATS = {{ 'true' if settings.get('show_qso_stats', False) else 'false' }};
 const QSO_STATS_POSITION = {{ settings.get('qso_stats_position', 0) }};
 const QSO_STATS_POLL_MS = 20000;  // same cadence as Recent Contacts/the map -- same qsos.json source
+const SHOW_WORKED_BADGES = {{ 'true' if settings.get('show_worked_badges', True) else 'false' }};
 const SHOW_TOP_ACTIVITY = {{ 'true' if settings.get('show_top_activity', False) else 'false' }};
 const TOP_ACTIVITY_POSITION = {{ settings.get('top_activity_position', 0) }};
 const SHOW_POTA = {{ 'true' if settings.get('show_pota', False) else 'false' }};
@@ -5022,7 +5209,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     recentcontacts: '__recent_contacts__', qsostats: '__qso_stats__',
     topactivity: '__top_activity__', pota: '__pota__', dvswitch: '__dvswitch__',
     hffav: '__hf_favorites__', rigpanel: '__rig_panel__', qrzquicklog: '__qrz_quick_log__',
-    beacons: '__beacons__', repeaters: '__repeaters__', sstv: '__sstv__',
+    beacons: '__beacons__', repeaters: '__repeaters__', sstv: '__sstv__', hotspothealth: '__hotspot_health__', mysignal: '__my_signal__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -5282,6 +5469,12 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (SHOW_REPEATERS && REPEATERS_PAGE === page) {
         sentinels.push({ key: 'repeaters', pos: Math.max(0, REPEATERS_POSITION) });
     }
+    if (SHOW_MY_SIGNAL && MY_SIGNAL_PAGE === page) {
+        sentinels.push({ key: 'mysignal', pos: Math.max(0, MY_SIGNAL_POSITION) });
+    }
+    if (SHOW_HOTSPOT_HEALTH && HOTSPOT_HEALTH_PAGE === page) {
+        sentinels.push({ key: 'hotspothealth', pos: Math.max(0, HOTSPOT_HEALTH_POSITION) });
+    }
     if (SHOW_SSTV && SSTV_PAGE === page) {
         sentinels.push({ key: 'sstv', pos: Math.max(0, SSTV_POSITION) });
     }
@@ -5369,6 +5562,10 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (beaconsCard && 'beacons' in sentinelOrders) { moveIfNeeded(beaconsCard, cardsOuter); beaconsCard.style.order = sentinelOrders.beacons; }
     const repeatersCard = document.getElementById('repeaters-card');
     if (repeatersCard && 'repeaters' in sentinelOrders) { moveIfNeeded(repeatersCard, cardsOuter); repeatersCard.style.order = sentinelOrders.repeaters; }
+    const mySignalCard = document.getElementById('my-signal-card');
+    if (mySignalCard && 'mysignal' in sentinelOrders) { moveIfNeeded(mySignalCard, cardsOuter); mySignalCard.style.order = sentinelOrders.mysignal; }
+    const hotspotHealthCard = document.getElementById('hotspot-health-card');
+    if (hotspotHealthCard && 'hotspothealth' in sentinelOrders) { moveIfNeeded(hotspotHealthCard, cardsOuter); hotspotHealthCard.style.order = sentinelOrders.hotspothealth; }
     const sstvCard = document.getElementById('sstv-card');
     if (sstvCard && 'sstv' in sentinelOrders) { moveIfNeeded(sstvCard, cardsOuter); sstvCard.style.order = sentinelOrders.sstv; }
     if (SHOW_CAMERAS) {
@@ -5477,15 +5674,18 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
             infoBlock = `<div class="active-label" ${activeColor}>📡 ACTIVE:
                  <a class="active-call-link" href="https://www.qrz.com/db/${hs.active_call}"
                     target="_blank" rel="noopener" onclick="event.stopPropagation()" ${activeColor}>${hs.active_call}</a>${friendLabel}
+                 ${workedBadgeHtml(hs.active_call)}
                </div>
                ${(hs.caller_name || hs.caller_location)
                    ? `<div class="caller-info">${[hs.caller_name, hs.caller_location].filter(Boolean).join(' — ')}</div>`
                    : ''}
+               ${workedLastLineHtml(hs.active_call)}
                <div class="tx-time" id="tx-${hs.id}">${fmtTx(hs.tx_start)}</div>`;
         } else if (isLastHeard) {
             infoBlock = `<div class="listening">Last heard:
                  <a class="recent-call" href="https://www.qrz.com/db/${hs.active_call}"
                     target="_blank" rel="noopener" onclick="event.stopPropagation()">${hs.active_call}</a>
+                 ${workedBadgeHtml(hs.active_call)}
                </div>
                ${(hs.caller_name || hs.caller_location)
                    ? `<div class="caller-info">${[hs.caller_name, hs.caller_location].filter(Boolean).join(' — ')}</div>`
@@ -6006,6 +6206,582 @@ function renderFleetStatusCard(data) {
             </div>
         </div>`;
     }).join('');
+}
+
+// --- My Signal (PSK Reporter reports of your own call, /api/my_signal) --
+// A Leaflet mini map (same keyless Esri dark tiles as the Live map) with a
+// line from your station to every receiver, per-band rows (farthest
+// station, count, modes, best SNR) and a 15/30/60 min window picked here.
+// The server always returns the last 60 min, so the window is a filter.
+var msData = null, msSel = null, msMap = null, msLayer = null;
+var msWin = 30;
+try { msWin = parseInt(localStorage.getItem('mySignalWindow'), 10) || 30; } catch (e) {}
+const MS_BAND_ORDER = ['160m', '80m', '60m', '40m', '30m', '20m', '17m', '15m', '12m', '10m', '6m', '2m'];
+function msDir(b) { return compassDir(b); }
+function msShown() {
+    const cut = Date.now() / 1000 - msWin * 60;
+    return ((msData && msData.spots) || []).filter(s => s.heard_at == null || s.heard_at >= cut);
+}
+function setMySignalWindow(w) {
+    msWin = w;
+    try { localStorage.setItem('mySignalWindow', String(w)); } catch (e) {}
+    renderMySignal(); renderMySignalDrawer();
+}
+function selectMySignalBand(b) { msSel = msSel === b ? null : b; renderMySignal(); renderMySignalDrawer(); }
+function fmtSnr(v) { return v == null ? '—' : (v > 0 ? '+' : '') + v + ' dB'; }
+function renderMySignal() {
+    const body = document.getElementById('ms-body');
+    if (!body || !msData) return;
+    document.querySelectorAll('#ms-win button').forEach(b => b.classList.toggle('on', +b.dataset.w === msWin));
+    if (msData.callsign) document.getElementById('ms-title').textContent = '📶 My Signal · ' + msData.callsign;
+    if (!msData.configured) {
+        body.innerHTML = '<div class="ms-empty"><b>Add your callsign to use this card</b>Settings → Integrations → PSK Reporter.</div>';
+        return;
+    }
+    const rows = msShown();
+    const bands = MS_BAND_ORDER.filter(b => rows.some(r => r.band === b)).concat(
+        Array.from(new Set(rows.map(r => r.band).filter(b => b && !MS_BAND_ORDER.includes(b)))));
+    if (msSel && !bands.includes(msSel)) msSel = null;
+    const ago = msData.fetched_at ? fmtAgoCompact(Math.max(0, Date.now() / 1000 - msData.fetched_at)) + ' ago' : 'not yet';
+    if (!body.querySelector('.ms-map')) {
+        body.innerHTML = '<div class="ms-map" id="ms-map"></div><div class="ms-bands" id="ms-bands"></div><div class="ms-foot" id="ms-foot"></div>';
+        msMap = null;
+    }
+    document.getElementById('ms-bands').innerHTML = rows.length ? bands.map(b => {
+        const br = rows.filter(r => r.band === b);
+        const far = br.slice().sort((x, y) => (y.dist_mi || 0) - (x.dist_mi || 0))[0];
+        const snrs = br.map(r => r.snr).filter(v => v != null);
+        const modes = Array.from(new Set(br.map(r => r.mode).filter(Boolean)));
+        return `<div class="ms-band ${msSel === b ? 'on' : ''}" onclick="selectMySignalBand('${escapeHtml(b)}')" title="Show only ${escapeHtml(b)}">
+            <span class="b">${escapeHtml(b)}</span>
+            <span class="far"><b>${escapeHtml(far.receiver_call || '?')}</b> ${far.dist_mi != null ? far.dist_mi.toLocaleString() + ' mi ' + msDir(far.bearing) : ''}${modes.length ? ' · ' + escapeHtml(modes.join('/')) : ''}</span>
+            <span class="n">${br.length} heard${snrs.length ? ' · best ' + fmtSnr(Math.max(...snrs)) : ''}</span></div>`;
+    }).join('') : `<div class="ms-empty"><b>Not heard in the last ${msWin} min</b>PSK Reporter only sees digital modes (FT8, FT4, JS8, PSK…).</div>`;
+    const stations = new Set(rows.map(r => r.receiver_call)).size;
+    const farAll = rows.slice().sort((x, y) => (y.dist_mi || 0) - (x.dist_mi || 0))[0];
+    document.getElementById('ms-foot').textContent = (rows.length
+        ? `${stations} station${stations === 1 ? '' : 's'}${farAll && farAll.dist_mi != null ? ` · farthest ${farAll.receiver_call} ${farAll.dist_mi.toLocaleString()} mi` : ''} · `
+        : '') + `PSK Reporter, updated ${ago}${msData.ok === false ? ' (last fetch failed)' : ''}`;
+    drawMySignalMap(rows);
+}
+function drawMySignalMap(rows) {
+    const el = document.getElementById('ms-map');
+    if (!el || typeof L === 'undefined') return;
+    if (!msMap) {
+        msMap = L.map(el, { zoomControl: false, attributionControl: true, worldCopyJump: true, maxZoom: 8, minZoom: 1 });
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles © Esri', maxNativeZoom: 16, maxZoom: 19
+        }).addTo(msMap);
+        msLayer = L.layerGroup().addTo(msMap);
+        msMap.setView([30, -40], 1);
+        msMap._msFitKey = null;
+    }
+    msMap.invalidateSize();
+    msLayer.clearLayers();
+    const hasQth = msData.qth_lat != null;
+    const pts = [];
+    rows.slice().sort((a, b) => (msSel === a.band) - (msSel === b.band)).forEach(r => {
+        if (r.lat == null) return;
+        const on = !msSel || r.band === msSel;
+        if (hasQth) L.polyline([[msData.qth_lat, msData.qth_lon], [r.lat, r.lon]], {
+            color: on ? '#4fd8c4' : '#5b6470', weight: on ? 1.2 : 0.8, opacity: on ? 0.55 : 0.25, interactive: false }).addTo(msLayer);
+        L.circleMarker([r.lat, r.lon], { radius: on ? 4.5 : 3, color: '#1a1e25', weight: 1.5,
+            fillColor: on ? '#4fd8c4' : '#5b6470', fillOpacity: on ? 1 : 0.55 })
+            .bindTooltip(`<b>${escapeHtml(r.receiver_call || '?')}</b> · ${escapeHtml(r.band || '')}${r.mode ? ' ' + escapeHtml(r.mode) : ''}<br>` +
+                `${r.dist_mi != null ? r.dist_mi.toLocaleString() + ' mi ' + msDir(r.bearing) + ' · ' : ''}${fmtSnr(r.snr)}` +
+                `${r.heard_at ? ' · ' + fmtAgoCompact(Math.max(0, Date.now() / 1000 - r.heard_at)) + ' ago' : ''}`)
+            .addTo(msLayer);
+        if (on) pts.push([r.lat, r.lon]);
+    });
+    if (hasQth) {
+        L.circleMarker([msData.qth_lat, msData.qth_lon], { radius: 5.5, color: '#1a1e25', weight: 2, fillColor: '#ffb648', fillOpacity: 1 })
+            .bindTooltip('Your station').addTo(msLayer);
+        pts.push([msData.qth_lat, msData.qth_lon]);
+    }
+    // Re-fit only when what's shown changes, so a poll doesn't undo the user's panning.
+    const key = msWin + '|' + msSel + '|' + pts.length;
+    if (pts.length && msMap._msFitKey !== key) {
+        msMap._msFitKey = key;
+        if (pts.length === 1) msMap.setView(pts[0], 3);
+        else msMap.fitBounds(pts, { padding: [14, 14], maxZoom: 5 });
+    }
+}
+function fetchMySignal() {
+    fetch('/api/my_signal').then(r => r.json()).then(d => { msData = d; renderMySignal(); renderMySignalDrawer(); }).catch(() => {});
+}
+if (SHOW_MY_SIGNAL) {
+    fetchMySignal();
+    setInterval(fetchMySignal, 2 * 60000);   // server caches 10 min; this only catches the refresh sooner
+}
+function openMySignalDrawer() {
+    closeAllDrawers();
+    document.getElementById('my-signal-drawer').classList.add('open');
+    document.getElementById('hs-drawer-backdrop').classList.add('open');
+    renderMySignalDrawer();
+}
+function openMySignalOnMap() {
+    closeAllDrawers();
+    const tab = document.querySelector('.tab-btn[data-tab="map"]');
+    if (tab) tab.click();
+    setTimeout(() => {
+        const cb = document.getElementById('psk-toggle');
+        if (cb && !cb.checked && typeof togglePsk === 'function') { cb.checked = true; togglePsk(); }
+    }, 600);
+}
+function renderMySignalDrawer() {
+    const d = document.getElementById('my-signal-drawer');
+    if (!d || !d.classList.contains('open') || !msData) return;
+    const rows = msShown().filter(r => !msSel || r.band === msSel).sort((a, b) => (b.dist_mi || 0) - (a.dist_mi || 0));
+    d.innerHTML = `<div class="hs-drawer-header"><div class="hs-drawer-title-row">
+            <div class="hs-drawer-title">📶 Who heard ${escapeHtml(msData.callsign || 'you')}</div>
+            <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div></div>
+            <div class="hs-drawer-sub">last ${msWin} min${msSel ? ' · ' + escapeHtml(msSel) : ''} · ${rows.length} report${rows.length === 1 ? '' : 's'} · sorted by distance</div></div>
+        <div class="hs-drawer-body">
+            <div style="margin:12px 0"><button class="btn-link-live" onclick="openMySignalOnMap()">Open on the Live map ↗</button></div>
+            ${rows.length ? `<table class="ms-rep"><tr><th>Heard by</th><th>Band</th><th>Mode</th><th class="r">Distance</th><th class="r">SNR</th><th class="r">Ago</th></tr>
+            ${rows.map(r => `<tr><td>${escapeHtml(r.receiver_call || '?')}</td><td>${escapeHtml(r.band || '')}</td><td>${escapeHtml(r.mode || '—')}</td>
+                <td class="r">${r.dist_mi != null ? r.dist_mi.toLocaleString() + ' mi ' + msDir(r.bearing) : '—'}</td><td class="r">${fmtSnr(r.snr)}</td>
+                <td class="r" style="color:var(--text-dim)">${r.heard_at ? fmtAgoCompact(Math.max(0, Date.now() / 1000 - r.heard_at)) : ''}</td></tr>`).join('')}</table>`
+            : `<div class="hs-empty-note">Nobody has reported hearing you in the last ${msWin} min.</div>`}
+        </div>`;
+}
+
+// --- Hotspot Health (health_history.py / /api/hotspot_health) ---------
+// A dedicated optional card, a full drawer (any hotspot, 7 or 30 days),
+// and a compact Health section in each hotspot's own drawer. Temperatures
+// arrive in °C and are shown in the weather unit (Settings -> General).
+var healthData = null, healthDrawerState = { id: null, days: 7 };
+function fmtHealthTemp(c) {
+    if (c == null) return '—';
+    return HEALTH_TEMP_UNIT === 'C' ? `${Math.round(c)}°C` : `${Math.round(c * 9 / 5 + 32)}°F`;
+}
+function fmtHealthDelta(c) {
+    const d = HEALTH_TEMP_UNIT === 'C' ? c : c * 9 / 5;
+    return `${d > 0 ? '↑' : '↓'} ${Math.abs(Math.round(d))}°${HEALTH_TEMP_UNIT === 'C' ? 'C' : 'F'} vs last week`;
+}
+function fmtHealthDur(s) {
+    if (s == null) return '';
+    const m = Math.round(s / 60);
+    return m >= 1440 ? `${Math.floor(m / 1440)}d ${Math.floor(m % 1440 / 60)}h` : m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${Math.max(1, m)} min`;
+}
+function healthStripHtml(strip) {
+    return `<div class="hh-strip">${(strip || []).map(s => `<i class="${s === 'on' ? '' : s}"></i>`).join('')}</div>`;
+}
+function healthSparkHtml(vals, warn) {
+    const v = (vals || []).filter(x => x != null);
+    if (v.length < 2) return '';
+    const w = 80, h = 18, mn = Math.min(...v), mx = Math.max(...v), sp = (mx - mn) || 1;
+    const pts = []; let i = 0;
+    vals.forEach((x, k) => { if (x != null) pts.push(`${(k / (vals.length - 1) * (w - 4) + 2).toFixed(1)},${(h - 3 - (x - mn) / sp * (h - 6)).toFixed(1)}`); });
+    const last = pts[pts.length - 1].split(',');
+    const col = warn ? 'var(--caution)' : 'var(--live)';
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts.join(' ')}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="2" fill="${col}"/></svg>`;
+}
+function healthNote(e, portable) {
+    const bits = [];
+    if (e.outages) bits.push(`${e.outages} outage${e.outages === 1 ? '' : 's'}`);
+    if (e.reboots) bits.push(`${e.reboots} reboot${e.reboots === 1 ? '' : 's'}`);
+    if (portable && e.away_hours) bits.push(`away ${Math.round(e.away_hours)}h`);
+    if (!bits.length && e.cpu != null) bits.push(`CPU ${Math.round(e.cpu)}%`);
+    if (e.uptime_s) bits.push(`up ${fmtHealthDur(e.uptime_s)}`);
+    return bits.join(' · ');
+}
+function healthRowHtml(id, e, d) {
+    const portable = (d.portable || []).includes(id);
+    const dot = e.online === false ? (portable ? 'away' : 'off') : '';
+    const warn = e.week_delta_c != null && e.week_delta_c >= 3;
+    return `<div class="hh-row" onclick="openHealthDrawer('${escapeHtml(id)}')">
+        <div class="hh-top"><span class="hh-dot ${dot}"></span><span class="hh-name">${escapeHtml(d.names[id] || id)}</span>
+            <span class="hh-pct">${e.uptime_pct == null ? '—' : e.uptime_pct + '%'}</span></div>
+        ${healthStripHtml(e.strip)}
+        <div class="hh-meta"><span class="temp">${fmtHealthTemp(e.temp_c)}</span>${healthSparkHtml(e.spark, warn)}
+            ${warn ? `<span class="warn">${fmtHealthDelta(e.week_delta_c)}</span>` : `<span class="note">${escapeHtml(healthNote(e, portable))}</span>`}</div>
+    </div>`;
+}
+function renderHealthCard() {
+    const el = document.getElementById('hh-list');
+    if (!el || !healthData) return;
+    const ids = (healthData.order || Object.keys(healthData.hotspots || {})).filter(id => (healthData.hotspots || {})[id]);
+    const withData = ids.filter(id => healthData.hotspots[id].samples > 0);
+    el.innerHTML = withData.length
+        ? withData.map(id => healthRowHtml(id, healthData.hotspots[id], healthData)).join('')
+        : '<div class="hh-empty">Collecting — the first sample is taken a minute after startup, then every 5 minutes.</div>';
+}
+function fetchHealth() {
+    fetch('/api/hotspot_health?days=7').then(r => r.json()).then(d => { healthData = d; renderHealthCard(); }).catch(() => {});
+}
+if (SHOW_HOTSPOT_HEALTH) {
+    fetchHealth();
+    setInterval(fetchHealth, 5 * 60000);
+}
+function fetchHotspotDrawerHealth(id) {
+    fetch('/api/hotspot_health?days=7&id=' + encodeURIComponent(id)).then(r => r.json()).then(d => {
+        const el = document.getElementById('hs-health-section');
+        if (!el || currentDrawerId !== id) return;
+        const e = (d.hotspots || {})[id];
+        if (!e || !e.samples) { el.innerHTML = ''; return; }
+        const types = d.types || {};
+        const warn = e.week_delta_c != null && e.week_delta_c >= 3;
+        el.innerHTML = `<div class="hs-drawer-section-title" style="justify-content:space-between">
+                <span>Health · 7 days</span><a class="hs-settings-link" href="#" onclick="event.preventDefault(); openHealthDrawer('${escapeHtml(id)}')">Full history →</a></div>
+            ${healthStripHtml(e.strip)}
+            <div class="hh-meta"><span>Uptime <b class="temp">${e.uptime_pct == null ? '—' : e.uptime_pct + '%'}</b></span>
+                <span class="temp">${fmtHealthTemp(e.temp_c)}</span>${healthSparkHtml(e.spark, warn)}
+                ${warn ? `<span class="warn">${fmtHealthDelta(e.week_delta_c)}</span>` : `<span class="note">${escapeHtml(healthNote(e, (d.portable || []).includes(id)))}</span>`}</div>`;
+    }).catch(() => {});
+}
+function healthLineChart(series, key, opts) {
+    const W = 520, H = 120, L = 34, R = 6, T = 8, B = 18;
+    const vals = series.map(x => x[key]);
+    const have = vals.filter(v => v != null);
+    if (have.length < 2) return '<div class="hs-empty-note">Not enough samples yet.</div>';
+    const conv = opts.conv || (v => v);
+    const cv = vals.map(v => v == null ? null : conv(v));
+    let mn = opts.min != null ? opts.min : Math.floor(Math.min(...cv.filter(v => v != null)) / 10) * 10;
+    let mx = opts.max != null ? opts.max : Math.ceil(Math.max(...cv.filter(v => v != null), opts.thresh != null ? conv(opts.thresh) : -1e9) / 10) * 10;
+    if (mx <= mn) mx = mn + 10;
+    const x = i => L + i / Math.max(1, cv.length - 1) * (W - L - R);
+    const y = v => T + (1 - (v - mn) / (mx - mn)) * (H - T - B);
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${opts.label}">`;
+    const step = (mx - mn) / 3;
+    for (let k = 0; k <= 3; k++) { const t = Math.round(mn + step * k); s += `<line x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--border)"/><text x="${L - 4}" y="${y(t) + 3}" font-size="9" text-anchor="end" fill="var(--text-dim)" font-family="var(--font-mono)">${t}${opts.unit}</text>`; }
+    if (opts.thresh != null) { const tv = conv(opts.thresh); s += `<line x1="${L}" x2="${W - R}" y1="${y(tv)}" y2="${y(tv)}" stroke="var(--caution)" stroke-dasharray="4 3"/><text x="${W - R}" y="${y(tv) - 3}" font-size="9" text-anchor="end" fill="var(--caution)" font-family="var(--font-mono)">warm ${Math.round(tv)}${opts.unit}</text>`; }
+    let d = '', pen = false;
+    cv.forEach((v, i) => { if (v == null) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); pen = true; });
+    s += `<path d="${d}" fill="none" stroke="${opts.color}" stroke-width="2" stroke-linejoin="round"/>`;
+    const n = cv.length, bucket = opts.bucket, start = opts.start;
+    const every = n > 100 ? Math.round(n / 6) : 24;
+    for (let i = 0; i < n; i += every) {
+        const dt = new Date((start + i * bucket) * 1000);
+        s += `<text x="${x(i)}" y="${H - 4}" font-size="9" fill="var(--text-dim)" font-family="var(--font-mono)">${dt.toLocaleDateString([], { weekday: 'short', day: 'numeric' })}</text>`;
+    }
+    return s + '</svg>';
+}
+function openHealthDrawer(id) {
+    closeAllDrawers();
+    if (id) healthDrawerState.id = id;
+    document.getElementById('health-drawer').classList.add('open');
+    document.getElementById('hs-drawer-backdrop').classList.add('open');
+    renderHealthDrawer(null);
+    fetchHealthDrawer();
+}
+function setHealthDrawer(key, val) { healthDrawerState[key] = val; fetchHealthDrawer(); }
+function fetchHealthDrawer() {
+    const st = healthDrawerState;
+    const firstFetch = !st.id;
+    fetch('/api/hotspot_health?days=' + st.days + (st.id ? '&id=' + encodeURIComponent(st.id) : ''))
+        .then(r => r.json()).then(d => {
+            if (firstFetch) {   // no hotspot chosen yet: take the first one, then fetch its detail
+                st.id = (d.order || Object.keys(d.names || {}))[0] || null;
+                if (st.id) return fetchHealthDrawer();
+            }
+            renderHealthDrawer(d);
+        }).catch(() => {});
+}
+function renderHealthDrawer(d) {
+    const drawer = document.getElementById('health-drawer');
+    if (!drawer.classList.contains('open')) return;
+    const st = healthDrawerState;
+    const e = d && st.id ? (d.hotspots || {})[st.id] : null;
+    const names = (d && d.names) || {};
+    const isOs4 = d && (d.types || {})[st.id] === 'openspot4';
+    const head = `<div class="hs-drawer-header"><div class="hs-drawer-title-row">
+            <div class="hs-drawer-title">🩺 ${escapeHtml(names[st.id] || 'Hotspot health')}</div>
+            <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div></div>
+            <div class="hs-drawer-sub">${e && e.uptime_s ? 'up ' + fmtHealthDur(e.uptime_s) + ' since last reboot' : 'uptime, temperature, CPU and reboots'}</div></div>`;
+    if (!d) { drawer.innerHTML = head + '<div class="hs-drawer-body"><div class="hs-empty-note">Loading…</div></div>'; return; }
+    const sel = `<select onchange="setHealthDrawer('id', this.value)" aria-label="Hotspot">${Object.keys(names).map(id =>
+        `<option value="${escapeHtml(id)}" ${id === st.id ? 'selected' : ''}>${escapeHtml(names[id])}</option>`).join('')}</select>`;
+    const seg = `<div class="ap-seg">${[7, 30].map(n => `<button class="${st.days === n ? 'on' : ''}" onclick="setHealthDrawer('days', ${n})">${n} days</button>`).join('')}</div>`;
+    let body = `<div class="hh-controls">${sel}${seg}</div>`;
+    if (!e || !e.samples) {
+        body += '<div class="hs-empty-note">No samples for this hotspot yet — one is taken every 5 minutes.</div>';
+    } else {
+        const start = d.now - d.days * 86400;
+        const series = e.series || [];
+        const bucket = d.days > 7 ? 4 * 3600 : 3600;
+        const tempConv = HEALTH_TEMP_UNIT === 'C' ? (v => v) : (v => v * 9 / 5 + 32);
+        const evs = (e.events || []).map(ev => {
+            const when = new Date(ev.at * 1000).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const tag = ev.kind === 'offline' ? '<span class="hh-tag off">OFFLINE</span>' : ev.kind === 'reboot' ? '<span class="hh-tag rb">REBOOT</span>' : '<span class="hh-tag warm">WARM</span>';
+            const txt = ev.kind === 'offline' ? `${fmtHealthDur(ev.dur)}${ev.ongoing ? ' so far' : ''}`
+                : ev.kind === 'reboot' ? 'Uptime reset (seen at the next sample)'
+                : `Above ${fmtHealthTemp(d.warm_c)} for ${fmtHealthDur(ev.dur)}, peak ${fmtHealthTemp(ev.peak_c)}`;
+            return `<div class="hh-ev"><span class="when">${escapeHtml(when)}</span>${tag}<span>${escapeHtml(txt)}</span></div>`;
+        }).join('');
+        body += `${healthStripHtml(e.strip)}
+            <div class="hh-stat3">
+                <div><div class="k">Uptime (${d.days}d)</div><div class="v">${e.uptime_pct == null ? '—' : e.uptime_pct + '%'}</div></div>
+                <div><div class="k">Outages</div><div class="v">${e.outages}${e.outage_sec ? ' · ' + fmtHealthDur(e.outage_sec) : ''}</div></div>
+                <div><div class="k">Reboots</div><div class="v">${isOs4 ? '—' : e.reboots}</div></div>
+            </div>
+            <div class="hs-drawer-section"><div class="hs-drawer-section-title">Temperature</div>
+                <div class="hh-chart">${healthLineChart(series, 't', { label: 'Temperature', unit: '°', conv: tempConv, thresh: d.warm_c, color: 'var(--live)', bucket, start })}</div></div>
+            ${isOs4 ? '' : `<div class="hs-drawer-section"><div class="hs-drawer-section-title">CPU</div>
+                <div class="hh-chart">${healthLineChart(series, 'cpu', { label: 'CPU', unit: '%', min: 0, max: 100, color: 'var(--text-muted)', bucket, start })}</div></div>`}
+            <div class="hs-drawer-section"><div class="hs-drawer-section-title">Events <span class="count">(${(e.events || []).length})</span></div>
+                ${evs || '<div class="hs-empty-note">No outages, reboots or warm spells in this range.</div>'}</div>
+            <div class="ap-foot">One sample every 5 minutes, kept 30 days${d.since ? ' · collecting since ' + new Date(d.since * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}. Warm alerts go to Notifications (hotspot events) at ${fmtHealthTemp(d.warm_c)}.</div>`;
+    }
+    drawer.innerHTML = head + `<div class="hs-drawer-body">${body}</div>`;
+}
+
+// --- Activity patterns (Hotspot Activity card -> Patterns drawer) ------
+// Day-of-week x hour-of-day heatmap from storage_activity's 90-day hourly
+// rollup (/api/activity_patterns). The server sends raw UTC hours; the
+// browser buckets them into its own time zone (or UTC), averages per week
+// over the chosen range, and looks for regular nets: an hour that's at
+// least 2x its usual level for that hour, in at least 3 of every 4 weeks.
+var apData = null, apFetchedAt = 0;
+var apState = { hs: 'all', m: 'time', r: 12, z: 'local' };
+const AP_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const AP_NET_MIN_WEEKS = 4;
+
+function apPad(n) { return String(n).padStart(2, '0'); }
+function apFmtTime(s) { return s >= 3600 ? (s / 3600).toFixed(1) + ' h' : s >= 60 ? Math.round(s / 60) + ' min' : Math.round(s) + ' s'; }
+function apFmtVal(v, m) { return m === 'time' ? apFmtTime(v) : (v >= 10 ? Math.round(v) : v.toFixed(1)) + ' tx'; }
+// dow (Mon=0) and hour of an epoch second, in local time or UTC
+function apDH(ts, utc) {
+    const d = new Date(ts * 1000);
+    return utc ? [(d.getUTCDay() + 6) % 7, d.getUTCHours()] : [(d.getDay() + 6) % 7, d.getHours()];
+}
+function apCompute(data, st) {
+    const utc = st.z === 'utc';
+    const now = data.now;
+    const nowHour = Math.floor(now / 3600) * 3600;
+    const since = data.since == null ? nowHour : data.since;
+    const start = Math.max(nowHour - st.r * 7 * 86400 + 3600, since);
+    const nWeeks = Math.floor((nowHour + 3600 - start) / (7 * 86400));
+    const z = () => AP_DAYS.map(() => new Array(24).fill(0));
+    const sum = z(), cover = z();
+    const weekly = Array.from({ length: Math.max(nWeeks, 0) }, z);
+    const viaBy = {}, hsBy = {};
+    for (let t = start; t <= nowHour; t += 3600) { const [d, h] = apDH(t, utc); cover[d][h]++; }
+    let any = false;
+    for (const [ts, hid, via, tx, secs] of data.rows) {
+        if (ts < start || (st.hs !== 'all' && hid !== st.hs)) continue;
+        const v = st.m === 'time' ? secs : tx;
+        if (!v) continue;
+        any = true;
+        const [d, h] = apDH(ts, utc);
+        sum[d][h] += v;
+        const w = Math.floor((ts - start) / (7 * 86400));
+        if (w < nWeeks) weekly[w][d][h] += v;
+        const k = d + ':' + h;
+        if (via) { const kv = k + '|' + hid; viaBy[kv] = viaBy[kv] || {}; viaBy[kv][via] = (viaBy[kv][via] || 0) + v; }
+        hsBy[k] = hsBy[k] || {}; hsBy[k][hid] = (hsBy[k][hid] || 0) + v;
+    }
+    const avg = sum.map((r, d) => r.map((v, h) => cover[d][h] ? v / cover[d][h] : null));
+    // cover counts how many times each day/hour occurred in the range
+    // (one per week), so this is the average per week
+    const nets = [];
+    if (nWeeks >= AP_NET_MIN_WEEKS) {
+        const floor = st.m === 'time' ? 180 : 4;
+        for (let d = 0; d < 7; d++) for (let h = 0; h < 24; h++) {
+            let hits = 0;
+            for (let w = 0; w < nWeeks; w++) {
+                const others = [];
+                for (let dd = 0; dd < 7; dd++) if (dd !== d) others.push(weekly[w][dd][h]);
+                others.sort((a, b) => a - b);
+                const med = (others[2] + others[3]) / 2;
+                if (weekly[w][d][h] >= Math.max(2 * med, floor)) hits++;
+            }
+            if (hits / nWeeks >= 0.75) {
+                const top = o => o ? Object.entries(o).sort((a, b) => b[1] - a[1])[0][0] : '';
+                const hs = top(hsBy[d + ':' + h]);
+                nets.push({ d, h, hits, n: nWeeks, v: avg[d][h] || 0, hs, via: top(viaBy[d + ':' + h + '|' + hs]) });
+            }
+        }
+        nets.sort((a, b) => b.hits - a.hits || b.v - a.v);
+    }
+    const flat = avg.flat().filter(v => v != null);
+    const max = Math.max(0, ...flat);
+    const rowTot = avg.map(r => r.reduce((a, v) => a + (v || 0), 0));
+    const colTot = Array.from({ length: 24 }, (_, h) => avg.reduce((a, r) => a + (r[h] || 0), 0));
+    return { avg, nets: nets.slice(0, 4), max, rowTot, colTot, any, since, start, nWeeks };
+}
+function apColor(v, max) {
+    if (v == null) return null;
+    if (!v || !max) return 'var(--panel-2)';
+    // square-root scale: one very busy net hour shouldn't flatten every
+    // other hour into the same dark shade (hover shows the exact value)
+    return `color-mix(in oklab, var(--live) ${Math.round(8 + Math.sqrt(v / max) * 92)}%, var(--panel-2))`;
+}
+function apHsName(id) {
+    const live = (lastApiData || []).find(h => h.id === id);
+    return (live && live.name) || (apData && apData.hotspots && apData.hotspots[id]) || id;
+}
+// Next occurrence of (dow, hour) as the YYYYMMDD calendar date in the
+// chosen zone, for the .ics link.
+function apNextDate(d, h, utc) {
+    const now = new Date();
+    for (let i = 0; i < 8; i++) {
+        const c = new Date(now.getTime() + i * 86400000);
+        const cd = utc ? (c.getUTCDay() + 6) % 7 : (c.getDay() + 6) % 7;
+        if (cd !== d) continue;
+        const y = utc ? c.getUTCFullYear() : c.getFullYear();
+        const m = (utc ? c.getUTCMonth() : c.getMonth()) + 1;
+        const dd = utc ? c.getUTCDate() : c.getDate();
+        const nowH = utc ? now.getUTCHours() : now.getHours();
+        if (i === 0 && h <= nowH) continue;
+        return `${y}${apPad(m)}${apPad(dd)}`;
+    }
+    return '';
+}
+function apNetTitle(n) {
+    return ['Net', n.via ? 'TG ' + n.via : '', apHsName(n.hs)].filter(Boolean).join(' · ');
+}
+function apCalHref(n, utc) {
+    const tz = utc ? 'UTC' : (Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
+    const q = new URLSearchParams({
+        date: apNextDate(n.d, n.h, utc), hour: n.h, tz,
+        title: apNetTitle(n),
+        desc: `Regular activity found by the Hotspot Activity heatmap: busy in ${n.hits} of the last ${n.n} weeks.`,
+    });
+    return '/api/net_reminder.ics?' + q.toString();
+}
+function fetchActivityPatterns(force) {
+    if (!force && apData && Date.now() - apFetchedAt < 5 * 60000) { renderActivityPatternsDrawer(); return; }
+    fetch('/api/activity_patterns').then(r => r.json()).then(d => {
+        apData = d; apFetchedAt = Date.now();
+        renderActivityPatternsDrawer();
+    }).catch(() => {
+        const d = document.getElementById('ap-drawer');
+        const b = d && d.querySelector('.hs-drawer-body');
+        if (b) b.innerHTML = '<div class="hs-empty-note">Couldn\'t load activity history.</div>';
+    });
+}
+function openActivityPatternsDrawer() {
+    closeAllDrawers();
+    const d = document.getElementById('ap-drawer');
+    d.classList.add('open');
+    document.getElementById('hs-drawer-backdrop').classList.add('open');
+    if (!apData) {
+        d.innerHTML = `<div class="hs-drawer-header"><div class="hs-drawer-title-row">
+            <div class="hs-drawer-title">▦ Activity patterns</div>
+            <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div></div></div>
+            <div class="hs-drawer-body"><div class="hs-empty-note">Loading…</div></div>`;
+    }
+    fetchActivityPatterns(false);
+}
+function apSet(key, val) { apState[key] = val; renderActivityPatternsDrawer(); }
+function renderActivityPatternsDrawer() {
+    const drawer = document.getElementById('ap-drawer');
+    if (!drawer || !drawer.classList.contains('open') || !apData) return;
+    const st = apState, utc = st.z === 'utc';
+    const hsIds = Array.from(new Set([...(lastApiData || []).map(h => h.id), ...Object.keys(apData.hotspots || {})]))
+        .filter(id => (apData.hotspots || {})[id] || (lastApiData || []).some(h => h.id === id));
+    if (st.hs !== 'all' && !hsIds.includes(st.hs)) st.hs = 'all';
+    const c = apCompute(apData, st);
+    const seg = (key, opts) => `<div class="ap-seg">${opts.map(([v, l]) =>
+        `<button class="${String(st[key]) === String(v) ? 'on' : ''}" onclick="apSet('${key}', ${typeof v === 'number' ? v : `'${v}'`})">${l}</button>`).join('')}</div>`;
+    const daysCollected = Math.max(1, Math.round((apData.now - c.since) / 86400));
+    const sinceStr = new Date(c.since * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+
+    let grid = '';
+    if (!c.any) {
+        grid = `<div class="hs-empty-note">No transmissions recorded in this range yet. The heatmap fills in as your hotspots are used.</div>`;
+    } else {
+        const netSet = new Set(c.nets.map(n => n.d + ':' + n.h));
+        const rMax = Math.max(...c.rowTot) || 1, cMax = Math.max(...c.colTot) || 1;
+        grid = '<div class="ap-grid" id="ap-grid"><div></div>';
+        for (let h = 0; h < 24; h++) grid += `<div class="colbar" title="${apPad(h)}:00, all days: ${apFmtVal(c.colTot[h], st.m)} per week"><i style="height:${Math.max(2, c.colTot[h] / cMax * 100)}%"></i></div>`;
+        grid += '<div class="hl" style="align-self:end">per wk</div>';
+        c.avg.forEach((row, d) => {
+            grid += `<div class="dl">${AP_DAYS[d]}</div>`;
+            row.forEach((v, h) => {
+                const col = apColor(v, c.max);
+                grid += `<div class="cell${col == null ? ' nodata' : ''}${netSet.has(d + ':' + h) ? ' net' : ''}" data-d="${d}" data-h="${h}"${col ? ` style="background:${col}"` : ''}></div>`;
+            });
+            grid += `<div class="rt"><i style="width:${Math.max(2, c.rowTot[d] / rMax * 18)}px"></i>${apFmtVal(c.rowTot[d], st.m).replace(' tx', '')}</div>`;
+        });
+        grid += '<div></div>';
+        for (let h = 0; h < 24; h++) grid += `<div class="hl">${h % 3 === 0 ? apPad(h) : ''}</div>`;
+        grid += `<div class="hl">${utc ? 'UTC' : 'local'}</div></div>`;
+        grid += `<div class="ap-scale"><span>less</span><span class="ramp">${[0.05, 0.25, 0.5, 0.75, 1].map(t =>
+            `<span style="background:color-mix(in oklab, var(--live) ${Math.round(8 + Math.sqrt(t) * 92)}%, var(--panel-2))"></span>`).join('')}</span>
+            <span>more · max ${apFmtVal(c.max, st.m)}/week in one hour</span>
+            ${c.nets.length ? '<span class="netkey"><span></span>regular net</span>' : ''}</div>`;
+    }
+
+    let ins = '';
+    if (c.any) {
+        let best = { v: -1, d: 0, h: 0 };
+        c.avg.forEach((r, d) => r.forEach((v, h) => { if ((v || 0) > best.v) best = { v: v || 0, d, h }; }));
+        const cMax = Math.max(...c.colTot) || 1;
+        let quiet = { s: 0, len: 0 }, run = 0;
+        for (let i = 0; i < 48; i++) {
+            const h = i % 24;
+            if (c.colTot[h] <= cMax * 0.08) { run++; if (run > quiet.len && run <= 23) quiet = { s: (i - run + 1) % 24, len: run }; }
+            else run = 0;
+        }
+        const busiestDay = c.rowTot.indexOf(Math.max(...c.rowTot));
+        const wkd = c.rowTot.slice(0, 5).reduce((a, b) => a + b, 0) / 5, wke = (c.rowTot[5] + c.rowTot[6]) / 2;
+        ins = `<div class="ap-ins">
+            <div><div class="k">Busiest hour</div><div class="v">${AP_DAYS[best.d]} ${apPad(best.h)}:00</div><div class="s">${apFmtVal(best.v, st.m)} per week</div></div>
+            <div><div class="k">Busiest day</div><div class="v">${AP_DAYS[busiestDay]}</div><div class="s">weekends ${wkd ? Math.round(wke / wkd * 100) + '% of' : 'vs'} a weekday</div></div>
+            <div><div class="k">Quiet stretch</div><div class="v">${quiet.len >= 2 ? apPad(quiet.s) + ':00–' + apPad((quiet.s + quiet.len) % 24) + ':00' : '—'}</div><div class="s">${quiet.len >= 2 ? 'almost no traffic, any day' : 'no long quiet stretch'}</div></div>
+        </div>`;
+    }
+
+    let nets;
+    if (c.nWeeks < AP_NET_MIN_WEEKS) {
+        nets = `<div class="hs-empty-note">Needs ${AP_NET_MIN_WEEKS} weeks of history to spot a net that repeats every week — ${daysCollected} day${daysCollected === 1 ? '' : 's'} so far.</div>`;
+    } else if (!c.nets.length) {
+        nets = `<div class="hs-empty-note">Nothing repeats reliably enough to call a regular net.</div>`;
+    } else {
+        nets = c.nets.map(n => `<div class="ap-net">
+            <span class="when">${AP_DAYS[n.d]} ${apPad(n.h)}:00</span>
+            <span class="what">${escapeHtml([n.via ? 'TG ' + n.via : '', apHsName(n.hs)].filter(Boolean).join(' on '))}<br>busy in ${n.hits} of ${n.n} weeks</span>
+            <a href="${apCalHref(n, utc)}" download="net-reminder.ics" title="Weekly calendar event with a 15-minute reminder">📅 Add to calendar</a>
+        </div>`).join('');
+    }
+
+    drawer.innerHTML = `
+        <div class="hs-drawer-header">
+            <div class="hs-drawer-title-row">
+                <div class="hs-drawer-title">▦ Activity patterns</div>
+                <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
+            </div>
+            <div class="hs-drawer-sub">When your hotspots are busy · average per week, each hour</div>
+        </div>
+        <div class="hs-drawer-body">
+            <div class="ap-controls">
+                <select onchange="apSet('hs', this.value)" aria-label="Hotspot">
+                    <option value="all">All hotspots</option>
+                    ${hsIds.map(id => `<option value="${escapeHtml(id)}" ${st.hs === id ? 'selected' : ''}>${escapeHtml(apHsName(id))}</option>`).join('')}
+                </select>
+                ${seg('m', [['time', 'Talk time'], ['tx', 'Transmissions']])}
+                ${seg('r', [[4, '4 weeks'], [12, '12 weeks']])}
+                ${seg('z', [['local', 'Local'], ['utc', 'UTC']])}
+            </div>
+            ${grid}
+            ${ins}
+            <div class="hs-drawer-section">
+                <div class="hs-drawer-section-title">Regular nets</div>
+                ${nets}
+            </div>
+            <div class="ap-foot">Collecting since ${escapeHtml(sinceStr)} · ${daysCollected} day${daysCollected === 1 ? '' : 's'}${daysCollected < 28 ? ' so far — patterns get reliable after about 4 weeks' : ''} · history kept ${apData.retention_days || 90} days</div>
+        </div>`;
+
+    const g = document.getElementById('ap-grid');
+    if (g) {
+        let tip = document.getElementById('ap-tip');
+        if (!tip) { tip = document.createElement('div'); tip.id = 'ap-tip'; tip.hidden = true; document.body.appendChild(tip); }
+        g.onmousemove = e => {
+            const cell = e.target.closest('.cell');
+            if (!cell) { tip.hidden = true; return; }
+            const d = +cell.dataset.d, h = +cell.dataset.h, v = c.avg[d][h];
+            const net = c.nets.find(n => n.d === d && n.h === h);
+            tip.innerHTML = `<b>${AP_DAYS[d]} ${apPad(h)}:00–${apPad((h + 1) % 24)}:00</b><br>` +
+                (v == null ? 'not collected yet' : `${apFmtVal(v, st.m)} per week`) +
+                `<div class="t2">${st.r} weeks${net ? ` · busy in ${net.hits} of ${net.n} weeks — looks like a regular net` : ''}</div>`;
+            tip.hidden = false;
+            tip.style.left = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8) + 'px';
+            tip.style.top = (e.clientY + 14) + 'px';
+        };
+        g.onmouseleave = () => { tip.hidden = true; };
+    }
 }
 
 function openFleetStatusDrawer() {
@@ -6612,6 +7388,131 @@ function fmtAgoShort(epochSeconds) {
 // Message text and sender come from a public radio network (untrusted
 // input) and get inserted via innerHTML below -- escape both rather than
 // trusting APRS/HamAlert traffic to be well-formed.
+// --- Worked Before badges (worked.py / /api/worked) -------------------
+// One index of every callsign in qsos.json (base call -> count, bands,
+// confirmed bands, last few QSOs), fetched once a minute and shared by
+// every card through workedBadgeHtml(), so all the cards always agree.
+// `var`, not `let`: renderCards() can run before this line is reached.
+var WORKED = null;
+var WORKED_POLL_MS = 60000;
+// Mirrors worked.py's base_call(): EA8/W1ABC, W1ABC/P, W1ABC-9 -> W1ABC.
+// Anything with no letter+digit (a bare ASL node number) -> ''.
+function workedBaseCall(call) {
+    if (!call) return '';
+    const c = String(call).trim().toUpperCase().replace(/-\d+$/, '');
+    const cands = c.split('/').filter(p => p && /^[A-Z0-9]*[0-9][A-Z0-9]*[A-Z][A-Z0-9]*$/.test(p));
+    if (!cands.length) return '';
+    return cands.reduce((a, b) => (b.length > a.length ? b : a));
+}
+function workedInfo(call) {
+    if (!SHOW_WORKED_BADGES || !WORKED) return null;
+    const b = workedBaseCall(call);
+    return b ? (WORKED[b] || null) : null;
+}
+// 'new band' = worked this station before, but never on `band`.
+function workedIsNewBand(call, band) {
+    const w = workedInfo(call);
+    const bd = (band || '').toLowerCase();
+    return !!(w && bd && w.bands.length && !w.bands.includes(bd));
+}
+// opts.band: show "new band" when worked but not on this band.
+// opts.minN: hide unless worked at least this many times (Recent
+// Contacts passes 2, since the row's own QSO is already in the count).
+function workedBadgeHtml(call, opts) {
+    const w = workedInfo(call);
+    if (!w) return '';
+    opts = opts || {};
+    const b = escapeHtml(workedBaseCall(call));
+    if (workedIsNewBand(call, opts.band)) {
+        return `<button type="button" class="wb newband" data-wb="${b}" onclick="event.stopPropagation(); event.preventDefault(); showWorkedPop(this)"
+            title="Worked ${w.n}× on ${escapeHtml(w.bands.join(', '))} -- never on ${escapeHtml(opts.band)}">new band</button>`;
+    }
+    if (w.n < (opts.minN || 1)) return '';
+    return `<button type="button" class="wb${w.confirmed ? ' cfm' : ''}" data-wb="${b}" onclick="event.stopPropagation(); event.preventDefault(); showWorkedPop(this)"
+        title="${w.n} QSO${w.n === 1 ? '' : 's'} in your log${w.confirmed ? ', confirmed on QRZ' : ''}">${w.n}×${w.confirmed ? ' ✓' : ''}</button>`;
+}
+// "Last QSO 12 Aug 2026 · 20m FT8" under an active hotspot caller.
+function workedLastLineHtml(call) {
+    const w = workedInfo(call);
+    if (!w || !w.qsos || !w.qsos.length) return '';
+    const q = w.qsos[0];
+    const bm = [q.band, q.mode].filter(Boolean).join(' ');
+    return `<div class="wb-last">Last QSO <b>${escapeHtml(workedDateStr(q))}</b>${bm ? ' · ' + escapeHtml(bm) : ''}</div>`;
+}
+function workedDateStr(q) {
+    if (q.logged_at) return new Date(q.logged_at * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    const d = String(q.date || '');
+    return d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : (d || '—');
+}
+function fetchWorked() {
+    if (!SHOW_WORKED_BADGES) return;
+    fetch('/api/worked').then(r => r.json()).then(d => {
+        const first = WORKED === null;
+        WORKED = (d && d.calls) || {};
+        // Repaint the cards that would otherwise wait for their own next
+        // poll before showing badges on first load.
+        if (first) {
+            try { if (typeof renderPotaCard === 'function') renderPotaCard(); } catch (e) {}
+            try { if (typeof renderNotifications === 'function') renderNotifications(); } catch (e) {}
+        }
+    }).catch(() => {});
+}
+var workedPopQsos = [];
+function showWorkedPop(btn) {
+    const call = btn.dataset.wb;
+    const w = WORKED && WORKED[call];
+    let pop = document.getElementById('wb-pop');
+    if (!w) { if (pop) pop.hidden = true; return; }
+    if (!pop) {
+        pop = document.createElement('div');
+        pop.id = 'wb-pop';
+        pop.hidden = true;
+        document.body.appendChild(pop);
+    }
+    if (!pop.hidden && pop.dataset.call === call) { pop.hidden = true; return; }
+    workedPopQsos = w.qsos || [];
+    const cf = new Set(w.cfm_bands || []);
+    const bands = (w.bands || []).map(b => `<span class="${cf.has(b) ? 'cf' : ''}">${escapeHtml(b)}</span>`).join('');
+    const rows = workedPopQsos.map((q, i) => `<tr class="wb-q" onclick="openWorkedQso(${i})" title="Open this QSO">
+        <td>${escapeHtml(workedDateStr(q))}</td><td>${escapeHtml(q.band || '')}</td><td>${escapeHtml(q.mode || '')}</td>
+        <td class="c">${q.qrz_confirmed ? '✓' : ''}</td></tr>`).join('');
+    const more = w.n > workedPopQsos.length ? ` · last ${workedPopQsos.length} shown` : '';
+    const lookup = QRZ_ENABLED ? `https://www.qrz.com/db/${encodeURIComponent(call)}`
+                               : `https://radioid.net/database/search?callsign=${encodeURIComponent(call)}`;
+    pop.innerHTML = `<h3>${escapeHtml(call)}</h3>
+        <div class="wb-sum">${w.n} QSO${w.n === 1 ? '' : 's'}${w.confirmed ? ' · confirmed' : ''}${more}</div>
+        ${bands ? `<div class="wb-bands" title="Bands worked (green = confirmed on that band)">${bands}</div>` : ''}
+        <table>${rows}</table>
+        <div class="wb-foot">Click a QSO for details · <a href="${lookup}" target="_blank" rel="noopener">Look up ${escapeHtml(call)} →</a></div>`;
+    pop.dataset.call = call;
+    pop.hidden = false;
+    const r = btn.getBoundingClientRect();
+    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    let left = r.left + window.scrollX;
+    left = Math.max(window.scrollX + 12, Math.min(left, window.scrollX + window.innerWidth - pw - 12));
+    let top = r.bottom + window.scrollY + 6;
+    if (r.bottom + ph + 12 > window.innerHeight && r.top - ph - 6 > 0) top = r.top + window.scrollY - ph - 6;
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+}
+function openWorkedQso(i) {
+    const q = workedPopQsos[i];
+    const pop = document.getElementById('wb-pop');
+    if (pop) pop.hidden = true;
+    if (q) openQsoRecordDrawer(q);
+}
+document.addEventListener('click', e => {
+    const pop = document.getElementById('wb-pop');
+    if (pop && !pop.hidden && !e.target.closest('#wb-pop') && !e.target.closest('.wb')) pop.hidden = true;
+});
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { const pop = document.getElementById('wb-pop'); if (pop) pop.hidden = true; }
+});
+if (SHOW_WORKED_BADGES) {
+    fetchWorked();
+    setInterval(fetchWorked, WORKED_POLL_MS);
+}
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text == null ? '' : String(text);
@@ -6625,6 +7526,7 @@ let notifSolarData = null;
 let notifBrandmeisterData = null;
 let notifQrzData = null;
 let notifRigData = null;
+let notifSatData = null;
 let notifFilter = 'all';
 
 // Each source pill IS the filter control -- clicking it isolates that
@@ -6647,6 +7549,7 @@ function renderNotifRow(item, unread) {
             <div class="msg-top">
                 <span class="notif-source" title="Brandmeister network activity">📶</span>
                 <a class="msg-from" href="https://www.qrz.com/db/${escapeHtml(e.callsign)}" target="_blank" rel="noopener">${escapeHtml(e.callsign)}</a>
+                ${workedBadgeHtml(e.callsign)}
                 ${e.name ? `<span class="msg-to">${escapeHtml(e.name)}</span>` : ''}
                 <span class="msg-time">${fmtAgoShort(e.at)}</span>
             </div>
@@ -6674,7 +7577,7 @@ function renderNotifRow(item, unread) {
                 <span class="msg-from">${escapeHtml(e.name)}</span>
                 <span class="msg-time">${fmtAgoShort(e.at)}</span>
             </div>
-            <div class="msg-text">${e.kind === 'offline' ? '🔴 went offline' : '🟢 back online'}</div>
+            <div class="msg-text">${e.kind === 'offline' ? '🔴 went offline' : e.kind === 'warm' ? '🌡 running warm — ' + fmtHealthTemp(e.temp_c) : e.kind === 'cool' ? '✅ cooled down — ' + fmtHealthTemp(e.temp_c) : '🟢 back online'}</div>
         </div>`;
     }
     if (item.source === 'qrz') {
@@ -6689,6 +7592,29 @@ function renderNotifRow(item, unread) {
                 <span class="msg-time">${fmtAgoShort(e.at)}</span>
             </div>
             <div class="msg-text">Confirmed in your QRZ logbook</div>
+        </div>`;
+    }
+    if (item.source === 'sat') {
+        const e = item.data;
+        const nowS = Date.now() / 1000;
+        const mins = Math.round((e.aos_epoch - nowS) / 60);
+        const headline = nowS < e.aos_epoch ? `rises in ${Math.max(0, mins)} min`
+            : (e.los_epoch && nowS < e.los_epoch ? 'overhead now' : 'pass ended');
+        const aosAt = new Date(e.aos_epoch * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const durMin = e.los_epoch ? Math.round((e.los_epoch - e.aos_epoch) / 60) : null;
+        const dir = [compassDir(e.aos_azimuth), compassDir(e.los_azimuth)].filter(Boolean).join(' → ');
+        const freq = e.downlink_mhz ? `down <b>${Number(e.downlink_mhz).toFixed(3)}</b>${e.mode ? ' ' + escapeHtml(e.mode) : ''}${e.uplink_mhz ? ' / up ' + Number(e.uplink_mhz).toFixed(3) : ''}` : '';
+        const bits = [e.max_elevation != null ? `Max <b>${Math.round(e.max_elevation)}°</b>` : '', dir ? `<b>${dir}</b>` : '',
+                      durMin ? durMin + ' min' : '', `AOS <b>${aosAt}</b>`, freq].filter(Boolean);
+        const click = typeof jumpToSatelliteOnMap === 'function' ? ` onclick="jumpToSatelliteOnMap(${Number(e.norad_id)})" style="cursor:pointer" title="Show on the Live map"` : '';
+        return `
+        <div class="msg-row ${unread ? 'unread' : ''}"${click}>
+            <div class="msg-top">
+                <span class="notif-source" title="Satellite pass">🛰</span>
+                <span class="msg-from">${escapeHtml(e.name || 'Satellite')} ${headline}</span>
+                <span class="msg-time">${fmtAgoShort(e.at)}</span>
+            </div>
+            <div class="msg-text">${bits.join(' · ')}</div>
         </div>`;
     }
     if (item.source === 'rig') {
@@ -6713,6 +7639,7 @@ function renderNotifRow(item, unread) {
             <div class="msg-top">
                 <span class="notif-source" title="APRS message">📨</span>
                 <a class="msg-from" href="https://www.qrz.com/db/${escapeHtml(m.from)}" target="_blank" rel="noopener">${escapeHtml(m.from)}</a>
+                ${workedBadgeHtml(m.from)}
                 ${m.to ? `<span class="msg-to">→ ${escapeHtml(m.to)}</span>` : ''}
                 <span class="msg-time">${fmtAgoShort(m.received_at)}</span>
             </div>
@@ -6726,6 +7653,7 @@ function renderNotifRow(item, unread) {
             <div class="msg-top">
                 <span class="notif-source" title="HamAlert">🔔</span>
                 <a class="msg-from" href="https://www.qrz.com/db/${escapeHtml(a.callsign)}" target="_blank" rel="noopener">${escapeHtml(a.full_callsign || a.callsign)}</a>
+                ${workedBadgeHtml(a.callsign, { band: a.band })}
                 ${a.source ? `<span class="ha-badge ${escapeHtml(a.source)}">${HA_SOURCE_LABEL[a.source] || escapeHtml(a.source)}</span>` : ''}
                 ${a.frequency ? `<span class="ha-freq">${escapeHtml(String(a.frequency))}${a.mode ? ' ' + escapeHtml(a.mode) : ''}</span>` : ''}
                 <span class="msg-time">${fmtAgoShort(a.received_at)}</span>
@@ -6757,6 +7685,9 @@ function renderNotifications() {
     }
     if (notifRigData) {
         (notifRigData.events || []).forEach(e => items.push({ source: 'rig', received_at: e.at, data: e }));
+    }
+    if (notifSatData) {
+        (notifSatData.events || []).forEach(e => items.push({ source: 'sat', received_at: e.at, data: e }));
     }
     items.sort((a, b) => (b.received_at || 0) - (a.received_at || 0));
 
@@ -6912,6 +7843,26 @@ function fetchNotifRig() {
 if (SHOW_RIG_PA_ALERTS) {
     fetchNotifRig();
     setInterval(fetchNotifRig, 15000);
+}
+
+function fetchNotifSat() {
+    if (!SHOW_SAT_ALERTS) return;
+    fetch('/api/sat_alerts')
+        .then(r => r.json())
+        .then(data => {
+            notifSatData = data;
+            const dot = document.getElementById('sat-alert-conn-dot');
+            if (dot) {
+                dot.classList.toggle('down', !data.connected);
+                dot.title = data.connected ? 'Watching upcoming passes' : 'Set your station grid square (Settings → General) for pass alerts';
+            }
+            renderNotifications();
+        })
+        .catch(() => {});
+}
+if (SHOW_SAT_ALERTS) {
+    fetchNotifSat();
+    setInterval(fetchNotifSat, 30000);
 }
 
 // --- Satellites card + Live map ground-track overlay ---
@@ -9212,6 +10163,7 @@ function renderRecentContactsCard(qsos) {
                     <a class="qso-call" href="${lookupHref}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${escapeHtml(call)}</a>
                     ${bandModeBits ? `<span class="qso-band-badge">${escapeHtml(bandModeBits)}</span>` : ''}
                     ${q.qrz_confirmed ? '<span class="qso-confirmed" title="Confirmed in your QRZ logbook">✓ QRZ</span>' : ''}
+                    ${workedBadgeHtml(call, { minN: 2 })}
                     ${q.name ? `<span class="qso-name">${escapeHtml(q.name)}</span>` : ''}
                     <span class="qso-time">${escapeHtml(when)}</span>
                 </div>
@@ -9462,7 +10414,10 @@ function potaScore(s) {
     const near = (s.dist_mi != null) ? Math.max(0, 30 - s.dist_mi / 100) : 0;
     const q = (typeof s.qso_count === 'number') ? s.qso_count : 99;
     const early = q < 10 ? (10 - q) : 0;
-    return (s.new_to_you ? 100 : 0) + fresh + near + early;
+    // A station you've worked, just not on this band yet, ranks up too --
+    // less than a new park (+100), more than freshness/distance alone.
+    const newBand = workedIsNewBand(s.activator, s.band) ? 50 : 0;
+    return (s.new_to_you ? 100 : 0) + newBand + fresh + near + early;
 }
 function rbnAgeSec(epochSec) {
     if (!epochSec) return 99999;
@@ -9506,6 +10461,7 @@ function potaSpotHtml(s, rigOk) {
             <div class="pota-spot-top">
                 <span class="src-tag">${s._program}</span>
                 <a class="pota-spot-act" href="${lookupHref}" target="_blank" rel="noopener">${escapeHtml(call)}</a>
+                ${workedBadgeHtml(call, { band: s.band })}
                 ${s.new_to_you ? '<span class="pota-newtag">🚩 NEW</span>' : ''}
                 <a class="pota-spot-ref" href="${refHref}" target="_blank" rel="noopener">${escapeHtml(s.reference || '')}</a>
             </div>
@@ -9550,7 +10506,7 @@ function firehoseSpotHtml(s, rigOk, srcTag) {
     <div class="pota-spot">
         <div class="pota-dot${age < 30 ? ' fresh' : ''}"></div>
         <div class="pota-spot-main">
-            <div class="pota-spot-top"><span class="src-tag">${srcTag}</span>${callHtml}</div>
+            <div class="pota-spot-top"><span class="src-tag">${srcTag}</span>${callHtml}${workedBadgeHtml(call, { band: s.band })}</div>
             <div class="pota-spot-sub">${freqCell}${escapeHtml(s.band || '')} · ${detail}</div>
         </div>
         <div class="pota-spot-right"><span>${age < 5 ? 'now' : rbnAgeStr(age)}</span></div>
@@ -10707,7 +11663,7 @@ function renderQuickLogCard() {
             ? `— ${escapeHtml(match.reference || '')}${match.park_name ? ', ' + escapeHtml(match.park_name) : ''}`
             : '';
         slot.innerHTML = `<div class="ql-match" title="Best-effort match within your mode's typical tuning tolerance — FT8/FT4 share one dial frequency for every QSO on the channel, so this narrows things down rather than uniquely identifying a station. Edit freely.">
-            <span class="ic">🎯</span><span class="src-tag">${match.source}</span><b>${escapeHtml(match.call)}</b>${detail ? '<span class="dim">' + detail + '</span>' : ''}
+            <span class="ic">🎯</span><span class="src-tag">${match.source}</span><b>${escapeHtml(match.call)}</b>${workedBadgeHtml(match.call, { band: r.freq_hz ? mhzToBand(r.freq_hz / 1e6) : '' })}${detail ? '<span class="dim">' + detail + '</span>' : ''}
         </div>`;
         if (qlAuto.call || !callInput.value) {
             callInput.value = match.call;
@@ -11853,6 +12809,7 @@ function openHotspotDrawer(hotspotId) {
                 <a class="hs-settings-link" href="/setup#hotspots">Open in full Settings →</a>
             </div>
             <div class="hs-field-block" id="hs-settings-fields"><div class="hs-empty-note">Loading…</div></div>
+            <div class="hs-drawer-section" id="hs-health-section"></div>
             ${dvNetworkHtml}
             ${talkersHtml}
             ${linkedHtml}
@@ -11882,6 +12839,7 @@ function openHotspotDrawer(hotspotId) {
     if (hs.ircddb_enabled) {
         fetchIrcddbStatus(hotspotId);
     }
+    fetchHotspotDrawerHealth(hotspotId);
 }
 
 // Collapses the hotspot drawer's whole Settings block (Name/IP/SSH/lat-lon/
@@ -12637,6 +13595,9 @@ function closeAllDrawers() {
     document.getElementById('hf-fav-drawer').classList.remove('open');
     document.getElementById('rig-panel-drawer').classList.remove('open');
     document.getElementById('fleet-status-drawer').classList.remove('open');
+    document.getElementById('ap-drawer').classList.remove('open');
+    document.getElementById('health-drawer').classList.remove('open');
+    document.getElementById('my-signal-drawer').classList.remove('open');
     document.getElementById('sstv-drawer').classList.remove('open');
     document.getElementById('hs-drawer-backdrop').classList.remove('open');
 }
@@ -12699,7 +13660,9 @@ function ensureQsoDrawerSkeleton() {
 }
 
 function openQsoDrawer(i) {
-    const q = lastRenderedContacts[i];
+    openQsoRecordDrawer(lastRenderedContacts[i]);
+}
+function openQsoRecordDrawer(q) {
     if (!q) return;
     ensureQsoDrawerSkeleton();
     closeAllDrawers();
@@ -13234,6 +14197,7 @@ function renderTopActivity(topTargets) {
             <div class="ta-bar-wrap">
                 <div class="ta-top">
                     <a class="ta-label" href="${lookupHref}" target="_blank" rel="noopener">${escapeHtml(call)}</a>
+                    ${workedBadgeHtml(call)}
                     ${t.via ? `<span class="ta-via">TG ${escapeHtml(t.via)}</span>` : ''}
                 </div>
                 <div class="ta-bar-track"><div class="ta-bar-fill" style="width:${pct}%"></div></div>

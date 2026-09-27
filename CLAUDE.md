@@ -286,6 +286,21 @@ sstv_controller.py and exact start in noise); sstv_rx.py is the wfweb-audio
                    process (like wfweb_power.py), NOT a separate container.
                    See the SSTV gotcha entry below before touching any of it.
 
+worked.py          Worked Before index for the "3x / 5x ✓ / new band" callsign
+                   badges: one entry per BASE callsign from qsos.json, cached
+                   by the file's mtime/size, served by /api/worked. The JS
+                   mirrors base_call() as workedBaseCall() in BOTH templates --
+                   keep the three in sync.
+
+health_history.py  Hotspot Health: 5-minute samples of monitor.snapshot()
+                   (online/away/temp/CPU/uptime) in health.db, 30 days; derives
+                   outages, reboots and warm spells; WarmWatcher raises
+                   "warm"/"cool" hotspot events (monitor.record_health_event).
+
+sat_alerts.py      Satellite pass alerts (a Notifications source "sat"), built
+                   on satellites.py's pass predictions; quiet hours read in
+                   settings.station_tz via zoneinfo (+ the tzdata package).
+
 nearby.py          BrandmeisterDirectory + AslDirectory for Pocket Dash's
                    Nearby screen (a PHONE's position, not the station's). See
                    the "Nearby (v4.98)" gotcha below.
@@ -8399,6 +8414,64 @@ config for per-integration credentials; put it in
       clearing the search removes every `<mark>`, the welcome card's
       footer link points at `/whats-available`, and Pocket Dash's strip
       shows, dismisses, and stays dismissed after a reload.
+
+- **v5.3 added five features in one release -- the non-obvious parts:**
+  - **Worked Before badges (worked.py).** Matched on the BASE callsign
+    (longest "/"-separated part with a digit followed by a letter, SSID
+    stripped), so EA8/W1ABC and W1ABC/P are W1ABC and a bare ASL node
+    number never matches. Counts every QSO regardless of mode (the user's
+    call: a DMR caller you worked on 20 m FT8 still gets the badge).
+    "Confirmed" = QRZ-confirmed only (LoTW isn't synced). "new band" adds
+    +50 to Spots' potaScore() (a new park is +100). Recent Contacts only
+    shows the badge from the 2nd QSO (minN: 2), since the row's own QSO is
+    already in the count. Pocket Dash uses a bottom sheet, and a STATIC
+    span inside Status rows so a tap still toggles the card.
+  - **Activity patterns heatmap.** storage_activity's raw log only keeps
+    ~49 h, so a separate activity_hourly rollup (hotspot/UTC hour/via,
+    90 days) is upserted in log_activity() and seeded once from the raw
+    log when the table is first created (rows with a NULL hotspot_id are
+    skipped -- they'd show up as a phantom hotspot). The browser does all
+    time-zone bucketing, per-week averaging and net detection (>= 2x the
+    median of that hour's other days, in >= 75% of >= 4 full weeks); the
+    net's talkgroup is looked up WITHIN the net's own hotspot, or an ASL
+    net borrows another hotspot's TG. Colours use a square-root scale so a
+    dominant net hour doesn't flatten everything else. Only collected while
+    show_fleet_activity is on (same gate as the raw log). Desktop and
+    Pocket Dash each have their own copy of the math -- keep them in sync.
+    Offline hours are NOT excluded from the averages (disclosed gap).
+  - **/api/net_reminder.ics** writes a weekly RRULE event with a 15-min
+    VALARM, in the browser's IANA zone via DTSTART;TZID= and no VTIMEZONE
+    block -- fine for Google/Apple, untested in older desktop Outlook. The
+    title/desc are RFC 5545-escaped (\\, ; , newline).
+  - **Hotspot Health.** No extra SSH -- temp/CPU/uptime come from the
+    existing poll (temp arrives as "48.2°C", uptime as `uptime -p` text,
+    both parsed back to numbers). A reboot is "uptime grew by less than the
+    time since the last ONLINE sample" -- comparing to the previous sample
+    instead missed reboots during an outage, and a hotspot that's merely
+    unreachable keeps counting uptime so it isn't a false positive. Warm
+    alerts ride the existing "fleet" Notifications source (kinds warm/cool)
+    and _push_maybe() kind "warm" (same per-hotspot "offline alerts" pref);
+    WarmWatcher is reseeded from fleet_events() on restart. The card shows
+    °F/°C per settings.weather_unit even though hotspot cards show raw °C.
+    Card rows follow the response's `order` list -- jsonify sorts dict keys.
+  - **Satellite pass alerts (sat_alerts.py).** One alert per pass: keyed by
+    satellite + AOS, and a refreshed prediction within 5 min of an alerted
+    AOS is the same pass (predictions step 30 s). A pass skipped for quiet
+    hours is remembered so it never fires late. Quiet hours are read in
+    settings.station_tz, which the Settings page sends from the browser on
+    save -- a Docker container's clock is usually UTC, and zoneinfo needs
+    the `tzdata` pip package there AND on Windows (confirmed: no tz found
+    without it). "sat_alerts_enabled" was added to every Notifications
+    enabled-key list (the _SENTINEL_DEFS tuple, _overflow_sentinels'
+    duplicate check, whats-available, the Jinja source counts in
+    dashboard.html/setup.html/dashboard-mobile.html).
+  - **My Signal.** psk_reporter.py now fetches 60 min (the longest card
+    window) and /api/psk_reporter filters back to 30 min for the Live map
+    overlay. `mode`/`sNR` are read per pskdev.html (mode is required in
+    uploaded reports, sNR optional) but were NOT yet seen in a live
+    response -- the only live query returned no reports -- so both are
+    parsed defensively and show "—" when missing. PSK Reporter and RBN SNRs
+    use different scales, which is why the card is PSK-only for now.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
