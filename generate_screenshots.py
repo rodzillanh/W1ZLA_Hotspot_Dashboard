@@ -147,6 +147,15 @@ SETTINGS = {
     # audio_manager.snapshot patch further down.
     "rig_control_enabled": True,
     "rig_host": "192.168.1.44",
+    # v5.3 features. Worked Before badges are on by default; My Signal's
+    # PSK Reporter reports, Hotspot Health's history, the activity
+    # heatmap's hourly rollup and a satellite pass alert are all seeded
+    # below (section 4b), not fetched.
+    "show_worked_badges": True,
+    "show_my_signal": True,
+    "psk_reporter_callsign": "W1ZLA",
+    "show_hotspot_health": True,
+    "sat_alerts_enabled": True,
 }
 
 # 7 favorites, no "pinned" key -- deliberately legacy-shaped so this run
@@ -193,6 +202,16 @@ QSOS = [
         "rst_sent": "59", "rst_rcvd": "57", "frequency_hz": 7185000,
         "logged_at": time.time() - 90000,
     },
+]
+
+# Two earlier QSOs with the active caller (KC1ABC), one confirmed, so the
+# hotspot card and Recent Contacts show a real "3x ✓" Worked Before badge.
+QSOS += [
+    {"call": "KC1ABC", "band": "40m", "mode": "SSB", "date": "20260712", "grid": "FN42aa",
+     "lat": 43.5, "lon": -70.9, "country": "UNITED STATES", "logged_at": time.time() - 45 * 86400,
+     "qrz_logid": 918001, "qrz_confirmed": True},
+    {"call": "KC1ABC/P", "band": "2m", "mode": "FM", "date": "20260620", "grid": "FN42",
+     "lat": 43.5, "lon": -70.9, "country": "UNITED STATES", "logged_at": time.time() - 67 * 86400},
 ]
 
 # Spread a handful more QSOs across the last two weeks -- QSO Stats' own
@@ -410,6 +429,86 @@ for call, duration in (("W1ZLA", 14), ("KC1ABC", 9), ("W1ZLA", 11), ("N1LCP", 6)
         hotspot_id=_ip_to_id[HOTSPOT_ASL3["ip"]],
     )
 
+# --- 4b. v5.3 demo data: activity heatmap history, Hotspot Health history,
+# My Signal's PSK Reporter reports, a satellite pass alert and a warm alert.
+import random as _random  # noqa: E402
+import sqlite3 as _sqlite3  # noqa: E402
+import health_history  # noqa: E402
+
+_rng = _random.Random(7)
+_now_i = int(time.time())
+_wpsd_id = _ip_to_id[HOTSPOT_WPSD_ACTIVE["ip"]]
+_asl_id = _ip_to_id[HOTSPOT_ASL3["ip"]]
+
+# 12 weeks of hourly activity: commute + evening traffic, busier weekends,
+# and a weekly net on Tuesday 20:00 (local) on TG 31665.
+_rows = []
+_h0 = _now_i // 3600 * 3600 - 84 * 86400
+for _t in range(_h0, _now_i // 3600 * 3600, 3600):
+    _lt = time.localtime(_t)
+    _d, _h = _lt.tm_wday, _lt.tm_hour
+    _lam = 0.15 + (1.2 if _d < 5 and 7 <= _h <= 8 else 0) + (2.0 if 18 <= _h <= 22 else 0) + (1.4 if _d >= 5 and 9 <= _h <= 16 else 0)
+    _n = sum(1 for _ in range(10) if _rng.random() < _lam / 10)
+    if _n:
+        _rows.append((_wpsd_id, HOTSPOT_WPSD_ACTIVE["name"], _t, "3100", _n, _n * _rng.uniform(15, 40)))
+    if _d == 1 and _h == 20 and _rng.random() < 0.92:
+        _rows.append((_wpsd_id, HOTSPOT_WPSD_ACTIVE["name"], _t, "31665", 22, 1400.0))
+    if _d == 6 and _h == 9 and _rng.random() < 0.85:
+        _rows.append((_asl_id, HOTSPOT_ASL3["name"], _t, "", 10, 800.0))
+_c = _sqlite3.connect(storage_activity.DB_PATH)
+storage_activity._ensure_hourly(_c)
+_c.executemany("INSERT OR REPLACE INTO activity_hourly (hotspot_id, hotspot_name, hour_ts, via, tx, secs) VALUES (?,?,?,?,?,?)", _rows)
+_c.commit(); _c.close()
+
+# 14 days of 5-minute health samples: a steady WPSD, an ASL3 node with two
+# outages, a reboot, a warm spell and a warming trend, and an idle WPSD.
+_hrows = []
+_up = {_wpsd_id: 38 * 86400, _asl_id: 5 * 86400, _ip_to_id[HOTSPOT_WPSD_IDLE["ip"]]: 9 * 86400}
+_start = _now_i - 14 * 86400
+_rebooted = False
+for _t in range(_start, _now_i, 300):
+    _day = (_t - _start) / 86400
+    for _hid in _up:
+        _up[_hid] += 300
+        if _hid == _asl_id:
+            if (10.2 <= _day < 10.33) or (12.6 <= _day < 12.62):
+                _hrows.append((_hid, _t, 0, 0, None, None, None))
+                continue
+            if _day >= 12.62 and not _rebooted:
+                _up[_hid] = 300; _rebooted = True
+            _tc = 55 + (6 if _day >= 7 else 0) + 3 * _rng.random() + (19 if 11.0 <= _day < 11.14 else 0)
+            _hrows.append((_hid, _t, 1, 0, round(_tc, 1), round(10 + 6 * _rng.random() + (45 if 11.0 <= _day < 11.14 else 0), 1), _up[_hid]))
+        else:
+            _hrows.append((_hid, _t, 1, 0, round(46 + 3 * _rng.random(), 1), round(8 + 6 * _rng.random(), 1), _up[_hid]))
+_c = _sqlite3.connect(health_history.DB_PATH)
+_c.executescript(health_history._SCHEMA)
+_c.executemany("INSERT INTO samples VALUES (?,?,?,?,?,?,?)", _hrows)
+_c.commit(); _c.close()
+app.monitor.record_health_event(_asl_id, "warm", 72.6)
+
+# My Signal: canned PSK Reporter reports of W1ZLA (the real API isn't hit).
+_psk = []
+for _call, _grid, _band, _hz, _mode, _snr, _ago in [
+    ("EA8TL", "IL18ro", "20m", 14075100, "FT8", -14, 4), ("G4XYZ", "IO91wm", "20m", 14075050, "FT8", -17, 12),
+    ("DL1ABC", "JO62qm", "20m", 14075200, "FT8", -11, 22), ("K7ABC", "CN87tp", "20m", 14075300, "FT8", -9, 8),
+    ("VK2DX", "QF56od", "20m", 14074900, "FT8", -22, 17), ("PY2ZZ", "GG66rk", "20m", 14075000, "FT8", -19, 41),
+    ("W3LPL", "FM19la", "40m", 7047600, "FT4", -2, 6), ("VE3ZZ", "FN03gs", "40m", 7047500, "FT4", -6, 14),
+    ("KB8ABC", "EN91", "40m", 7075100, "FT8", -3, 11), ("ZS6AA", "KG33", "15m", 21075000, "FT8", -20, 19),
+    ("OH6BG", "KP22", "15m", 21075200, "FT8", -16, 9),
+]:
+    _ll = app.grid_to_latlon(_grid)
+    _psk.append({"receiver_call": _call, "receiver_grid": _grid, "band": _band, "freq_hz": _hz, "mode": _mode,
+                 "snr": _snr, "lat": _ll[0], "lon": _ll[1], "heard_at": _now_i - _ago * 60})
+_psk_data = {"spots": _psk, "fetched_at": time.time() - 180}
+app.psk_reporter.get = lambda call, force=False: _psk_data
+
+# A satellite pass alert, as the minute-by-minute check would raise it.
+app.sat_alerter._events.append({
+    "at": time.time() - 60, "norad_id": 43017, "name": "AO-91", "mode": "FM",
+    "downlink_mhz": 145.96, "uplink_mhz": 435.25, "aos_epoch": time.time() + 480,
+    "los_epoch": time.time() + 1140, "max_elevation": 42, "aos_azimuth": 315, "los_azimuth": 135,
+})
+
 # --- 5. Start the real app the same way main() does (waitress, not the
 # Flask dev server -- see CLAUDE.md's own gotcha on why waitress specifically).
 server_thread = threading.Thread(
@@ -454,6 +553,9 @@ CARD_SHOTS = [
     ("beacons-card", "beacons-card.png"),
     ("repeaters-card", "repeaters-card.png"),
     ("sstv-card", "sstv-card.png"),
+    ("my-signal-card", "my-signal-card.png"),
+    ("hotspot-health-card", "hotspot-health-card.png"),
+    ("notifications-card", "notifications-card.png"),
 ]
 
 with sync_playwright() as p:
@@ -504,6 +606,35 @@ with sync_playwright() as p:
                     page.wait_for_timeout(500)
                     continue
                 print(f"FAILED (after retry): #{element_id}: {e}")
+
+    # --- v5.3 drawers and the Worked Before popover ---
+    def _drawer_shot(open_js, drawer_id, filename, wait=1500):
+        page.evaluate(open_js)
+        page.wait_for_timeout(wait)
+        _d = page.query_selector(f'[id="{drawer_id}"]')
+        if _d and _d.is_visible():
+            _d.screenshot(path=os.path.join(OUTPUT_DIR, filename))
+            print(f"wrote {filename}")
+        page.evaluate("closeAllDrawers()")
+        page.wait_for_timeout(400)
+
+    _drawer_shot("openActivityPatternsDrawer()", "ap-drawer", "activity-patterns.png")
+    _drawer_shot(f"openHealthDrawer('{_asl_id}')", "health-drawer", "hotspot-health-drawer.png")
+    _drawer_shot("openMySignalDrawer()", "my-signal-drawer", "my-signal-drawer.png", 800)
+    _wb = page.query_selector(f'[id="card-{_wpsd_id}"] .wb')
+    if _wb:
+        _wb.click()
+        page.wait_for_timeout(500)
+        _cb = page.query_selector(f'[id="card-{_wpsd_id}"]').bounding_box()
+        _pb = page.query_selector("#wb-pop").bounding_box()
+        _x0, _y0 = min(_cb["x"], _pb["x"]) - 8, min(_cb["y"], _pb["y"]) - 8
+        _x1 = max(_cb["x"] + _cb["width"], _pb["x"] + _pb["width"]) + 8
+        _y1 = max(_cb["y"] + _cb["height"], _pb["y"] + _pb["height"]) + 8
+        page.screenshot(path=os.path.join(OUTPUT_DIR, "worked-before.png"),
+                        clip={"x": _x0, "y": _y0, "width": _x1 - _x0, "height": _y1 - _y0})
+        print("wrote worked-before.png")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(200)
 
     page.click('a.settings-link')  # opens the Quick Settings drawer (not /setup -- that's a separate capture below)
     page.wait_for_timeout(500)
@@ -600,6 +731,7 @@ with sync_playwright() as p:
     _now = time.time()
     _canned = {
         "/api/fleet_events": {"events": [
+            {"name": "ASL 59929", "kind": "warm", "temp_c": 72.6, "at": _now - 300},
             {"name": "Mobile Hotspot", "kind": "offline", "at": _now - 540},
             {"name": "W1ZLA Hub", "kind": "online", "at": _now - 7200}]},
         "/api/hf_alerts": {"events": [{"kind": "elevated", "k_index": 5.0, "at": _now - 3100}]},
@@ -645,7 +777,8 @@ with sync_playwright() as p:
 
     _jsclick('.tabbar button[data-go="activity"]')
     m2.wait_for_timeout(1500)
-    for _btn, _close, _name, _wait in (("#notif-entry-btn", "#notif-close", "mobile-notif-feed.png", 900),
+    for _btn, _close, _name, _wait in (("#ap-entry-btn", "#ap-close", "mobile-activity-patterns.png", 1500),
+                                       ("#notif-entry-btn", "#notif-close", "mobile-notif-feed.png", 900),
                                        ("#spots-entry-btn", "#spots-close", "mobile-spots.png", 3500),
                                        ("#sstv-entry-btn", "#sstv-close", "mobile-sstv.png", 1500)):
         _el = m2.query_selector(_btn)

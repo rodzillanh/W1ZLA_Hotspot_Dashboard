@@ -14,7 +14,10 @@ app.py          Flask routes only
 config.py       all the tunables (timeouts, thresholds, regex patterns)
 models.py       HotspotStatus dataclass — the shape of each dashboard card
 storage.py      load/save hotspots.json and settings.json
-storage_activity.py  SQLite log for the optional Hotspot Activity card
+storage_activity.py  SQLite log for the optional Hotspot Activity card (+ the 90-day heatmap rollup)
+health_history.py    5-minute uptime/temperature/CPU samples for Hotspot Health (30 days)
+worked.py       Worked Before index: every callsign in your logbook, for the badges
+sat_alerts.py   satellite pass alerts for the Notifications card and phone push
 monitor.py      FleetMonitor: SSH polling + MMDVM log parsing (WPSD) / rpt xnode parsing (ASL3)
 openspot.py     openSPOT4 (SharkRF): persistent WebSocket client, one per configured device
 qrz.py          optional QRZ.com lookup for the active caller's name/city/state/photo/coords
@@ -1242,7 +1245,7 @@ a proper APRS message.
 <!-- wiki-group: Integrations -->
 ## Notifications card
 
-Optional dashboard card (Settings → Cards) that merges up to six
+Optional dashboard card (Settings → Cards) that merges up to eight
 independent message/alert sources into one scrollable, time-sorted list —
 appears as soon as *any* is enabled, and each remains its own separate
 on/off toggle underneath. Position it anywhere in the same drag-and-drop
@@ -1305,7 +1308,10 @@ the specific trigger comment that matched (e.g. "New DXCC needed").
 Notifications", off by default) — no new connection or credentials at
 all: this dashboard already tracks when a hotspot goes offline (for the
 red "OFFLINE" badge on its card) and comes back; this setting just also
-surfaces that exact moment as a notification.
+surfaces that exact moment as a notification. It also carries **running
+warm** / **cooled down** events: a hotspot at or above the warm threshold
+(Settings → Cards, default 70 °C) for two samples in a row (10 minutes),
+and again once it's back 3 °C below it. See "Hotspot Health card" below.
 
 **Solar alerts** (Settings → Cards → "Geomagnetic storm alerts in
 Notifications", off by default) — also no new connection: the HF
@@ -1330,6 +1336,26 @@ contact in your logbook gets confirmed on QRZ. Needs a QRZ Logbook API
 key (Settings → Integrations → "QRZ Logbook sync"); the same setting also
 syncs your logged contacts into the Recent Contacts card and marks the
 confirmed ones there with a ✓ badge. See "QRZ Logbook sync" above.
+
+**Satellite passes** (Settings → Cards → "Satellite passes in
+Notifications", off by default) — one alert per pass, shortly before a
+tracked satellite rises: "AO-91 rises in 10 min · Max 42° · NW → SE ·
+AOS 20:37 · down 145.960 FM / up 435.250". Click it to see the satellite
+on the Live map. Options are under Settings → Cards → Card extras →
+Tracked satellites:
+
+- **Alert me** 5, 10 (default), 15 or 30 minutes before it rises.
+- **Only passes higher than** 10°, 20°, 30° (default), 45° or 60°.
+- **Alert** checkbox on each tracked satellite (all on by default).
+- **Quiet hours** — no alerts between 23:00 and 06:00 by default, on the
+  card or the phone. They use your browser's time zone, saved when you
+  click Save tracked satellites.
+- **Also send to Pocket Dash** — a push notification on phones that have
+  alerts turned on.
+
+Needs your station grid square (Settings → Cards → Show / hide). A pass is
+never alerted twice, even across a restart, and a pass skipped during
+quiet hours doesn't fire late.
 
 All enabled sources share one connection-status readout in the card
 header (Connected / Connecting / Reconnecting per source, where the
@@ -1610,6 +1636,9 @@ satellites, plus a live ground-track overlay on the **Live map**.
   get their own individually catalogued orbits. If nothing's currently
   tracked, or nothing's predicted visible, the section either stays
   hidden or says so plainly rather than showing an error.
+- **Pass alerts** — get a Notifications alert (and optionally a phone
+  push) before a good pass. See "Satellite passes" under "Notifications
+  card".
 
 <!-- wiki-group: Optional Cards -->
 ## Flights Overhead card
@@ -2027,6 +2056,88 @@ data than HF Conditions: real observed spot counts from
   free API is rate-limited (20 requests/minute, non-commercial use).
 - Same drag-and-drop **Card order** placement as every other extra card.
 
+<!-- wiki-group: Optional Cards -->
+## Hotspot Health card
+<!-- wiki-image: hotspot-health-card.png -->
+
+Optional (Settings → Cards → "Show Hotspot Health card"). Uptime,
+temperature, CPU and reboots for every hotspot, so a Pi that's slowly
+overheating or a link that keeps dropping shows up before it becomes an
+outage.
+
+- **7-day strip** — one bar per hour: green online, red offline, grey for a
+  portable hotspot that was away (away time never counts as downtime).
+- **Uptime %**, the current temperature and a 24-hour temperature line.
+  The line turns amber with "↑ N° vs last week" when a hotspot is running
+  warmer than the week before.
+- **Click a row** for its drawer: 7- or 30-day temperature and CPU charts
+  with the warm threshold drawn in, and a list of outages, reboots and
+  warm spells.
+- **Every hotspot's own drawer** (gear icon) has a *Health · 7 days*
+  section too, whether or not this card is on.
+- **Running-warm alerts** go to the Notifications card's hotspot events
+  and to Pocket Dash push. Set the threshold under Settings → Cards
+  (default 70 °C; a Raspberry Pi starts slowing itself down at 80 °C).
+
+<!-- wiki-image: hotspot-health-drawer.png -->
+
+No extra SSH: temperature, CPU and uptime already come back with every
+poll, and one sample per hotspot is saved every 5 minutes in `health.db`
+(kept 30 days). A reboot is spotted when a hotspot's uptime goes down,
+which catches reboots too quick to ever show as offline. Temperatures
+follow your weather unit (°F or °C). openSPOT4 has no SSH, so it gets the
+online strip and, on battery units, board temperature only.
+
+<!-- wiki-group: Optional Cards -->
+## My Signal card
+<!-- wiki-image: my-signal-card.png -->
+
+Optional (Settings → Cards → "Show My Signal card"). Where your own signal
+is being heard right now, from [PSK Reporter](https://pskreporter.info),
+using the PSK Reporter callsign under Settings → Integrations.
+
+- **Mini map** — your station in amber, a line to every station that
+  decoded you. Hover a dot for its callsign, distance, SNR and how long
+  ago.
+- **15m / 30m / 60m** switch in the card header — instant, no extra
+  request.
+- **Band rows** — farthest station, modes heard (FT8, FT4…), how many
+  heard you and the best SNR. Tap a band to show only that band.
+- **☰ drawer** — every report sorted by distance, and **Open on the Live
+  map** (turns the map's PSK Reporter overlay on).
+
+<!-- wiki-image: my-signal-drawer.png -->
+
+PSK Reporter only covers digital modes, so the card says "Not heard in
+the last 30 min" after a phone-only session. It rate-limits hard, so the
+data refreshes every 10 minutes at most; the footer shows how old it is.
+
+<!-- wiki-group: Dashboard and Live Map -->
+## Worked Before badges
+<!-- wiki-image: worked-before.png -->
+
+A small tag next to any callsign you've already logged (ADIF imports,
+WSJT-X, QRZ Logbook sync and QRZ Quick Log all count):
+
+- **3×** — worked 3 times, not confirmed.
+- **5× ✓** (green) — worked, and confirmed on QRZ.
+- **new band** (amber) — you've worked them, but never on the band
+  they're on now. Only where a band is known (Spots, Quick Log).
+- No badge — never worked.
+
+They show on hotspot cards (plus a "Last QSO" line under an active
+caller), the Spots card and its Browse drawer, Top 5 Activity, Recent
+Contacts (from the second QSO with a station), Notifications, QRZ Quick
+Log and Pocket Dash. Click one for the bands you've worked that station on
+(green = confirmed there) and your last few QSOs; click a QSO for its
+details. On the Spots card, a worked station on a new band ranks higher in
+Smart rank.
+
+Callsigns match on the base call, so EA8/W1ABC, W1ABC/P and W1ABC-9 all
+count as W1ABC, and any mode counts (a DMR caller you worked on 20 m FT8
+still gets the badge). Turn them off under Settings → Cards → "Show Worked
+Before badges".
+
 <!-- wiki-group: Dashboard and Live Map -->
 ## Transmission timer
 
@@ -2207,6 +2318,31 @@ a *newly started* one instead — Analog_Bridge's log doesn't have a
 confirmed end-of-transmission line to detect completion from, so this is
 a deliberate, disclosed difference in what's being counted for this mode
 specifically, not a bug.
+
+### Activity patterns
+<!-- wiki-image: activity-patterns.png -->
+
+The card's **▦ Patterns** button opens a heatmap of *when* your hotspots
+are busy: days of the week down the side, hours across, each square the
+average talk time (or number of transmissions) in that hour per week.
+
+- **Controls** — one hotspot or all of them, talk time or transmissions,
+  the last 4 or 12 weeks, your local time or UTC. Hover a square for its
+  exact value.
+- **Busiest hour, busiest day and quiet stretch** are worked out from
+  what's shown.
+- **Regular nets** — an hour that's at least twice as busy as the same
+  hour on other days, in at least 3 of every 4 weeks, gets an amber
+  outline and a row with its talkgroup and hotspot. **📅 Add to calendar**
+  downloads a weekly repeating calendar event (with a 15-minute reminder)
+  that any phone or desktop calendar can import. Nets only show once
+  there are 4 weeks of history.
+- **History** — a compact hourly summary kept for 90 days, collected
+  while the Hotspot Activity card is on. It starts from the day you
+  update (seeded with the last two days of the regular log), so the
+  drawer says how long it has been collecting.
+- **Pocket Dash** shows the same data one day at a time (Activity tab →
+  Activity patterns).
 
 <!-- wiki-group: Dashboard and Live Map -->
 ## Talkgroup / reflector display
@@ -2391,8 +2527,14 @@ untouched. It's a single-column layout with a bottom tab bar:
   Technician/General, 50 for Extra; 74% to pass) with answers revealed at the
   end, a per-subelement breakdown and every missed question.
 - **Notifications** (top of the Activity tab) — the same sources as the
-  desktop Notifications card in one newest-first list, with source chips and
-  an unread count that's remembered per phone.
+  desktop Notifications card in one newest-first list (including satellite
+  passes and hotspots running warm), with source chips and an unread count
+  that's remembered per phone.
+- **Activity patterns** (Activity tab, when the Hotspot Activity card is
+  on) — the desktop heatmap one day at a time: 24 hour bars, regular nets
+  outlined, and each net's **📅 Add** calendar link.
+- **Worked Before badges** — the same badges as the desktop; tap one for
+  your QSO history with that station.
 - **SSTV** and **Spots** (Activity tab rows, shown when those cards are
   enabled) — the SSTV picture / live preview / gallery with Listen now and
   Stop, and POTA / SOTA / DX / RBN spots with search and an optional Tune
@@ -2415,6 +2557,7 @@ untouched. It's a single-column layout with a bottom tab bar:
 <!-- wiki-image: mobile-band-plan.png -->
 <!-- wiki-image: mobile-digital-links.png -->
 <!-- wiki-image: mobile-notif-feed.png -->
+<!-- wiki-image: mobile-activity-patterns.png -->
 <!-- wiki-image: mobile-spots.png -->
 <!-- wiki-image: mobile-sstv.png -->
 <!-- wiki-image: mobile-quiz.png -->
