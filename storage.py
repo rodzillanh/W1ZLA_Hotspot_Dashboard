@@ -463,7 +463,7 @@ def _mode_key(mode: str) -> str:
     return "PHONE" if m in _PHONE_MODES else m
 
 
-def _qso_matches(a: dict, b: dict, window_sec: int) -> bool:
+def qso_matches(a: dict, b: dict, window_sec: int) -> bool:
     """True if `a` and `b` are almost certainly the same contact logged
     from two sources (QRZ Logbook vs. WSJT-X live / ADIF import): same
     callsign + band + mode-group, and their timestamps within
@@ -489,7 +489,7 @@ def merge_qrz_qsos(add_records: list, confirm_map: dict,
       * `add_records` -- QSO dicts freshly pulled from QRZ (each carrying
         `qrz_logid` and source "qrz"). One whose `qrz_logid` is already
         stored is skipped. One that fuzzily matches an existing entry
-        (WSJT-X- or ADIF-logged, see _qso_matches) enriches that entry in
+        (WSJT-X- or ADIF-logged, see qso_matches) enriches that entry in
         place -- attaches the `qrz_logid`, fills only blank fields, never
         appends a duplicate row. Otherwise it's appended.
       * `confirm_map` -- {qrz_logid: confirmed_at_epoch} for QSOs QRZ now
@@ -527,7 +527,7 @@ def merge_qrz_qsos(add_records: list, confirm_map: dict,
             # the QRZ logbook.
             hit = next((q for q in qsos
                         if q.get("qrz_logid") is None
-                        and _qso_matches(rec, q, window_sec)), None)
+                        and qso_matches(rec, q, window_sec)), None)
             if hit is not None:
                 if lid is not None and hit.get("qrz_logid") is None:
                     hit["qrz_logid"] = lid
@@ -560,3 +560,56 @@ def merge_qrz_qsos(add_records: list, confirm_map: dict,
 
     return {"added": added, "matched": matched, "confirmed": confirmed,
             "confirmed_logids": confirmed_logids}
+
+
+def merge_wfweb_qsos(add_records: list, window_sec: int = None) -> dict:
+    """Fold a wfweb server-side-logbook sync into qsos.json under
+    _file_lock -- same shape as merge_qrz_qsos above, simpler since wfweb
+    has no confirmation concept and no persistent per-record id embedded
+    in its exported ADIF (confirmed live: wfweb's /export deliberately
+    omits its own APP_WFWEB_* fields -- "a file for other services").
+    Cross-run dedupe against wfweb re-sending the same record is handled
+    entirely on wfweb's own side (its export/exported bookkeeping), not
+    here -- this function only needs to dedupe/enrich against a contact
+    ALREADY known from a different source (WSJT-X live logging, ADIF
+    import, QRZ Logbook sync).
+
+    `add_records` are QSO dicts already carrying source: "wfweb" and
+    (optionally) a qrz_logid if wfweb_logbook.py already pushed them to
+    QRZ before calling this. One that fuzzily matches an existing entry
+    (qso_matches, filtered to non-wfweb rows only -- same "only match
+    across sources" guard merge_qrz_qsos uses, so two genuinely distinct
+    wfweb-sourced QSOs with the same station minutes apart never merge
+    into one) enriches that entry in place; otherwise it's appended.
+    Returns {"added", "matched"}. Never raises."""
+    if window_sec is None:
+        window_sec = config.WFWEB_LOGBOOK_MATCH_WINDOW_SEC
+    os.makedirs(config.CONFIG_DIR, exist_ok=True)
+    with _file_lock:
+        try:
+            with open(config.QSOS_FILE, "r") as f:
+                qsos = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            qsos = []
+
+        added = matched = 0
+        for rec in add_records or []:
+            hit = next((q for q in qsos
+                        if q.get("source") != "wfweb"
+                        and qso_matches(rec, q, window_sec)), None)
+            if hit is not None:
+                if rec.get("qrz_logid") and not hit.get("qrz_logid"):
+                    hit["qrz_logid"] = rec["qrz_logid"]
+                for k in ("name", "city", "state", "country", "grid",
+                          "rst_sent", "rst_rcvd", "frequency_hz"):
+                    if not hit.get(k) and rec.get(k):
+                        hit[k] = rec[k]
+                matched += 1
+            else:
+                qsos.append(rec)
+                added += 1
+
+        with open(config.QSOS_FILE, "w") as f:
+            json.dump(qsos, f, indent=4)
+
+    return {"added": added, "matched": matched}

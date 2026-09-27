@@ -56,6 +56,7 @@ from openspot import OpenSpot4Manager
 from asl_audio import AslAudioManager
 from wsjtx import WsjtxListener, freq_to_band
 from qrz_logbook import QrzLogbookClient
+from wfweb_logbook import WfwebLogbookClient
 from hamalert import HamAlertListener
 from rbn import RbnListener
 from dxcluster import DxClusterListener
@@ -155,6 +156,7 @@ ircddb_client = IrcddbGatewayClient()
 audio_manager.reconcile(load_hotspots())
 wsjtx_listener  = WsjtxListener(monitor)
 qrz_logbook_client = QrzLogbookClient()
+wfweb_logbook_client = WfwebLogbookClient()
 hamalert_listener = HamAlertListener()
 brandmeister_lh = BrandmeisterLastHeardListener()
 rbn_listener = RbnListener()
@@ -410,6 +412,22 @@ def _rebuild_sstv() -> None:
     )
 
 _rebuild_sstv()
+
+
+def _rebuild_wfweb_logbook() -> None:
+    """(Re)point the wfweb server-side-logbook sync at the current
+    settings -- reuses wfweb_host (already used by wfweb power/LAN
+    control and SSTV above) plus its own REST port, since wfweb's REST
+    API is a genuinely different port from its WebSocket/web UI one.
+    configure() has no thread of its own (the background
+    _wfweb_logbook_loop drives it), so cheap to call on every save."""
+    s = load_settings()
+    wfweb_logbook_client.configure(
+        s.get("wfweb_logbook_enabled", False), s.get("wfweb_host", ""),
+        s.get("wfweb_logbook_rest_port", 8081),
+    )
+
+_rebuild_wfweb_logbook()
 
 import radioid as radioid_mod
 import aprs as aprs_mod
@@ -829,6 +847,13 @@ def api_settings_post():
             pass
     if "wfweb_use_ssl" in data:
         settings["wfweb_use_ssl"] = bool(data["wfweb_use_ssl"])
+    if "wfweb_logbook_enabled" in data:
+        settings["wfweb_logbook_enabled"] = bool(data["wfweb_logbook_enabled"])
+    if "wfweb_logbook_rest_port" in data:
+        try:
+            settings["wfweb_logbook_rest_port"] = max(1, min(65535, int(data["wfweb_logbook_rest_port"])))
+        except (TypeError, ValueError):
+            pass
     if "show_rig_panel" in data:
         settings["show_rig_panel"] = bool(data["show_rig_panel"])
     if "rig_panel_position" in data:
@@ -1071,6 +1096,8 @@ def api_settings_post():
     if any(k in data for k in ("show_sstv", "wfweb_host", "wfweb_port", "wfweb_use_ssl",
                                "sstv_keep", "sstv_quality_gate")):
         _rebuild_sstv()
+    if any(k in data for k in ("wfweb_logbook_enabled", "wfweb_host", "wfweb_logbook_rest_port")):
+        _rebuild_wfweb_logbook()
     return jsonify({"ok": True})
 
 
@@ -3697,6 +3724,47 @@ def api_qrz_logbook_sync():
     return jsonify({"ok": True, "started": True})
 
 
+@app.route("/api/wfweb_logbook_status")
+def api_wfweb_logbook_status():
+    """Health/last-sync info for the Settings "wfweb Logbook sync"
+    section -- the sync itself runs in _wfweb_logbook_loop, not here --
+    see wfweb_logbook.py."""
+    return jsonify(wfweb_logbook_client.status())
+
+
+@app.route("/api/wfweb_logbook_sync", methods=["POST"])
+def api_wfweb_logbook_sync():
+    """Run a wfweb Logbook sync right now instead of waiting for the next
+    background cycle -- for the Settings "Sync now" button. Fires in a
+    daemon thread and returns immediately; poll /api/wfweb_logbook_status
+    for the result. A sync already in progress is a harmless no-op
+    (wfweb_logbook.py's own _sync_lock guard)."""
+    if not wfweb_logbook_client.enabled:
+        return jsonify({"ok": False, "reason": "wfweb Logbook sync is off or has no host configured"}), 400
+    grid = load_settings().get("station_grid", "")
+    threading.Thread(
+        target=wfweb_logbook_client.sync,
+        args=(qrz_logbook_client, monitor.lookup_caller_info, grid),
+        daemon=True,
+    ).start()
+    return jsonify({"ok": True, "started": True})
+
+
+@app.route("/api/test_wfweb_logbook", methods=["POST"])
+def api_test_wfweb_logbook():
+    """Settings "Test connection" button for the wfweb Logbook sync
+    section -- a fresh, one-off probe against whatever host/port is in
+    the request body (not necessarily saved yet), same shape as every
+    other integration's Test button in this app."""
+    data = request.json or {}
+    settings = load_settings()
+    ok, message = wfweb_logbook_client.test_connection(
+        data.get("host") or settings.get("wfweb_host", ""),
+        data.get("port") or settings.get("wfweb_logbook_rest_port", 8081),
+    )
+    return jsonify({"success": ok, "message": message})
+
+
 @app.route("/api/qrz_quick_log", methods=["POST"])
 def api_qrz_quick_log():
     """Submit one QSO from the QRZ Quick Log card -- builds an ADIF
@@ -4573,6 +4641,34 @@ def _qrz_logbook_loop():
         time.sleep(config.QRZ_LOGBOOK_SYNC_INTERVAL)
 
 
+def _wfweb_logbook_loop():
+    """Pulls new QSOs from wfweb's own server-side ADIF logbook into
+    qsos.json on a fast (local-LAN, no rate limit) cadence, forwarding
+    genuinely new ones to QRZ Logbook -- both handled inside
+    WfwebLogbookClient.sync(), which never raises. Same decoupled
+    background-thread pattern as _qrz_logbook_loop above.
+
+    qrz_logbook_client is always passed through, regardless of its own
+    separate qrz_logbook_enabled (read-sync) toggle -- same reasoning
+    QRZ Quick Log already uses: a QRZ API key being configured is what
+    gates a push, not whether historical QRZ sync happens to be on.
+    insert_qso() itself raises cleanly if no key is set, which sync()
+    already catches as a best-effort QRZ push, so this is safe either
+    way."""
+    time.sleep(15)  # let startup settle before the first network round-trip
+    while True:
+        try:
+            if wfweb_logbook_client.enabled:
+                wfweb_logbook_client.sync(
+                    qrz_logbook_client,
+                    monitor.lookup_caller_info,
+                    load_settings().get("station_grid", ""),
+                )
+        except Exception as e:  # noqa: BLE001 -- sync() already swallows its own; belt and braces
+            print(f"[wfweb_logbook] loop error: {type(e).__name__}: {e}", flush=True)
+        time.sleep(config.WFWEB_LOGBOOK_SYNC_INTERVAL)
+
+
 def _sstv_controller_loop():
     """Drives the SSTV idle/tune/yield state machine every couple of
     seconds. tick() never raises. Separate thread, same pattern as
@@ -4594,6 +4690,7 @@ def main():
     threading.Thread(target=_sat_alert_loop, daemon=True).start()
     threading.Thread(target=_health_loop, daemon=True).start()
     threading.Thread(target=_qrz_logbook_loop, daemon=True).start()
+    threading.Thread(target=_wfweb_logbook_loop, daemon=True).start()
     threading.Thread(target=digipi_monitor.run_forever, daemon=True).start()
     threading.Thread(target=openspot_manager.run_forever, daemon=True).start()
     threading.Thread(target=audio_manager.run_forever, daemon=True).start()

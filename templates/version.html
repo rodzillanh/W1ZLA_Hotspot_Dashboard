@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v5.3</span>
+                <span class="release-version">v5.4</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>wfweb Logbook sync (optional)</span> &mdash; if you're running wfweb 0.9.1 or newer with its own server-side ADIF logbook, this pulls new QSOs in automatically every few minutes into Recent Contacts, matching/enriching against anything already known from another source, and pushes genuinely new ones to QRZ Logbook if you have a key configured. Settings &rarr; Integrations &rarr; "wfweb Logbook sync" &mdash; uses wfweb's own separate REST API port, not its web UI/power-control connection</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v5.3</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>"Worked before" badges</span> &mdash; a small tag next to any callsign you've already logged: <b>3&times;</b> (worked, not confirmed), <b>5&times; &#10003;</b> (confirmed on QRZ) or <b>new band</b> (worked before, never on the band they're on now). Shows on hotspot cards, the Spots card and its Browse drawer, Top 5 Activity, Recent Contacts, Notifications, QRZ Quick Log and Pocket Dash. Click one for the bands you've worked and your last few QSOs. A worked station on a new band also ranks higher in Spots' Smart rank. Matches the base callsign, so EA8/W1ABC and W1ABC/P count as W1ABC. Turn off under Settings &rarr; Cards</li>

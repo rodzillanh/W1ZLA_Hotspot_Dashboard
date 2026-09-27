@@ -23,7 +23,7 @@ def _version_tuple(v):
 # version number now, no new names get appended here. See
 # _LAST_NAMED_VERSION below for how APP_CODENAME resolves to None past
 # this list's last entry.
-APP_VERSION = "5.3"
+APP_VERSION = "5.4"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -323,6 +323,7 @@ DIGEST_HIGHLIGHTS = [
               "Hotspot Activity → Patterns: when your hotspots are busy, with regular nets you can add to your calendar",
               "New optional cards: Hotspot Health and My Signal",
               "Satellite pass alerts in Notifications and on your phone"]),
+    ("5.4",  ["wfweb users: sync your logbook automatically into Recent Contacts and QRZ (Settings → Integrations)"]),
 ]
 
 
@@ -1105,6 +1106,21 @@ QRZ_LOGBOOK_MAX_PAGES   = int(os.environ.get("QRZ_LOGBOOK_MAX_PAGES", 60))     #
 QRZ_LOGBOOK_LOGID_CHUNK = int(os.environ.get("QRZ_LOGBOOK_LOGID_CHUNK", 100))  # LOGIDS per recheck request
 QRZ_LOGBOOK_MAX_EVENTS  = 50   # confirmation-notification history cap, matches the other Notifications sources
 
+# --- wfweb's own server-side ADIF logbook sync (v5.4) ---
+# A plain no-auth HTTP REST API on wfweb's own separate "REST/API" port
+# (NOT the HTTPS web UI / WebSocket port `wfweb_host`/`wfweb_port` already
+# cover -- confirmed live 2026-09 this is a genuinely different port,
+# e.g. 8281 vs. 8282 on the user's own real deployment, purely because of
+# how THEIR Unraid template happens to map the two container ports 8081/
+# 8080 -- don't assume any fixed relationship between the two host ports
+# for a different install). Reuses wfweb_host for the hostname.
+WFWEB_LOGBOOK_TIMEOUT = int(os.environ.get("WFWEB_LOGBOOK_TIMEOUT", 10))
+# Local LAN, no rate limit, no reason to wait as long as QRZ's 30 min.
+WFWEB_LOGBOOK_SYNC_INTERVAL = int(os.environ.get("WFWEB_LOGBOOK_SYNC_INTERVAL", 300))  # 5 min
+# Same reasoning/value as QRZ_LOGBOOK_MATCH_WINDOW_SEC above, kept as its
+# own constant since the two integrations are independent.
+WFWEB_LOGBOOK_MATCH_WINDOW_SEC = int(os.environ.get("WFWEB_LOGBOOK_MATCH_WINDOW_SEC", 900))
+
 # --- RadioID.net lookup (free fallback for caller name/location) ---
 RADIOID_AGENT     = os.environ.get("RADIOID_AGENT", "hotspot-dashboard/1.0")
 RADIOID_TIMEOUT   = int(os.environ.get("RADIOID_TIMEOUT", 5))
@@ -1677,6 +1693,8 @@ DEFAULT_SETTINGS = {
     "wfweb_host": "",
     "wfweb_port": 8080,
     "wfweb_use_ssl": True,
+    "wfweb_logbook_enabled": False,
+    "wfweb_logbook_rest_port": 8081,
     # HF Favorites card (v4.50) -- a tap-to-tune memory bank (80m-6m
     # common activity frequencies), each row a button that drives the
     # same rigctld path as the POTA card. The favorites list itself

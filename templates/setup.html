@@ -1885,6 +1885,43 @@
     </div>
 
     <div class="section">
+        <div class="section-title">wfweb Logbook sync
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — pulls wfweb's own server-side ADIF logbook into Recent Contacts
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            wfweb 0.9.1+ keeps its own server-side ADIF logbook (an FT8/etc. contact
+            it logged itself, plus any WSJT-X entries it saw). This pulls new QSOs
+            from it into this dashboard's own log every few minutes, matching/
+            enriching against anything already known from another source, and — if
+            a QRZ Logbook API key is configured above — pushes genuinely new ones to
+            QRZ too. Uses a DIFFERENT port from wfweb's web UI/power-control
+            connection above: wfweb's plain-HTTP REST API port, not its
+            WebSocket one.
+        </p>
+        <div class="toggle-group" style="margin-bottom:10px">
+            <div class="toggle-row">
+                <span class="toggle-label">Pull new QSOs from wfweb's logbook</span>
+                <div class="toggle {{ 'on' if settings.get('wfweb_logbook_enabled') else '' }}"
+                     id="wfweb-logbook-enabled-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>wfweb REST API port</label>
+                <input type="text" id="wfweb-logbook-port" placeholder="8081" style="width:90px"
+                       value="{{ settings.get('wfweb_logbook_rest_port', 8081) }}">
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveWfwebLogbook()">Save wfweb Logbook settings</button>
+        <button class="btn btn-info" onclick="testWfwebLogbook()">Test connection</button>
+        <button class="btn btn-info" onclick="syncWfwebLogbookNow()">Sync now</button>
+        <span class="status-txt" id="wfweb-logbook-status"></span>
+    </div>
+
+    <div class="section">
         <div class="section-title">HamAlert
             <span style="font-size:10px;color:var(--text-dim);font-weight:400;
                          text-transform:none;letter-spacing:0;margin-left:6px">
@@ -4225,6 +4262,80 @@ async function testWfwebPower() {
     setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
 }
 
+// --- wfweb Logbook sync (plain-HTTP REST port, separate from the WebSocket above) ---
+function saveWfwebLogbook() {
+    const status = document.getElementById('wfweb-logbook-status');
+    fetch('/api/settings', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            wfweb_logbook_enabled: document.getElementById('wfweb-logbook-enabled-toggle').classList.contains('on'),
+            wfweb_logbook_rest_port: parseInt(document.getElementById('wfweb-logbook-port').value, 10) || 8081,
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved'; status.style.color = '';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+async function testWfwebLogbook() {
+    const status = document.getElementById('wfweb-logbook-status');
+    status.textContent = 'Testing...'; status.style.color = '';
+    try {
+        const r = await fetch('/api/test_wfweb_logbook', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                host: document.getElementById('wfweb-pwr-host').value.trim(),
+                port: parseInt(document.getElementById('wfweb-logbook-port').value, 10) || 8081,
+            })
+        });
+        const data = await r.json();
+        status.textContent = (data.success ? '✓ ' : '✕ ') + data.message;
+        status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
+    } catch (e) {
+        status.textContent = '✕ ' + e;
+        status.style.color = 'var(--danger)';
+    }
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
+}
+
+async function syncWfwebLogbookNow() {
+    const status = document.getElementById('wfweb-logbook-status');
+    status.textContent = 'Syncing...'; status.style.color = '';
+    try {
+        const r = await fetch('/api/wfweb_logbook_sync', {method: 'POST'});
+        const data = await r.json();
+        if (!data.ok) {
+            status.textContent = '✕ ' + (data.reason || 'Failed to start');
+            status.style.color = 'var(--danger)';
+            setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
+            return;
+        }
+        setTimeout(async () => {
+            try {
+                const sr = await fetch('/api/wfweb_logbook_status');
+                const sd = await sr.json();
+                if (sd.last_sync) {
+                    status.textContent = sd.ok
+                        ? `✓ Pulled ${sd.last_sync.pulled}, added ${sd.last_sync.added}, matched ${sd.last_sync.matched}`
+                        : ('✕ ' + (sd.last_error || 'Sync failed'));
+                    status.style.color = sd.ok ? 'var(--accent)' : 'var(--danger)';
+                } else {
+                    status.textContent = sd.ok ? '✓ Sync started' : ('✕ ' + (sd.last_error || 'Sync failed'));
+                    status.style.color = sd.ok ? '' : 'var(--danger)';
+                }
+            } catch (e) {
+                status.textContent = '✕ ' + e;
+                status.style.color = 'var(--danger)';
+            }
+            setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 8000);
+        }, 2500);
+    } catch (e) {
+        status.textContent = '✕ ' + e;
+        status.style.color = 'var(--danger)';
+        setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
+    }
+}
+
 function saveHamAlert() {
     const status = document.getElementById('hamalert-status');
     fetch('/api/settings', {
@@ -4542,6 +4653,7 @@ if (location.hash) {
         ['QRZ Logbook sync',        'Callsign lookup & logging', 'cfg',    () => val('qrz-logbook-key'), 'qrz_logbook'],
         ['RadioID.net lookup',      'Callsign lookup & logging', 'toggle', () => tog('radioid-toggle'), 'radioid'],
         ['WSJT-X live QSO logging', 'Callsign lookup & logging', 'toggle', () => tog('wsjtx-toggle'), 'wsjtx'],
+        ['wfweb Logbook sync',      'Callsign lookup & logging', 'toggle', () => tog('wfweb-logbook-enabled-toggle'), 'wfweb_logbook'],
         ['HamAlert',                'Callsign lookup & logging', 'cfg',    () => val('hamalert-username'), 'hamalert'],
         ['Rig control',             'Radio & rig',               'toggle', () => tog('rig-enabled-toggle'), 'rig_control'],
         ['wfweb power',             'Radio & rig',               'toggle', () => tog('wfweb-pwr-enabled-toggle'), 'wfweb'],
