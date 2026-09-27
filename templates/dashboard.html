@@ -1310,6 +1310,8 @@
         .msg-text { font-size: 13px; color: var(--text); line-height: 1.4; word-break: break-word; }
         .msg-ack { display: block; font-size: 10px; color: var(--good); margin-top: 4px; }
         .msg-empty { color: var(--text-dim); font-size: 12.5px; padding: 16px 0; text-align: center; display: none; }
+        .msg-empty a { color: var(--link); }
+        .msg-empty a:hover { text-decoration: underline; }
         /* Recent Contacts' rows are more compact than APRS/Notifications'
            .msg-row, so the shared .msg-scroll's 220px cap left this card
            looking mostly-empty next to a taller row neighbor (e.g.
@@ -1626,6 +1628,11 @@
             min-width: 76px; display: inline-block; text-align: center; }
         .hf-fav-foot { font-size: 10.5px; color: var(--text-muted); padding-top: 4px; border-top: 1px solid var(--border-soft); }
         .hf-fav-foot a { color: var(--text-dim); cursor: pointer; text-decoration: underline; }
+        .hf-card-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+        .hf-card-tab { font: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
+            color: var(--text-dim); background: var(--panel-2); border: 1px solid var(--border);
+            border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+        .hf-card-tab.active { color: var(--live); background: var(--live-dim); border-color: transparent; }
         @media (prefers-reduced-motion: reduce) { .hf-tune-chip.pending { animation: none; } }
 
         /* HF Favorites drawer -- "wfweb Memories" tab (v5.5, mockup-
@@ -3939,7 +3946,11 @@
                     <button class="pota-gear" type="button" onclick="openHfFavDrawer()">✎ Edit</button>
                 </div>
             </div>
-            <div class="pota-controls">
+            <div class="hf-card-tabs">
+                <button class="hf-card-tab active" id="hf-card-tab-favorites" onclick="hfCardSwitchTab('favorites')">Favorites</button>
+                <button class="hf-card-tab" id="hf-card-tab-memories" onclick="hfCardSwitchTab('memories')" title="The rig's own memory channels, read/written through wfweb">wfweb Memories</button>
+            </div>
+            <div class="pota-controls" id="hf-fav-controls">
                 <span class="pota-cnt">Favorites <b id="hf-fav-cnt">—</b></span>
                 <select id="hf-fav-filter" onchange="hfFavSetFilter()">
                     <option value="all">All modes</option>
@@ -3947,6 +3958,10 @@
                     <option value="phone">Phone (SSB/AM/FM)</option>
                     <option value="cw">CW</option>
                 </select>
+            </div>
+            <div class="pota-controls" id="hf-mem-controls" style="display:none">
+                <span class="pota-cnt">Channels <b id="hf-mem-cnt">—</b></span>
+                <button class="pota-gear" type="button" style="padding:3px 9px;font-size:10.5px" onclick="fetchWfwebMemories()">↻ Rescan</button>
             </div>
             <div class="hf-fav-list" id="hf-fav-list"></div>
             <div class="hf-fav-foot" id="hf-fav-foot"></div>
@@ -11202,18 +11217,8 @@ const hfOnAir = (hz, rig) => !!(rig && rig.reachable && rig.freq_hz && Math.abs(
 function renderHfFavCard() {
     const listEl = document.getElementById('hf-fav-list');
     if (!listEl || !hfFavData) return;
-    const favs = (hfFavData.favorites || []).slice().sort((a, b) => a.freq_hz - b.freq_hz);
-    const filt = (document.getElementById('hf-fav-filter') || {}).value || 'all';
-    let list = favs;
-    if (filt === 'ft8')   list = favs.filter(f => hfModeClass(f.mode) === 'ft8');
-    if (filt === 'phone') list = favs.filter(f => hfModeClass(f.mode) === 'phone');
-    if (filt === 'cw')    list = favs.filter(f => f.mode === 'CW');
-
-    document.getElementById('hf-fav-cnt').textContent =
-        filt === 'all' ? favs.length : `${list.length} / ${favs.length}`;
 
     const rig = hfFavData.rig;
-    const rigOk = RIG_CONTROL_ENABLED && !!(rig && rig.reachable);
     const pill = document.getElementById('hf-rig-pill');
     if (pill && rig) {
         pill.classList.toggle('live', !!rig.reachable);
@@ -11225,6 +11230,36 @@ function renderHfFavCard() {
             : (rig.error || 'Rig server not reachable');
     }
 
+    // Keep the card's own tab pills/controls-row in sync with hfDrawerTab
+    // even when it was changed from INSIDE the drawer (hfDrawerSwitchTab),
+    // not just via the card's own hfCardSwitchTab() -- one shared piece
+    // of state, two places that can change it.
+    const tabFav = document.getElementById('hf-card-tab-favorites');
+    const tabMem = document.getElementById('hf-card-tab-memories');
+    if (tabFav && tabMem) {
+        tabFav.classList.toggle('active', hfDrawerTab !== 'memories');
+        tabMem.classList.toggle('active', hfDrawerTab === 'memories');
+        document.getElementById('hf-fav-controls').style.display = hfDrawerTab === 'memories' ? 'none' : '';
+        document.getElementById('hf-mem-controls').style.display = hfDrawerTab === 'memories' ? '' : 'none';
+    }
+
+    if (hfDrawerTab === 'memories') {
+        renderHfFavCardMemories();
+        renderHfFavDrawer();
+        return;
+    }
+
+    const favs = (hfFavData.favorites || []).slice().sort((a, b) => a.freq_hz - b.freq_hz);
+    const filt = (document.getElementById('hf-fav-filter') || {}).value || 'all';
+    let list = favs;
+    if (filt === 'ft8')   list = favs.filter(f => hfModeClass(f.mode) === 'ft8');
+    if (filt === 'phone') list = favs.filter(f => hfModeClass(f.mode) === 'phone');
+    if (filt === 'cw')    list = favs.filter(f => f.mode === 'CW');
+
+    document.getElementById('hf-fav-cnt').textContent =
+        filt === 'all' ? favs.length : `${list.length} / ${favs.length}`;
+
+    const rigOk = RIG_CONTROL_ENABLED && !!(rig && rig.reachable);
     const cur = favs.find(f => hfOnAir(f.freq_hz, rig));
     document.getElementById('hf-fav-foot').innerHTML = cur
         ? `on air: <a onclick="hfFavScrollTo('${cur.id}')">${escapeHtml(cur.label)}</a> · ${favs.length} favorites`
@@ -11250,6 +11285,62 @@ function renderHfFavCard() {
     }
     listEl.innerHTML = html;
     renderHfFavDrawer();
+}
+
+// Compact card's own "wfweb Memories" tab -- tap-to-recall only (no
+// rename/write/clear controls here, those stay in the drawer, same
+// "card shows a quick list, drawer does the editing" split as the
+// Favorites tab itself). Reuses the SAME wfwebMemData/fetchWfwebMemories
+// the drawer already uses -- one shared fetch/cache, two renderers.
+function renderHfFavCardMemories() {
+    const listEl = document.getElementById('hf-fav-list');
+    if (!listEl) return;
+    const d = wfwebMemData;
+
+    if (!WFWEB_HOST_SET || (d && d.gated)) {
+        document.getElementById('hf-mem-cnt').textContent = '—';
+        listEl.innerHTML = '<div class="msg-empty" style="padding:26px 10px">wfweb not configured. <a href="/setup?item=wfweb#integrations">Set up →</a></div>';
+        document.getElementById('hf-fav-foot').innerHTML = 'wfweb feature';
+        return;
+    }
+    if (!d || (wfwebMemLoading && !d.memories)) {
+        document.getElementById('hf-mem-cnt').textContent = '—';
+        listEl.innerHTML = '<div class="msg-empty" style="padding:26px 10px">Loading channels…</div>';
+        document.getElementById('hf-fav-foot').innerHTML = 'wfweb feature';
+        return;
+    }
+    if (!d.ok) {
+        document.getElementById('hf-mem-cnt').textContent = '—';
+        listEl.innerHTML = `<div class="msg-empty" style="padding:26px 10px">Can't reach wfweb: ${escapeHtml(d.error || 'connection failed')}</div>`;
+        document.getElementById('hf-fav-foot').innerHTML = 'wfweb feature';
+        return;
+    }
+
+    const mems = (d.memories || []).slice().sort((a, b) => a.channel - b.channel);
+    document.getElementById('hf-mem-cnt').textContent = mems.length;
+    document.getElementById('hf-fav-foot').innerHTML =
+        `${mems.length} channel${mems.length === 1 ? '' : 's'} · <a onclick="openHfFavDrawer()">edit list</a>`;
+
+    if (!mems.length) {
+        listEl.innerHTML = '<div class="msg-empty" style="padding:26px 10px">No memory channels found on the rig yet. Use the drawer to save one.</div>';
+        return;
+    }
+    listEl.innerHTML = mems.map(m => {
+        const freqStr = m.frequency != null ? (m.frequency / 1e6).toFixed(3) : '—';
+        const chip = `<button class="hf-tune-chip" title="Recall channel ${m.channel} on the rig"
+             onclick="wfwebMemRecall(${m.channel}, ${m.group || 0})"><span class="ic">▶</span>${escapeHtml(freqStr)}</button>`;
+        return `<div class="hf-fav-row">${chip}
+            <span class="lbl">${escapeHtml(m.name || '(unnamed)')}</span>
+            <span class="mode">${escapeHtml(m.mode || '')}</span></div>`;
+    }).join('');
+}
+
+function hfCardSwitchTab(tab) {
+    hfDrawerTab = tab;  // shared with the drawer, so Edit opens on the same tab you were viewing
+    if (tab === 'memories' && WFWEB_HOST_SET && !wfwebMemData && !wfwebMemLoading) {
+        fetchWfwebMemories();
+    }
+    renderHfFavCard();
 }
 
 function hfFavScrollTo(id) {
@@ -11418,6 +11509,7 @@ function hfDrawerSwitchTab(tab) {
         fetchWfwebMemories();
     }
     renderHfFavDrawer();
+    renderHfFavCard();
 }
 
 function openHfFavDrawer() {
@@ -11430,17 +11522,19 @@ function openHfFavDrawer() {
 }
 
 function fetchWfwebMemories() {
-    if (!WFWEB_HOST_SET) { wfwebMemData = { gated: true }; renderHfFavDrawer(); return; }
+    if (!WFWEB_HOST_SET) { wfwebMemData = { gated: true }; renderHfFavDrawer(); renderHfFavCard(); return; }
     wfwebMemLoading = true;
-    if (hfDrawerTab === 'memories') renderHfFavDrawer();
+    if (hfDrawerTab === 'memories') { renderHfFavDrawer(); renderHfFavCard(); }
     fetch('/api/wfweb_memories').then(r => r.json()).then(data => {
         wfwebMemLoading = false;
         wfwebMemData = data;
         renderHfFavDrawer();
+        renderHfFavCard();
     }).catch(() => {
         wfwebMemLoading = false;
         wfwebMemData = { ok: false, gated: false, memories: [], error: 'Request failed' };
         renderHfFavDrawer();
+        renderHfFavCard();
     });
 }
 
