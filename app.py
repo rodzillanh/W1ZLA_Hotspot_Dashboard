@@ -45,6 +45,9 @@ from pota import PotaClient
 from rigctl import RigctlClient
 from rig_panel import RigPanelPoller
 from wfweb_power import WfwebPowerClient
+from wfweb_memory import WfwebMemoryClient
+from wfweb_packet import WfwebPacketClient
+import wfweb_station
 from sstv_rx import SstvReceiver
 from sstv_controller import SstvController
 from sota import SotaClient
@@ -117,6 +120,7 @@ rig_panel_poller = RigPanelPoller()
 # port/protocol from rig_panel_poller's rigctld socket above, even though
 # both typically point at the same physical rig. See wfweb_power.py.
 wfweb_power_client = WfwebPowerClient()
+wfweb_packet_client = WfwebPacketClient()
 
 
 def _sstv_tune(freq_hz, mode):
@@ -412,6 +416,22 @@ def _rebuild_sstv() -> None:
     )
 
 _rebuild_sstv()
+
+
+def _rebuild_wfweb_packet() -> None:
+    """(Re)point the wfweb-native packet (AX.25/APRS) WebSocket at the
+    current settings -- gated by show_wfweb_packet (the card's own
+    toggle), not wfweb_power_enabled, same independence as SSTV above.
+    See wfweb_packet.py for why this shares wfweb's ONE server-side
+    demodulator with anyone else using that wfweb instance."""
+    s = load_settings()
+    wfweb_packet_client.configure(
+        s.get("show_wfweb_packet"), s.get("wfweb_host", ""),
+        s.get("wfweb_port", 8080), s.get("wfweb_use_ssl", True),
+        s.get("wfweb_packet_mode", 300),
+    )
+
+_rebuild_wfweb_packet()
 
 
 def _rebuild_wfweb_logbook() -> None:
@@ -854,6 +874,22 @@ def api_settings_post():
             settings["wfweb_logbook_rest_port"] = max(1, min(65535, int(data["wfweb_logbook_rest_port"])))
         except (TypeError, ValueError):
             pass
+    if "show_wfweb_packet" in data:
+        settings["show_wfweb_packet"] = bool(data["show_wfweb_packet"])
+    if "wfweb_packet_position" in data:
+        try:
+            settings["wfweb_packet_position"] = max(0, int(data["wfweb_packet_position"]))
+        except (TypeError, ValueError):
+            pass
+    if "wfweb_packet_mode" in data:
+        try:
+            mode = int(data["wfweb_packet_mode"])
+            if mode in (300, 1200, 9600):
+                settings["wfweb_packet_mode"] = mode
+        except (TypeError, ValueError):
+            pass
+    if "wfweb_station_sync_enabled" in data:
+        settings["wfweb_station_sync_enabled"] = bool(data["wfweb_station_sync_enabled"])
     if "show_rig_panel" in data:
         settings["show_rig_panel"] = bool(data["show_rig_panel"])
     if "rig_panel_position" in data:
@@ -1098,6 +1134,24 @@ def api_settings_post():
         _rebuild_sstv()
     if any(k in data for k in ("wfweb_logbook_enabled", "wfweb_host", "wfweb_logbook_rest_port")):
         _rebuild_wfweb_logbook()
+    if any(k in data for k in ("show_wfweb_packet", "wfweb_host", "wfweb_port", "wfweb_use_ssl",
+                               "wfweb_packet_mode")):
+        _rebuild_wfweb_packet()
+    if settings.get("wfweb_station_sync_enabled") and any(
+        k in data for k in ("station_grid", "wfweb_station_sync_enabled", "wfweb_host", "wfweb_logbook_rest_port")
+    ):
+        # Best-effort, fire-and-forget -- a slow/unreachable wfweb must
+        # never hold up this settings save. Reads the just-saved values
+        # off the local `settings` dict directly (cheaper than a fresh
+        # load_settings() call, and the transaction's already been
+        # committed by this point, same as every other rebuild trigger
+        # in this block).
+        threading.Thread(
+            target=wfweb_station.push_grid,
+            args=(settings.get("wfweb_host", ""), settings.get("wfweb_logbook_rest_port", 8081),
+                  settings.get("station_grid", "")),
+            daemon=True,
+        ).start()
     return jsonify({"ok": True})
 
 
@@ -1409,6 +1463,7 @@ _SENTINEL_DEFS = [
     ("__my_signal__", "show_my_signal", "my_signal_position", "📶", "My Signal", "where your signal is heard card"),
     ("__hotspot_health__", "show_hotspot_health", "hotspot_health_position", "🩺", "Hotspot Health", "uptime, temperature and reboots card"),
     ("__sstv__", "show_sstv", "sstv_position", "🖼️", "SSTV", "last decoded SSTV image card"),
+    ("__wfweb_packet__", "show_wfweb_packet", "wfweb_packet_position", "📦", "Packet Monitor", "wfweb AX.25/APRS decode card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -2602,6 +2657,102 @@ def test_wfweb_power():
         data.get("host", ""), data.get("port") or 8080, data.get("use_ssl", True),
     )
     return jsonify({"success": ok, "message": message})
+
+@app.route("/api/wfweb_memories")
+def api_wfweb_memories():
+    """List the rig's own memory channels for the HF Favorites drawer's
+    "wfweb Memories" tab -- a live scan over wfweb's WebSocket, not a
+    REST snapshot (wfweb's REST endpoint only returns whatever's already
+    cached, which can be empty/stale if no client has scanned recently
+    -- see wfweb_memory.py's own docstring). Read-only, no
+    _control_gate() needed. `gated: true` (not an `error`) is the
+    "wfweb isn't configured at all" case the drawer's own gate screen
+    keys off -- distinct from a real connection failure, which comes
+    back as a normal error string instead."""
+    settings = load_settings()
+    host = (settings.get("wfweb_host") or "").strip()
+    if not host:
+        return jsonify({"ok": False, "gated": True, "memories": [], "error": None})
+    port = settings.get("wfweb_port", 8080)
+    use_ssl = settings.get("wfweb_use_ssl", True)
+    try:
+        start = max(1, min(999, int(request.args.get("start", 1))))
+        end = max(start, min(999, int(request.args.get("end", 99))))
+    except (TypeError, ValueError):
+        start, end = 1, 99
+    memories, err = WfwebMemoryClient.list_memories(host, port, use_ssl, start=start, end=end)
+    return jsonify({"ok": err is None, "memories": memories, "error": err})
+
+@app.route("/api/wfweb_memory_action", methods=["POST"])
+def api_wfweb_memory_action():
+    """Write/rename/clear/recall one of the rig's own memory channels
+    over wfweb's own WebSocket -- see wfweb_memory.py. Every action here
+    reaches the real radio, so it goes through the same _control_gate()
+    every other rig-affecting route in this app uses."""
+    blocked = _control_gate()
+    if blocked:
+        return blocked
+    settings = load_settings()
+    host = (settings.get("wfweb_host") or "").strip()
+    if not host:
+        return jsonify({"ok": False, "message": "wfweb is not configured (Settings -> Integrations)"}), 400
+    port = settings.get("wfweb_port", 8080)
+    use_ssl = settings.get("wfweb_use_ssl", True)
+    data = request.json or {}
+    try:
+        channel = int(data.get("channel"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "message": "Invalid channel number"}), 400
+    try:
+        group = int(data.get("group", 0))
+    except (TypeError, ValueError):
+        group = 0
+    action = data.get("action")
+    name = (data.get("name") or "").strip()[:16]  # rig's own MemFormat name field is 16 chars max
+    if action == "write":
+        mem, err = WfwebMemoryClient.write_memory(host, port, use_ssl, channel, name, group)
+        return jsonify({"ok": err is None, "memory": mem, "message": err})
+    if action == "rename":
+        mem, err = WfwebMemoryClient.rename_memory(host, port, use_ssl, channel, name, group)
+        return jsonify({"ok": err is None, "memory": mem, "message": err})
+    if action == "clear":
+        ok, err = WfwebMemoryClient.clear_memory(host, port, use_ssl, channel, group)
+        return jsonify({"ok": ok, "message": err})
+    if action == "recall":
+        sstv_controller.note_activity("tune")   # recall changes what's on the VFO, same as any other tune action
+        ok, err = WfwebMemoryClient.recall_memory(host, port, use_ssl, channel, group)
+        return jsonify({"ok": ok, "message": err})
+    return jsonify({"ok": False, "message": "Unknown action"}), 400
+
+@app.route("/api/wfweb_packet")
+def api_wfweb_packet():
+    """Live status + recent decoded AX.25/APRS frames for the Packet
+    Monitor card -- see wfweb_packet.py. Read-only (the persistent
+    listener itself runs in the background via _rebuild_wfweb_packet())."""
+    return jsonify(wfweb_packet_client.status())
+
+@app.route("/api/wfweb_station")
+def api_wfweb_station():
+    """wfweb's own currently-stored station callsign/grid, for the
+    Settings 'wfweb station sync' display -- read-only, see
+    wfweb_station.py."""
+    settings = load_settings()
+    info = wfweb_station.get_station(
+        settings.get("wfweb_host", ""), settings.get("wfweb_logbook_rest_port", 8081),
+    )
+    return jsonify({"ok": info is not None, "station": info})
+
+@app.route("/api/wfweb_station_sync", methods=["POST"])
+def api_wfweb_station_sync():
+    """Settings 'Sync now' button -- pushes this app's own station_grid
+    into wfweb right away instead of waiting for the next settings
+    save. See wfweb_station.py -- grid only, callsign is never pushed."""
+    settings = load_settings()
+    ok, message = wfweb_station.push_grid(
+        settings.get("wfweb_host", ""), settings.get("wfweb_logbook_rest_port", 8081),
+        settings.get("station_grid", ""),
+    )
+    return jsonify({"ok": ok, "message": message})
 
 @app.route("/api/sstv")
 def api_sstv():

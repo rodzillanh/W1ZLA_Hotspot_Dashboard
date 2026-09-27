@@ -117,9 +117,21 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v5.4</span>
+                <span class="release-version">v5.6</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>wfweb Memories tab</span> &mdash; a new "wfweb Memories" tab inside the HF Favorites drawer for reading, writing, renaming, clearing and recalling the rig's own memory channels through wfweb's WebSocket. "Save" always captures whatever the rig is tuned to right now &mdash; there's no way to write an arbitrary frequency to a channel that isn't already live on the VFO</li>
+                <li><span>Packet Monitor card (optional)</span> &mdash; if you're running wfweb 0.9.1 or newer, this shows AX.25/APRS packets decoded by wfweb's own built-in modem riding the rig's RX audio, no separate packet hardware needed. Receive only. Mode (300/1200/9600 baud) is set under Settings &rarr; Integrations &rarr; "Packet Monitor" &mdash; it's the one shared decoder on wfweb's own server, so turning it on also affects wfweb's own web UI for anyone else using that instance</li>
+                <li><span>wfweb station sync (optional)</span> &mdash; optionally pushes this dashboard's own station grid square into wfweb's new server-side station identity, so it doesn't need entering twice. Grid only, never the callsign. Settings &rarr; Integrations &rarr; "wfweb station sync"</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v5.4</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>wfweb Logbook sync (optional)</span> &mdash; if you're running wfweb 0.9.1 or newer with its own server-side ADIF logbook, this pulls new QSOs in automatically every few minutes into Recent Contacts, matching/enriching against anything already known from another source, and pushes genuinely new ones to QRZ Logbook if you have a key configured. Settings &rarr; Integrations &rarr; "wfweb Logbook sync" &mdash; uses wfweb's own separate REST API port, not its web UI/power-control connection</li>

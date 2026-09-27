@@ -1111,6 +1111,7 @@
             {% set my_signal_pos = settings.get('my_signal_position', 0) if (settings.get('show_my_signal', False) and settings.get('my_signal_page', 1) == page) else -1 %}
             {% set hotspot_health_pos = settings.get('hotspot_health_position', 0) if (settings.get('show_hotspot_health', False) and settings.get('hotspot_health_page', 1) == page) else -1 %}
             {% set sstv_pos = settings.get('sstv_position', 0) if (settings.get('show_sstv', False) and settings.get('sstv_page', 1) == page) else -1 %}
+            {% set wfweb_packet_pos = settings.get('wfweb_packet_position', 0) if (settings.get('show_wfweb_packet', False) and settings.get('wfweb_packet_page', 1) == page) else -1 %}
             {# DVSwitch (v3.99) -- one consolidated card, shown when the
                "Show DVSwitch card" toggle (show_dvswitch, default on) is
                on AND any hotspot has dvswitch_enabled set. #}
@@ -1297,6 +1298,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🖼️ SSTV</span>
                     <span class="node-meta">last decoded SSTV image card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == wfweb_packet_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__wfweb_packet__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📦 Packet Monitor</span>
+                    <span class="node-meta">wfweb AX.25/APRS decode card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -1919,6 +1927,71 @@
         <button class="btn btn-info" onclick="testWfwebLogbook()">Test connection</button>
         <button class="btn btn-info" onclick="syncWfwebLogbookNow()">Sync now</button>
         <span class="status-txt" id="wfweb-logbook-status"></span>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Packet Monitor
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — enable the Packet Monitor card in the Cards tab
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            wfweb 0.9.1+ has its own built-in AX.25/APRS packet decoder, riding the
+            rig's own RX audio — no separate DigiPi hardware needed. <b>Receive only</b>:
+            wfweb has no remote packet-send command. It's the ONE shared demodulator
+            on wfweb's own server, not one per browser — turning this on (or changing
+            the mode) also affects wfweb's own web UI for anyone else using this same
+            wfweb instance at the same time. Uses the same host/port as wfweb power
+            control above.
+        </p>
+        <div class="toggle-group" style="margin-bottom:10px">
+            <div class="toggle-row">
+                <span class="toggle-label">Decode packets and show the Packet Monitor card</span>
+                <div class="toggle {{ 'on' if settings.get('show_wfweb_packet') else '' }}"
+                     id="wfweb-packet-enabled-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+        </div>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div>
+                <label>Demodulator mode</label>
+                <select id="wfweb-packet-mode">
+                    <option value="300"{{ ' selected' if settings.get('wfweb_packet_mode', 300) == 300 else '' }}>300 baud — HF AFSK</option>
+                    <option value="1200"{{ ' selected' if settings.get('wfweb_packet_mode', 300) == 1200 else '' }}>1200 baud — VHF APRS (Bell 202)</option>
+                    <option value="9600"{{ ' selected' if settings.get('wfweb_packet_mode', 300) == 9600 else '' }}>9600 baud — VHF G3RUH</option>
+                </select>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveWfwebPacket()">Save Packet Monitor settings</button>
+        <span class="status-txt" id="wfweb-packet-status"></span>
+    </div>
+
+    <div class="section">
+        <div class="section-title">wfweb station sync
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — keeps wfweb's station grid matching this dashboard's
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            wfweb 0.9.1+ keeps one station callsign/grid server-side, applied to every
+            browser and stamped on every QSO it logs. This can push this dashboard's
+            own Station grid square (General tab) into wfweb so it doesn't need
+            entering twice — <b>grid only</b>, never the callsign (this app has no
+            single "my callsign" setting to push, and never risks blanking out
+            wfweb's own stored callsign).
+        </p>
+        <div class="toggle-group" style="margin-bottom:10px">
+            <div class="toggle-row">
+                <span class="toggle-label">Push this dashboard's station grid into wfweb on save</span>
+                <div class="toggle {{ 'on' if settings.get('wfweb_station_sync_enabled') else '' }}"
+                     id="wfweb-station-sync-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveWfwebStationSync()">Save</button>
+        <button class="btn btn-info" onclick="syncWfwebStationNow()">Sync now</button>
+        <span class="status-txt" id="wfweb-station-status"></span>
+        <div style="font-size:11.5px;color:var(--text-dim);margin-top:8px" id="wfweb-station-current"></div>
     </div>
 
     <div class="section">
@@ -3018,6 +3091,7 @@ const SENTINEL_POSITION_FIELDS = [
     ['__hotspot_health__', 'hotspot_health_position'],
     ['__my_signal__', 'my_signal_position'],
     ['__sstv__', 'sstv_position'],
+    ['__wfweb_packet__', 'wfweb_packet_position'],
     ['__dvswitch__', 'dvswitch_position'],
 ];
 
@@ -4336,6 +4410,64 @@ async function syncWfwebLogbookNow() {
     }
 }
 
+// --- Packet Monitor (wfweb's own built-in AX.25/APRS decoder) ---
+function saveWfwebPacket() {
+    const status = document.getElementById('wfweb-packet-status');
+    fetch('/api/settings', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            show_wfweb_packet: document.getElementById('wfweb-packet-enabled-toggle').classList.contains('on'),
+            wfweb_packet_mode: parseInt(document.getElementById('wfweb-packet-mode').value, 10) || 300,
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved'; status.style.color = '';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+// --- wfweb station sync (grid only, see wfweb_station.py) ---
+function saveWfwebStationSync() {
+    const status = document.getElementById('wfweb-station-status');
+    fetch('/api/settings', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            wfweb_station_sync_enabled: document.getElementById('wfweb-station-sync-toggle').classList.contains('on'),
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved'; status.style.color = '';
+        setTimeout(() => status.textContent = '', 2000);
+    });
+}
+
+async function syncWfwebStationNow() {
+    const status = document.getElementById('wfweb-station-status');
+    status.textContent = 'Syncing...'; status.style.color = '';
+    try {
+        const r = await fetch('/api/wfweb_station_sync', {method: 'POST'});
+        const data = await r.json();
+        status.textContent = (data.ok ? '✓ ' : '✕ ') + (data.message || '');
+        status.style.color = data.ok ? 'var(--accent)' : 'var(--danger)';
+        loadWfwebStationCurrent();
+    } catch (e) {
+        status.textContent = '✕ ' + e;
+        status.style.color = 'var(--danger)';
+    }
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
+}
+
+async function loadWfwebStationCurrent() {
+    const el = document.getElementById('wfweb-station-current');
+    if (!el) return;
+    try {
+        const r = await fetch('/api/wfweb_station');
+        const data = await r.json();
+        el.textContent = (data.ok && data.station)
+            ? `wfweb currently has: ${data.station.callsign || '(no callsign)'} · ${data.station.grid || '(no grid)'}`
+            : '';
+    } catch (e) { /* silent -- purely informational */ }
+}
+if (document.getElementById('wfweb-station-current')) loadWfwebStationCurrent();
+
 function saveHamAlert() {
     const status = document.getElementById('hamalert-status');
     fetch('/api/settings', {
@@ -4657,6 +4789,8 @@ if (location.hash) {
         ['HamAlert',                'Callsign lookup & logging', 'cfg',    () => val('hamalert-username'), 'hamalert'],
         ['Rig control',             'Radio & rig',               'toggle', () => tog('rig-enabled-toggle'), 'rig_control'],
         ['wfweb power',             'Radio & rig',               'toggle', () => tog('wfweb-pwr-enabled-toggle'), 'wfweb'],
+        ['Packet Monitor',          'Radio & rig',               'toggle', () => tog('wfweb-packet-enabled-toggle'), 'wfweb_packet'],
+        ['wfweb station sync',      'Radio & rig',               'toggle', () => tog('wfweb-station-sync-toggle'), 'wfweb_station'],
         ['DigiPi',                  'Radio & rig',               'cfg',    () => val('digipi-ip'), 'digipi'],
         ['Parks on the Air',        'Spots & propagation',       'cfg',    () => val('pota-callsign'), 'pota_callsign'],
         ['PSK Reporter',            'Spots & propagation',       'cfg',    () => val('psk-callsign'), 'psk_reporter'],

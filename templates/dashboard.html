@@ -1627,6 +1627,71 @@
         .hf-fav-foot { font-size: 10.5px; color: var(--text-muted); padding-top: 4px; border-top: 1px solid var(--border-soft); }
         .hf-fav-foot a { color: var(--text-dim); cursor: pointer; text-decoration: underline; }
         @media (prefers-reduced-motion: reduce) { .hf-tune-chip.pending { animation: none; } }
+
+        /* HF Favorites drawer -- "wfweb Memories" tab (v5.5, mockup-
+           approved, artifact 5XorA4qG6QQZYubua879js). A wfweb-only
+           feature: reads/writes the rig's own memory channels over
+           wfweb's WebSocket, see wfweb_memory.py. */
+        .hf-drawer-tabs { display: flex; gap: 4px; padding: 0 16px; border-bottom: 1px solid var(--border-soft); margin-top: 4px; }
+        .hf-drawer-tab { font: inherit; font-size: 12px; font-weight: 600; color: var(--text-dim);
+            background: transparent; border: none; padding: 9px 4px 10px; margin-right: 14px;
+            cursor: pointer; border-bottom: 2px solid transparent; }
+        .hf-drawer-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+        .hf-mem-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 9.5px; font-weight: 700;
+            letter-spacing: .04em; text-transform: uppercase; color: var(--live); background: var(--live-dim);
+            border: 1px solid color-mix(in srgb, var(--live) 30%, transparent); border-radius: 5px;
+            padding: 3px 7px; margin-bottom: 10px; }
+        .hf-mem-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--live); }
+        .hf-mem-conn { display: flex; align-items: center; justify-content: space-between; font-size: 11px;
+            color: var(--text-muted); margin-bottom: 12px; }
+        .hf-mem-conn .d { display: inline-flex; align-items: center; gap: 6px; }
+        .hf-mem-conn .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--good-dim); }
+        .hf-mem-conn .dot.err { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-dim); }
+        .hf-mem-conn button { font: inherit; font-size: 10.5px; font-weight: 600; color: var(--text-muted);
+            background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px; cursor: pointer; }
+        .hf-mem-conn button:hover { color: var(--text); border-color: var(--text-dim); }
+        .hf-mem-list { display: flex; flex-direction: column; height: 220px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+        .hf-mem-list::-webkit-scrollbar { width: 8px; }
+        .hf-mem-list::-webkit-scrollbar-track { background: transparent; }
+        .hf-mem-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        .hf-mem-row { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 9px;
+            padding: 7px 4px; border-top: 1px solid var(--border-soft); }
+        .hf-mem-row:first-child { border-top: none; }
+        .hf-mem-row .ch { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; color: var(--text-dim); text-align: right; }
+        .hf-mem-row .info { min-width: 0; }
+        .hf-mem-row .name { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hf-mem-row .detail { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+        .hf-mem-row .detail .mode { font-weight: 700; color: var(--caution); letter-spacing: .03em; }
+        .hf-mem-row .acts { display: flex; gap: 4px; }
+        .hf-mem-row .acts button { font-size: 11px; color: var(--text-dim); background: transparent; border: none;
+            cursor: pointer; padding: 3px 4px; border-radius: 5px; line-height: 1; }
+        .hf-mem-row .acts button:hover { color: var(--text); background: var(--panel-2); }
+        .hf-mem-row .acts button.recall:hover { color: var(--live); }
+        .hf-mem-row .acts button.del:hover { color: var(--danger); }
+        .hf-mem-row.editing { grid-template-columns: 30px 1fr auto; }
+        .hf-mem-row.editing input { font: inherit; font-size: 12px; background: var(--panel-2); border: 1px solid var(--live);
+            border-radius: 5px; padding: 4px 6px; color: var(--text); min-width: 0; width: 100%; }
+        .hf-mem-empty { padding: 30px 10px; text-align: center; color: var(--text-dim); font-size: 11.5px; }
+        .hf-mem-save { display: grid; grid-template-columns: 46px 1fr auto; gap: 6px; align-items: center; }
+        .hf-mem-save input { font: inherit; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+            padding: 7px 8px; color: var(--text); font-size: 12px; min-width: 0; }
+        .hf-mem-save input.ch { font-family: var(--font-mono); text-align: center; }
+        .hf-mem-save input:focus { outline: none; border-color: var(--live); }
+        .hf-mem-save button { font: inherit; font-size: 11.5px; font-weight: 700; color: var(--bg); background: var(--live);
+            border: none; border-radius: 6px; padding: 7px 12px; cursor: pointer; white-space: nowrap; }
+        .hf-mem-save button:disabled { opacity: .5; cursor: default; }
+        .hf-mem-hint { font-size: 10px; color: var(--text-dim); margin-top: 7px; line-height: 1.5; }
+        .hf-mem-hint b { color: var(--text-muted); }
+        .hf-mem-gate, .hf-mem-unreach { padding: 22px 18px; text-align: center; }
+        .hf-mem-gate .icon { font-size: 26px; margin-bottom: 10px; }
+        .hf-mem-unreach .icon { font-size: 22px; margin-bottom: 8px; color: var(--danger); }
+        .hf-mem-gate .head, .hf-mem-unreach .head { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+        .hf-mem-gate .body, .hf-mem-unreach .body { font-size: 11.5px; color: var(--text-muted); line-height: 1.6;
+            max-width: 300px; margin: 0 auto 16px; }
+        .hf-mem-gate a.setup-link { display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--bg);
+            background: var(--accent); border-radius: 6px; padding: 8px 16px; text-decoration: none; }
+        .hf-mem-unreach button { font: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+            background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 14px; cursor: pointer; }
         /* HF Favorites edit drawer -- every grid track that holds an
            <input>/<select> needs min-width:0, or the control's intrinsic
            min-width overflows the drawer and forces a horizontal scrollbar */
@@ -2525,6 +2590,39 @@
         }
         .dp-payload { color: var(--text-muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .dp-unavailable { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
+
+        /* Packet Monitor card (v5.6) -- wfweb's own built-in AX.25/APRS
+           decoder, see wfweb_packet.py. Own wp- prefix rather than
+           reusing DigiPi's dp- classes, same "each card owns its own
+           classes even when visually similar" convention this file
+           already follows elsewhere (e.g. HF Favorites' hf-mem-* vs.
+           POTA's pota-*). Connection pill copies .sstv-pill's shape
+           (same "shares wfweb" family of cards). */
+        .wp-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px;
+            background: var(--panel-2); border: 1px solid var(--border); color: var(--text-muted);
+            font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+            text-transform: uppercase; white-space: nowrap; }
+        .wp-pill .d { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); }
+        .wp-pill.live { background: var(--live-dim); border-color: transparent; color: var(--live); }
+        .wp-pill.live .d { background: var(--live); }
+        .wp-mode { font-size: 10.5px; color: var(--text-dim); margin: 6px 0 8px; }
+        .wp-mode b { color: var(--text-muted); font-family: var(--font-mono); }
+        .wp-packets { display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow-y: auto;
+            margin: 0 -4px; padding: 0 4px; scrollbar-width: thin; scrollbar-color: var(--card-border) transparent; }
+        .wp-packets::-webkit-scrollbar { width: 7px; }
+        .wp-packets::-webkit-scrollbar-track { background: transparent; }
+        .wp-packets::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 4px; }
+        .wp-packet { display: flex; align-items: baseline; gap: 7px; font-size: 12px; padding: 5px 7px;
+            border-radius: 6px; background: var(--bg); border: 1px solid var(--card-border); }
+        .wp-route { flex-shrink: 0; white-space: nowrap; }
+        .wp-call { color: var(--link); text-decoration: none; font-weight: 600; }
+        .wp-call:hover { text-decoration: underline; }
+        .wp-arrow { color: var(--text-dim); margin: 0 2px; }
+        .wp-dst { color: var(--text-muted); }
+        .wp-path { color: var(--text-dim); font-size: 10.5px; flex-shrink: 0; }
+        .wp-info { color: var(--text-muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .wp-empty { color: var(--text-dim); font-size: 12.5px; padding: 20px 0; text-align: center; }
+        .wp-unavailable { display: none; color: var(--text-dim); font-size: 12.5px; padding: 10px 0; text-align: center; }
 
         /* --- camera cards (RTSP / Bambu Labs A1) --- */
         .camera-card {
@@ -3999,6 +4097,18 @@
             <div class="sstv-foot"><span id="sstv-foot-l"></span><span id="sstv-foot-r"></span></div>
         </div>
         {% endif %}
+        {% if settings.get('show_wfweb_packet', False) %}
+        <div class="metrics-card" id="wfweb-packet-card"
+             style="order:{{ settings.get('wfweb_packet_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name" title="wfweb's own built-in AX.25/APRS packet decoder, riding the rig's RX audio. Receive only -- there's no remote send.">📦 Packet Monitor</div>
+                <span class="wp-pill" id="wp-pill"><span class="d"></span><span id="wp-pill-txt">…</span></span>
+            </div>
+            <div class="wp-mode">Mode: <b id="wp-mode-txt">—</b> · via wfweb</div>
+            <div class="wp-packets" id="wp-packets"></div>
+            <div class="wp-unavailable" id="wp-unavailable" style="display:none">Set a wfweb host under Settings → Integrations to enable this card.</div>
+        </div>
+        {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
         <div class="metrics-card" id="hf-conditions-card"
              style="order:{{ settings.get('hf_conditions_position', 0) }}">
@@ -4519,6 +4629,7 @@ const HOTSPOT_HEALTH_POSITION = {{ settings.get('hotspot_health_position', 0) }}
 const HEALTH_WARM_C          = {{ settings.get('health_warm_c', 70) }};
 const HEALTH_TEMP_UNIT       = "{{ settings.get('weather_unit', 'F') }}";
 const SSTV_PAGE              = {{ settings.get('sstv_page', 1) }};
+const WFWEB_PACKET_PAGE      = {{ settings.get('wfweb_packet_page', 1) }};
 const DVSWITCH_PAGE          = {{ settings.get('dvswitch_page', 1) }};
 const DASHBOARD2_NAME        = {{ settings.get('dashboard2_name', 'Dashboard 2') | tojson }};
 // Whether the "Dashboard 2" tab even appears -- presence-derived (any
@@ -4619,6 +4730,11 @@ const SHOW_RIG_PANEL = {{ 'true' if settings.get('show_rig_panel', False) else '
 const RIG_PANEL_POSITION = {{ settings.get('rig_panel_position', 0) }};
 const RIG_PANEL_POLL_MS = 1000;
 const WFWEB_POWER_ENABLED = {{ 'true' if settings.get('wfweb_power_enabled', False) else 'false' }};
+// Gates the HF Favorites drawer's "wfweb Memories" tab -- a wfweb-only
+// feature (see wfweb_memory.py), independent of WFWEB_POWER_ENABLED
+// above since memory access shares only the connection info, not the
+// power-control toggle itself. Same field SSTV's card already relies on.
+const WFWEB_HOST_SET = {{ 'true' if (settings.get('wfweb_host') or '').strip() else 'false' }};
 const SHOW_QRZ_QUICK_LOG = {{ 'true' if settings.get('show_qrz_quick_log', False) else 'false' }};
 const QRZ_QUICK_LOG_POSITION = {{ settings.get('qrz_quick_log_position', 0) }};
 const SHOW_BEACONS = {{ 'true' if settings.get('show_beacons', False) else 'false' }};
@@ -4630,6 +4746,9 @@ const SHOW_SSTV = {{ 'true' if settings.get('show_sstv', False) else 'false' }};
 const SSTV_POSITION = {{ settings.get('sstv_position', 0) }};
 const SSTV_POLL_MS = 3000;
 const SSTV_RX_POLL_MS = 1500;  // faster while an image is being received, so the preview keeps up
+const SHOW_WFWEB_PACKET = {{ 'true' if settings.get('show_wfweb_packet', False) else 'false' }};
+const WFWEB_PACKET_POSITION = {{ settings.get('wfweb_packet_position', 0) }};
+const WFWEB_PACKET_POLL_MS = 3000;
 const POTA_POLL_MS = 20000;  // matches pota.py's spot cache TTL
 const SOTA_CARD_POLL_MS = 120000;  // matches sota.py's CACHE_TTL, same as the map overlay's own interval
 const RBN_ENABLED = {{ 'true' if settings.get('rbn_enabled', False) else 'false' }};
@@ -5210,6 +5329,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     topactivity: '__top_activity__', pota: '__pota__', dvswitch: '__dvswitch__',
     hffav: '__hf_favorites__', rigpanel: '__rig_panel__', qrzquicklog: '__qrz_quick_log__',
     beacons: '__beacons__', repeaters: '__repeaters__', sstv: '__sstv__', hotspothealth: '__hotspot_health__', mysignal: '__my_signal__',
+    wfwebpacket: '__wfweb_packet__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -5477,6 +5597,9 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     }
     if (SHOW_SSTV && SSTV_PAGE === page) {
         sentinels.push({ key: 'sstv', pos: Math.max(0, SSTV_POSITION) });
+    }
+    if (SHOW_WFWEB_PACKET && WFWEB_PACKET_PAGE === page) {
+        sentinels.push({ key: 'wfwebpacket', pos: Math.max(0, WFWEB_PACKET_POSITION) });
     }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, hfcond, bandplan,
@@ -8413,6 +8536,58 @@ if (SHOW_DIGIPI) {
     }
 }
 
+// --- Packet Monitor card (wfweb's own built-in AX.25/APRS decoder) ---
+const WFWEB_PACKET_MODE_LABELS = { 300: '300 baud HF AFSK', 1200: '1200 baud VHF APRS', 9600: '9600 baud G3RUH' };
+
+function renderWfwebPacket(data) {
+    const pill = document.getElementById('wp-pill');
+    const card = document.getElementById('wfweb-packet-card');
+    if (!pill || !card) return;
+
+    const unavailable = document.getElementById('wp-unavailable');
+    if (!data.enabled) {
+        unavailable.style.display = 'block';
+        document.getElementById('wp-packets').innerHTML = '';
+        pill.classList.remove('live');
+        document.getElementById('wp-pill-txt').textContent = 'Off';
+        return;
+    }
+    unavailable.style.display = 'none';
+
+    const live = data.connected && data.modem_enabled;
+    pill.classList.toggle('live', !!live);
+    document.getElementById('wp-pill-txt').textContent = live ? '● Decoding'
+        : data.connected ? 'Connecting…'
+        : (data.error ? 'Offline' : 'Connecting…');
+    pill.title = data.error || (live ? 'Connected to wfweb, modem running' : '');
+
+    document.getElementById('wp-mode-txt').textContent = WFWEB_PACKET_MODE_LABELS[data.mode] || (data.mode + ' baud');
+
+    const frames = (data.frames || []).slice().reverse();  // newest first
+    document.getElementById('wp-packets').innerHTML = frames.length ? frames.map(f => {
+        const path = (f.path || []).join(',');
+        const ago = fmtAgoCompact(Math.max(0, Date.now() / 1000 - f.at));
+        return `<div class="wp-packet" title="${ago} ago">
+            <span class="wp-route"><a class="wp-call" href="https://aprs.fi/${escapeHtml(f.src)}" target="_blank" rel="noopener">${escapeHtml(f.src)}</a><span class="wp-arrow">→</span><span class="wp-dst">${escapeHtml(f.dst)}</span></span>
+            ${path ? `<span class="wp-path">via ${escapeHtml(path)}</span>` : ''}
+            <span class="wp-info">${escapeHtml(f.info)}</span>
+        </div>`;
+    }).join('') : '<div class="wp-empty">No packets decoded yet.</div>';
+}
+
+function fetchWfwebPacket() {
+    if (!SHOW_WFWEB_PACKET) return;
+    fetch('/api/wfweb_packet')
+        .then(r => r.json())
+        .then(renderWfwebPacket)
+        .catch(() => {});
+}
+
+if (SHOW_WFWEB_PACKET) {
+    fetchWfwebPacket();
+    setInterval(fetchWfwebPacket, WFWEB_PACKET_POLL_MS);
+}
+
 // --- Big Ass Clock card ---
 // Purely client-side -- no backend module, no /api endpoint (same "no
 // Python client" precedent as the static Band Plan card). Style/format/
@@ -11007,6 +11182,10 @@ if (SHOW_POTA) {
 // RIG_CONTROL_ENABLED verbatim. See rigctl.py / /api/hf_favorites.
 let hfFavData = null;          // { favorites: [...], rig: {...}|null }
 let hfFavEditingId = null;     // id of the row being inline-edited, or null
+let hfDrawerTab = 'favorites'; // 'favorites' | 'memories' -- which HF Favorites drawer tab is showing
+let wfwebMemData = null;       // { ok, gated, memories:[...], error } | null (not loaded yet)
+let wfwebMemLoading = false;
+let wfwebMemEditingCh = null;  // channel # currently being renamed inline, or null
 
 const hfModeLabel = m => ({ PKTUSB: 'DATA-U', PKTLSB: 'DATA-L' }[m] || m);
 function hfModeClass(m) {
@@ -11085,9 +11264,7 @@ function hfFavTune(btn, freqHz, mode) {
     setTimeout(fetchHfFavorites, 1400);
 }
 
-function renderHfFavDrawer() {
-    const d = document.getElementById('hf-fav-drawer');
-    if (!d || !d.classList.contains('open') || !hfFavData) return;
+function hfFavTabBodyHtml() {
     const favs = (hfFavData.favorites || []).slice().sort((a, b) => a.freq_hz - b.freq_hz);
     const modeOpts = sel => HF_FAV_MODES.map(m =>
         `<option value="${m}"${m === sel ? ' selected' : ''}>${hfModeLabel(m)}</option>`).join('');
@@ -11113,6 +11290,111 @@ function renderHfFavDrawer() {
             </span></div>`;
     }).join('');
 
+    return `
+        <div class="hs-drawer-section-title">Add a favorite</div>
+        <div class="hf-e-add">
+            <input class="freq" id="hf-fav-add-freq" placeholder="14.313" inputmode="decimal">
+            <input id="hf-fav-add-label" placeholder="Label" maxlength="60">
+            <select id="hf-fav-add-mode">${modeOpts('USB')}</select>
+            <button onclick="hfFavAdd()">Add</button>
+        </div>
+        <div class="hf-e-hint">Frequency in MHz. Band is derived automatically; the mode is sent to the rig verbatim.</div>
+        <div class="hs-drawer-section-title">Your favorites (${favs.length})</div>
+        <div class="hf-e-list">${rows || '<div style="padding:14px;color:var(--text-muted);font-size:12px">No favorites. Use "Restore default set" below to bring the curated list back.</div>'}</div>
+        <div class="hf-e-bulk">
+            <button class="pota-gear" type="button" onclick="hfFavRestoreDefaults()">Restore default set</button>
+            <button class="pota-gear" type="button" onclick="hfFavRemoveAll()">Remove all</button>
+        </div>`;
+}
+
+// "wfweb Memories" tab -- reads/writes the rig's own memory channels
+// over wfweb's WebSocket (wfweb_memory.py). A wfweb-only feature:
+// gated on WFWEB_HOST_SET (same connection info wfweb power control/
+// SSTV already use), never on WFWEB_POWER_ENABLED specifically -- see
+// that constant's own comment.
+function wfwebMemTabBodyHtml() {
+    if (!WFWEB_HOST_SET) {
+        return `<div class="hf-mem-gate">
+            <div class="icon">📻</div>
+            <div class="head">wfweb feature</div>
+            <div class="body">Reading and writing the rig's own memory channels needs
+                <b style="color:var(--text)">wfweb</b>, connected the same way as its power/LAN control.
+                Not available with a plain rigctld connection or wfview.</div>
+            <a class="setup-link" href="/setup?item=wfweb#integrations">Set up wfweb →</a>
+        </div>`;
+    }
+    if (wfwebMemLoading && !wfwebMemData) {
+        return `<div class="hf-mem-empty">Loading channels…</div>`;
+    }
+    const d = wfwebMemData;
+    if (!d) return `<div class="hf-mem-empty">Loading channels…</div>`;
+    if (d.gated) {
+        return `<div class="hf-mem-gate">
+            <div class="icon">📻</div>
+            <div class="head">wfweb feature</div>
+            <div class="body">Reading and writing the rig's own memory channels needs
+                <b style="color:var(--text)">wfweb</b>, connected the same way as its power/LAN control.
+                Not available with a plain rigctld connection or wfview.</div>
+            <a class="setup-link" href="/setup?item=wfweb#integrations">Set up wfweb →</a>
+        </div>`;
+    }
+    if (!d.ok) {
+        return `<div class="hf-mem-badge"><span class="dot"></span> wfweb feature</div>
+        <div class="hf-mem-unreach">
+            <div class="icon">✕</div>
+            <div class="head">Can't reach wfweb</div>
+            <div class="body">${escapeHtml(d.error || 'Connection failed')}. Check the host/port under
+                Settings → Integrations.</div>
+            <button onclick="fetchWfwebMemories()">↻ Try again</button>
+        </div>`;
+    }
+    const mems = (d.memories || []);
+    const rows = mems.map(m => {
+        const freqStr = m.frequency != null ? (m.frequency / 1e6).toFixed(6) : '—';
+        if (wfwebMemEditingCh === m.channel) {
+            return `<div class="hf-mem-row editing">
+                <div class="ch">${String(m.channel).padStart(2, '0')}</div>
+                <input id="hf-mem-rename-${m.channel}" maxlength="16" value="${escapeHtml(m.name || '')}">
+                <span class="acts">
+                    <button title="save" style="color:var(--live);font-weight:700" onclick="wfwebMemSaveRename(${m.channel}, ${m.group || 0})">✓</button>
+                    <button title="cancel" onclick="wfwebMemEditingCh=null;renderHfFavDrawer()">✕</button>
+                </span></div>`;
+        }
+        return `<div class="hf-mem-row">
+            <div class="ch">${String(m.channel).padStart(2, '0')}</div>
+            <div class="info">
+                <div class="name">${escapeHtml(m.name || '(unnamed)')}</div>
+                <div class="detail">${escapeHtml(freqStr)} · <span class="mode">${escapeHtml(m.mode || '')}</span></div>
+            </div>
+            <div class="acts">
+                <button class="recall" title="Recall on the rig" onclick="wfwebMemRecall(${m.channel}, ${m.group || 0})">▶</button>
+                <button title="Rename" onclick="wfwebMemEditingCh=${m.channel};renderHfFavDrawer()">✎</button>
+                <button class="del" title="Clear channel" onclick="wfwebMemClear(${m.channel}, ${m.group || 0})">🗑</button>
+            </div></div>`;
+    }).join('');
+
+    return `
+        <div class="hf-mem-badge"><span class="dot"></span> wfweb feature</div>
+        <div class="hf-mem-conn">
+            <span class="d"><span class="dot"></span> Connected · ${mems.length} channel${mems.length === 1 ? '' : 's'}</span>
+            <button onclick="fetchWfwebMemories()">↻ Rescan</button>
+        </div>
+        <div class="hf-mem-list">${rows || '<div class="hf-mem-empty">No memory channels found on the rig yet.<br>Tune in and use "Save current VFO" below to add your first one.</div>'}</div>
+        <div class="hs-drawer-section-title">Save current VFO as a channel</div>
+        <div class="hf-mem-save">
+            <input class="ch" id="hf-mem-new-ch" placeholder="1" inputmode="numeric">
+            <input id="hf-mem-new-name" placeholder="Channel name" maxlength="16">
+            <button onclick="wfwebMemSaveNew()">Save</button>
+        </div>
+        <div class="hf-mem-hint">Writes whatever the rig is <b>tuned to right now</b> — tune with HF Favorites
+            or Rig Panel first, then save it here. There's no way to write a frequency to a channel that
+            isn't already live on the VFO.</div>`;
+}
+
+function renderHfFavDrawer() {
+    const d = document.getElementById('hf-fav-drawer');
+    if (!d || !d.classList.contains('open') || !hfFavData) return;
+
     d.innerHTML = `
         <div class="hs-drawer-header">
             <div class="hs-drawer-title-row">
@@ -11121,22 +11403,21 @@ function renderHfFavDrawer() {
             </div>
             <div class="hs-drawer-sub">Tap-to-tune memory bank — add your own or tweak any row</div>
         </div>
+        <div class="hf-drawer-tabs">
+            <button class="hf-drawer-tab${hfDrawerTab === 'favorites' ? ' active' : ''}" onclick="hfDrawerSwitchTab('favorites')">Favorites</button>
+            <button class="hf-drawer-tab${hfDrawerTab === 'memories' ? ' active' : ''}" onclick="hfDrawerSwitchTab('memories')">wfweb Memories</button>
+        </div>
         <div class="hs-drawer-body">
-            <div class="hs-drawer-section-title">Add a favorite</div>
-            <div class="hf-e-add">
-                <input class="freq" id="hf-fav-add-freq" placeholder="14.313" inputmode="decimal">
-                <input id="hf-fav-add-label" placeholder="Label" maxlength="60">
-                <select id="hf-fav-add-mode">${modeOpts('USB')}</select>
-                <button onclick="hfFavAdd()">Add</button>
-            </div>
-            <div class="hf-e-hint">Frequency in MHz. Band is derived automatically; the mode is sent to the rig verbatim.</div>
-            <div class="hs-drawer-section-title">Your favorites (${favs.length})</div>
-            <div class="hf-e-list">${rows || '<div style="padding:14px;color:var(--text-muted);font-size:12px">No favorites. Use "Restore default set" below to bring the curated list back.</div>'}</div>
-            <div class="hf-e-bulk">
-                <button class="pota-gear" type="button" onclick="hfFavRestoreDefaults()">Restore default set</button>
-                <button class="pota-gear" type="button" onclick="hfFavRemoveAll()">Remove all</button>
-            </div>
+            ${hfDrawerTab === 'memories' ? wfwebMemTabBodyHtml() : hfFavTabBodyHtml()}
         </div>`;
+}
+
+function hfDrawerSwitchTab(tab) {
+    hfDrawerTab = tab;
+    if (tab === 'memories' && WFWEB_HOST_SET && !wfwebMemData && !wfwebMemLoading) {
+        fetchWfwebMemories();
+    }
+    renderHfFavDrawer();
 }
 
 function openHfFavDrawer() {
@@ -11146,6 +11427,63 @@ function openHfFavDrawer() {
     hfFavEditingId = null;
     renderHfFavDrawer();
     fetchHfFavorites();
+}
+
+function fetchWfwebMemories() {
+    if (!WFWEB_HOST_SET) { wfwebMemData = { gated: true }; renderHfFavDrawer(); return; }
+    wfwebMemLoading = true;
+    if (hfDrawerTab === 'memories') renderHfFavDrawer();
+    fetch('/api/wfweb_memories').then(r => r.json()).then(data => {
+        wfwebMemLoading = false;
+        wfwebMemData = data;
+        renderHfFavDrawer();
+    }).catch(() => {
+        wfwebMemLoading = false;
+        wfwebMemData = { ok: false, gated: false, memories: [], error: 'Request failed' };
+        renderHfFavDrawer();
+    });
+}
+
+function wfwebMemAction(action, channel, group, name, okMsg) {
+    return fetch('/api/wfweb_memory_action', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, channel, group, name }),
+    }).then(r => r.json()).then(d => {
+        if (d.ok) {
+            if (okMsg) rigToast(okMsg, 'ok');
+            fetchWfwebMemories();
+        } else {
+            rigToast(d.message || 'wfweb memory action failed', 'err');
+        }
+        return d;
+    }).catch(() => { rigToast('wfweb memory action failed', 'err'); });
+}
+
+function wfwebMemRecall(channel, group) {
+    wfwebMemAction('recall', channel, group, '', `Recalled channel ${channel}`);
+}
+
+function wfwebMemClear(channel, group) {
+    if (!confirm(`Clear memory channel ${channel}? This can't be undone.`)) return;
+    wfwebMemAction('clear', channel, group, '', `Cleared channel ${channel}`);
+}
+
+function wfwebMemSaveRename(channel, group) {
+    const el = document.getElementById(`hf-mem-rename-${channel}`);
+    const name = (el ? el.value : '').trim();
+    wfwebMemEditingCh = null;
+    wfwebMemAction('rename', channel, group, name, `Renamed channel ${channel}`);
+}
+
+function wfwebMemSaveNew() {
+    const chEl = document.getElementById('hf-mem-new-ch');
+    const nameEl = document.getElementById('hf-mem-new-name');
+    const channel = parseInt(chEl.value, 10);
+    if (!channel || channel < 0) { rigToast('Enter a channel number', 'err'); return; }
+    const name = (nameEl.value || '').trim();
+    wfwebMemAction('write', channel, 0, name, `Saved channel ${channel}`).then(d => {
+        if (d && d.ok) { chEl.value = ''; nameEl.value = ''; }
+    });
 }
 
 // loose client-side band check -- the POST route validates authoritatively

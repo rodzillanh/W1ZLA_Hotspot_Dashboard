@@ -23,7 +23,7 @@ def _version_tuple(v):
 # version number now, no new names get appended here. See
 # _LAST_NAMED_VERSION below for how APP_CODENAME resolves to None past
 # this list's last entry.
-APP_VERSION = "5.4"
+APP_VERSION = "5.6"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -324,6 +324,7 @@ DIGEST_HIGHLIGHTS = [
               "New optional cards: Hotspot Health and My Signal",
               "Satellite pass alerts in Notifications and on your phone"]),
     ("5.4",  ["wfweb users: sync your logbook automatically into Recent Contacts and QRZ (Settings → Integrations)"]),
+    ("5.6",  ["wfweb users: a new Memories tab on HF Favorites, plus an optional Packet Monitor card"]),
 ]
 
 
@@ -1695,6 +1696,24 @@ DEFAULT_SETTINGS = {
     "wfweb_use_ssl": True,
     "wfweb_logbook_enabled": False,
     "wfweb_logbook_rest_port": 8081,
+    # Packet Monitor card (v5.6) -- wfweb's own built-in AX.25/APRS
+    # decoder (see wfweb_packet.py), a wfweb-only feature sharing the
+    # WebSocket connection info above. mode is the single ACTIVE
+    # demodulator on wfweb's own server (300 HF AFSK / 1200 VHF APRS /
+    # 9600 G3RUH) -- a deliberate Settings-only choice, not a quick
+    # card toggle, since only one can be active at a time and changing
+    # it also affects wfweb's own web UI for anyone else using it.
+    "wfweb_packet_enabled": False,
+    "wfweb_packet_mode": 300,
+    "show_wfweb_packet": False,
+    "wfweb_packet_position": 0,
+    "wfweb_packet_page": 1,
+    # Station callsign/grid sync (v5.6) -- wfweb 0.9.1+ keeps these
+    # server-side (GET/PUT /api/v1/station) instead of per-browser; this
+    # optionally pushes this app's own station_grid (and, if ever added,
+    # a station callsign setting) into wfweb so it doesn't need entering
+    # twice. See wfweb_station.py.
+    "wfweb_station_sync_enabled": False,
     # HF Favorites card (v4.50) -- a tap-to-tune memory bank (80m-6m
     # common activity frequencies), each row a button that drives the
     # same rigctld path as the POTA card. The favorites list itself
