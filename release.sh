@@ -45,7 +45,13 @@ fi
 VERSION="$(python3 -c "import config; print(config.APP_VERSION)")"
 CODENAME="$(python3 -c "import config; print(config.APP_CODENAME)")"
 TAG="v${VERSION}"
-TITLE="v${VERSION} \"${CODENAME}\""
+# Codenames were retired after v5.1 (APP_CODENAME is None from then on) --
+# only add one when there is one, or the release is titled 'v5.3 "None"'.
+if [ -n "$CODENAME" ] && [ "$CODENAME" != "None" ]; then
+    TITLE="v${VERSION} \"${CODENAME}\""
+else
+    TITLE="v${VERSION}"
+fi
 
 echo "==> Releasing ${TITLE} (tag ${TAG}) against $(git rev-parse --short HEAD)..."
 
