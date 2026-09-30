@@ -1313,7 +1313,7 @@
         /* --- APRS send composer (Notifications card) --- */
         .notif-header-right { display: flex; align-items: center; gap: 8px; }
         .notif-send-btn { font: inherit; font-size: 11.5px; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--panel-2); color: var(--text-muted); cursor: pointer; white-space: nowrap; }
-        .notif-send-btn:hover, .notif-send-btn.on { border-color: var(--live); color: var(--live); }
+        .notif-send-btn:hover { border-color: var(--live); color: var(--live); }
         .notif-composer { background: var(--panel-2); border: 1px solid var(--card-border); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
         .notif-composer[hidden] { display: none; }
         .nc-seg { display: flex; gap: 4px; margin-bottom: 10px; }
@@ -3737,7 +3737,7 @@
                 <div class="notif-header-right">
                     <div class="notif-stats">Total <b id="notif-count">—</b> &middot; last <b id="notif-last">—</b></div>
                     {% if settings.get('aprs_inbox_enabled', False) %}
-                    <button class="notif-send-btn" id="notif-send-btn" type="button" onclick="toggleAprsComposer()" title="Send an APRS message, text a phone, or ask WXBOT for weather">✉ Send</button>
+                    <button class="notif-send-btn" type="button" onclick="toggleAprsComposer(this)" title="Send an APRS message, text a phone, or ask WXBOT for weather">✉ Send</button>
                     {% endif %}
                 </div>
             </div>
@@ -7948,7 +7948,7 @@ function renderAprsSmsRow(m, unread) {
             </div>
             <div class="msg-text">${escapeHtml(r.text)}</div>
             ${m.backfilled ? '<span class="msg-caught-up">↺ arrived while offline</span>' : ''}
-            <button class="msg-reply" type="button" data-number="${escapeHtml(r.number)}" onclick="replyAprsSms(this.dataset.number)">↩ Reply</button>
+            <button class="msg-reply" type="button" data-number="${escapeHtml(r.number)}" onclick="replyAprsSms(this.dataset.number, this)">↩ Reply</button>
         </div>`;
 }
 
@@ -7987,13 +7987,19 @@ function renderAprsOutboundRow(m) {
         </div>`;
 }
 
-function toggleAprsComposer(force) {
+// There is ONE composer. When the Notifications card is shown on both
+// dashboard pages, it moves into whichever copy's Send button (or Reply
+// link) was clicked, so it's usable from either page; see
+// mirrorNotificationsToP2 for how the page-2 copy keeps it in place.
+function toggleAprsComposer(fromEl, force) {
     const box = document.getElementById('aprs-composer');
-    const btn = document.getElementById('notif-send-btn');
     if (!box) return;
-    const open = force === undefined ? box.hidden : force;
+    const card = fromEl && fromEl.closest('.metrics-card');
+    const scroll = card && card.querySelector('.msg-scroll');
+    const moved = scroll && !card.contains(box);
+    if (moved) scroll.parentNode.insertBefore(box, scroll);
+    const open = force !== undefined ? force : (moved || box.hidden);
     box.hidden = !open;
-    if (btn) btn.classList.toggle('on', open);
     if (open) setAprsComposeMode(aprsComposeMode);
 }
 
@@ -8032,7 +8038,7 @@ function saveAprsContacts() {
     }).catch(() => {});
 }
 
-function replyAprsSms(number) {
+function replyAprsSms(number, fromEl) {
     const i = APRS_SMS_CONTACTS.findIndex(c => c.number === number);
     if (i < 0) {
         aprsSmsSelected = 'new';
@@ -8041,7 +8047,7 @@ function replyAprsSms(number) {
     } else {
         aprsSmsSelected = i;
     }
-    toggleAprsComposer(true);
+    toggleAprsComposer(fromEl, true);
     setAprsComposeMode('sms');
 }
 
@@ -16174,13 +16180,25 @@ function mirrorNotificationsToP2() {
     const src = document.getElementById('notifications-card-inner');
     const dst = document.getElementById('notifications-card-p2-inner');
     if (!src || !dst) return;
-    // The APRS composer and its Send button stay on the primary card only --
-    // a copy would share their element ids and drive the hidden original.
+    // The APRS composer is never copied (there's one, with its own ids). It
+    // lives in whichever card last opened it; when that's this copy, the
+    // rebuild leaves the composer node where it is instead of replacing it,
+    // so typed text and focus survive the refresh.
     const tmp = document.createElement('div');
     tmp.innerHTML = src.innerHTML;
-    tmp.querySelectorAll('#aprs-composer, #notif-send-btn').forEach(el => el.remove());
-    if (dst.innerHTML !== tmp.innerHTML) dst.innerHTML = tmp.innerHTML;
+    tmp.querySelectorAll('#aprs-composer').forEach(el => el.remove());
+    if (tmp.innerHTML === lastNotifMirrorHtml) return;
+    lastNotifMirrorHtml = tmp.innerHTML;
+    const comp = [...dst.children].find(el => el.id === 'aprs-composer');
+    if (!comp) { dst.innerHTML = tmp.innerHTML; return; }
+    [...dst.childNodes].forEach(n => { if (n !== comp) n.remove(); });
+    let afterComposer = false;
+    [...tmp.childNodes].forEach(n => {
+        if (n.nodeType === 1 && n.classList.contains('msg-scroll')) afterComposer = true;
+        if (afterComposer) dst.appendChild(n); else dst.insertBefore(n, comp);
+    });
 }
+let lastNotifMirrorHtml = null;
 refresh();
 setInterval(refresh, POLL_MS);
 </script>
