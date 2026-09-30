@@ -8473,6 +8473,44 @@ config for per-integration credentials; put it in
     parsed defensively and show "—" when missing. PSK Reporter and RBN SNRs
     use different scales, which is why the card is PSK-only for now.
 
+- **APRS catch-up + sending (v5.8, both in aprs_inbox.py).**
+  - **Catch-up** uses aprs.fi's `what=msg` query (read from aprs.fi's own
+    API page): exact callsigns only, up to 10 recipients per call, at most
+    the 10 latest messages, and no msgNo -- so caught-up messages are
+    stored `acked: False, backfilled: True` and can't be acked. The gap is
+    measured from a heartbeat (`last_alive`, persisted in
+    `aprs_backfill.json` so a restart counts); a gap skipped by the 5-min
+    throttle stays `pending_since` and the heartbeat thread retries it.
+    Only messages timed inside the gap are imported, deduped by messageid
+    and by matching a live-stored message (same from/to/text within 10
+    min). The divider rows are a separate list (`gaps`, notifications
+    source `aprs_gap`) so they never count as notifications. Merged
+    messages are re-sorted by `received_at` since they arrive late.
+    **Not yet run against a live aprs.fi key** -- verified with a mocked
+    fetch only.
+  - **Sending** (`AprsInbox.send()`, `/api/aprs_send`): each message gets
+    a msgNo and is retried 3x, 30 s apart, on a short-lived VERIFIED
+    connection (the listener is unverified on purpose -- see the
+    APRS-IS kick gotcha above). Acks come back on the listener: aprslib
+    parses them as `response: "ack"|"rej"` with `msgNo` and no
+    `message_text` (confirmed against the installed library); matched by
+    msgNo AND sender == the message's `to`. Status changes are written
+    back with `storage_notifications.update_notification()` (matched by
+    the entry's exact `received_at`); a send in flight at restart reloads
+    as `no_ack`. Text is printable ASCII with `{ | ~` stripped (reserved
+    in APRS message text), max 67.
+  - **SMS**: SMSGTE is dead (smsgte.org now redirects to an unrelated
+    site). NA7Q's gateway (aprs.wiki/howto, read directly): to `SMS`,
+    text `@<10-12 digit number> msg`; recipients must opt in at
+    aprs.wiki/SMS; replies arrive FROM `SMS` as `@<number> text`, which
+    both templates parse to show the saved contact's name. **WXBOT**
+    (KI6WJP's page): `<where> [when] [what]`, blank where = the
+    callsign's last APRS position, so the route fills in station_grid.
+    Neither service has been live-tested from this code.
+  - The composer is left out of the Notifications card's page-2 mirror
+    (`mirrorNotificationsToP2` strips it) -- a copy would share its ids.
+    The route calls `_control_gate()` like every other transmit action.
+
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:
 

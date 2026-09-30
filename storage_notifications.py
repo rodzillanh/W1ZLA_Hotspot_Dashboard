@@ -102,3 +102,22 @@ def recent(source: str, limit: int) -> list:
         return [json.loads(row[0]) for row in reversed(rows)]
     except Exception:
         return []
+
+
+def update_notification(source: str, at: float, payload: dict) -> None:
+    """Replace the stored payload of one event, matched by source + its exact
+    `at` timestamp. Used for an outbound APRS message whose delivery status
+    (waiting -> acked/failed) changes after it was first logged. Never raises."""
+    try:
+        with _lock:
+            conn = _get_conn()
+            try:
+                conn.execute(
+                    "UPDATE notifications SET payload = ? WHERE source = ? AND at = ?",
+                    (json.dumps(payload), source, at),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+    except Exception:
+        pass

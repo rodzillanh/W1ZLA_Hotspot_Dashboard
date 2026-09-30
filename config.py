@@ -23,7 +23,7 @@ def _version_tuple(v):
 # version number now, no new names get appended here. See
 # _LAST_NAMED_VERSION below for how APP_CODENAME resolves to None past
 # this list's last entry.
-APP_VERSION = "5.7"
+APP_VERSION = "5.8"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -325,6 +325,8 @@ DIGEST_HIGHLIGHTS = [
               "Satellite pass alerts in Notifications and on your phone"]),
     ("5.4",  ["wfweb users: sync your logbook automatically into Recent Contacts and QRZ (Settings → Integrations)"]),
     ("5.6",  ["wfweb users: a new Memories tab on HF Favorites, plus an optional Packet Monitor card"]),
+    ("5.8",  ["APRS messages sent while the dashboard was offline are now caught up from aprs.fi",
+              "Send APRS messages, text a phone, or ask WXBOT for weather from the Notifications card"]),
 ]
 
 
@@ -1527,6 +1529,13 @@ DEFAULT_SETTINGS = {
     # independent on/off features). Position among the hotspot cards uses
     # the same single-sentinel scheme as Fleet Activity/ASL Favorites.
     "aprs_inbox_enabled": False,
+    # Catch up on messages sent while the inbox listener was down, from
+    # aprs.fi's messages API (needs aprs_api_key) -- see aprs_inbox.py.
+    "aprs_inbox_backfill": True,
+    # Saved phone contacts for the Notifications composer's "Text a phone"
+    # mode ([{"name": "Sarah", "number": "6035551234"}]) -- sent through the
+    # APRS SMS gateway, see app.api_aprs_send.
+    "aprs_sms_contacts": [],
     "aprs_inbox_position": 0,
     # DigiPi card -- off by default. SSH connection details for a single
     # DigiPi (digipi.py polls Direwolf's /run/direwolf.log for APRS

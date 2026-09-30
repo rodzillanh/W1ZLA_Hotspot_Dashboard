@@ -1574,6 +1574,16 @@
             <button class="btn btn-primary" onclick="saveAprs()">Save APRS.fi key</button>
             <span class="status-txt" id="aprs-status"></span>
         </div>
+        <div class="toggle-row" style="margin-top:14px">
+            <span class="toggle-label">Catch up on missed APRS messages
+                <span style="font-size:10px;color:var(--text-dim)">
+                    (when the APRS messages listener reconnects after being down, fetch messages sent to your callsign in the meantime from aprs.fi -- needs the key above and "APRS messages in Notifications" on)
+                </span>
+            </span>
+            <div class="toggle {{ 'on' if settings.get('aprs_inbox_backfill', True) else '' }}"
+                 id="aprs-backfill-toggle" onclick="toggleAprsBackfill(this)"></div>
+        </div>
+        <div id="aprs-backfill-info" style="font-size:11.5px;color:var(--text-dim);line-height:1.6;margin-top:4px"></div>
     </div>
 
     <div class="section">
@@ -4117,6 +4127,7 @@ function saveAprs() {
     }).then(() => {
         status.textContent = '✓ Saved';
         setTimeout(() => status.textContent = '', 2000);
+        loadAprsBackfillInfo();
     });
 }
 
@@ -4631,6 +4642,43 @@ async function testAprsMsg() {
     status.textContent = data.success ? '✓ ' + data.message : '✕ ' + data.message;
     status.style.color = data.success ? 'var(--accent)' : 'var(--danger)';
     setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 5000);
+}
+
+function toggleAprsBackfill(el) {
+    el.classList.toggle('on');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ aprs_inbox_backfill: el.classList.contains('on') })
+    }).then(() => setTimeout(loadAprsBackfillInfo, 300));
+}
+
+function loadAprsBackfillInfo() {
+    const info = document.getElementById('aprs-backfill-info');
+    if (!info) return;
+    fetch('/api/aprs_inbox').then(r => r.json()).then(d => {
+        const b = d.backfill || {};
+        const lines = [];
+        if (!d.enabled) lines.push('The APRS messages listener is off (Cards → Notifications card sources).');
+        else if (!b.has_key) lines.push('Add an aprs.fi API key above to use this.');
+        if (b.callsigns && b.callsigns.length) lines.push('Callsigns checked: ' + b.callsigns.map(escapeText).join(', '));
+        const last = b.last;
+        if (last && last.at) {
+            const when = new Date(last.at * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            lines.push('Last catch-up: ' + when + ' · ' + (last.error ? 'failed: ' + escapeText(last.error) : (last.found ? last.found + ' new' : 'nothing missed')));
+        } else if (d.enabled && b.has_key) {
+            lines.push('Last catch-up: none yet -- runs after the listener has been down for more than a minute.');
+        }
+        info.innerHTML = lines.join('<br>');
+    }).catch(() => {});
+}
+
+loadAprsBackfillInfo();
+
+function escapeText(t) {
+    const d = document.createElement('div');
+    d.textContent = t == null ? '' : String(t);
+    return d.innerHTML;
 }
 
 function saveAprsMsg() {

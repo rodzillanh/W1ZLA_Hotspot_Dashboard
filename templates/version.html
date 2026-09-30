@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v5.7</span>
+                <span class="release-version">v5.8</span>
                 <span class="release-date">September 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Catch up on missed APRS messages</span> &mdash; when the APRS messages listener reconnects after being down (a restart, an update, a dropped connection), it asks aprs.fi for messages sent to your callsign in the meantime and adds any it missed to the Notifications card, under a divider showing how long it was offline. Needs your aprs.fi API key; on by default, Settings &rarr; Integrations &rarr; APRS.fi live position. aprs.fi only returns the 10 newest messages per callsign, so after a long outage the divider warns that older ones may be missing. Caught-up messages can't be acked (aprs.fi doesn't return the sender's message number)</li>
+                <li><span>Send from the Notifications card</span> &mdash; a new &#9993; Send button (desktop and Pocket Dash) with three modes: a normal APRS message to any callsign, a text to a phone through NA7Q's APRS SMS gateway (saved contacts; the number must be opted in once at aprs.wiki/SMS), and a weather request to WXBOT (defaults to your station grid). Sent messages show in the list with their status and are retried up to 3 times until acked; phone replies show under the contact's name with a Reply link. Sending uses the same trusted-network check and Pocket Dash PIN as other control actions</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v5.7</span>
+                <span class="release-date">September 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>wfweb Memories on the HF Favorites card</span> &mdash; the "wfweb Memories" tab (v5.6) is now also right on the compact HF Favorites card, not just its drawer: a Favorites/wfweb Memories tab switcher lets you tap-to-recall a memory channel without opening Edit. The two stay in sync &mdash; opening Edit lands on whichever tab you were just viewing</li>

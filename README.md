@@ -1286,6 +1286,41 @@ text messages addressed to you.
 - This is a separate, independent on/off toggle from APRS favorite
   alerts — you can run either one alone, or both, sharing the one
   callsign setting.
+- **Catches up on messages you missed** — APRS-IS has no history, so a
+  message sent while the dashboard was restarting or disconnected would
+  normally be lost. When the listener reconnects after more than a
+  minute, it asks aprs.fi for messages sent to your callsign during the
+  gap and adds any it missed, under a divider ("Dashboard offline 2h 14m ·
+  caught up 3 from aprs.fi"). Needs your aprs.fi API key (Settings →
+  Integrations → APRS.fi live position, where the "Catch up on missed
+  APRS messages" switch and the last result live). aprs.fi returns at
+  most the 10 newest messages per callsign, so after a long outage the
+  divider warns that older ones may be missing, and caught-up messages
+  can't be acked (aprs.fi doesn't pass on the sender's message number).
+  It checks your callsign, your base call, and every SSID you've received
+  messages on — aprs.fi needs exact callsigns — at most once every 5
+  minutes.
+- **Send from the card** — the **✉ Send** button (desktop and Pocket
+  Dash) opens a composer with three modes:
+  - **Message** — a normal APRS message to any callsign.
+  - **Text a phone** — through NA7Q's APRS SMS gateway (addressed to
+    `SMS` as `@<number> message`). Save contacts by name; the phone
+    number has to be opted in once at
+    [aprs.wiki/SMS](https://aprs.wiki/SMS/) (carrier rules), and it
+    covers the US, Canada, Puerto Rico, Australia and the UK only.
+    Replies arrive from `SMS` and show under the contact's name with a
+    Reply link. (The older SMSGTE gateway is no longer running.)
+  - **Weather** — asks [WXBOT](https://sites.google.com/site/ki6wjp/wxbot)
+    for a forecast: a grid square, zip, City,ST, callsign or airport
+    code (blank uses your station grid), a day, and brief/full/current.
+    The forecast comes back as a message.
+
+  What you send shows in the list as "You →" rows with their status
+  (waiting / acked / no ack after 3 tries), retried every 30 seconds
+  until acked the way APRS radios do. Sending transmits under your
+  callsign, so it uses the same trusted-network check as ASL connect
+  and rig tuning (plus the Pocket Dash PIN, and a confirm tap on the
+  phone). Replies only show up while APRS Messages is on.
 
 **HamAlert** (Settings → Cards → "Show HamAlert card", off by default) —
 shows your own personal [HamAlert](https://hamalert.org) alert matches

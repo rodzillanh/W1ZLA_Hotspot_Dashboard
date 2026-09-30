@@ -591,6 +591,37 @@
     .nf-time { font-family:var(--font-mono); font-size:11px; color:var(--text-dim); flex:0 0 auto; }
     .nf-text { margin-top:4px; font-size:12.5px; color:var(--text-muted); word-break:break-word; }
     .nf-extra { margin-top:3px; font-size:11px; color:var(--text-dim); }
+    .nc-open { margin-left:auto; background:none; border:1px solid var(--border); border-radius:8px; color:var(--text-muted);
+        padding:5px 11px; font-family:var(--font-ui); font-size:13px; cursor:pointer; }
+    .nc-open.on { color:var(--live); border-color:var(--live); }
+    .nc-sheet { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:12px; }
+    .nc-sheet[hidden], #nc-new-contact[hidden] { display:none; }
+    .nc-seg { display:flex; gap:6px; margin-bottom:10px; }
+    .nc-seg button { flex:1; padding:8px 4px; border-radius:8px; border:1px solid var(--border); background:transparent;
+        color:var(--text-muted); font-family:var(--font-ui); font-size:12.5px; font-weight:600; cursor:pointer; }
+    .nc-seg button.on { background:var(--live-dim); color:var(--live); border-color:var(--live); }
+    .nc-pane { display:none; }
+    .nc-pane.show { display:block; }
+    .nc-lbl { display:block; font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em; margin:0 0 4px; }
+    .nc-in { width:100%; box-sizing:border-box; padding:10px 12px; border-radius:9px; border:1px solid var(--border); background:var(--bg);
+        color:var(--text); font-family:var(--font-ui); font-size:15px; margin-bottom:10px; }
+    .nc-in.mono { font-family:var(--font-mono); text-transform:uppercase; }
+    .nc-foot { display:flex; align-items:center; gap:10px; }
+    .nc-hint { flex:1; font-size:11.5px; color:var(--text-dim); line-height:1.4; }
+    .nc-hint a { color:var(--text-muted); }
+    .nc-cnt { font-size:12px; color:var(--text-dim); font-family:var(--font-mono); }
+    .nc-go { padding:9px 18px; border-radius:9px; border:1px solid var(--live); background:var(--live); color:var(--bg);
+        font-family:var(--font-ui); font-size:14px; font-weight:700; cursor:pointer; }
+    .nc-go:disabled { opacity:.5; }
+    .nf-tag { display:inline-block; font-size:10px; padding:1px 6px; border-radius:8px; border:1px solid var(--border); margin-left:4px; }
+    .nf-tag.sms { color:var(--accent); }
+    .nf-tag.wx { color:var(--live); }
+    .nf-status-ok { color:var(--good); }
+    .nf-status-bad { color:var(--danger); }
+    .nf-reply { background:none; border:none; color:var(--live); padding:0; margin-top:4px; font-family:var(--font-ui); font-size:12px; cursor:pointer; }
+    .nf-gap { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-muted); margin:4px 2px 12px; }
+    .nf-gap::before, .nf-gap::after { content:""; flex:1; height:1px; background:var(--border); }
+    .nf-gap.warn { color:var(--caution); }
 
     /* License quiz */
     #quiz-screen { position:fixed; inset:0; z-index:35; background:var(--bg); display:none; flex-direction:column; }
@@ -1174,8 +1205,58 @@
         <div class="prefs-hdr">
             <button class="back" id="notif-close">‹ Back</button>
             <span class="ttl">Notifications</span>
+            {% if settings.get('aprs_inbox_enabled', False) %}
+            <button class="nc-open" id="nc-open" type="button">✉ Send</button>
+            {% endif %}
         </div>
         <div class="asl-body" id="notif-body">
+            {% if settings.get('aprs_inbox_enabled', False) %}
+            <div class="nc-sheet" id="nc-sheet" hidden>
+                <div class="nc-seg" id="nc-seg">
+                    <button type="button" data-mode="message">Message</button>
+                    <button type="button" data-mode="sms">📱 Phone</button>
+                    <button type="button" data-mode="wx">☁ Weather</button>
+                </div>
+                <div class="nc-pane" data-pane="message">
+                    <label class="nc-lbl" for="nc-to">To</label>
+                    <input class="nc-in mono" id="nc-to" maxlength="9" placeholder="Callsign" autocomplete="off" autocapitalize="characters">
+                </div>
+                <div class="nc-pane" data-pane="sms">
+                    <div class="sp-chips" id="nc-contacts"></div>
+                    <div id="nc-new-contact" hidden>
+                        <label class="nc-lbl" for="nc-new-name">Name</label>
+                        <input class="nc-in" id="nc-new-name" maxlength="20" placeholder="Sarah" autocomplete="off">
+                        <label class="nc-lbl" for="nc-new-number">Phone number</label>
+                        <input class="nc-in mono" id="nc-new-number" maxlength="14" placeholder="6035551234" inputmode="numeric" autocomplete="off">
+                    </div>
+                </div>
+                <div class="nc-pane" data-pane="wx">
+                    <label class="nc-lbl" for="nc-wx-where">Where</label>
+                    <input class="nc-in mono" id="nc-wx-where" maxlength="30" autocomplete="off" autocapitalize="characters">
+                    <label class="nc-lbl" for="nc-wx-when">When</label>
+                    <select class="nc-in" id="nc-wx-when">
+                        <option value="today">Today</option><option value="tonight">Tonight</option>
+                        <option value="tomorrow">Tomorrow</option><option value="tomorrow night">Tomorrow night</option>
+                        <option value="monday">Monday</option><option value="tuesday">Tuesday</option><option value="wednesday">Wednesday</option>
+                        <option value="thursday">Thursday</option><option value="friday">Friday</option><option value="saturday">Saturday</option><option value="sunday">Sunday</option>
+                    </select>
+                    <div class="sp-chips" id="nc-wx-what">
+                        <button type="button" class="on" data-what="brief">Brief</button>
+                        <button type="button" data-what="full">Full</button>
+                        <button type="button" data-what="current">Current</button>
+                    </div>
+                </div>
+                <div id="nc-text-wrap">
+                    <label class="nc-lbl" for="nc-text">Message</label>
+                    <input class="nc-in" id="nc-text" autocomplete="off">
+                </div>
+                <div class="nc-foot">
+                    <span class="nc-hint" id="nc-hint"></span>
+                    <span class="nc-cnt" id="nc-cnt"></span>
+                    <button type="button" class="nc-go" id="nc-go">Send</button>
+                </div>
+            </div>
+            {% endif %}
             <div class="sp-chips" id="nf-chips"></div>
             <div id="nf-list"><div class="asl-empty">Loading…</div></div>
         </div>
@@ -3274,7 +3355,13 @@
         Object.keys(NF_SOURCES).forEach(function (k) {
             var src = NF_SOURCES[k];
             if (!src.on) return;
-            ((nfData[k] || {})[src.key] || []).forEach(function (e) { items.push({ src: k, ts: e[src.ts] || 0, d: e }); });
+            // uts = the time used for unread: a caught-up APRS message (aprs_inbox.py
+            // backfill) keeps its original timestamp but becomes "new" when fetched.
+            ((nfData[k] || {})[src.key] || []).forEach(function (e) {
+                var ts = e[src.ts] || 0;
+                items.push({ src: k, ts: ts, uts: e.outbound ? 0 : (e.caught_up_at || ts), out: !!e.outbound, d: e });
+            });
+            if (k === "aprs") ((nfData[k] || {}).gaps || []).forEach(function (g) { items.push({ src: k, ts: g.at || 0, uts: 0, gap: true, d: g }); });
         });
         items.sort(function (a, b) { return b.ts - a.ts; });
         return items;
@@ -3282,7 +3369,25 @@
 
     function nfRow(it, unread) {
         var e = it.d, ic = NF_SOURCES[it.src].ic, who = "", text = "", extra = "";
-        if (it.src === "aprs") { who = csLink(e.from) + wbHtml(e.from) + (e.to ? " → " + esc(e.to) : ""); text = esc(e.message_text || ""); extra = e.acked ? "✓ ack sent" : ""; }
+        if (it.gap) {
+            var gs = Math.max(0, Math.round(e.offline_sec || 0)), gd = Math.floor(gs / 86400), gh = Math.floor((gs % 86400) / 3600), gm = Math.floor((gs % 3600) / 60);
+            var dur = gd ? gd + (gd === 1 ? " day" : " days") : gh ? gh + "h " + gm + "m" : Math.max(1, gm) + "m";
+            return '<div class="nf-gap' + (e.maybe_incomplete ? " warn" : "") + '">Offline ' + dur + " · caught up " + (e.count || 0) + " from aprs.fi" +
+                (e.maybe_incomplete ? " · older ones may be missing" : "") + "</div>";
+        }
+        if (it.src === "aprs" && e.outbound) return ncOutboundRow(e);
+        var smsIn = it.src === "aprs" ? ncSmsReply(e) : null;
+        if (smsIn) {
+            ic = "📱";
+            who = esc(smsIn.name) + '<span class="nf-tag sms">SMS</span>';
+            text = esc(smsIn.text);
+            extra = (e.backfilled ? "↺ arrived while offline · " : "") + '<button class="nf-reply" type="button" data-number="' + esc(smsIn.number) + '">↩ Reply</button>';
+        }
+        else if (it.src === "aprs") {
+            if (e.from === NC_WX_BOT) ic = "☁";
+            who = csLink(e.from) + (e.from === NC_WX_BOT ? '<span class="nf-tag wx">Weather</span>' : wbHtml(e.from)) + (e.to ? " → " + esc(e.to) : "");
+            text = esc(e.message_text || ""); extra = e.acked ? "✓ ack sent" : (e.backfilled ? "↺ arrived while offline · not acked" : "");
+        }
         else if (it.src === "hamalert") {
             who = csLink(e.full_callsign || e.callsign) + wbHtml(e.callsign, { band: e.band });
             text = esc([e.entity, e.spotter ? "via " + e.spotter : ""].filter(Boolean).join(" · "));
@@ -3313,10 +3418,145 @@
             (text ? '<div class="nf-text">' + text + "</div>" : "") + (extra ? '<div class="nf-extra">' + extra + "</div>" : "") + "</div>";
     }
 
+    /* ---- APRS send composer (see dashboard.html's for the same logic) ---- */
+    var NC_SMS_GATEWAY = "SMS", NC_WX_BOT = "WXBOT", NC_MAX = 67;
+    var ncContacts = {{ settings.get('aprs_sms_contacts', []) | tojson }};
+    var ncGrid = {{ (settings.get('station_grid') or '') | tojson }};
+    var ncMode = "message", ncSel = null, ncWhat = "brief";
+    var NC_STATUS = { sending: ["", "Sending…"], waiting: ["", "Sent · waiting for ack"], acked: ["ok", "✓ acked"],
+        rejected: ["bad", "Rejected by the recipient"], no_ack: ["bad", "No ack after 3 tries"], send_failed: ["bad", "Couldn't reach APRS-IS"] };
+
+    function ncSmsReply(m) {
+        if (!m || m.outbound || m.from !== NC_SMS_GATEWAY) return null;
+        var mm = /^@(\S+)\s*(.*)$/.exec(m.message_text || "");
+        if (!mm) return null;
+        var c = ncContacts.filter(function (c) { return c.number === mm[1]; })[0];
+        return { number: mm[1], text: mm[2], name: c ? c.name : mm[1] };
+    }
+    function ncOutboundRow(m) {
+        var to = esc(m.to), text = m.message_text || "";
+        if (m.via === "sms") {
+            var mm = /^@(\S+)\s*(.*)$/.exec(text), num = mm ? mm[1] : "";
+            var c = ncContacts.filter(function (c) { return c.number === num; })[0];
+            to = esc(m.contact || (c ? c.name : num)) + " via SMS";
+            if (mm) text = mm[2];
+        }
+        var st = NC_STATUS[m.status] || ["", m.status || ""], label = st[1];
+        if (m.status === "waiting" && m.tries) label = "Sent · waiting for ack (try " + m.tries + " of 3)";
+        if (m.status === "acked" && m.via === "sms") label = "✓ gateway received it";
+        return '<div class="nf-row"><div class="nf-top"><span class="nf-ic">↗</span><span class="nf-who">You → ' + to +
+            '</span><span class="nf-time">' + nfAgo(m.received_at) + '</span></div><div class="nf-text">' + esc(text) +
+            '</div><div class="nf-extra' + (st[0] ? " nf-status-" + st[0] : "") + '">' + esc(label) + "</div></div>";
+    }
+    function ncEl(id) { return document.getElementById(id); }
+    function ncRenderContacts() {
+        if (ncSel === null && ncContacts.length) ncSel = 0;
+        if (!ncContacts.length) ncSel = "new";
+        ncEl("nc-contacts").innerHTML = ncContacts.map(function (c, i) {
+            return '<button type="button" data-i="' + i + '" class="' + (ncSel === i ? "on" : "") + '">' + esc(c.name) + "</button>";
+        }).join("") + '<button type="button" data-i="new" class="' + (ncSel === "new" ? "on" : "") + '">+ New</button>';
+        ncEl("nc-new-contact").hidden = ncSel !== "new";
+    }
+    function ncPayload() {
+        var text = ncEl("nc-text").value;
+        if (ncMode === "message") {
+            var to = ncEl("nc-to").value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+            return { body: { mode: "message", to: to, text: text }, to: to, limit: NC_MAX, typed: text.length, ok: !!to && !!text.trim() };
+        }
+        if (ncMode === "sms") {
+            var number = "", name = "";
+            if (ncSel === "new") { number = ncEl("nc-new-number").value.replace(/\D/g, ""); name = ncEl("nc-new-name").value.trim(); }
+            else if (ncContacts[ncSel]) { number = ncContacts[ncSel].number; name = ncContacts[ncSel].name; }
+            var limit = NC_MAX - ("@" + number + " ").length;
+            return { body: { mode: "sms", number: number, text: text, contact: name }, to: name || number, limit: limit, typed: text.length,
+                     ok: number.length >= 10 && number.length <= 12 && !!text.trim() && text.length <= limit, newName: name, newNumber: number };
+        }
+        var where = ncEl("nc-wx-where").value.trim().toUpperCase() || ncGrid;
+        return { body: { mode: "wx", where: where, when: ncEl("nc-wx-when").value, what: ncWhat }, to: "WXBOT", ok: true };
+    }
+    function ncUpdate() {
+        var p = ncPayload();
+        if (ncMode === "wx") { ncEl("nc-cnt").textContent = ""; ncEl("nc-hint").textContent = "Grid, zip, City,ST, callsign or airport. Blank uses your station grid."; }
+        else {
+            ncEl("nc-cnt").textContent = p.typed + "/" + p.limit;
+            ncEl("nc-text").maxLength = p.limit;
+            ncEl("nc-hint").innerHTML = ncMode === "sms" ? 'Number must be opted in at <a href="https://aprs.wiki/SMS/" target="_blank" rel="noopener">aprs.wiki/SMS</a>' : "Retried up to 3 times until acked";
+        }
+        ncEl("nc-go").disabled = !p.ok;
+    }
+    function ncSetMode(mode) {
+        ncMode = mode;
+        Array.prototype.forEach.call(document.querySelectorAll("#nc-seg button"), function (b) { b.classList.toggle("on", b.getAttribute("data-mode") === mode); });
+        Array.prototype.forEach.call(document.querySelectorAll("#nc-sheet .nc-pane"), function (p) { p.classList.toggle("show", p.getAttribute("data-pane") === mode); });
+        ncEl("nc-text-wrap").style.display = mode === "wx" ? "none" : "";
+        ncEl("nc-go").textContent = mode === "wx" ? "Ask" : "Send";
+        if (ncGrid) ncEl("nc-wx-where").placeholder = ncGrid;
+        if (mode === "sms") ncRenderContacts();
+        ncUpdate();
+    }
+    function ncOpen(open) {
+        var sh = ncEl("nc-sheet");
+        if (!sh) return;
+        sh.hidden = !open;
+        ncEl("nc-open").classList.toggle("on", open);
+        if (open) { ncSetMode(ncMode); ncEl("notif-body").scrollTop = 0; }
+    }
+    async function ncSend() {
+        var p = ncPayload();
+        if (!p.ok) return;
+        var what = ncMode === "wx" ? "Ask WXBOT for a forecast?" : "Send to " + p.to + "?";
+        var ok = await confirmAction(ncMode === "wx" ? "Ask for weather" : "Send APRS message", what + " It goes out under your callsign.", false);
+        if (!ok) return;
+        ncEl("nc-go").disabled = true;
+        var res = await apiControl("/api/aprs_send", p.body);
+        if (!res || !res.ok) { toast((res && res.message) || "Send failed"); ncUpdate(); return; }
+        if (ncMode === "sms" && ncSel === "new" && p.newName && p.newNumber) {
+            ncContacts = ncContacts.filter(function (c) { return c.number !== p.newNumber; }).concat([{ name: p.newName.slice(0, 20), number: p.newNumber }]);
+            ncSel = ncContacts.length - 1;
+            ncEl("nc-new-name").value = ""; ncEl("nc-new-number").value = "";
+            fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ aprs_sms_contacts: ncContacts }) }).catch(function () {});
+            ncRenderContacts();
+        }
+        ncEl("nc-text").value = "";
+        toast(ncMode === "wx" ? "Asked WXBOT" : "Sent");
+        ncUpdate();
+        nfRendered = "";
+        fetchNotifFeed();
+        setTimeout(fetchNotifFeed, 3000);
+    }
+    (function () {
+        var sh = document.getElementById("nc-sheet");
+        if (!sh) return;
+        ncEl("nc-open").onclick = function () { ncOpen(sh.hidden); };
+        ncEl("nc-seg").addEventListener("click", function (e) { var b = e.target.closest("button[data-mode]"); if (b) ncSetMode(b.getAttribute("data-mode")); });
+        ncEl("nc-contacts").addEventListener("click", function (e) {
+            var b = e.target.closest("button[data-i]"); if (!b) return;
+            ncSel = b.getAttribute("data-i") === "new" ? "new" : parseInt(b.getAttribute("data-i"), 10);
+            ncRenderContacts(); ncUpdate();
+        });
+        ncEl("nc-wx-what").addEventListener("click", function (e) {
+            var b = e.target.closest("button[data-what]"); if (!b) return;
+            ncWhat = b.getAttribute("data-what");
+            Array.prototype.forEach.call(document.querySelectorAll("#nc-wx-what button"), function (x) { x.classList.toggle("on", x === b); });
+        });
+        sh.addEventListener("input", ncUpdate);
+        sh.addEventListener("change", ncUpdate);
+        ncEl("nc-go").onclick = ncSend;
+        ncEl("nf-list").addEventListener("click", function (e) {
+            var b = e.target.closest(".nf-reply"); if (!b) return;
+            var num = b.getAttribute("data-number");
+            var i = -1;
+            ncContacts.forEach(function (c, j) { if (c.number === num) i = j; });
+            if (i < 0) { ncSel = "new"; ncEl("nc-new-number").value = num; } else ncSel = i;
+            ncMode = "sms";
+            ncOpen(true);
+        });
+    })();
+
     function renderNotifFeed() {
-        var items = nfItems();
+        var all = nfItems(), items = all.filter(function (i) { return !i.gap && !i.out; });
         var seen = nfOpen() ? nfSeenAtOpen : nfSeen();
-        var unread = items.filter(function (i) { return i.ts > seen; }).length;
+        var unread = items.filter(function (i) { return i.uts > seen; }).length;
         var sub = document.getElementById("notif-entry-sub"), badge = document.getElementById("notif-badge");
         if (sub) sub.textContent = items.length ? "Latest " + nfAgo(items[0].ts) + " ago · " + items.length + " total" : "Nothing yet";
         if (badge) { badge.style.display = unread ? "" : "none"; badge.textContent = unread > 99 ? "99+" : unread; }
@@ -3327,8 +3567,8 @@
         document.getElementById("nf-chips").innerHTML = keys.length > 1 ? keys.map(function (k) {
             return '<button data-src="' + k + '" class="' + (nfFilter === k ? "on" : "") + '">' + NF_SOURCES[k].ic + " " + NF_SOURCES[k].label + " " + counts[k] + "</button>";
         }).join("") : "";
-        var shown = (nfFilter === "all" || !counts[nfFilter] ? items : items.filter(function (i) { return i.src === nfFilter; })).slice(0, 100);
-        var html = shown.map(function (i) { return nfRow(i, i.ts > seen); }).join("");
+        var shown = (nfFilter === "all" || !counts[nfFilter] ? all : all.filter(function (i) { return i.src === nfFilter; })).slice(0, 100);
+        var html = shown.map(function (i) { return nfRow(i, !i.gap && i.uts > seen); }).join("");
         var list = document.getElementById("nf-list");
         var sig = html + "|" + nfFilter + "|" + keys.join(",");
         if (sig !== nfRendered) { nfRendered = sig; list.innerHTML = html || '<div class="asl-empty">No notifications yet.</div>'; }
@@ -3358,8 +3598,9 @@
             if (!nfTimer) nfPoll();
         };
         document.getElementById("notif-close").onclick = function () {
-            var items = nfItems();
-            if (items.length) nfSetSeen(items[0].ts);
+            var maxSeen = 0;
+            nfItems().forEach(function (i) { if (i.uts > maxSeen) maxSeen = i.uts; });
+            if (maxSeen) nfSetSeen(maxSeen);
             document.getElementById("notif-screen").classList.remove("open");
             renderNotifFeed();
         };

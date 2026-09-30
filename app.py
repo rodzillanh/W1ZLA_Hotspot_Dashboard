@@ -254,6 +254,10 @@ def _rebuild_aprs_inbox() -> None:
         settings.get("aprs_msg_callsign", ""),
         settings.get("aprs_inbox_enabled", False),
     )
+    aprs_inbox.configure_backfill(
+        settings.get("aprs_inbox_backfill", True),
+        settings.get("aprs_api_key", ""),
+    )
 
 _rebuild_aprs_inbox()
 
@@ -686,6 +690,18 @@ def api_settings_post():
         settings["show_dvswitch"] = bool(data["show_dvswitch"])
     if "aprs_inbox_enabled" in data:
         settings["aprs_inbox_enabled"] = bool(data["aprs_inbox_enabled"])
+    if "aprs_inbox_backfill" in data:
+        settings["aprs_inbox_backfill"] = bool(data["aprs_inbox_backfill"])
+    if "aprs_sms_contacts" in data and isinstance(data["aprs_sms_contacts"], list):
+        contacts = []
+        for c in data["aprs_sms_contacts"][:20]:
+            if not isinstance(c, dict):
+                continue
+            name = re.sub(r"[^ -~]", "", str(c.get("name", ""))).strip()[:20]
+            number = re.sub(r"\D", "", str(c.get("number", "")))
+            if name and 10 <= len(number) <= 12:
+                contacts.append({"name": name, "number": number})
+        settings["aprs_sms_contacts"] = contacts
     if "aprs_inbox_position" in data:
         try:
             settings["aprs_inbox_position"] = max(0, int(data["aprs_inbox_position"]))
@@ -1106,7 +1122,7 @@ def api_settings_post():
         _rebuild_mqtt_client()
     if any(k in data for k in ("aprs_msg_callsign", "aprs_msg_to_callsign", "aprs_msg_cooldown_min")):
         _rebuild_aprs_messenger()
-    if any(k in data for k in ("aprs_msg_callsign", "aprs_inbox_enabled")):
+    if any(k in data for k in ("aprs_msg_callsign", "aprs_inbox_enabled", "aprs_inbox_backfill", "aprs_api_key")):
         _rebuild_aprs_inbox()
     if any(k in data for k in ("wsjtx_enabled", "wsjtx_port")):
         _rebuild_wsjtx()
@@ -3816,7 +3832,64 @@ def api_aprs_inbox():
     listener connection's live status -- see aprs_inbox.py."""
     status = aprs_inbox.status()
     status["messages"] = aprs_inbox.messages()
+    status["gaps"] = aprs_inbox.gaps()
     return jsonify(status)
+
+# Addressees of the two APRS services the Notifications composer talks to --
+# both read directly from each service's own docs (2026-09):
+#   NA7Q's SMS gateway (aprs.wiki/howto): to "SMS", text "@<number> <message>";
+#     the number must be opted in at aprs.wiki/SMS first (carrier rules).
+#     (The older SMSGTE gateway is gone -- smsgte.org no longer serves it.)
+#   KI6WJP's WXBOT: to "WXBOT", text "<where> [when] [what]".
+APRS_SMS_GATEWAY = "SMS"
+APRS_WX_BOT = "WXBOT"
+_WX_WHEN = {"today", "tonight", "tomorrow", "tomorrow night", "monday", "tuesday", "wednesday",
+            "thursday", "friday", "saturday", "sunday"}
+_WX_WHAT = {"brief", "full", "current"}
+
+
+@app.route("/api/aprs_send", methods=["POST"])
+def api_aprs_send():
+    """Send from the Notifications card's composer. mode: "message" (to any
+    callsign), "sms" (a phone number through the SMS gateway) or "wx"
+    (a WXBOT forecast request). Transmits under your callsign, so it goes
+    through the same control check as every other action that sends."""
+    gate = _control_gate()
+    if gate:
+        return gate
+    data = request.get_json(silent=True) or {}
+    mode = data.get("mode")
+    if mode == "sms":
+        number = re.sub(r"\D", "", str(data.get("number", "")))
+        if not 10 <= len(number) <= 12:
+            return jsonify({"ok": False, "message": "Enter a 10-digit phone number (11 for AU, 12 for UK)"}), 400
+        text = f"@{number} " + AprsInbox.clean_text(data.get("text", ""))
+        ok, res = aprs_inbox.send(APRS_SMS_GATEWAY, text, via="sms",
+                                  contact=(str(data.get("contact") or "")[:20] or None))
+    elif mode == "wx":
+        where = re.sub(r"[^A-Za-z0-9,./\- ]", "", str(data.get("where", ""))).strip()[:30]
+        if not where:
+            where = (load_settings().get("station_grid") or "").strip()[:6]
+        when = str(data.get("when", "")).lower().strip()
+        what = str(data.get("what", "")).lower().strip()
+        parts = [where] if where else []
+        if when in _WX_WHEN and when != "today":
+            parts.append(when)
+        if what in _WX_WHAT and what != "brief":
+            parts.append(what)
+        # an empty message asks WXBOT for this callsign's last APRS position
+        ok, res = aprs_inbox.send(APRS_WX_BOT, " ".join(parts) or "?", via="wx")
+    elif mode == "message":
+        to = re.sub(r"[^A-Za-z0-9-]", "", str(data.get("to", ""))).upper()[:9]
+        if not to:
+            return jsonify({"ok": False, "message": "Enter a callsign to send to"}), 400
+        ok, res = aprs_inbox.send(to, data.get("text", ""))
+    else:
+        return jsonify({"ok": False, "message": "Unknown send mode"}), 400
+    if not ok:
+        return jsonify({"ok": False, "message": res}), 400
+    return jsonify({"ok": True, "message": "Sent", "entry": res})
+
 
 @app.route("/api/fleet_events")
 def api_fleet_events():
