@@ -42,8 +42,8 @@ if [ -z "$FORGEJO_TOKEN" ]; then
     exit 1
 fi
 
-VERSION="$(python3 -c "import config; print(config.APP_VERSION)")"
-CODENAME="$(python3 -c "import config; print(config.APP_CODENAME)")"
+VERSION="$(python -c "import config; print(config.APP_VERSION)")"
+CODENAME="$(python -c "import config; print(config.APP_CODENAME)")"
 TAG="v${VERSION}"
 # Codenames were retired after v5.1 (APP_CODENAME is None from then on) --
 # only add one when there is one, or the release is titled 'v5.3 "None"'.
@@ -65,7 +65,7 @@ echo "==> Releasing ${TITLE} (tag ${TAG}) against $(git rev-parse --short HEAD).
 # shell's default Python stdout encoding is cp1252 (confirmed live), which
 # silently mangles the em-dashes ("—") every changelog entry in this repo
 # uses, rather than raising an error that would've caught it immediately.
-NOTES="$(PYTHONIOENCODING=utf-8 python3 - "${SCRIPT_DIR}/templates/version.html" <<'PY'
+NOTES="$(PYTHONIOENCODING=utf-8 python - "${SCRIPT_DIR}/templates/version.html" <<'PY'
 import re, sys
 html = open(sys.argv[1], encoding='utf-8').read()
 m = re.search(r'<div class="release">.*?<ul class="change-list">(.*?)</ul>', html, re.S)
@@ -103,7 +103,7 @@ echo "==> Creating Forgejo release..."
 # the stdout one above (shell argv decoding has its own locale-dependent
 # behavior on Windows), so it's safer to sidestep entirely rather than
 # assume it round-trips correctly.
-PAYLOAD="$(PYTHONIOENCODING=utf-8 python3 -c "
+PAYLOAD="$(PYTHONIOENCODING=utf-8 python -c "
 import json, sys
 tag, title = sys.argv[1], sys.argv[2]
 notes = sys.stdin.read()
