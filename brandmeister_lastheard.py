@@ -15,18 +15,36 @@ reverse-engineering (same "verify against the real thing" discipline as
 openspot.py/digipi.py), not any of Brandmeister's own docs, which don't
 cover this at all:
 
-- The actual host/path (wss://ws.brandmeister.network/lh/socket.io) was
-  found by fetching brandmeister.network's own bundled frontend JS
-  (assets/index-*.js) and locating where it calls socket.io-client with
-  a `fb.lh.host`/`fb.lh.path` config object -- those exact values are
-  injected at build time and aren't literal strings anywhere in the
-  bundle, so the host was found by probing candidate subdomains
-  directly against the standard Engine.IO polling handshake path
-  (`/socket.io/?EIO=4&transport=polling`) until one returned a real
-  Engine.IO open packet instead of a 404/503 wall.
-  `ws.brandmeister.network` with path `/lh/socket.io` is the one that
-  worked, confirmed with a real handshake response
-  (`0{"sid":"...","upgrades":[...],"pingInterval":25000,...}`).
+- The actual host/path was found by fetching brandmeister.network's own
+  bundled frontend JS (assets/index-*.js) and locating where it calls
+  socket.io-client with a config object keyed by feed name -- those
+  exact values are injected at build time and aren't literal strings
+  anywhere in the bundle, so the host was originally found by probing
+  candidate subdomains directly against the standard Engine.IO polling
+  handshake path (`/socket.io/?EIO=4&transport=polling`) until one
+  returned a real Engine.IO open packet instead of a 404/503 wall.
+- **Corrected 2026-10: the feed moved hosts at some point after the
+  original build, and the old host is now dead.** `ws.brandmeister.network`
+  (the original, confirmed-live host) is now completely unreachable (no
+  response at all, not even a TCP-level error page) -- confirmed by a
+  fresh pull of the current bundle, which shows the real config as
+  `US = { lh: { host: "wss://api.brandmeister.network", path: "/lh" },
+  tetralh: { host: "wss://api.brandmeister.network", path: "/tetralh" } }`.
+  The "Last Heard" feed this module uses now lives on the SAME host as
+  the plain REST API (`api.brandmeister.network`), just a different path
+  (`/lh`, not `/lh/socket.io`) -- re-verified live end-to-end against the
+  new host/path (handshake, `join("everything")`, and real "LH"-topic
+  events all confirmed, same field shape as before: SourceCall/SourceName/
+  DestinationID/DestinationName/LinkTypeName/SessionID, plus several
+  fields this module doesn't use -- TalkerAlias, Event ("Session-Start"
+  observed), Master, LossCount, FlagSet, ContextID, Route, LinkCall).
+  There is also a sibling `tetralh` feed (`/tetralh`) -- presumably a
+  TETRA-network Last Heard stream -- that is NOT investigated or used
+  here at all; if Brandmeister TETRA support is ever wanted, that's a
+  separate, unverified feed, not a drop-in extension of this one. If
+  this feed ever goes dark again, repeat this exact process (fetch the
+  current bundle, grep for a `{host, path}`-shaped config object) rather
+  than assuming the host just needs another guess.
 - This hand-rolls the Engine.IO v4 / Socket.IO v4 wire protocol over
   plain `websocket-client` (already a project dependency, used by
   openspot.py) rather than adding a new `python-socketio` pip dependency
@@ -67,7 +85,7 @@ import websocket  # websocket-client, already a project dependency (see openspot
 from storage import favorites_set
 import storage_notifications
 
-WS_URL = "wss://ws.brandmeister.network/lh/socket.io/?EIO=4&transport=websocket"
+WS_URL = "wss://api.brandmeister.network/lh/?EIO=4&transport=websocket"
 RECV_TIMEOUT = 40  # comfortably above the handshake's own ~20-25s pingInterval
 RECONNECT_BACKOFF = 10
 MAX_EVENTS = 50
