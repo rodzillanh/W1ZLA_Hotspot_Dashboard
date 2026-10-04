@@ -3055,6 +3055,7 @@
         .hs-link-call { font-weight: 600; font-size: 13px; color: var(--text); }
         .hs-link-desc { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .hs-link-duration { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); flex-shrink: 0; margin-right: 2px; }
+        .hs-link-adjacent { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); flex-shrink: 0; margin-right: 2px; }
         /* Mode badge (v4.11, extended v4.13) -- was a bare raw RPT_ALINKS
            letter (T/R/L/C) unconditionally for every row; now a friendly
            word, only shown for the non-default modes (Transceive, the
@@ -6072,7 +6073,22 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
                            const modeTag = isLocalMon ? '<span class="mode-tag localmon">🎧 Local Mon</span>'
                                : isMonitor ? '<span class="mode-tag monitor">🎧 Monitor</span>'
                                : isConnecting ? '<span class="mode-tag connecting">Connecting…</span>' : '';
-                           const durTitle = n.duration ? ` title="Linked ${escapeHtml(n.duration)}${n.peer_ip ? ' via ' + escapeHtml(n.peer_ip) : ''}"` : '';
+                           // Adjacent-link stats (v5.9) -- same data/source as
+                           // the detail drawer's own visible pill (see its
+                           // comment); no room for a visible pill on the
+                           // compact card, so it's folded into this row's
+                           // existing hover tooltip instead, right alongside
+                           // the duration/peer-IP text it already carries.
+                           const adjStat = aslFavoriteStats[n.node];
+                           const adjBits = [];
+                           if (adjStat && adjStat.found) {
+                               if (adjStat.rx_pct != null) adjBits.push(adjStat.rx_pct + '% rx');
+                               if (adjStat.lcnt != null) adjBits.push(adjStat.lcnt + ' link' + (adjStat.lcnt === 1 ? '' : 's'));
+                           }
+                           const titleBits = [];
+                           if (n.duration) titleBits.push('Linked ' + n.duration + (n.peer_ip ? ' via ' + n.peer_ip : ''));
+                           if (adjBits.length) titleBits.push(adjBits.join(' · '));
+                           const durTitle = titleBits.length ? ` title="${escapeHtml(titleBits.join(' — '))}"` : '';
                            return `<div class="linked-item ${dotClass}"${durTitle}>
                                      <span class="dot"></span>
                                      <span class="info">${nameHtml}${modeTag}${descHtml}</span>
@@ -13386,6 +13402,25 @@ function openHotspotDrawer(hotspotId) {
                 // room of the 4 surfaces; the other 3 get it as a hover
                 // tooltip instead to avoid crowding a compact tile/chip/row.
                 const durHtml = n.duration ? `<span class="hs-link-duration">linked ${escapeHtml(n.duration)}</span>` : '';
+                // Adjacent-link stats (v5.9) -- how busy the node you're
+                // linked to is right now (its OWN rx%/link count from
+                // stats.allstarlink.org), not just that you're linked to it.
+                // Reuses the exact same AslStatsClient.favorite_stats() call
+                // the ASL Favorites tiles already make -- extended here to
+                // cover every currently-linked node, not only saved
+                // favorites (see fetchAslFavoriteStats()). Omitted entirely
+                // when there's nothing to show yet (still-connecting node,
+                // a fetch error, or a genuine 404/unregistered node) rather
+                // than cluttering the row with a "—" placeholder.
+                const adjStat = aslFavoriteStats[n.node];
+                const adjBits = [];
+                if (adjStat && adjStat.found) {
+                    if (adjStat.rx_pct != null) adjBits.push(adjStat.rx_pct + '% rx');
+                    if (adjStat.lcnt != null) adjBits.push(adjStat.lcnt + ' link' + (adjStat.lcnt === 1 ? '' : 's'));
+                }
+                const adjHtml = adjBits.length
+                    ? `<span class="hs-link-adjacent" title="That node's own current stats, from stats.allstarlink.org">${escapeHtml(adjBits.join(' · '))}</span>`
+                    : '';
                 return `
                 <div class="hs-link-row ${rowClass}">
                     <span class="hs-link-dot"></span>
@@ -13395,6 +13430,7 @@ function openHotspotDrawer(hotspotId) {
                         ${desc ? `<div class="hs-link-desc">${escapeHtml(desc)}</div>` : ''}
                     </div>
                     ${durHtml}
+                    ${adjHtml}
                     ${modeHtml}
                     <button class="hs-link-action-btn" data-linked="true" data-node="${escapeHtml(n.node)}" onclick="hotspotLinkAction(this)">Disconnect</button>
                 </div>`;
@@ -15953,28 +15989,44 @@ function renderAslDrawer() {
     fetchAslFavoriteStats();
 }
 
-// Server-cached (120s, see aslstats.py's favorite_stats()) per-favorite
+// Server-cached (120s, see aslstats.py's favorite_stats()) per-node
 // Rx%/LCnt/Active/Web-Transceiver from stats.allstarlink.org. Throttled
 // client-side too (own timestamp, not just the server cache) so the 3s
 // poll-driven renderAslFavorites()/renderAslDrawer() calls don't refetch
 // on every single render -- AllScan's own docs cite a real 30-req/min cap
-// on this API. Shared by both the compact card and the drawer -- one
-// fetch, one throttle timestamp, two renderers refreshed from the result.
+// on this API. Shared by the compact ASL Favorites card, the ASL Control
+// drawer, AND (v5.9) every ASL3 hotspot's own card/detail-drawer linked-
+// node rows -- one fetch, one throttle timestamp, every renderer refreshed
+// from the same result. aslFavoriteStats is keyed by node number, same
+// shape /api/asl_favorite_stats already returns.
 let aslFavoriteStats = {};
 let aslFavoriteStatsFetchedAt = 0;
 const ASL_FAVORITE_STATS_INTERVAL_MS = 60000;
 
 function fetchAslFavoriteStats() {
-    if (!aslFavorites.length) return;
+    // Union of saved favorites' nodes + every node currently linked to any
+    // ASL3 hotspot right now (asl_linked_nodes, SSH-sourced) -- the latter
+    // is what lets a hotspot's own card/drawer show "adjacent" rx%/link
+    // counts for a linked node even when it was never saved as a favorite.
+    const nodeSet = new Set(aslFavorites.map(f => f.node));
+    (lastApiData || []).forEach(hs => {
+        if (hs.type === 'asl3') {
+            (hs.asl_linked_nodes || []).forEach(n => { if (n.node) nodeSet.add(String(n.node)); });
+        }
+    });
+    if (!nodeSet.size) return;
     if (Date.now() - aslFavoriteStatsFetchedAt < ASL_FAVORITE_STATS_INTERVAL_MS) return;
     aslFavoriteStatsFetchedAt = Date.now();
-    const nodes = aslFavorites.map(f => f.node).join(',');
+    const nodes = Array.from(nodeSet).join(',');
     fetch('/api/asl_favorite_stats?nodes=' + encodeURIComponent(nodes))
         .then(r => r.json())
         .then(data => {
             aslFavoriteStats = data;
-            renderAslFavorites(); // always visible whenever ASL Favorites is enabled, unlike the drawer
+            renderAslFavorites(); // no-op if the compact card isn't in the DOM (show_asl_favorites off)
             if (!isAslDrawerFocused()) renderAslDrawer(); // no-op if closed by the time this resolves
+            // Hotspot cards (renderCards()) and the Hotspot Status card both
+            // re-render from lastApiData every poll regardless, so they pick
+            // this up on their own very next tick without an extra call here.
         })
         .catch(() => {});
 }
@@ -16149,6 +16201,12 @@ function refresh() {
                 // -- see isAslDrawerFocused()'s own comment for why.
                 if (!isAslDrawerFocused()) renderAslDrawer(); // no-op unless the sidebar is currently open
             }
+            // Unconditional (v5.9, not gated on SHOW_ASL_FAVORITES) -- an
+            // ASL3 hotspot's own card/detail-drawer linked-node rows want
+            // this too, independent of whether the ASL Favorites card is
+            // enabled at all. Cheap: the function itself early-returns with
+            // nothing to fetch and throttles to once per 60s regardless.
+            fetchAslFavoriteStats();
         });
     if (SHOW_FLEET_ACTIVITY) fetchFleetActivity();
     if (SHOW_TOP_ACTIVITY) fetchTopActivity();

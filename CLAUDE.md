@@ -8730,6 +8730,59 @@ Always clean up `__pycache__` before zipping/packaging a build.
   literally every card in that group) since that's where the 1:1
   section-to-card correspondence is cleanest.
 
+- **Adjacent-link counts for ASL3 (v5.9) -- mockup-first (a published
+  Artifact, approved before any real code changed), prompted by looking
+  at AllScan's own v1.01 changelog entry ("shows direct and adjacent link
+  counts") for feature ideas.** "Adjacent" means: for whatever node
+  you're directly linked to (your own `RPT_ALINKS`, SSH-sourced), how
+  many links does THAT node itself currently have -- a sense of how
+  populated/busy a shared hub or reflector is, without resolving who
+  specifically is on it (app_rpt genuinely doesn't expose that, see the
+  earlier `RPT_ALINKS` keyed-state gotcha above -- this is additive
+  context, not a fix for that ceiling).
+  **No backend changes were needed at all** -- `aslstats.py`'s
+  `favorite_stats(node)` was already fully generic (keyed by whatever
+  node number you pass it, used only for saved ASL Favorites before
+  this), and `/api/asl_favorite_stats?nodes=...` already accepted an
+  arbitrary comma list, not a favorites-specific one. The only change
+  was teaching the client which node numbers to ask for: dashboard.html's
+  `fetchAslFavoriteStats()` now unions saved favorites' nodes with every
+  node currently linked to any ASL3 hotspot (`asl_linked_nodes`), and
+  runs unconditionally from the main poll loop (not just when
+  `show_asl_favorites` is on) since a hotspot's own card/drawer needed
+  this independent of whether that card exists at all -- still throttled
+  to once/60s client-side on top of the existing 120s server cache, same
+  rate-limit discipline this API has needed twice before (see the two
+  real incidents documented above).
+  **Two different surfaces, two different presentations, by deliberate
+  choice, not inconsistency**: the hotspot's own detail-drawer "Linked
+  nodes" rows get a new small `.hs-link-adjacent` pill ("62% rx · 17
+  links"), styled identically to the row's existing `.hs-link-duration`
+  text rather than the heavier boxed-pill look the mockup originally
+  used -- matching the drawer's own established visual language for a
+  very similar already-shipped piece of info (duration/peer-IP) beat
+  introducing a new visual idiom for one more stat. The compact ASL3
+  card has no room for a new element at all, so the same stat is folded
+  into that row's EXISTING hover tooltip (which already carries
+  duration/peer-IP) rather than adding a new tooltip -- the mockup's own
+  second board modeled this as a bespoke custom tooltip bubble, which
+  turned out to be unnecessary once the real existing tooltip mechanism
+  was found.
+  **Omitted entirely, not shown as "--", when there's no data** (a
+  still-connecting node, a genuine 404/unregistered node, or a stats-API
+  fetch error) -- avoids cluttering a row with a placeholder for
+  something that may never resolve.
+  **One known, accepted gap**: the hotspot's own detail drawer doesn't
+  live-refresh while already open (it only rebuilds on explicit actions
+  like connect/disconnect), so a stat can be up to ~60s stale if the
+  drawer was opened right before a refresh lands. Deliberately NOT fixed
+  by force-rebuilding the open drawer every poll -- `#hs-drawer` is a
+  single element reused by several unrelated features (camera, flight,
+  etc.), and reliably confirming "this is still the hotspot drawer, safe
+  to rebuild" without risking a wrong rebuild felt like more risk than a
+  once-a-minute cosmetic lag is worth. Revisit if this turns out to
+  bother anyone in practice.
+
 ## Conventions
 
 - Every hotspot dict (from `hotspots.json`) is a plain dict, not a

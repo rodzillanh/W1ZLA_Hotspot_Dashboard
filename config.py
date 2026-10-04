@@ -23,7 +23,7 @@ def _version_tuple(v):
 # version number now, no new names get appended here. See
 # _LAST_NAMED_VERSION below for how APP_CODENAME resolves to None past
 # this list's last entry.
-APP_VERSION = "5.8"
+APP_VERSION = "5.9"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -327,6 +327,7 @@ DIGEST_HIGHLIGHTS = [
     ("5.6",  ["wfweb users: a new Memories tab on HF Favorites, plus an optional Packet Monitor card"]),
     ("5.8",  ["APRS messages sent while the dashboard was offline are now caught up from aprs.fi",
               "Send APRS messages, text a phone, or ask WXBOT for weather from the Notifications card"]),
+    ("5.9",  ["AllStarLink users: linked nodes now show how busy they are (rx%/link count) on the card and in the drawer"]),
 ]
 
 
