@@ -1597,9 +1597,13 @@
             Publishes each hotspot to Home Assistant via MQTT auto-discovery —
             point this at the same broker your HA instance already uses and each
             hotspot shows up as its own device with sensors for mode, active call,
-            talkgroup, temperature, CPU, RSSI, and online/active/favorite-active
-            binary sensors, with no manual HA configuration needed. Leave the
-            broker host blank to disable.
+            talkgroup, temperature, CPU, RSSI, online/active/favorite-active
+            binary sensors, and (for any mode a hotspot has turned on) its current
+            DMR/D-STAR/YSF/P25/NXDN reflector or talkgroup, with no manual HA
+            configuration needed. If Rig Control is also on, a separate "Station
+            Rig" device publishes live PTT/frequency/mode/band/power too — handy
+            for an on-air light or similar automation. Leave the broker host blank
+            to disable.
         </p>
         <div class="form-grid" style="margin-bottom:10px">
             <div>

@@ -374,21 +374,24 @@ _rebuild_push_client()
 def _rebuild_rig_panel() -> None:
     """(Re)point the rigctld poller at the current settings -- runs only
     when rig control is on AND something consumes it (the Rig Panel card,
-    the PA-temp alert, or the QRZ Quick Log card -- the latter needs the
-    same live freq/mode/power snapshot even if the Rig Panel card itself
-    is hidden). Same hot-swap-on-settings-save pattern as the other
-    integration clients; the poller's own generation counter handles an
-    in-flight reconnect."""
+    the PA-temp alert, the QRZ Quick Log card -- which needs the same live
+    freq/mode/power snapshot even if the Rig Panel card itself is hidden --
+    or MQTT publishing to Home Assistant). Same hot-swap-on-settings-save
+    pattern as the other integration clients; the poller's own generation
+    counter handles an in-flight reconnect."""
     s = load_settings()
-    active = bool(s.get("rig_control_enabled")) and (
+    rig_on = bool(s.get("rig_control_enabled"))
+    want_mqtt = rig_on and mqtt_pub.enabled
+    active = rig_on and (
         bool(s.get("show_rig_panel")) or bool(s.get("rig_pa_alert_enabled"))
-        or bool(s.get("show_qrz_quick_log"))
+        or bool(s.get("show_qrz_quick_log")) or want_mqtt
     )
     rig_panel_poller.configure(
         s.get("rig_host", ""), s.get("rig_port", 4532), active,
         bool(s.get("rig_pa_alert_enabled")), s.get("rig_pa_alert_pct", 60),
         s.get("rig_pa_temp_cal", ""),
     )
+    mqtt_pub.set_rig_enabled(want_mqtt)
 
 _rebuild_rig_panel()
 
@@ -1120,6 +1123,7 @@ def api_settings_post():
         _rebuild_aprs_client()
     if any(k in data for k in ("mqtt_host", "mqtt_port", "mqtt_username", "mqtt_password")):
         _rebuild_mqtt_client()
+        _rebuild_rig_panel()  # MQTT on/off changes whether the rig poller needs to run
     if any(k in data for k in ("aprs_msg_callsign", "aprs_msg_to_callsign", "aprs_msg_cooldown_min")):
         _rebuild_aprs_messenger()
     if any(k in data for k in ("aprs_msg_callsign", "aprs_inbox_enabled", "aprs_inbox_backfill", "aprs_api_key")):
@@ -4661,11 +4665,14 @@ def api_import_backup():
 def _mqtt_publish_loop():
     """Publishes current hotspot state to MQTT on the same cadence as the
     main poll loop. Decoupled from FleetMonitor itself -- just reads its
-    snapshot() the same way /api/data does."""
+    snapshot() the same way /api/data does. Also publishes the Rig Panel's
+    live state here (publish_rig_state() no-ops internally when rig MQTT
+    publishing isn't enabled) rather than a second loop/thread."""
     while True:
         if mqtt_pub.enabled:
             for entry in monitor.snapshot().values():
                 mqtt_pub.publish_state(entry)
+            mqtt_pub.publish_rig_state(rig_panel_poller.snapshot())
         time.sleep(config.MQTT_PUBLISH_INTERVAL)
 
 
