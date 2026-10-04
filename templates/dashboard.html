@@ -6843,16 +6843,31 @@ function apCompute(data, st) {
     }
     const flat = avg.flat().filter(v => v != null);
     const max = Math.max(0, ...flat);
+    // Color domain is capped at the 90th percentile of non-zero cells, not
+    // the raw max -- a single outlier hour (a real weekly net can run 5-10x
+    // the ambient rate) would otherwise single-handedly set the scale and
+    // crush every other cell toward the dark end, which is exactly what
+    // made a perfectly ordinary week of activity look visually flat/
+    // undramatic. Falls back to the raw max when there are too few non-zero
+    // cells for a percentile to mean anything (avoids a degenerate near-
+    // zero cap on a mostly-empty grid). Anything at/above this cap just
+    // reads as fully "busy" -- the exact value is still in the hover title.
+    const nonZero = flat.filter(v => v > 0).sort((a, b) => a - b);
+    const colorMax = (nonZero.length >= 10 ? nonZero[Math.floor(nonZero.length * 0.9)] : max) || max;
     const rowTot = avg.map(r => r.reduce((a, v) => a + (v || 0), 0));
     const colTot = Array.from({ length: 24 }, (_, h) => avg.reduce((a, r) => a + (r[h] || 0), 0));
-    return { avg, nets: nets.slice(0, 4), max, rowTot, colTot, any, since, start, nWeeks };
+    return { avg, nets: nets.slice(0, 4), max, colorMax, rowTot, colTot, any, since, start, nWeeks };
 }
 function apColor(v, max) {
     if (v == null) return null;
     if (!v || !max) return 'var(--panel-2)';
-    // square-root scale: one very busy net hour shouldn't flatten every
-    // other hour into the same dark shade (hover shows the exact value)
-    return `color-mix(in oklab, var(--live) ${Math.round(8 + Math.sqrt(v / max) * 92)}%, var(--panel-2))`;
+    // Power curve (exponent > 1) against the (percentile-capped) max passed
+    // in -- the cap keeps one dominant hour from flattening the rest; this
+    // extra ^1.6 then pushes quiet cells further down toward background and
+    // busy cells faster up toward full color, so the grid reads in clear
+    // visual bands (quiet/moderate/busy) instead of a smooth, muted gradient.
+    const ratio = Math.pow(Math.min(1, v / max), 1.6);
+    return `color-mix(in oklab, var(--live) ${Math.round(4 + ratio * 96)}%, var(--panel-2))`;
 }
 function apHsName(id) {
     const live = (lastApiData || []).find(h => h.id === id);
@@ -6937,7 +6952,7 @@ function renderActivityPatternsDrawer() {
         c.avg.forEach((row, d) => {
             grid += `<div class="dl">${AP_DAYS[d]}</div>`;
             row.forEach((v, h) => {
-                const col = apColor(v, c.max);
+                const col = apColor(v, c.colorMax);
                 grid += `<div class="cell${col == null ? ' nodata' : ''}${netSet.has(d + ':' + h) ? ' net' : ''}" data-d="${d}" data-h="${h}"${col ? ` style="background:${col}"` : ''}></div>`;
             });
             grid += `<div class="rt"><i style="width:${Math.max(2, c.rowTot[d] / rMax * 18)}px"></i>${apFmtVal(c.rowTot[d], st.m).replace(' tx', '')}</div>`;
@@ -6946,7 +6961,7 @@ function renderActivityPatternsDrawer() {
         for (let h = 0; h < 24; h++) grid += `<div class="hl">${h % 3 === 0 ? apPad(h) : ''}</div>`;
         grid += `<div class="hl">${utc ? 'UTC' : 'local'}</div></div>`;
         grid += `<div class="ap-scale"><span>less</span><span class="ramp">${[0.05, 0.25, 0.5, 0.75, 1].map(t =>
-            `<span style="background:color-mix(in oklab, var(--live) ${Math.round(8 + Math.sqrt(t) * 92)}%, var(--panel-2))"></span>`).join('')}</span>
+            `<span style="background:color-mix(in oklab, var(--live) ${Math.round(4 + Math.pow(t, 1.6) * 96)}%, var(--panel-2))"></span>`).join('')}</span>
             <span>more · max ${apFmtVal(c.max, st.m)}/week in one hour</span>
             ${c.nets.length ? '<span class="netkey"><span></span>regular net</span>' : ''}</div>`;
     }
