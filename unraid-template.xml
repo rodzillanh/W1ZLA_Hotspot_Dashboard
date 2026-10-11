@@ -33,7 +33,7 @@
   <Category>Network:Other</Category>
   <WebUI>http://[IP]:5000/</WebUI>
   <TemplateURL/>
-  <Icon/>
+  <Icon>https://git.trytheitguy.com/rodney_berry/W1ZLA_Hotspot_Dashboard/raw/branch/main/icon.png</Icon>
   <ExtraParams/>
   <PostArgs/>
   <CPUset/>

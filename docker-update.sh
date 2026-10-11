@@ -34,7 +34,9 @@
 # its "WebUI" shortcut in the Docker tab dropdown -- creating a container
 # via plain `docker run` (as this script does) doesn't set that
 # automatically the way Unraid's own "Add Container" GUI does, which is
-# why that link disappears otherwise.
+# why that link disappears otherwise. Same story for net.unraid.docker.icon
+# (the Docker tab's container icon -- icon.png in this repo, fetched by
+# Unraid from the raw URL, so it must stay pushed and the repo public).
 #
 # For the same reason, a container created this way is invisible to
 # Unraid's "Edit" logic. Confirmed directly from Unraid's own source
@@ -87,6 +89,7 @@ docker run -d \
   -e QRZ_PASSWORD="${QRZ_PASSWORD:-}" \
   -l net.unraid.docker.webui='http://[IP]:5000/' \
   -l net.unraid.docker.managed='dockerman' \
+  -l net.unraid.docker.icon='https://git.trytheitguy.com/rodney_berry/W1ZLA_Hotspot_Dashboard/raw/branch/main/icon.png' \
   "$IMAGE_NAME"
 
 # --- register the Unraid template so "Edit" works in the Docker tab ---
