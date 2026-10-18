@@ -51,6 +51,7 @@ from sota import SotaClient
 from psk_reporter import PskReporterClient
 from repeaters import RepeaterDirectoryClient
 from adif import parse_adif
+import wfweb_logbook
 from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
 from asl_audio import AslAudioManager
@@ -2664,6 +2665,76 @@ def _adif_datetime_to_epoch(qso_date: str, time_on) -> "float | None":
     except ValueError:
         return None
 
+def _adif_record_to_qso(r: dict, default_qth, require_position: bool = True) -> "dict | None":
+    """One parsed ADIF record -> a qsos.json entry (see api_import_adif's
+    docstring for the position/QTH/enrichment rules). Returns None for a
+    record with no callsign, or -- when require_position -- no position
+    to plot. The wfweb importer passes require_position=False: a phone
+    QSO with no grid still belongs in Recent Contacts, it just gets no
+    map pin (renderQsoLayer() skips a null lat/lon)."""
+    call = (r.get("CALL") or "").strip().upper()
+    if not call:
+        return None
+    grid = (r.get("GRIDSQUARE") or "").strip()
+    latlon = grid_to_latlon(grid) if grid else None
+    # Always resolve name/city/state/country via QRZ/RadioID, not just
+    # when GRIDSQUARE is absent -- ADIF has no city/state fields at
+    # all, and in practice most real logs carry GRIDSQUARE but NOT
+    # COUNTRY (many logging programs never populate it), so the old
+    # "only look up when grid is missing" rule left country/flag
+    # blank for nearly every imported QSO, a real reported gap, not a
+    # hypothetical. Matches wsjtx.py's live path, which already always
+    # enriches regardless of grid. QrzClient.lookup() caches per
+    # callsign and short-circuits near-instantly when QRZ isn't
+    # configured (QrzClient.enabled), so this stays cheap for a large
+    # import when QRZ is off; when QRZ IS configured, repeated
+    # callsigns in a real log (common) hit the cache after the first.
+    info = monitor.lookup_caller_info(call)
+    if latlon is not None:
+        lat, lon = latlon
+    else:
+        lat, lon = info["lat"], info["lon"]
+    qrz_name, location = info["name"], info["location"]
+    city, state, qrz_country = info["city"], info["state"], info["country"]
+    if (lat is None or lon is None) and require_position:
+        return None  # can't plot without a position
+
+    my_grid = (r.get("MY_GRIDSQUARE") or "").strip()
+    qth = grid_to_latlon(my_grid) if my_grid else None
+    if qth is None:
+        qth = default_qth
+    qth_lat, qth_lon = qth if qth is not None else (None, None)
+
+    qso_date = (r.get("QSO_DATE") or "").strip()
+    return {
+        "call": call,
+        "band": (r.get("BAND") or "").strip().lower(),
+        "mode": (r.get("MODE") or "").strip().upper(),
+        "date": qso_date,
+        "grid": grid or None,
+        "frequency_hz": _adif_freq_to_hz(r.get("FREQ")),
+        "lat": lat, "lon": lon,
+        "qth_lat": qth_lat, "qth_lon": qth_lon,
+        # POTA park reference(s) hunted in this QSO, if the log carries
+        # them -- POTA_REF (may be a comma list for a multi-park hunt)
+        # or SIG_INFO when SIG=POTA. Used by /api/pota to flag which
+        # currently-spotted parks are new to you. Absent for a normal
+        # non-POTA QSO.
+        "pota_refs": _adif_pota_refs(r),
+        # ADIF's own NAME/COUNTRY fields (when the logging software
+        # already captured them) take priority over QRZ's -- more
+        # likely to reflect what was actually true at QSO time, and
+        # doesn't cost an extra lookup for the common case where
+        # GRIDSQUARE already gave us a position.
+        "name": (r.get("NAME") or "").strip() or qrz_name, "location": location,
+        "city": city, "state": state,
+        "country": (r.get("COUNTRY") or "").strip() or qrz_country,
+        "rst_sent": (r.get("RST_SENT") or "").strip() or None,
+        "rst_rcvd": (r.get("RST_RCVD") or "").strip() or None,
+        "logged_at": _adif_datetime_to_epoch(qso_date, r.get("TIME_ON")),
+    }
+
+
 @app.route("/api/import_adif", methods=["POST"])
 def api_import_adif():
     """Parses an uploaded ADIF log and replaces the stored QSO list
@@ -2689,70 +2760,50 @@ def api_import_adif():
 
     qsos = []
     for r in records:
-        call = (r.get("CALL") or "").strip().upper()
-        if not call:
-            continue
-        grid = (r.get("GRIDSQUARE") or "").strip()
-        latlon = grid_to_latlon(grid) if grid else None
-        # Always resolve name/city/state/country via QRZ/RadioID, not just
-        # when GRIDSQUARE is absent -- ADIF has no city/state fields at
-        # all, and in practice most real logs carry GRIDSQUARE but NOT
-        # COUNTRY (many logging programs never populate it), so the old
-        # "only look up when grid is missing" rule left country/flag
-        # blank for nearly every imported QSO, a real reported gap, not a
-        # hypothetical. Matches wsjtx.py's live path, which already always
-        # enriches regardless of grid. QrzClient.lookup() caches per
-        # callsign and short-circuits near-instantly when QRZ isn't
-        # configured (QrzClient.enabled), so this stays cheap for a large
-        # import when QRZ is off; when QRZ IS configured, repeated
-        # callsigns in a real log (common) hit the cache after the first.
-        info = monitor.lookup_caller_info(call)
-        if latlon is not None:
-            lat, lon = latlon
-        else:
-            lat, lon = info["lat"], info["lon"]
-        qrz_name, location = info["name"], info["location"]
-        city, state, qrz_country = info["city"], info["state"], info["country"]
-        if lat is None or lon is None:
-            continue  # can't plot without a position
-
-        my_grid = (r.get("MY_GRIDSQUARE") or "").strip()
-        qth = grid_to_latlon(my_grid) if my_grid else None
-        if qth is None:
-            qth = default_qth
-        qth_lat, qth_lon = qth if qth is not None else (None, None)
-
-        qso_date = (r.get("QSO_DATE") or "").strip()
-        qsos.append({
-            "call": call,
-            "band": (r.get("BAND") or "").strip().lower(),
-            "mode": (r.get("MODE") or "").strip().upper(),
-            "date": qso_date,
-            "grid": grid or None,
-            "frequency_hz": _adif_freq_to_hz(r.get("FREQ")),
-            "lat": lat, "lon": lon,
-            "qth_lat": qth_lat, "qth_lon": qth_lon,
-            # POTA park reference(s) hunted in this QSO, if the log carries
-            # them -- POTA_REF (may be a comma list for a multi-park hunt)
-            # or SIG_INFO when SIG=POTA. Used by /api/pota to flag which
-            # currently-spotted parks are new to you. Absent for a normal
-            # non-POTA QSO.
-            "pota_refs": _adif_pota_refs(r),
-            # ADIF's own NAME/COUNTRY fields (when the logging software
-            # already captured them) take priority over QRZ's -- more
-            # likely to reflect what was actually true at QSO time, and
-            # doesn't cost an extra lookup for the common case where
-            # GRIDSQUARE already gave us a position.
-            "name": (r.get("NAME") or "").strip() or qrz_name, "location": location,
-            "city": city, "state": state,
-            "country": (r.get("COUNTRY") or "").strip() or qrz_country,
-            "rst_sent": (r.get("RST_SENT") or "").strip() or None,
-            "rst_rcvd": (r.get("RST_RCVD") or "").strip() or None,
-            "logged_at": _adif_datetime_to_epoch(qso_date, r.get("TIME_ON")),
-        })
+        q = _adif_record_to_qso(r, default_qth)
+        if q is not None:
+            qsos.append(q)
 
     save_qsos(qsos)
     return jsonify({"ok": True, "count": len(qsos), "filename": filename, "qsos": qsos})
+
+@app.route("/api/import_wfweb_log", methods=["POST"])
+def api_import_wfweb_log():
+    """Settings -> Integrations "Import wfweb logbook": pulls wfweb's own
+    server-side QSO log (wfweb_logbook.py) over the same wfweb host/port/SSL
+    settings the Rig Panel power control and SSTV card use, and MERGES it
+    into qsos.json (storage.merge_wfweb_qsos) -- unlike the ADIF file
+    importer above, it never replaces the list, so WSJT-X / QRZ / ADIF rows
+    survive and re-running only adds what's new. Records already pulled
+    (same APP_WFWEB_ID) skip the QRZ/RadioID lookup entirely."""
+    s = load_settings()
+    text, err = wfweb_logbook.fetch_adif(s.get("wfweb_host", ""), s.get("wfweb_port", 8080),
+                                         s.get("wfweb_use_ssl", True))
+    if err:
+        return jsonify({"ok": False, "message": err})
+    records = parse_adif(text)
+    default_qth = grid_to_latlon(s.get("station_grid", ""))
+    already = storage_mod.known_wfweb_ids()
+    candidates, seen = [], 0
+    for r in records:
+        wid = (r.get("APP_WFWEB_ID") or "").strip()
+        if wid and wid in already:
+            seen += 1
+            continue
+        q = _adif_record_to_qso(r, default_qth, require_position=False)
+        if q is None:
+            continue
+        q["source"] = "wfweb"
+        if wid:
+            q["wfweb_id"] = wid
+        candidates.append(q)
+    result = storage_mod.merge_wfweb_qsos(candidates)
+    result["skipped"] += seen
+    result["total"] = len(records)
+    return jsonify({"ok": True, **result,
+                    "message": (f"{result['added']} added, {result['matched']} matched to "
+                                f"QSOs already here, {result['skipped']} already imported "
+                                f"({result['total']} in wfweb's log)")})
 
 @app.route("/api/clear_qsos", methods=["POST"])
 def api_clear_qsos():

@@ -9044,6 +9044,9 @@ function renderQsoLayer(qsos) {
     if (qsoLinesLayer) qsoLinesLayer.clearLayers();
     const nowSec = Date.now() / 1000;
     (qsos || []).forEach(q => {
+        // A QRZ- or wfweb-imported QSO with no grid and no lookup hit has a
+        // null position -- it still shows in Recent Contacts, just no pin.
+        if (q.lat == null || q.lon == null) return;
         const color = QSO_COLOR;
         const isNew = q.logged_at != null && (nowSec - q.logged_at) < QSO_NEW_WINDOW_SEC;
         // Line back to the QTH this QSO was worked from (that record's own
@@ -12721,6 +12724,8 @@ function openQsoDrawer(i) {
     const loc = [q.city, q.state || q.country].filter(Boolean).join(', ') || '—';
     const source = q.source === 'wsjtx' ? 'Live (WSJT-X)'
                  : q.source === 'qrz' ? 'QRZ Logbook'
+                 : q.source === 'wfweb' ? 'wfweb logbook'
+                 : q.source === 'qrz_quick_log' ? 'QRZ Quick Log'
                  : 'ADIF import';
     let qrzLine = '—';
     if (q.qrz_confirmed) {

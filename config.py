@@ -23,7 +23,7 @@ def _version_tuple(v):
 # version number now, no new names get appended here. See
 # _LAST_NAMED_VERSION below for how APP_CODENAME resolves to None past
 # this list's last entry.
-APP_VERSION = "5.2"
+APP_VERSION = "5.3"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -319,6 +319,7 @@ DIGEST_HIGHLIGHTS = [
     ("5.0",  ["Settings' Integrations and Cards tabs are now searchable and collapsible"]),
     ("5.1",  ["Onboarding is now an inline welcome card instead of a blocking popup"]),
     ("5.2",  ["Hotspot Status now puts on-air hotspots at the top of the list"]),
+    ("5.3",  ["Import your wfweb logbook into Recent Contacts (Settings → Integrations → wfweb)"]),
 ]
 
 

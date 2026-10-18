@@ -131,6 +131,14 @@ wsjtx.py           WsjtxListener: listens for WSJT-X's own UDP telemetry
                    (WSJT-X's own configured grid square, not a settings
                    fallback, in the very common case it's actually set).
 
+wfweb_logbook.py   fetch_adif(): one-shot GET of wfweb's own server logbook
+                   (/api/v1/logbook/adif, wfweb v0.9.1+) for Settings ->
+                   Integrations' "Import wfweb logbook" button. app.py's
+                   /api/import_wfweb_log converts records with the SAME
+                   _adif_record_to_qso() the ADIF file importer uses, then
+                   storage.merge_wfweb_qsos() MERGES (never replaces) -- see
+                   the "wfweb logbook import" gotcha below.
+
 pota.py            PotaClient: live Parks on the Air activator spots
                    (api.pota.app, free/no-auth/CORS-open, confirmed live)
                    for the Live map's "POTA spots" overlay AND (v4.47) the
@@ -8399,6 +8407,34 @@ config for per-integration credentials; put it in
       clearing the search removes every `<mark>`, the welcome card's
       footer link points at `/whats-available`, and Pocket Dash's strip
       shows, dismisses, and stays dismissed after a reload.
+
+- **wfweb logbook import (v5.3, `wfweb_logbook.py` + `/api/import_wfweb_log`)
+  -- built from wfweb's own source (`src/logbook.cpp` `toAdif()`,
+  `src/webserver.cpp` `handleRestRequest()`), not its REST_API.md alone.**
+  `GET /api/v1/logbook/adif` is served by the same handler on both the
+  HTTPS web-UI port and the plain REST port, so it reuses `wfweb_host`/
+  `wfweb_port`/`wfweb_use_ssl` (self-signed cert, verification off, same as
+  wfweb_power.py). The FULL download keeps `APP_WFWEB_ID` (a permanent
+  per-QSO UUID); `?new=1` strips it, so never use that form here -- the id
+  is the dedupe key. `storage.merge_wfweb_qsos()` mirrors `merge_qrz_qsos()`:
+  skip a known `wfweb_id`; otherwise fuzzy-match (`_qso_matches`, 900 s
+  window) only against rows WITHOUT a `wfweb_id` -- WSJT-X rows from
+  wfweb's own `--remote-log`, QRZ rows, ADIF rows -- and enrich in place
+  (blank fields only, incl. lat/lon); else append with `source: "wfweb"`.
+  Candidates are indexed by callsign (wfweb is built for 100k-QSO logs).
+  The route pre-filters already-imported ids BEFORE calling
+  `_adif_record_to_qso()`, so a re-run does no QRZ lookups for old QSOs.
+  Unlike the ADIF file importer it keeps QSOs with no position
+  (`require_position=False`); `renderQsoLayer()` now skips null lat/lon
+  (the guard the QRZ Logbook entry above said to add if needed). The ADIF
+  FILE importer still replaces qsos.json wholesale, wfweb rows included --
+  documented in the README rather than changed. Verified with a local
+  HTTPS fake serving byte-for-byte `toAdif()`-format records: first run
+  2 added / 1 matched to a seeded WSJT-X row, second run 3 skipped and no
+  write, 404 and connection-refused give plain messages, the ADIF file
+  importer (now on the shared helper) still behaves as before, and the
+  Settings button works in a real browser with no page errors. NOT yet
+  run against a real wfweb.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

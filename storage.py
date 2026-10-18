@@ -560,3 +560,71 @@ def merge_qrz_qsos(add_records: list, confirm_map: dict,
 
     return {"added": added, "matched": matched, "confirmed": confirmed,
             "confirmed_logids": confirmed_logids}
+
+
+def known_wfweb_ids() -> set:
+    """APP_WFWEB_IDs already stored -- lets the wfweb importer skip the
+    QRZ/RadioID enrichment lookup for records it already has."""
+    return {q.get("wfweb_id") for q in load_qsos() if q.get("wfweb_id")}
+
+
+def merge_wfweb_qsos(add_records: list, window_sec: int = None) -> dict:
+    """Fold a pull of wfweb's server logbook into qsos.json under _file_lock,
+    same shape as merge_qrz_qsos() above:
+
+      * a record whose `wfweb_id` (wfweb's own APP_WFWEB_ID) is already
+        stored is skipped, so re-importing is safe and only adds what's new;
+      * one that fuzzily matches a row WITHOUT a wfweb_id (a WSJT-X live
+        row -- wfweb's own --remote-log sends exactly those -- an ADIF
+        import or a QRZ-synced row, see _qso_matches) enriches that row in
+        place: attaches the wfweb_id and fills only blank fields, never a
+        second row for the same contact;
+      * anything else is appended.
+
+    Candidates for the fuzzy match are indexed by callsign so a lifetime
+    log (wfweb is built for 100k QSOs) isn't an all-pairs scan.
+    Returns {"added", "matched", "skipped"}."""
+    if window_sec is None:
+        window_sec = config.QRZ_LOGBOOK_MATCH_WINDOW_SEC
+    os.makedirs(config.CONFIG_DIR, exist_ok=True)
+    with _file_lock:
+        try:
+            with open(config.QSOS_FILE, "r") as f:
+                qsos = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            qsos = []
+
+        known = {q.get("wfweb_id") for q in qsos if q.get("wfweb_id")}
+        by_call = {}
+        for q in qsos:
+            if not q.get("wfweb_id"):
+                by_call.setdefault((q.get("call") or "").upper(), []).append(q)
+        added = matched = skipped = 0
+
+        for rec in add_records or []:
+            wid = rec.get("wfweb_id")
+            if wid and wid in known:
+                skipped += 1
+                continue
+            cands = by_call.get((rec.get("call") or "").upper(), [])
+            hit = next((q for q in cands
+                        if not q.get("wfweb_id") and _qso_matches(rec, q, window_sec)), None)
+            if hit is not None:
+                if wid:
+                    hit["wfweb_id"] = wid
+                for k in ("name", "city", "state", "country", "grid", "rst_sent",
+                          "rst_rcvd", "frequency_hz", "lat", "lon", "qth_lat", "qth_lon"):
+                    if hit.get(k) in (None, "") and rec.get(k) not in (None, ""):
+                        hit[k] = rec[k]
+                matched += 1
+            else:
+                qsos.append(rec)
+                added += 1
+            if wid:
+                known.add(wid)
+
+        if added or matched:
+            with open(config.QSOS_FILE, "w") as f:
+                json.dump(qsos, f, indent=4)
+
+    return {"added": added, "matched": matched, "skipped": skipped}

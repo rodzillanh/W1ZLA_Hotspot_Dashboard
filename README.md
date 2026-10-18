@@ -1681,6 +1681,22 @@ in your QRZ logbook are folded into this list, and a green **✓ QRZ**
 badge marks the ones QRZ has confirmed — the detail drawer shows the
 confirmation date.
 
+If you log in **[wfweb](https://github.com/adecarolis/wfweb)** (v0.9.1 or
+newer, server build — it keeps its own logbook on the server), Settings →
+Integrations → wfweb → **"Import wfweb logbook"** copies those QSOs in,
+using the same wfweb host/port/SSL settings as the Rig Panel power
+control and SSTV card. It adds to your log rather than replacing it:
+QSOs it already imported are skipped (wfweb gives every QSO its own
+permanent id), and a QSO that's already here from WSJT-X, QRZ or an ADIF
+file is matched up and filled in rather than duplicated — so it's safe to
+run as often as you like. A QSO with no grid square and no QRZ/RadioID
+position still shows in this list; it just gets no map pin. To have
+wfweb QSOs arrive live instead, point wfweb's `--remote-log` (or
+`[RemoteLog] Target=`) at this dashboard's WSJT-X listener (port 2237).
+Note that uploading an ADIF *file* (Quick Settings → Live map) still
+replaces the whole stored log, wfweb imports included — just run the
+wfweb import again afterwards.
+
 <!-- wiki-group: Optional Cards -->
 ## Hotspot Status card
 <!-- wiki-image: hotspot-status-card.png -->

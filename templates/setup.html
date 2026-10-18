@@ -1796,6 +1796,19 @@
         <button class="btn btn-primary" onclick="saveWfwebPower()">Save wfweb power settings</button>
         <button class="btn btn-info" onclick="testWfwebPower()">Test connection</button>
         <span class="status-txt" id="wfweb-pwr-status"></span>
+
+        <div class="toggle-subhead" style="margin-top:18px">wfweb logbook</div>
+        <p style="font-size:12px;color:var(--text-muted);margin:6px 0 10px;line-height:1.5">
+            Copies the QSOs in wfweb's own logbook (wfweb v0.9.1+, server build) into this
+            dashboard's log &mdash; Recent Contacts, QSO Stats and the Live map. Uses the host,
+            port and SSL settings above (save them first). It <b>adds to</b> your log rather
+            than replacing it: QSOs already imported are skipped, and one that's already here
+            from WSJT-X, QRZ or an ADIF file is matched up instead of duplicated, so it's safe
+            to run again whenever you like. For QSOs to arrive live as you log them, point
+            wfweb's <code>--remote-log</code> at this dashboard's WSJT-X listener instead.
+        </p>
+        <button class="btn btn-info" id="wfweb-log-btn" onclick="importWfwebLog()">Import wfweb logbook</button>
+        <span class="status-txt" id="wfweb-log-status"></span>
     </div>
 
     <div class="section">
@@ -4116,6 +4129,24 @@ async function testWfwebPower() {
         status.style.color = 'var(--danger)';
     }
     setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 6000);
+}
+
+async function importWfwebLog() {
+    const status = document.getElementById('wfweb-log-status');
+    const btn = document.getElementById('wfweb-log-btn');
+    btn.disabled = true;
+    status.textContent = 'Importing… (a big log with QRZ lookups can take a while)';
+    status.style.color = '';
+    try {
+        const r = await fetch('/api/import_wfweb_log', { method: 'POST' });
+        const data = await r.json();
+        status.textContent = (data.ok ? '✓ ' : '✕ ') + data.message;
+        status.style.color = data.ok ? 'var(--accent)' : 'var(--danger)';
+    } catch (e) {
+        status.textContent = '✕ ' + e;
+        status.style.color = 'var(--danger)';
+    }
+    btn.disabled = false;
 }
 
 function saveHamAlert() {
