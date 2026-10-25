@@ -17,7 +17,9 @@ grouped by category. If you need the full story behind any entry
 | RadioID.net | `radioid.py` | DMR ID lookup |
 | APRS-IS (`aprs-is.net`) | `aprs.py`, `aprs_messaging.py`, `aprs_inbox.py` | Spec for `javAPRSFilter`, `b/` buddy filter |
 | Brandmeister REST API v1 + v2 (`api.brandmeister.network`) | `brandmeister.py` | v2 added for talkgroup link/unlink write support |
-| Brandmeister Last Heard feed (`ws.brandmeister.network/lh/socket.io/`) | `brandmeister_lastheard.py` | Reverse-engineered Socket.IO, undocumented by Brandmeister |
+| Brandmeister Last Heard feed (`wss://api.brandmeister.network/lh`) | `brandmeister_lastheard.py` | Reverse-engineered Socket.IO, undocumented by Brandmeister. Moved from `ws.brandmeister.network/lh/socket.io/` (now dead) in Oct 2026 |
+| Brandmeister device list (`/v2/device`) | `nearby.py` | ~9.7 MB bulk list, no auth; repeater-vs-hotspot is a heuristic |
+| AllStarLink node DB (`allmondb.allstarlink.org`) | `nearby.py` | No coordinates; nodes matched to repeaters by callsign + frequency |
 | AllStarLink stats API (`stats.allstarlink.org`) | `aslstats.py` | Rate-limited ~30 req/min |
 | wspr.live (ClickHouse HTTP API) | `wspr_activity.py` | Rate-limited 20 req/min, non-commercial terms |
 | NOAA SWPC OVATION aurora feed | `aurora.py` | Full download verified, not WebFetch summary |
@@ -36,6 +38,10 @@ grouped by category. If you need the full story behind any entry
 | Open-Meteo | `weather.py` | Free weather API |
 | Forgejo REST API | `update_check.py`, `release.sh` | Self-update check + release creation |
 | aprs.fi | `aprs_inbox.py` (`what=msg` backfill), plain callsign links elsewhere | |
+| NA7Q APRS SMS gateway (aprs.wiki) | `aprs_inbox.py` | Replaced the dead SMSGTE; recipients must opt in |
+| WXBOT (KI6WJP) | `aprs_inbox.py` | APRS weather-by-message bot |
+| wfweb audio WebSocket | `sstv_rx.py`, `wfweb_power.py` | Undocumented; reverse-engineered live against a real IC-7300 MK2 |
+| Hamlib `rigctld` (via WFView/wfweb) | `rig_panel.py`, tap-to-tune | |
 
 ## Source code read directly (not just docs)
 
@@ -72,7 +78,7 @@ grouped by category. If you need the full story behind any entry
 
 ## PyPI packages
 
-`paramiko`, `paho-mqtt`, `aprslib`, `bambulabs_api`, `websocket-client`, `sgp4`, `sstv`, `numpy`, `Pillow`
+`Flask`, `waitress`, `paramiko`, `paho-mqtt`, `aprslib`, `bambulabs_api`, `websocket-client`, `sgp4`, `pywebpush`, `sstv`, `numpy`, `Pillow`, `tzdata`
 
 ## Map / CDN
 
