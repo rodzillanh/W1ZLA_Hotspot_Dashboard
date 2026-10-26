@@ -8557,6 +8557,14 @@ config for per-integration credentials; put it in
     names have apostrophes -- the onclick-interpolation gotcha above).
     Tuning uses its own fetch, not `rigTune()`, since that helper rewrites
     the button label with an MHz figure.
+  - **The "you're on this one" highlight reads the radio, not the last
+    tap** (`/api/shortwave/rig`, polled every 5 s): wfweb's native
+    frequency first, then rigctld's cached probe, then the last frequency
+    tapped on the card. The first version only used the Rig Panel's data
+    (absent unless that card or Quick Log is on) or the last tap, so a
+    radio retuned by hand stayed "highlighted" on the old row -- a real
+    report. wfweb's rigctld answers 0 Hz on the IC-7300MK2, hence wfweb
+    first.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

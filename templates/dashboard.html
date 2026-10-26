@@ -12915,7 +12915,8 @@ if (SHOW_REPEATERS) {
 let swData = null;
 let swView = 'likely';            // likely | all | pirates | time
 let swBand = '';
-let swTunedKhz = null;            // last tune from this card, used when there's no live rig frequency
+let swTunedKhz = null;            // last tune from this card, used only when the rig's frequency can't be read
+let swLiveKhz = null;             // the rig's actual frequency, polled from /api/shortwave/rig
 const swHeardThisTab = new Set(); // marked heard in this tab, so a second tap undoes it
 let swDrawerTab = 'now';
 let swDrawerSearch = '';
@@ -12931,10 +12932,22 @@ function swUtcMinutes() { const d = new Date(); return d.getUTCHours() * 60 + d.
 function swHhmmToMin(s) { return (+s.slice(0, 2)) * 60 + (+s.slice(2)); }
 function swDur(m) { return m < 60 ? m + 'm' : Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : ''); }
 function swRigKhz() {
+    if (swLiveKhz != null) return swLiveKhz;
     if (typeof rigPanelData !== 'undefined' && rigPanelData && rigPanelData.reachable && rigPanelData.freq_hz) {
         return rigPanelData.freq_hz / 1000;
     }
     return swTunedKhz;
+}
+// Follows the radio however it was tuned (knob, wfweb, another card), not
+// just taps on this card. Re-renders only when the frequency changes.
+function fetchShortwaveRig() {
+    fetch('/api/shortwave/rig').then(r => r.json()).then(d => {
+        const khz = d.freq_hz ? d.freq_hz / 1000 : null;
+        if (khz === swLiveKhz) return;
+        swLiveKhz = khz;
+        renderShortwaveCard();
+        renderShortwaveDrawerList();
+    }).catch(() => {});
 }
 function swRigOk() {
     const rig = swData && swData.rig;
@@ -13090,6 +13103,7 @@ function swTune(btn) {
             swTunedKhz = khz;
             renderShortwaveCard();
             renderShortwaveDrawerList();
+            fetchShortwaveRig();
         }
     }).catch(() => {
         btn.classList.remove('pending');
@@ -13222,6 +13236,10 @@ if (SHOW_SHORTWAVE) {
     setInterval(fetchShortwave, SHORTWAVE_POLL_MS);
     // "12m left" counts down between polls without another request.
     setInterval(() => { if (swData) renderShortwaveCard(); }, 60000);
+    if (RIG_CONTROL_ENABLED) {
+        fetchShortwaveRig();
+        setInterval(() => { if (!document.hidden) fetchShortwaveRig(); }, 5000);
+    }
 }
 
 // --- SSTV card (v4.91) -- see sstv_rx.py / sstv_controller.py. Receive-

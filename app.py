@@ -2370,6 +2370,23 @@ def api_shortwave():
     report["rig"] = _rig_status_block(settings)
     return jsonify(report)
 
+@app.route("/api/shortwave/rig")
+def api_shortwave_rig():
+    """The rig's current frequency, for the Shortwave card's "you're on
+    this one" highlight -- polled every few seconds, so it has to be
+    cheap. wfweb's native reading first (its rigctld bridge answers a
+    literal 0 frequency on the IC-7300MK2, see /api/rig_panel), then
+    rigctld's cached probe. Works without the Rig Panel card turned on."""
+    settings = load_settings()
+    if not settings.get("rig_control_enabled"):
+        return jsonify({"freq_hz": None, "source": None})
+    wp = wfweb_power_client.status()
+    if wp.get("connected") and wp.get("freq_hz"):
+        return jsonify({"freq_hz": wp["freq_hz"], "source": "wfweb"})
+    st = rig_client.status(settings.get("rig_host", ""), settings.get("rig_port", 4532))
+    freq = st.get("freq_hz") if st.get("reachable") else None
+    return jsonify({"freq_hz": freq or None, "source": "rigctld" if freq else None})
+
 @app.route("/api/shortwave/schedule")
 def api_shortwave_schedule():
     """Every broadcast aimed at North America, for the Shortwave drawer's
