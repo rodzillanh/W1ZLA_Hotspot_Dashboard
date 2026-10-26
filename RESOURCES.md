@@ -35,6 +35,8 @@ grouped by category. If you need the full story behind any entry
 | api.wheretheiss.at | `satellites.py` | Ground-truth ISS position, used to verify SGP4 math |
 | openSPOT4 HTTP+WebSocket API | `openspot.py` | Reverse-engineered live; newer firmware gen than SharkRF's published docs |
 | hearham.com repeater directory API | `repeaters.py` | Free, no auth, ~22k rows |
+| HFCC broadcast schedule (`hfcc.org/data/<season>/<season>allx2.zip`) | `shortwave.py` | Free, no auth; plain `http://` (the `https://www.` URL failed from the dev box) |
+| EiBi shortwave schedule (`eibispace.de/dx/sked-<season>.csv`, `README.TXT`) | `shortwave.py` | Free, no auth; README has the language, target and transmitter-site tables |
 | Open-Meteo | `weather.py` | Free weather API |
 | Forgejo REST API | `update_check.py`, `release.sh` | Self-update check + release creation |
 | aprs.fi | `aprs_inbox.py` (`what=msg` backfill), plain callsign links elsewhere | |

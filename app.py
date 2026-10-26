@@ -53,6 +53,7 @@ from sstv_controller import SstvController
 from sota import SotaClient
 from psk_reporter import PskReporterClient
 from repeaters import RepeaterDirectoryClient
+from shortwave import ShortwaveClient
 from adif import parse_adif
 from digipi import DigipiMonitor
 from openspot import OpenSpot4Manager
@@ -144,6 +145,7 @@ sstv_controller = SstvController(sstv_receiver, _sstv_tune, load_settings)
 sota_client     = SotaClient()
 psk_reporter    = PskReporterClient()
 repeater_client = RepeaterDirectoryClient()
+shortwave_client = ShortwaveClient()
 digipi_monitor  = DigipiMonitor()
 openspot_manager = OpenSpot4Manager(monitor)
 openspot_manager.reconcile(load_hotspots())  # eager start at boot, mirrors mqtt_pub's startup rebuild
@@ -936,6 +938,13 @@ def api_settings_post():
             pass
     if "show_repeaters" in data:
         settings["show_repeaters"] = bool(data["show_repeaters"])
+    if "show_shortwave" in data:
+        settings["show_shortwave"] = bool(data["show_shortwave"])
+    if "shortwave_position" in data:
+        try:
+            settings["shortwave_position"] = max(0, int(data["shortwave_position"]))
+        except (TypeError, ValueError):
+            pass
     if "show_my_signal" in data:
         settings["show_my_signal"] = bool(data["show_my_signal"])
     if "my_signal_position" in data:
@@ -1030,6 +1039,7 @@ def api_settings_post():
         "qso_stats_page", "top_activity_page", "pota_page",
         "hf_favorites_page", "rig_panel_page", "dvswitch_page", "qrz_quick_log_page",
         "beacons_page", "repeaters_page", "sstv_page", "hotspot_health_page", "my_signal_page",
+        "shortwave_page",
     ):
         if _page_key in data:
             try:
@@ -1480,6 +1490,7 @@ _SENTINEL_DEFS = [
     ("__qrz_quick_log__", "show_qrz_quick_log", "qrz_quick_log_position", "📝", "Quick Log", "rig-panel-driven QRZ logging card"),
     ("__beacons__", "show_beacons", "beacons_position", "📡", "Beacons", "NCDXF/IARU beacon ladder card"),
     ("__repeaters__", "show_repeaters", "repeaters_position", "🗼", "Repeaters", "nearby repeater directory card"),
+    ("__shortwave__", "show_shortwave", "shortwave_position", "📻", "Shortwave", "broadcasts you're likely to hear card"),
     ("__my_signal__", "show_my_signal", "my_signal_position", "📶", "My Signal", "where your signal is heard card"),
     ("__hotspot_health__", "show_hotspot_health", "hotspot_health_position", "🩺", "Hotspot Health", "uptime, temperature and reboots card"),
     ("__sstv__", "show_sstv", "sstv_position", "🖼️", "SSTV", "last decoded SSTV image card"),
@@ -2343,6 +2354,47 @@ def _rig_status_block(settings: dict):
     rig = rig_client.status(settings.get("rig_host", ""), settings.get("rig_port", 4532))
     rig["send_mode"] = bool(settings.get("rig_send_mode", True))
     return rig
+
+@app.route("/api/shortwave")
+def api_shortwave():
+    """Shortwave card: HFCC + EiBi broadcast schedules (see shortwave.py),
+    what's on now / starting soon / pirates / time signals, each scored
+    for how likely it is to be heard at settings.station_grid. The HF
+    Conditions card's cached band ratings feed the score when available."""
+    settings = load_settings()
+    qth = grid_to_latlon(settings.get("station_grid", ""))
+    report = shortwave_client.report(qth, hf_conditions.get())
+    if report is None:
+        return jsonify({"error": "Shortwave schedules are unavailable right now"}), 503
+    report["qth_set"] = qth is not None
+    report["rig"] = _rig_status_block(settings)
+    return jsonify(report)
+
+@app.route("/api/shortwave/schedule")
+def api_shortwave_schedule():
+    """Every broadcast aimed at North America, for the Shortwave drawer's
+    All stations tab."""
+    rows = shortwave_client.schedule()
+    if rows is None:
+        return jsonify({"error": "Shortwave schedules are unavailable right now"}), 503
+    return jsonify({"schedule": rows})
+
+@app.route("/api/shortwave/heard", methods=["POST"])
+def api_shortwave_heard():
+    """Mark (or un-mark, undo=true) a broadcast as heard; heard stations
+    score higher next time. Stored in shortwave_heard.json."""
+    data = request.json or {}
+    station = str(data.get("station") or "").strip()[:120]
+    try:
+        khz = float(data.get("khz"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "message": "khz required"}), 400
+    if not station:
+        return jsonify({"ok": False, "message": "station required"}), 400
+    count = shortwave_client.mark_heard(khz, station, undo=bool(data.get("undo")))
+    if count is None:
+        return jsonify({"ok": False, "message": "Couldn't save that"}), 500
+    return jsonify({"ok": True, "count": count})
 
 @app.route("/api/repeaters")
 def api_repeaters():
@@ -3219,6 +3271,8 @@ def _whats_available_groups(settings, hotspots):
              g("show_beacons"), "/setup?item=beacons#cards"),
             ("Nearby Repeaters", "hearham.com's open worldwide repeater directory",
              g("show_repeaters"), "/setup?item=repeaters#cards"),
+            ("Shortwave", "Broadcasts on the air now, ranked by how likely you are to hear them",
+             g("show_shortwave"), "/setup?item=shortwave#cards"),
             ("HF Conditions", "Solar/band propagation data, no API key needed",
              g("show_hf_conditions"), "/setup?item=hf_conditions#cards"),
             ("Band Activity", "Live WSPR spot activity near your station",

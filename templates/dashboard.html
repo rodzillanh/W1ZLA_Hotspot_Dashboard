@@ -2032,6 +2032,65 @@
         .rpt-foot { font-size: 10.5px; color: var(--text-dim); padding-top: 6px; margin-top: 4px; border-top: 1px solid var(--border-soft);
             line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .rpt-empty { color: var(--text-muted); font-size: 12px; text-align: center; padding: 34px 10px; }
+        /* --- Shortwave card (HFCC + EiBi, see shortwave.py) --- */
+        .sw-head-right { display: flex; align-items: center; gap: 8px; }
+        .sw-count { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--live); margin-left: 6px;
+            border: 1px solid color-mix(in srgb, var(--live) 40%, var(--border)); background: var(--live-dim);
+            padding: 1px 7px; border-radius: 999px; }
+        .sw-count:empty { display: none; }
+        .sw-filter-row { display: flex; justify-content: space-between; align-items: center; gap: 6px;
+            padding-bottom: 7px; border-bottom: 1px solid var(--border-soft); }
+        .sw-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+        .sw-chip { font: inherit; font-size: 10.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border);
+            background: transparent; color: var(--text-muted); cursor: pointer; }
+        .sw-chip b { font-family: var(--font-mono); font-weight: 600; color: var(--text-dim); margin-left: 4px; }
+        .sw-chip.on { color: var(--live); border-color: color-mix(in srgb, var(--live) 50%, var(--border)); background: var(--live-dim); }
+        .sw-chip.on b { color: var(--live); }
+        .sw-filter-row select { background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border); border-radius: 6px;
+            font: inherit; font-size: 10.5px; padding: 2px 6px; cursor: pointer; }
+        .sw-list { height: 170px; overflow-y: auto; overflow-x: hidden; margin: 4px -4px 0; padding: 0 4px;
+            scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+        .sw-list::-webkit-scrollbar { width: 8px; }
+        .sw-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; border: 2px solid var(--panel); }
+        .sw-row { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 6px 4px; border-radius: 6px; }
+        .sw-row + .sw-row { border-top: 1px solid var(--border-soft); }
+        .sw-row:hover { background: var(--panel-2); }
+        .sw-row.here { background: color-mix(in srgb, var(--live) 9%, transparent); }
+        .sw-row.later { opacity: .7; }
+        .sw-tune { font-family: var(--font-mono); font-size: 11.5px; font-weight: 650; color: var(--live); background: transparent;
+            border: 1px solid color-mix(in srgb, var(--live) 45%, var(--border)); border-radius: 6px; padding: 3px 0; cursor: pointer;
+            text-align: center; font-variant-numeric: tabular-nums; width: 100%; display: block; }
+        .sw-tune small { font-size: 8.5px; font-weight: 600; opacity: .75; margin-left: 2px; }
+        .sw-tune:hover { background: var(--live-dim); }
+        .sw-tune.off { color: var(--text-muted); border-color: var(--border); cursor: default; }
+        .sw-tune.off:hover { background: transparent; }
+        .sw-tune.pending { color: var(--caution); }
+        .sw-tune.ok { color: var(--good); border-color: var(--good); }
+        .sw-tune.err { color: var(--danger); border-color: var(--danger); }
+        .sw-row.here .sw-tune:not(.off) { background: var(--live); color: var(--panel); }
+        .sw-tune2 { display: flex; gap: 3px; }
+        .sw-tune2 .sw-tune.alt { width: 30px; flex: none; font-size: 9px; }
+        .sw-main { min-width: 0; }
+        .sw-top { display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+        .sw-stn { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+        .sw-lang { font-size: 10px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; min-width: 0; }
+        .sw-sub { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+        .sw-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+        .sw-odds { font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 5px;
+            border-radius: 4px; border: 1px solid var(--border); color: var(--text-dim); cursor: help; white-space: nowrap; }
+        .sw-odds.likely { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--border)); background: var(--good-dim); }
+        .sw-odds.possible { color: var(--caution); border-color: color-mix(in srgb, var(--caution) 45%, var(--border)); background: var(--caution-dim); }
+        .sw-heard { font: inherit; font-size: 9.5px; color: var(--text-dim); background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
+        .sw-heard:hover { color: var(--text); text-decoration: underline; }
+        .sw-heard.on { color: var(--live); }
+        .sw-src { font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; color: var(--text-dim); }
+        .sw-foot { font-size: 10px; color: var(--text-dim); padding-top: 6px; margin-top: 4px; border-top: 1px solid var(--border-soft);
+            display: flex; justify-content: space-between; gap: 8px; }
+        .sw-foot span:last-child { cursor: help; }
+        .sw-grp { font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--text-muted); margin: 12px 0 4px;
+            display: flex; justify-content: space-between; }
+        .sw-grp span { font-family: var(--font-mono); letter-spacing: 0; color: var(--text-dim); }
+        #sw-d-list .sw-row { grid-template-columns: 70px minmax(0, 1fr) auto; }
 
         /* --- SSTV card (v4.91) -- mockup-approved: the last decoded picture
            + a little metadata, in four states (resting / receiving /
@@ -4191,6 +4250,26 @@
             <div class="rpt-foot">Source: <a href="https://hearham.com" target="_blank" rel="noopener">hearham.com</a> — within {{ settings.get('repeaters_radius_mi', 50) }} mi.</div>
         </div>
         {% endif %}
+        {% if settings.get('show_shortwave', False) %}
+        <div class="metrics-card" id="shortwave-card"
+             style="order:{{ settings.get('shortwave_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name" title="Shortwave broadcasts from the HFCC and EiBi schedules, ranked by how likely you are to hear them at your grid square. Hover a Likely / Possible / Long shot badge for the reasons.">📻 Shortwave<span class="sw-count" id="sw-count"></span></div>
+                <div class="sw-head-right">
+                    {% if settings.get('rig_control_enabled', False) %}
+                    <span class="rp-pill" id="sw-rig-pill" style="display:none"><span class="d"></span><span id="sw-rig-pill-txt">rig</span></span>
+                    {% endif %}
+                    <button class="pota-gear" type="button" onclick="openShortwaveDrawer()">☰ Browse</button>
+                </div>
+            </div>
+            <div class="sw-filter-row">
+                <div class="sw-chips" id="sw-chips"></div>
+                <select id="sw-band" aria-label="Band" onchange="swSetBand(this.value)"><option value="">All bands</option></select>
+            </div>
+            <div class="sw-list" id="sw-list"><div class="rpt-empty">Loading schedules…</div></div>
+            <div class="sw-foot" id="sw-foot"></div>
+        </div>
+        {% endif %}
         {% if settings.get('show_sstv', False) %}
         <div class="metrics-card" id="sstv-card"
              style="order:{{ settings.get('sstv_position', 0) }}">
@@ -4603,6 +4682,7 @@
 <div class="hs-drawer" id="health-drawer"></div>
 <div class="hs-drawer" id="my-signal-drawer"></div>
 <div class="hs-drawer" id="sstv-drawer"></div>
+<div class="hs-drawer" id="shortwave-drawer"></div>
 
 <!-- ASL Control's "Disconnect all links on this node" confirm dialog
      (v4.8) -- a standalone overlay, not one more hs-drawer, since it
@@ -4729,6 +4809,7 @@ const RIG_PANEL_PAGE         = {{ settings.get('rig_panel_page', 1) }};
 const QRZ_QUICK_LOG_PAGE     = {{ settings.get('qrz_quick_log_page', 1) }};
 const BEACONS_PAGE           = {{ settings.get('beacons_page', 1) }};
 const REPEATERS_PAGE         = {{ settings.get('repeaters_page', 1) }};
+const SHORTWAVE_PAGE         = {{ settings.get('shortwave_page', 1) }};
 const HOTSPOT_HEALTH_PAGE    = {{ settings.get('hotspot_health_page', 1) }};
 const MY_SIGNAL_PAGE         = {{ settings.get('my_signal_page', 1) }};
 const SHOW_MY_SIGNAL         = {{ 'true' if settings.get('show_my_signal', False) else 'false' }};
@@ -4851,6 +4932,9 @@ const BEACONS_POSITION = {{ settings.get('beacons_position', 0) }};
 const SHOW_REPEATERS = {{ 'true' if settings.get('show_repeaters', False) else 'false' }};
 const REPEATERS_POSITION = {{ settings.get('repeaters_position', 0) }};
 const REPEATERS_POLL_MS = 60000;  // hearham's backend cache is 24h; no need to re-poll faster than this
+const SHOW_SHORTWAVE = {{ 'true' if settings.get('show_shortwave', False) else 'false' }};
+const SHORTWAVE_POSITION = {{ settings.get('shortwave_position', 0) }};
+const SHORTWAVE_POLL_MS = 120000;  // the schedule only changes on the half hour; scoring is cheap server-side
 const SHOW_SSTV = {{ 'true' if settings.get('show_sstv', False) else 'false' }};
 const SSTV_POSITION = {{ settings.get('sstv_position', 0) }};
 const SSTV_POLL_MS = 3000;
@@ -5437,7 +5521,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     recentcontacts: '__recent_contacts__', qsostats: '__qso_stats__',
     topactivity: '__top_activity__', pota: '__pota__', dvswitch: '__dvswitch__',
     hffav: '__hf_favorites__', rigpanel: '__rig_panel__', qrzquicklog: '__qrz_quick_log__',
-    beacons: '__beacons__', repeaters: '__repeaters__', sstv: '__sstv__', hotspothealth: '__hotspot_health__', mysignal: '__my_signal__',
+    beacons: '__beacons__', repeaters: '__repeaters__', shortwave: '__shortwave__', sstv: '__sstv__', hotspothealth: '__hotspot_health__', mysignal: '__my_signal__',
     wfwebpacket: '__wfweb_packet__',
 };
 function sentinelDataIp(key) {
@@ -5698,6 +5782,9 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (SHOW_REPEATERS && REPEATERS_PAGE === page) {
         sentinels.push({ key: 'repeaters', pos: Math.max(0, REPEATERS_POSITION) });
     }
+    if (SHOW_SHORTWAVE && SHORTWAVE_PAGE === page) {
+        sentinels.push({ key: 'shortwave', pos: Math.max(0, SHORTWAVE_POSITION) });
+    }
     if (SHOW_MY_SIGNAL && MY_SIGNAL_PAGE === page) {
         sentinels.push({ key: 'mysignal', pos: Math.max(0, MY_SIGNAL_POSITION) });
     }
@@ -5794,6 +5881,8 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (beaconsCard && 'beacons' in sentinelOrders) { moveIfNeeded(beaconsCard, cardsOuter); beaconsCard.style.order = sentinelOrders.beacons; }
     const repeatersCard = document.getElementById('repeaters-card');
     if (repeatersCard && 'repeaters' in sentinelOrders) { moveIfNeeded(repeatersCard, cardsOuter); repeatersCard.style.order = sentinelOrders.repeaters; }
+    const shortwaveCard = document.getElementById('shortwave-card');
+    if (shortwaveCard && 'shortwave' in sentinelOrders) { moveIfNeeded(shortwaveCard, cardsOuter); shortwaveCard.style.order = sentinelOrders.shortwave; }
     const mySignalCard = document.getElementById('my-signal-card');
     if (mySignalCard && 'mysignal' in sentinelOrders) { moveIfNeeded(mySignalCard, cardsOuter); mySignalCard.style.order = sentinelOrders.mysignal; }
     const hotspotHealthCard = document.getElementById('hotspot-health-card');
@@ -12816,6 +12905,325 @@ if (SHOW_REPEATERS) {
     setInterval(fetchRepeaters, REPEATERS_POLL_MS);
 }
 
+// --- Shortwave card (HFCC + EiBi broadcast schedules) -- see shortwave.py.
+// Every row comes scored from /api/shortwave; the card only filters, sorts
+// and renders. Tune buttons and "Heard" buttons carry their values in
+// data-* attributes (station names contain apostrophes -- the onclick
+// string-interpolation trap documented in CLAUDE.md). Everything here is
+// prefixed sw* (one shared script scope; a same-named helper silently
+// replaces an earlier one).
+let swData = null;
+let swView = 'likely';            // likely | all | pirates | time
+let swBand = '';
+let swTunedKhz = null;            // last tune from this card, used when there's no live rig frequency
+const swHeardThisTab = new Set(); // marked heard in this tab, so a second tap undoes it
+let swDrawerTab = 'now';
+let swDrawerSearch = '';
+let swSchedule = null;
+try { swView = localStorage.getItem('sw-view') || 'likely'; } catch (e) {}
+try { swBand = localStorage.getItem('sw-band') || ''; } catch (e) {}
+
+const SW_ODDS_LABEL = { likely: 'Likely', possible: 'Possible', longshot: 'Long shot' };
+
+function swKey(r) { return Math.round(r.khz) + '|' + r.station; }
+function swKhzText(k) { k = +k; return Number.isInteger(k) ? String(k) : k.toFixed(1); }
+function swUtcMinutes() { const d = new Date(); return d.getUTCHours() * 60 + d.getUTCMinutes(); }
+function swHhmmToMin(s) { return (+s.slice(0, 2)) * 60 + (+s.slice(2)); }
+function swDur(m) { return m < 60 ? m + 'm' : Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : ''); }
+function swRigKhz() {
+    if (typeof rigPanelData !== 'undefined' && rigPanelData && rigPanelData.reachable && rigPanelData.freq_hz) {
+        return rigPanelData.freq_hz / 1000;
+    }
+    return swTunedKhz;
+}
+function swRigOk() {
+    const rig = swData && swData.rig;
+    return RIG_CONTROL_ENABLED && !!(rig && rig.reachable);
+}
+function swWhenText(r) {
+    if (r.starts_in != null) return 'starts in ' + swDur(r.starts_in);
+    if (r.range_khz) return '';
+    if (r.on_air === false) return r.start + '–' + r.stop + 'Z';
+    if (r.start === '0000' && (r.stop === '2400' || r.stop === '0000')) return 'all day';
+    let left = (swHhmmToMin(r.stop === '0000' ? '2400' : r.stop) - swUtcMinutes() + 1440) % 1440;
+    if (left === 0) left = 1440;
+    return left <= 60 ? left + 'm left' : 'till ' + r.stop + 'Z';
+}
+
+function swTuneButtons(r, rigOk) {
+    const k = swKhzText(r.khz);
+    const one = (mode, cls, label) => rigOk
+        ? `<button class="sw-tune${cls}" type="button" data-khz="${r.khz}" data-mode="${mode}" title="Tune the rig to ${k} kHz ${mode}" onclick="swTune(this)">${label}</button>`
+        : `<span class="sw-tune off${cls}" title="Turn on rig control (Settings → Integrations) to tune with a tap">${label}</span>`;
+    const main = one('AM', '', `${k}<small>AM</small>`);
+    return r.alt_mode ? `<div class="sw-tune2">${main}${one(r.alt_mode, ' alt', r.alt_mode)}</div>` : main;
+}
+
+function swRowHtml(r, rigOk) {
+    const rigKhz = swRigKhz();
+    const here = rigKhz != null && Math.abs(rigKhz - r.khz) < 1;
+    const heardN = r.heard || 0;
+    const sub = [
+        r.aimed_elsewhere ? (r.aimed_elsewhere === 'elsewhere' ? 'aimed elsewhere' : 'aimed at ' + r.aimed_elsewhere) : '',
+        r.range_khz ? r.range_khz[0] + '–' + r.range_khz[1] + ' kHz' : r.site,
+        r.kw ? r.kw + ' kW' : '',
+        r.dist_mi != null && !r.range_khz ? r.dist_mi.toLocaleString() + ' mi' : '',
+        r.note || '',
+        r.note ? '' : (r.days || ''),
+        swWhenText(r),
+    ].filter(Boolean).map(escapeHtml).join(' · ');
+    const srcTitle = 'Listed by ' + (r.srcs || []).join(' + ') + (r.start ? ` · ${r.start}–${r.stop} UTC` : '');
+    const odds = r.odds ? `<span class="sw-odds ${r.odds}" title="${escapeHtml((r.why || []).join(' · '))}">${SW_ODDS_LABEL[r.odds]}</span>` : '';
+    return `<div class="sw-row${here ? ' here' : ''}${r.on_air === false ? ' later' : ''}">
+        ${swTuneButtons(r, rigOk)}
+        <div class="sw-main">
+            <div class="sw-top"><span class="sw-stn" title="${escapeHtml(srcTitle)}">${escapeHtml(r.station)}</span><span class="sw-lang">${escapeHtml(r.lang || '')}</span></div>
+            <div class="sw-sub">${sub}</div>
+        </div>
+        <div class="sw-right">${odds}
+            <button class="sw-heard${heardN ? ' on' : ''}" type="button" data-khz="${r.khz}" data-station="${escapeHtml(r.station)}"
+                title="${heardN ? `You've marked this heard ${heardN}×. Tap again to undo.` : 'Heard it? Stations you mark rank higher next time.'}"
+                onclick="swMarkHeard(this)">${heardN ? 'Heard' + (heardN > 1 ? ' ×' + heardN : '') : 'Heard?'}</button>
+        </div>
+    </div>`;
+}
+
+function swRowsForView(view) {
+    if (!swData) return [];
+    let rows;
+    if (view === 'pirates') rows = swData.pirates || [];
+    else if (view === 'time') rows = swData.time_signals || [];
+    else if (view === 'all') rows = swData.now || [];
+    else rows = (swData.now || []).filter(r => r.odds !== 'longshot');
+    if (swBand && (view === 'likely' || view === 'all')) rows = rows.filter(r => r.band === swBand);
+    return rows;
+}
+
+function renderShortwaveCard() {
+    const listEl = document.getElementById('sw-list');
+    if (!listEl || !swData) return;
+    const nowRows = swData.now || [];
+    const counts = {
+        likely: nowRows.filter(r => r.odds !== 'longshot').length,
+        all: nowRows.length,
+        pirates: (swData.pirates || []).length,
+        time: (swData.time_signals || []).length,
+    };
+    const labels = { likely: 'Likely here', all: 'All on air', pirates: 'Pirates', time: 'Time signals' };
+    document.getElementById('sw-chips').innerHTML = Object.keys(labels).map(v =>
+        `<button class="sw-chip${swView === v ? ' on' : ''}" type="button" onclick="swSetView('${v}')">${labels[v]}<b>${counts[v]}</b></button>`
+    ).join('');
+    const bandSel = document.getElementById('sw-band');
+    const bands = [...new Set(nowRows.map(r => r.band).filter(Boolean))]
+        .sort((a, b) => parseInt(b) - parseInt(a));
+    if (swBand && !bands.includes(swBand)) swBand = '';
+    // Rebuild the options only when the band list changes: replacing them
+    // every minute would snap shut a dropdown someone has open.
+    const bandSig = bands.join(',');
+    if (bandSel.dataset.sig !== bandSig) {
+        bandSel.innerHTML = '<option value="">All bands</option>' + bands.map(b => `<option value="${b}">${b}</option>`).join('');
+        bandSel.dataset.sig = bandSig;
+    }
+    if (bandSel.value !== swBand) bandSel.value = swBand;
+    bandSel.style.display = (swView === 'likely' || swView === 'all') ? '' : 'none';
+    document.getElementById('sw-count').textContent = nowRows.length + ' on air';
+
+    const pill = document.getElementById('sw-rig-pill');
+    if (pill) {
+        const rig = swData.rig;
+        pill.style.display = rig ? '' : 'none';
+        if (rig) {
+            pill.classList.toggle('live', !!rig.reachable);
+            document.getElementById('sw-rig-pill-txt').textContent = rig.reachable ? (rig.rig || 'rig ready') : 'rig offline';
+        }
+    }
+
+    const rows = swRowsForView(swView);
+    const rigOk = swRigOk();
+    if (!rows.length) {
+        const msg = {
+            likely: 'Nothing likely on the air right now. Try “All on air”.',
+            all: 'Nothing on the air' + (swBand ? ' on ' + swBand : '') + ' right now.',
+            pirates: 'No pirate listings for North America.',
+            time: 'No time-signal stations listed.',
+        }[swView];
+        listEl.innerHTML = `<div class="rpt-empty">${msg}</div>`;
+    } else {
+        listEl.innerHTML = rows.map(r => swRowHtml(r, rigOk)).join('');
+    }
+
+    const m = swData.meta || {};
+    const winterNote = m.eibi_season && m.current_season && m.eibi_season !== m.current_season
+        ? ` (EiBi ${m.current_season.toUpperCase()} not out yet)` : '';
+    const where = swData.qth_set ? (swData.qth_dark ? 'Dark here' : 'Daylight here') : 'Set your grid square for “likely”';
+    document.getElementById('sw-foot').innerHTML =
+        `<span>${escapeHtml(where)}</span><span title="HFCC ${escapeHtml((m.hfcc_season || '?').toUpperCase())} + EiBi ${escapeHtml((m.eibi_season || '?').toUpperCase())}${escapeHtml(winterNote)}">HFCC + EiBi · ${escapeHtml(swData.utc || '')} UTC</span>`;
+}
+
+function swSetView(v) {
+    swView = v;
+    try { localStorage.setItem('sw-view', v); } catch (e) {}
+    renderShortwaveCard();
+}
+function swSetBand(b) {
+    swBand = b;
+    try { localStorage.setItem('sw-band', b); } catch (e) {}
+    renderShortwaveCard();
+}
+
+// Same /api/rig_tune route as the Spots/Beacons chips, but a bespoke fetch
+// rather than rigTune(): that helper rewrites the button's label with an
+// MHz figure, and these buttons keep their kHz label.
+function swTune(btn) {
+    if (!btn || btn.classList.contains('pending')) return;
+    const khz = parseFloat(btn.dataset.khz);
+    const mode = btn.dataset.mode || 'AM';
+    btn.classList.add('pending');
+    fetch('/api/rig_tune', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ freq_hz: Math.round(khz * 1000), mode: mode }),
+    }).then(r => r.json()).then(d => {
+        btn.classList.remove('pending');
+        btn.classList.add(d.ok ? 'ok' : 'err');
+        rigToast(d.ok ? ('Rig → ' + d.message) : ('Tune failed: ' + (d.message || 'rig server error')), d.ok ? 'ok' : 'err');
+        if (d.ok) {
+            swTunedKhz = khz;
+            renderShortwaveCard();
+            renderShortwaveDrawerList();
+        }
+    }).catch(() => {
+        btn.classList.remove('pending');
+        btn.classList.add('err');
+        rigToast('Tune failed: no response from the dashboard', 'err');
+    }).finally(() => setTimeout(() => btn.classList.remove('ok', 'err'), 2200));
+}
+
+function swMarkHeard(btn) {
+    const khz = parseFloat(btn.dataset.khz);
+    const station = btn.dataset.station;
+    const key = Math.round(khz) + '|' + station;
+    const undo = swHeardThisTab.has(key);
+    fetch('/api/shortwave/heard', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ khz: khz, station: station, undo: undo }),
+    }).then(r => r.json()).then(d => {
+        if (!d.ok) { rigToast(d.message || 'Couldn’t save that', 'err'); return; }
+        if (undo) swHeardThisTab.delete(key); else swHeardThisTab.add(key);
+        // Update every copy of this row we hold, then re-render; the next
+        // poll re-scores it server-side with the new count.
+        const all = [].concat(swData ? (swData.now || []) : [], swData ? (swData.soon || []) : [],
+            swData ? (swData.pirates || []) : [], swData ? (swData.time_signals || []) : []);
+        all.forEach(r => { if (swKey(r) === key) r.heard = d.count; });
+        renderShortwaveCard();
+        renderShortwaveDrawerList();
+    }).catch(() => rigToast('Couldn’t save that: no response from the dashboard', 'err'));
+}
+
+function fetchShortwave() {
+    if (!SHOW_SHORTWAVE) return;
+    fetch('/api/shortwave').then(r => r.json()).then(data => {
+        if (data.error) {
+            const el = document.getElementById('sw-list');
+            if (el && !swData) el.innerHTML = `<div class="rpt-empty">${escapeHtml(data.error)}</div>`;
+            return;
+        }
+        swData = data;
+        renderShortwaveCard();
+        renderShortwaveDrawerList();
+    }).catch(() => {});
+}
+
+// --- Shortwave drawer: On air now / Coming up / All stations, with search ---
+function openShortwaveDrawer() {
+    closeAllDrawers();
+    swDrawerTab = 'now';
+    swDrawerSearch = '';
+    const d = document.getElementById('shortwave-drawer');
+    d.classList.add('open');
+    document.getElementById('hs-drawer-backdrop').classList.add('open');
+    renderShortwaveDrawer();
+}
+function swSetDrawerTab(t) {
+    swDrawerTab = t;
+    renderShortwaveDrawer();
+    if (t === 'all' && !swSchedule) {
+        fetch('/api/shortwave/schedule').then(r => r.json()).then(d => {
+            swSchedule = d.schedule || [];
+            renderShortwaveDrawerList();
+        }).catch(() => {});
+    }
+}
+function renderShortwaveDrawer() {
+    const d = document.getElementById('shortwave-drawer');
+    if (!d || !d.classList.contains('open')) return;
+    const tab = (id, label) => `<div class="pota-d-tab${swDrawerTab === id ? ' on' : ''}" onclick="swSetDrawerTab('${id}')">${label}</div>`;
+    // Shell built once per open / tab switch, never per poll, so the search
+    // box keeps focus and caret while the list refreshes under it.
+    d.innerHTML = `
+        <div class="hs-drawer-header">
+            <div class="hs-drawer-title-row">
+                <div class="hs-drawer-title">📻 Shortwave schedule</div>
+                <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
+            </div>
+            <div class="hs-drawer-sub">Broadcasts listed by HFCC and EiBi, ranked for your grid square</div>
+            <div class="pota-d-tabs">${tab('now', 'On air now')}${tab('soon', 'Coming up')}${tab('all', 'All stations')}</div>
+        </div>
+        <div class="hs-drawer-body">
+            <div class="pota-d-search">
+                <span class="ic">⌕</span>
+                <input type="text" id="sw-d-search" placeholder="Search station, language or kHz" autocomplete="off"
+                       value="${escapeHtml(swDrawerSearch)}" oninput="swDrawerSearch=this.value; renderShortwaveDrawerList()">
+                <span class="clr" onclick="swDrawerSearch=''; document.getElementById('sw-d-search').value=''; renderShortwaveDrawerList()">✕</span>
+            </div>
+            <div id="sw-d-list"></div>
+        </div>`;
+    renderShortwaveDrawerList();
+}
+function swMatches(r, term) {
+    if (!term) return true;
+    return (r.station + ' ' + (r.lang || '') + ' ' + swKhzText(r.khz) + ' ' + (r.site || '')).toLowerCase().includes(term);
+}
+function renderShortwaveDrawerList() {
+    const el = document.getElementById('sw-d-list');
+    if (!el) return;
+    const term = swDrawerSearch.trim().toLowerCase();
+    const rigOk = swRigOk();
+    if (swDrawerTab === 'all') {
+        if (!swSchedule) { el.innerHTML = '<div class="rpt-empty">Loading…</div>'; return; }
+        const rows = swSchedule.filter(r => swMatches(r, term));
+        el.innerHTML = rows.length
+            ? `<div class="sw-grp">${rows.length} broadcasts aimed at North America</div>` + rows.slice(0, 300).map(r => `
+                <div class="sw-row">
+                    ${swTuneButtons(r, rigOk)}
+                    <div class="sw-main"><div class="sw-top"><span class="sw-stn">${escapeHtml(r.station)}</span><span class="sw-lang">${escapeHtml(r.lang || '')}</span></div>
+                    <div class="sw-sub">${[r.site, r.band, r.start + '–' + r.stop + 'Z', r.days].filter(Boolean).map(escapeHtml).join(' · ')}</div></div>
+                    <div class="sw-right"><span class="sw-src">${(r.srcs || []).join('+')}</span></div>
+                </div>`).join('') + (rows.length > 300 ? '<div class="rpt-empty">Showing the first 300. Search to narrow it down.</div>' : '')
+            : '<div class="rpt-empty">No matches.</div>';
+        return;
+    }
+    if (!swData) { el.innerHTML = '<div class="rpt-empty">Loading…</div>'; return; }
+    if (swDrawerTab === 'soon') {
+        const rows = (swData.soon || []).filter(r => swMatches(r, term));
+        if (!rows.length) { el.innerHTML = '<div class="rpt-empty">Nothing starting in the next three hours.</div>'; return; }
+        const groups = {};
+        rows.forEach(r => { (groups[r.start] = groups[r.start] || []).push(r); });
+        el.innerHTML = Object.keys(groups).sort((a, b) => groups[a][0].starts_in - groups[b][0].starts_in).map(st =>
+            `<div class="sw-grp">Starts ${st} UTC<span>${groups[st].length}</span></div>` +
+            groups[st].sort((a, b) => b.score - a.score).map(r => swRowHtml(r, rigOk)).join('')).join('');
+        return;
+    }
+    const rows = (swData.now || []).filter(r => swMatches(r, term));
+    el.innerHTML = rows.length ? rows.map(r => swRowHtml(r, rigOk)).join('') : '<div class="rpt-empty">No matches.</div>';
+}
+
+if (SHOW_SHORTWAVE) {
+    fetchShortwave();
+    setInterval(fetchShortwave, SHORTWAVE_POLL_MS);
+    // "12m left" counts down between polls without another request.
+    setInterval(() => { if (swData) renderShortwaveCard(); }, 60000);
+}
+
 // --- SSTV card (v4.91) -- see sstv_rx.py / sstv_controller.py. Receive-
 // only: the card shows the last decoded picture; the controller behind it
 // decides when the rig is idle enough to tune to the SSTV frequency.
@@ -14445,6 +14853,7 @@ function closeAllDrawers() {
     document.getElementById('health-drawer').classList.remove('open');
     document.getElementById('my-signal-drawer').classList.remove('open');
     document.getElementById('sstv-drawer').classList.remove('open');
+    document.getElementById('shortwave-drawer').classList.remove('open');
     document.getElementById('hs-drawer-backdrop').classList.remove('open');
 }
 function closeHotspotDrawer() { closeAllDrawers(); }

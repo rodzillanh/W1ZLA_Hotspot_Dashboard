@@ -915,6 +915,15 @@
                      id="repeaters-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show Shortwave card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (shortwave broadcasts on the air now from the HFCC and EiBi schedules, ranked by how likely you are to hear them at your station grid, plus pirates and time signals. Tap a frequency to tune the rig when rig control is set up)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_shortwave', False) else '' }}"
+                     id="shortwave-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show SSTV card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (receive-only slow-scan TV decoder -- shows the last picture heard through wfweb. Needs the wfweb host under Settings → Integrations. Automatic retuning to 14.230 MHz is a separate opt-in inside the card's ⚙ drawer and needs Rig control set up)
@@ -1108,6 +1117,7 @@
             {% set qrz_quick_log_pos = settings.get('qrz_quick_log_position', 0) if (settings.get('show_qrz_quick_log', False) and settings.get('qrz_quick_log_page', 1) == page) else -1 %}
             {% set beacons_pos = settings.get('beacons_position', 0) if (settings.get('show_beacons', False) and settings.get('beacons_page', 1) == page) else -1 %}
             {% set repeaters_pos = settings.get('repeaters_position', 0) if (settings.get('show_repeaters', False) and settings.get('repeaters_page', 1) == page) else -1 %}
+            {% set shortwave_pos = settings.get('shortwave_position', 0) if (settings.get('show_shortwave', False) and settings.get('shortwave_page', 1) == page) else -1 %}
             {% set my_signal_pos = settings.get('my_signal_position', 0) if (settings.get('show_my_signal', False) and settings.get('my_signal_page', 1) == page) else -1 %}
             {% set hotspot_health_pos = settings.get('hotspot_health_position', 0) if (settings.get('show_hotspot_health', False) and settings.get('hotspot_health_page', 1) == page) else -1 %}
             {% set sstv_pos = settings.get('sstv_position', 0) if (settings.get('show_sstv', False) and settings.get('sstv_page', 1) == page) else -1 %}
@@ -1277,6 +1287,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">🗼 Nearby Repeaters</span>
                     <span class="node-meta">nearby repeater directory card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == shortwave_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__shortwave__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">📻 Shortwave</span>
+                    <span class="node-meta">broadcasts you're likely to hear card</span>
                 </div>
                 {% endif %}
                 {% if loop.index0 == my_signal_pos %}
@@ -2913,6 +2930,7 @@ function saveCards() {
             show_qrz_quick_log: document.getElementById('qrz-quick-log-toggle').classList.contains('on'),
             show_beacons: document.getElementById('beacons-toggle').classList.contains('on'),
             show_repeaters: document.getElementById('repeaters-toggle').classList.contains('on'),
+            show_shortwave: document.getElementById('shortwave-toggle').classList.contains('on'),
             show_hotspot_health: document.getElementById('hotspot-health-toggle').classList.contains('on'),
             show_my_signal: document.getElementById('my-signal-toggle').classList.contains('on'),
             health_warm_c: parseInt(document.getElementById('health-warm-c').value, 10) || 70,
@@ -3102,6 +3120,7 @@ const SENTINEL_POSITION_FIELDS = [
     ['__qrz_quick_log__', 'qrz_quick_log_position'],
     ['__beacons__', 'beacons_position'],
     ['__repeaters__', 'repeaters_position'],
+    ['__shortwave__', 'shortwave_position'],
     ['__hotspot_health__', 'hotspot_health_position'],
     ['__my_signal__', 'my_signal_position'],
     ['__sstv__', 'sstv_position'],
@@ -4867,7 +4886,7 @@ if (location.hash) {
         top_activity: 'top-activity-toggle', pota: 'pota-toggle',
         hf_favorites: 'hf-favorites-toggle', rig_panel: 'rig-panel-toggle',
         qrz_quick_log: 'qrz-quick-log-toggle', beacons: 'beacons-toggle',
-        repeaters: 'repeaters-toggle', sstv: 'sstv-toggle', dvswitch: 'dvswitch-card-toggle', hotspot_health: 'hotspot-health-toggle', my_signal: 'my-signal-toggle',
+        repeaters: 'repeaters-toggle', shortwave: 'shortwave-toggle', sstv: 'sstv-toggle', dvswitch: 'dvswitch-card-toggle', hotspot_health: 'hotspot-health-toggle', my_signal: 'my-signal-toggle',
         aprs_inbox: 'aprs-inbox-toggle', hamalert_card: 'hamalert-toggle',
         fleet_alerts: 'fleet-alerts-toggle', digipi_card: 'digipi-toggle',
         starlink_trains: 'starlink-trains-toggle',

@@ -305,6 +305,13 @@ nearby.py          BrandmeisterDirectory + AslDirectory for Pocket Dash's
                    Nearby screen (a PHONE's position, not the station's). See
                    the "Nearby (v4.98)" gotcha below.
 
+shortwave.py       ShortwaveClient for the Shortwave card: HFCC + EiBi broadcast
+                   schedules (both free, no auth), cached daily in
+                   CONFIG_DIR/shortwave, merged into one row per broadcast and
+                   scored for how likely each is to be heard at station_grid.
+                   "Heard" marks live in shortwave_heard.json. See the
+                   "Shortwave card (v5.10)" gotcha below.
+
 host_stats.py, weather.py
                    Small standalone pollers (host CPU/mem, Open-Meteo).
                    host_stats.py also has is_pi_standalone() (checks
@@ -8510,6 +8517,46 @@ config for per-integration credentials; put it in
   - The composer is left out of the Notifications card's page-2 mirror
     (`mirrorNotificationsToP2` strips it) -- a copy would share its ids.
     The route calls `_control_gate()` like every other transmit action.
+
+- **Shortwave card (v5.10, `shortwave.py`)** -- mockup-approved, both
+  sources downloaded and parsed live before writing it.
+  - **HFCC's file is fixed-column**; offsets come from its own header
+    ruler (MOD at 93, LANGUAGE 102, ADM 113, BRC 117). Only `MOD == "D"`
+    (AM) rows are kept. DAYS uses 1=Sunday, confirmed by matching Radio
+    Exterior de Espana's "23456" 1900-0400 entry to EiBi's "Tu-Sa".
+    `https://www.hfcc.org` failed from the dev box; plain `http://` works.
+  - **Don't use HFCC's azimuth column for "aimed here"**: 0 also means an
+    omnidirectional antenna, and a first version flagged Chinese domestic
+    stations (Lhasa, Urumqi; antenna type 925, azimuth 0) as aimed at New
+    England. "Aimed at North America" is CIRAF zones 1-11 (HFCC) or EiBi
+    target codes NAm/ENA/CNA/WNA/Am/USA/CAN/Car/Glo. The zone mapping is
+    inferred from the data plus one web reference, not the ITU's own map.
+  - **Merging the two sources needs three checks**: start within 15 min,
+    same transmitter country (HFCC ADM vs. EiBi's host country, the
+    "/USA" in a relay's remark), and known sites within 300 mi. A looser
+    "times overlap on the same kHz" test gave WRMI's and WBCQ's slots the
+    names of unrelated programmes aired on the same frequency at other
+    hours, and a Brazilian pirate's name to a Chinese transmitter.
+  - **EiBi has no "broadcast vs. utility" field.** Utility modes are
+    language codes starting with "-" (-TY RTTY, -HF HFDL, -TS time
+    signals). Voice utilities (coast guard, volmet, military) are dropped
+    by frequency: only rows inside `BROADCAST_BANDS` (widened for US
+    private stations at 5085/5130/5850/7490-7780/9265/9330 kHz) are kept.
+    Pirates are EiBi rows with "pirate" in the name or USA + remark "xx".
+  - **New seasons appear late**: on 2026-10-25 (B26 start) HFCC's b26
+    file existed but EiBi's `sked-b26.csv` was a 404, so each source falls
+    back to the previous season independently and the footer tooltip says
+    which season is in use.
+  - **"Likely" is a heuristic score**, not a propagation model (aimed
+    here, power, distance and skip zone, dark/daylit fraction of the great
+    circle via a NOAA sun-elevation formula, the HF Conditions card's band
+    rating, and the operator's own Heard marks). Every factor appends a
+    plain-language reason shown in the badge tooltip; keep that true if
+    the weights change.
+  - Card buttons carry kHz/mode/station in `data-*` attributes (station
+    names have apostrophes -- the onclick-interpolation gotcha above).
+    Tuning uses its own fetch, not `rigTune()`, since that helper rewrites
+    the button label with an MHz figure.
 
 No test suite/framework is set up — verification has been done ad hoc but
 consistently with this pattern; reuse it for any nontrivial change:

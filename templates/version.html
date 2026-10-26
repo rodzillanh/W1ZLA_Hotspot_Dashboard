@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v5.9</span>
+                <span class="release-version">v5.10</span>
                 <span class="release-date">October 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>Shortwave card</span> &mdash; shortwave broadcasts on the air right now, from the two public schedules broadcasters and listeners use: HFCC (what broadcasters register each season) and EiBi (a volunteer list that adds stations HFCC misses, such as Radio Habana Cuba and most US private stations). The default view ranks them by how likely you are to hear them at your grid square, with a Likely / Possible / Long shot badge whose tooltip gives the reasons: aimed at North America or not, transmitter power, distance, whether the path is dark or daylit, and the HF Conditions card's band rating. Tap a frequency to tune the rig in AM. Other views: everything on air, pirates (the usual 43 m frequencies plus named regulars, with AM and USB tune buttons) and time signals (WWV, WWVH, CHU). Tap Heard? on a row and that station ranks higher next time. The Browse drawer adds Coming up (the next three hours) and every station with search. Both schedules download once a day; a new season's file is used as soon as it's published. Turn it on under Settings &rarr; Cards</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v5.9</span>
+                <span class="release-date">October 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>Adjacent-link counts for AllStarLink nodes</span> &mdash; shows how busy whatever node you're currently linked to is right now, not just that you're linked to it: its own Rx% and link count, pulled from stats.allstarlink.org (the same call the ASL Favorites tiles already make, now extended to any currently-linked node, favorite or not). Shows as a small pill in the hotspot's own detail-drawer Linked nodes list, and folded into the compact card's existing hover tooltip. No setting to turn on &mdash; it's there whenever a linked node has data on file, and respects the same 30 req/min rate limit as the existing ASL Favorites stats</li>

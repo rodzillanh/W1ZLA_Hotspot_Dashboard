@@ -1498,6 +1498,48 @@ miles, adjustable under Settings → Integrations) around your
 - Same drag-and-drop **Card order** placement as every other extra card.
 
 <!-- wiki-group: Optional Cards -->
+## Shortwave card
+
+Optional dashboard card (Settings → Cards → "Show Shortwave card", off by
+default) — shortwave broadcasts on the air right now, from two free public
+schedules:
+
+- [HFCC](http://www.hfcc.org/data/) — the schedule international and US
+  private broadcasters register each season (frequency, times, site, power,
+  target zones).
+- [EiBi](http://www.eibispace.de/) — Eike Bierwirth's volunteer list, which
+  adds stations HFCC misses (Radio Habana Cuba, most US private stations'
+  everyday names, pirates, time signals).
+
+What the card does:
+
+- **Likely here** (the default view) ranks everything on the air by how
+  likely you are to hear it at your `station_grid`. Each row gets a
+  **Likely / Possible / Long shot** badge; hover it for the reasons:
+  whether the broadcast is aimed at North America, transmitter power,
+  distance (including the night-time skip zone on 41 m and up), whether the
+  path is dark or daylit right now, and the [HF Conditions](#hf-conditions-card)
+  band rating. It's a prediction, not a guarantee.
+- **All on air**, **Pirates** and **Time signals** views, plus a band picker.
+  Pirates shows the usual 6850–6985 kHz frequencies and named regulars from
+  EiBi; most have no fixed schedule. Pirate rows get both AM and USB tune
+  buttons, since many pirates run USB.
+- **Tap a frequency to tune the rig** in AM when
+  [Rig control](#rig-control-rigctld) is set up. The row you're tuned to is
+  highlighted.
+- **Heard?** — tap it when you hear a station; stations you've marked rank
+  higher next time. Tap again in the same browser tab to undo.
+- **☰ Browse** opens a drawer with On air now, Coming up (the next three
+  hours) and All stations, all searchable by station, language or kHz.
+
+Both schedules download once a day into the config folder
+(`shortwave/`). A new season starts on the last Sunday of March and of
+October; until a source publishes its new season's file, the card keeps
+using the previous one and says so in the footer tooltip. Digital (DRM)
+broadcasts and utility stations (coast guard, aviation, navy, fax) are left
+out.
+
+<!-- wiki-group: Optional Cards -->
 ## SSTV card
 <!-- wiki-image: sstv-card.png -->
 
