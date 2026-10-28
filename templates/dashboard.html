@@ -13238,7 +13238,7 @@ if (SHOW_SHORTWAVE) {
     setInterval(() => { if (swData) renderShortwaveCard(); }, 60000);
     if (RIG_CONTROL_ENABLED) {
         fetchShortwaveRig();
-        setInterval(() => { if (!document.hidden) fetchShortwaveRig(); }, 5000);
+        setInterval(() => { if (!document.hidden) fetchShortwaveRig(); }, 2000);
     }
 }
 

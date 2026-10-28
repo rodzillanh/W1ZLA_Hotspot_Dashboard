@@ -8558,8 +8558,10 @@ config for per-integration credentials; put it in
     Tuning uses its own fetch, not `rigTune()`, since that helper rewrites
     the button label with an MHz figure.
   - **The "you're on this one" highlight reads the radio, not the last
-    tap** (`/api/shortwave/rig`, polled every 5 s): wfweb's native
-    frequency first, then rigctld's cached probe, then the last frequency
+    tap** (`/api/shortwave/rig`, polled every 2 s): wfweb's native
+    frequency first, then the Rig Panel poller's 1 s snapshot, then a
+    rigctld read cached only 2 s (`rig_client.status()`'s own 20 s cache
+    made a hand-turned dial lag up to ~25 s -- a real report), then the last frequency
     tapped on the card. The first version only used the Rig Panel's data
     (absent unless that card or Quick Log is on) or the last tap, so a
     radio retuned by hand stayed "highlighted" on the old row -- a real
