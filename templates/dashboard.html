@@ -3119,10 +3119,13 @@
         .hs-link-row.monitor .hs-link-dot { background: var(--caution); }
         .hs-link-node { font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); width: 52px; flex-shrink: 0; }
         .hs-link-body { flex: 1; min-width: 0; }
-        .hs-link-call { font-weight: 600; font-size: 13px; color: var(--text); }
+        .hs-link-call { display: block; font-weight: 600; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* Link duration + that node's own stats, on their own line under the
+           description -- as separate fixed-width columns they squeezed the
+           callsign to nothing and it overlapped them. */
+        .hs-link-meta { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
         .hs-link-desc { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .hs-link-duration { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); flex-shrink: 0; margin-right: 2px; }
-        .hs-link-adjacent { font-size: 10px; color: var(--text-dim); font-family: var(--font-mono); flex-shrink: 0; margin-right: 2px; }
+        .hs-link-duration, .hs-link-adjacent { white-space: nowrap; }
         /* Mode badge (v4.11, extended v4.13) -- was a bare raw RPT_ALINKS
            letter (T/R/L/C) unconditionally for every row; now a friendly
            word, only shown for the non-default modes (Transceive, the
@@ -13882,9 +13885,8 @@ function openHotspotDrawer(hotspotId) {
                     <div class="hs-link-body">
                         ${callHtml}
                         ${desc ? `<div class="hs-link-desc">${escapeHtml(desc)}</div>` : ''}
+                        ${(durHtml || adjHtml) ? `<div class="hs-link-meta">${durHtml}${durHtml && adjHtml ? ' · ' : ''}${adjHtml}</div>` : ''}
                     </div>
-                    ${durHtml}
-                    ${adjHtml}
                     ${modeHtml}
                     <button class="hs-link-action-btn" data-linked="true" data-node="${escapeHtml(n.node)}" onclick="hotspotLinkAction(this)">Disconnect</button>
                 </div>`;
