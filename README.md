@@ -809,46 +809,45 @@ everything else (Settings → Hotspots) — one position for the whole card,
 same as Hotspot Activity/ASL Favorites, not one per node.
 
 <!-- wiki-group: Hotspot Types -->
-## ASL3 live audio-level VU meter
+## ASL3 receiver meter and RX/TX lights
 <!-- wiki-image: hotspot-card-asl3.png -->
 
-An optional, real (not synthetic) VU meter for ASL3 hotspot cards. WPSD/
-openSPOT4 cards already have one driven by RSSI/BER/dejitter telemetry —
-ASL3 has none of that (it's IAX2/Asterisk, not a radio modem), so this
-taps the node's own repeater audio directly instead.
+An optional live meter for ASL3 hotspot cards. WPSD/openSPOT4 cards
+already have one driven by RSSI/BER/dejitter telemetry; ASL3 has none of
+that (it's IAX2/Asterisk, not a radio modem), so this reads the radio
+interface directly instead. The card shows:
 
-**One-time setup per node**, run *on the node itself* over SSH:
+- **RX** lights while your radio is receiving a signal (COS).
+- **TX** lights while your radio is transmitting (PTT).
+- A meter of the received audio's deviation, with 3 kHz and 5 kHz marks
+  and an approximate kHz readout. It rests at zero when nothing is being
+  received, and it only measures what your radio hears, not what it
+  transmits.
 
-```
-sudo bash provision-audio-meter.sh <your-node-number>
-```
+Turn it on per hotspot: tick **"Receiver meter + RX/TX"** (Settings →
+Hotspots → edit the node, or the card's own gear-icon drawer). There's
+nothing to install on the node. The dashboard reads the same two displays
+the SimpleUSB tune menu and ASL's own web admin use
+(`susb tune menu-support b` and `v`), over the SSH login already stored
+for that hotspot. Both are display-only and change nothing on the node.
 
-This loads four Asterisk modules (already present on a stock ASL3 build,
-just not loaded by default) and installs a small, isolated dialplan file
-of its own — it never edits your existing `extensions.conf`/`modules.conf`
-content, only appends an `#include` line and a `load =>` line if they're
-not already there. Safe to re-run. Then, back in the dashboard, tick
-**"Live audio-level VU meter"** for that hotspot (Settings → Hotspots →
-edit the node, or the card's own gear-icon drawer).
+SimpleUSB nodes are supported. A USBRadio node should work too (the
+dashboard falls back to the `radio` command prefix) but hasn't been
+tested.
 
-No SSH credentials or ports to configure beyond what's already there —
-the dashboard triggers a `ChanSpy`/`AudioSocket` dialplan call over the
-same SSH login already stored for that hotspot, and tunnels the audio
-back to itself over that same connection (an SSH reverse port forward),
-so nothing new needs opening on your network or firewall.
-
-The meter updates several times a second, not just once per poll cycle,
-so it visibly tracks real signal dynamics rather than stepping between
-infrequent samples.
-
-Confirmed working live against real hardware (see CLAUDE.md for the full
-diagnostic story) — as a one-time sanity check after provisioning a new
-node, this should show at most one matched pair while the meter is
-active, and none while idle:
+To check a node by hand, run this while keyed; it should print about 10
+frames a second (and nothing while unkeyed):
 
 ```
-sudo asterisk -rx "core show channels concise" | grep dashboard-audiospy
+sudo timeout 3 asterisk -rx "susb tune menu-support b" | tr '
+' '
+' | grep -c '>'
 ```
+
+If you set up the old version of this meter with `provision-audio-meter.sh`,
+its dialplan file (`/etc/asterisk/dashboard-audiospy-<node>.conf`), the
+`#include` line for it in `extensions.conf` and the `load =>` lines it
+added to `modules.conf` are no longer used and can be removed.
 
 <!-- wiki-group: Hotspot Types -->
 ## openSPOT 4 (SharkRF) nodes
@@ -1089,6 +1088,10 @@ below, any ASL3 hotspot's own card):
   format directly, for anyone migrating from an existing AllScan setup.
 - **AllScan link** — jumps straight to that node's own AllScan control
   panel, if it's running one, at `http://<node ip>/allscan`.
+- **ASL Node Admin link** — opens AllStarLink's own web admin
+  (asl-web-ui, ASL3 on Debian 13) at `https://<node ip>/asl-web-ui/`, if
+  it's installed. It logs in with a Linux account in the `asl-web-ui`
+  group.
 
 **Connect / Disconnect** runs `asterisk -rx "rpt cmd <node> ilink <code>
 <remotenode>"` over the same SSH connection already used for polling.

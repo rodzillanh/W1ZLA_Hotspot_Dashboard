@@ -2373,8 +2373,8 @@
             <div style="grid-column:1/-1;display:flex;align-items:center">
                 <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
                     <input type="checkbox" id="hs-audio-meter-enabled">
-                    Live audio-level VU meter
-                    <span style="font-size:10px;color:var(--text-dim)">(real signal level from the node's own repeater audio, not RSSI/BER — needs provision-audio-meter.sh run against this node first; see README)</span>
+                    Receiver meter + RX/TX
+                    <span style="font-size:10px;color:var(--text-dim)">(your radio's receive level plus RX/TX lights, read from the SimpleUSB driver over SSH — nothing to install on the node)</span>
                 </label>
             </div>
         </div>

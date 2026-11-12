@@ -573,11 +573,9 @@ def api_data():
 @app.route("/api/audio_level")
 def api_audio_level():
     """Cheap in-memory read of every audio_meter_enabled ASL3 node's
-    current level (see asl_audio.py) -- no SSH, no network call per
-    request, just a lock-guarded dict read. Polled by the browser on its
-    own fast (~250ms) interval, decoupled from /api/data's 3s cycle, so
-    the VU meter actually tracks live audio instead of stepping between
-    infrequent samples the way a WPSD card's RSSI-driven meter does."""
+    receiver level and RX/TX (COS/PTT) state (see asl_audio.py) -- no SSH
+    per request, just a lock-guarded dict read. Polled by the browser
+    every ~250ms, decoupled from /api/data's 3s cycle."""
     return jsonify(audio_manager.snapshot())
 
 @app.route("/api/map_data")
@@ -1806,13 +1804,10 @@ def setup():
             sa818_conf_path = request.form.get("sa818_conf_path", "").strip()
             if sa818_conf_path and re.match(config.SA818_CONF_PATH_PATTERN, sa818_conf_path):
                 new_hotspot["sa818_conf_path"] = sa818_conf_path
-            # Live audio-level VU meter (see asl_audio.py) -- opt-in, same
+            # Receiver meter + RX/TX (see asl_audio.py) -- opt-in, same
             # "absent means off" checkbox convention as dvswitch_enabled
-            # above. Needs the node to have already been provisioned via
-            # provision-audio-meter.sh; the toggle itself is harmless to
-            # flip on an unprovisioned node (the worker just retries with
-            # backoff, same degrade-gracefully contract as every other
-            # integration here).
+            # above. Nothing to provision on the node; a non-SimpleUSB
+            # node just leaves the worker retrying with backoff.
             new_hotspot["audio_meter_enabled"] = "audio_meter_enabled" in request.form
         elif node_type == "openspot4":
             new_hotspot["type"] = "openspot4"

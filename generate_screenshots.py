@@ -368,7 +368,7 @@ with app.monitor._lock:
 # behavior -- same trick already used for the ASL Favorites "recently
 # active" state screenshot (see CLAUDE.md). Keyed by id, not ip, matching
 # AslAudioManager.snapshot()'s real shape.
-app.audio_manager.snapshot = lambda: {_ip_to_id[HOTSPOT_ASL3["ip"]]: {"level_dbfs": -26.0, "connected": True}}
+app.audio_manager.snapshot = lambda: {_ip_to_id[HOTSPOT_ASL3["ip"]]: {"level_pct": 48.0, "level_cols": 36, "connected": True, "cos": True, "ptt": False}}
 
 # Same idea for the POTA card's rig-control pill / tap-to-tune chips:
 # /api/pota calls rig_client.status(), which can only ever fail against a

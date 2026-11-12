@@ -117,9 +117,20 @@
 
         <div class="release">
             <div class="release-header">
+                <span class="release-version">v5.11</span>
+                <span class="release-date">November 2026</span>
+                <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL3 receiver meter and RX/TX lights</span> &mdash; the ASL3 card's meter now reads the SimpleUSB driver's own receive-level and status displays (the same ones the tune menu and ASL's new web admin use) over the SSH login the dashboard already has. <b>RX</b> lights while your radio receives a signal, <b>TX</b> while it transmits, and the meter shows the received deviation with 3 kHz and 5 kHz marks. It replaces the ChanSpy/AudioSocket tap, so there's nothing to provision on the node any more and no more gaps every few seconds; <code>provision-audio-meter.sh</code> is gone. Turn it on with "Receiver meter + RX/TX" in the hotspot's settings. SimpleUSB nodes; USBRadio untested</li>
+                <li><span>ASL Node Admin link</span> &mdash; the ASL Control drawer has an "Open ASL Node Admin" button next to the AllScan one, opening AllStarLink's new web admin (asl-web-ui) at <code>https://&lt;node&gt;/asl-web-ui/</code></li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
                 <span class="release-version">v5.10</span>
                 <span class="release-date">October 2026</span>
-                <span class="release-tag">current</span>
             </div>
             <ul class="change-list">
                 <li><span>Shortwave card</span> &mdash; shortwave broadcasts on the air right now, from the two public schedules broadcasters and listeners use: HFCC (what broadcasters register each season) and EiBi (a volunteer list that adds stations HFCC misses, such as Radio Habana Cuba and most US private stations). The default view ranks them by how likely you are to hear them at your grid square, with a Likely / Possible / Long shot badge whose tooltip gives the reasons: aimed at North America or not, transmitter power, distance, whether the path is dark or daylit, and the HF Conditions card's band rating. Tap a frequency to tune the rig in AM. Other views: everything on air, pirates (the usual 43 m frequencies plus named regulars, with AM and USB tune buttons) and time signals (WWV, WWVH, CHU). Tap Heard? on a row and that station ranks higher next time. The Browse drawer adds Coming up (the next three hours) and every station with search. Both schedules download once a day; a new season's file is used as soon as it's published. Turn it on under Settings &rarr; Cards</li>

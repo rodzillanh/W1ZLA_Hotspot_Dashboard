@@ -5552,6 +5552,26 @@ config for per-integration credentials; put it in
        point-in-time check) before believing the gaps are actually as
        brief/tolerable as intended.
 
+- **SUPERSEDED (v5.11): the ChanSpy + AudioSocket meter above is gone.**
+  `asl_audio.py` now reads SimpleUSB's own tune-menu displays over the
+  existing SSH login -- `susb tune menu-support b` (RX level bar) and
+  `v` (COS in / CTCSS in / COS out / PTT out) -- the same ones ASL's new
+  web admin (asl-web-ui, Nov 2026) reads. Confirmed live on W1ZLA/node
+  59929 (2026-11): both stream one record per carriage return; `b` sends
+  frames ONLY while the receiver is open (0 frames in 10 s unkeyed, 98 in
+  10 s keyed), so "no frames" means zero, not a fault -- connection health
+  comes from `v`, which streams constantly. Bar = "|" + "="*n + ">" in a
+  75-column field, 3 kHz at column 32, 5 kHz at 49 (the kHz readout
+  interpolates between those and is approximate). PTT Out has only ever
+  been seen "Clear" live, so anything but Clear/Off counts as on. Both
+  remote commands run under `timeout` (ASL_METER_CMD_MAX_SEC) and restart.
+  `provision-audio-meter.sh` and every ASL_AUDIO_* dialplan/tunnel
+  constant were removed. USBRadio ("radio" prefix) is an untested
+  fallback. The `audio_meter_enabled` key and `/api/audio_level` route kept
+  their names; the response is now `{connected, level_pct, level_cols,
+  cos, ptt}`. The ASL Control drawer also gained an "Open ASL Node Admin"
+  link to `https://<ip>/asl-web-ui/`.
+
 - **Every hotspot now has its own generated `id`, independent of `ip` --
   `ip` stopped being an identity key anywhere in this app and went back to
   meaning exactly one thing: the SSH/HTTP connection target.** Prompted by
