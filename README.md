@@ -1502,6 +1502,7 @@ miles, adjustable under Settings → Integrations) around your
 
 <!-- wiki-group: Optional Cards -->
 ## Shortwave card
+<!-- wiki-image: shortwave-card.png -->
 
 Optional dashboard card (Settings → Cards → "Show Shortwave card", off by
 default) — shortwave broadcasts on the air right now, from two free public

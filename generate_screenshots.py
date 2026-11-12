@@ -134,6 +134,9 @@ SETTINGS = {
     # SSTV card (v4.91) -- shows the seeded picture below; no wfweb here, so
     # it reads as Standby/last-image, which is exactly the resting view.
     "show_sstv": True,
+    # Shortwave card (v5.10) -- downloads the real HFCC/EiBi schedules (free,
+    # no auth) on first request, same "real free API" treatment as above.
+    "show_shortwave": True,
     # Pocket Dash notification feed sources that need no network/credentials
     # (their events are canned in the phone capture below, not real).
     "fleet_alerts_enabled": True,
@@ -556,6 +559,7 @@ CARD_SHOTS = [
     ("my-signal-card", "my-signal-card.png"),
     ("hotspot-health-card", "hotspot-health-card.png"),
     ("notifications-card", "notifications-card.png"),
+    ("shortwave-card", "shortwave-card.png"),
 ]
 
 with sync_playwright() as p:
