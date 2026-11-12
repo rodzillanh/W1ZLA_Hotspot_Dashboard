@@ -171,6 +171,20 @@
     .rw-chip.on i { background:var(--live); }
     .rw-chip b { font-family:var(--font-mono); font-size:10px; }
     .rw-hl { font-family:var(--font-mono); font-size:10.5px; color:var(--text-dim); white-space:nowrap; }
+    /* ASL3 receiver meter + RX/TX lights (v5.11, asl_audio.py via /api/audio_level).
+       Updated in place by id between the 3s card re-renders. */
+    .rxtx {
+        flex:0 0 auto; font-family:var(--font-mono); font-size:9.5px; font-weight:700; padding:1px 6px;
+        border-radius:20px; border:1px solid var(--border); background:var(--panel-2); color:var(--text-dim);
+    }
+    .rxtx.rx-on { border-color:var(--live); background:var(--live-dim); color:var(--live); }
+    .rxtx.tx-on { border-color:var(--danger); background:var(--danger-dim); color:var(--danger); }
+    .am { display:flex; align-items:center; gap:8px; margin-top:8px; padding-left:16px; }
+    .am-bar { position:relative; flex:1; height:5px; border-radius:3px; background:var(--panel-2); }
+    .am-fill { position:absolute; left:0; top:0; bottom:0; width:0; border-radius:3px; background:var(--good); transition:width .15s linear; }
+    .am-fill.hot { background:var(--caution); }
+    .am-mark { position:absolute; top:-3px; bottom:-3px; width:1px; background:var(--text-dim); }
+    .am-val { flex:0 0 auto; width:38px; text-align:right; font-family:var(--font-mono); font-size:10.5px; color:var(--text-muted); }
     .card-more { display:grid; grid-template-rows:0fr; transition:grid-template-rows .24s ease; }
     .card.open .card-more { grid-template-rows:1fr; }
     .card-more > div { overflow:hidden; }
@@ -1683,6 +1697,7 @@
         }).map(function (x) { return x[0]; });
         host.innerHTML = ordered.map(cardHtml).join("");
         tickTimers();  // fill [data-ts] spans now, not up to 1s later on the next interval
+        applyAudioLevels();
         // keep the long-press outline on across a poll re-render (PR 6)
         if (_lpHid && document.getElementById("lp-sheet").classList.contains("open")) {
             var armed = host.querySelector('.card[data-hid="' + _lpHid + '"]');
@@ -1763,8 +1778,17 @@
         var chipsHtml = chipRow.map(function (c) {
             return '<span class="rw-chip' + (c[2] ? " on" : "") + '"><i></i><b>' + esc(c[0]) + "</b> " + esc(c[1]) + "</span>";
         }).join("");
-        var row2 = (chipsHtml || health)
-            ? '<div class="rw2"><div class="rw-chips">' + chipsHtml + '</div><span class="rw-hl">' + esc(health) + "</span></div>" : "";
+        var meterOn = isAsl && hs.audio_meter_enabled && !isAway && !isOffline;
+        var rxtxHtml = meterOn
+            ? '<span class="rxtx" id="rx-' + esc(hs.id) + '">RX</span><span class="rxtx" id="tx-' + esc(hs.id) + '">TX</span>' : "";
+        var row2 = (chipsHtml || health || rxtxHtml)
+            ? '<div class="rw2">' + rxtxHtml + '<div class="rw-chips">' + chipsHtml + '</div><span class="rw-hl">' + esc(health) + "</span></div>" : "";
+        if (meterOn) {
+            var mark = function (col) { return '<span class="am-mark" style="left:' + (col / AM_COLS * 100).toFixed(2) + '%"></span>'; };
+            row2 += '<div class="am"><div class="am-bar">' +
+                    '<span class="am-fill" id="am-' + esc(hs.id) + '"></span>' + mark(32) + mark(49) + '</div>' +
+                    '<span class="am-val" id="amv-' + esc(hs.id) + '">—</span></div>';
+        }
         return '<div class="card ' + cls + (open ? " open" : "") + '" data-hid="' + esc(hs.id) + '">' +
                '<button class="card-tap" type="button" aria-expanded="' + (open ? "true" : "false") + '" aria-controls="cm-' + esc(hs.id) + '">' +
                  '<div class="rw1"><span class="rw-dot"></span>' +
@@ -1812,6 +1836,42 @@
                        (n.keyed ? " · keyed" : "") + "</div>";
             }).join("") + "</div>";
     }
+
+    /* ---- ASL3 receiver meter + RX/TX (asl_audio.py) ----
+       Own fast poll, only while some ASL3 hotspot has the meter turned on
+       and the page is visible. level_pct is the ">" position in the node's
+       75-column RX bar, which marks 3 kHz at column 32 and 5 kHz at 49; the
+       kHz readout interpolates between those (approximate, hence "~"). Same
+       math as dashboard.html's aslKhzLabel() -- keep the two in sync. */
+    var AM_COLS = 75, audioLevels = {};
+    function amKhz(pct) {
+        var col = pct / 100 * AM_COLS;
+        if (col < 1) return "—";
+        var khz = col <= 32 ? col * 3 / 32 : 3 + (col - 32) * 2 / 17;
+        return "~" + khz.toFixed(1) + "k";
+    }
+    function applyAudioLevels() {
+        Object.keys(audioLevels).forEach(function (id) {
+            var e = audioLevels[id] || {}, live = !!e.connected;
+            var rx = document.getElementById("rx-" + id), tx = document.getElementById("tx-" + id);
+            var fill = document.getElementById("am-" + id), val = document.getElementById("amv-" + id);
+            if (rx) rx.classList.toggle("rx-on", live && e.cos === true);
+            if (tx) tx.classList.toggle("tx-on", live && e.ptt === true);
+            var pct = live ? (e.level_pct || 0) : 0;
+            if (fill) { fill.style.width = pct + "%"; fill.classList.toggle("hot", pct > 49 / AM_COLS * 100); }
+            if (val) val.textContent = live ? amKhz(pct) : "—";
+        });
+    }
+    function fetchAudioLevels() {
+        var wanted = (lastData || []).some(function (h) { return h.type === "asl3" && h.audio_meter_enabled; });
+        if (!wanted || document.hidden) { setTimeout(fetchAudioLevels, 1000); return; }
+        fetch("/api/audio_level")
+            .then(function (r) { return r.json(); })
+            .then(function (d) { audioLevels = d || {}; applyAudioLevels(); })
+            .catch(function () {})
+            .finally(function () { setTimeout(fetchAudioLevels, 300); });
+    }
+    fetchAudioLevels();
 
     /* ---- 1s timer tick (mirrors dashboard.html's approach: re-render on
        poll, but update elapsed-time spans every second by id/attr) ---- */
