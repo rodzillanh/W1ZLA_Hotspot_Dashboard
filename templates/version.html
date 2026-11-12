@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v5.11</span>
+                <span class="release-version">v5.12</span>
                 <span class="release-date">November 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>ASL3 meter shows transmit audio</span> &mdash; while the node is transmitting and not receiving, the ASL3 card's meter (desktop and Pocket Dash) now shows the audio going out to the radio: the last second's peak on a -40..0 dBFS scale, from the SimpleUSB driver's own transmit statistics (<code>susb tune menu-support z</code>). Link audio never passes the receiver, so before this the meter sat flat while TX was lit. Hover the readout for peak, average and clipped samples; it turns red if anything clipped. Updates once a second</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v5.11</span>
+                <span class="release-date">November 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>ASL3 receiver meter and RX/TX lights</span> &mdash; the ASL3 card's meter now reads the SimpleUSB driver's own receive-level and status displays (the same ones the tune menu and ASL's new web admin use) over the SSH login the dashboard already has. <b>RX</b> lights while your radio receives a signal, <b>TX</b> while it transmits, and the meter shows the received deviation with 3 kHz and 5 kHz marks. It replaces the ChanSpy/AudioSocket tap, so there's nothing to provision on the node any more and no more gaps every few seconds; <code>provision-audio-meter.sh</code> is gone. Turn it on with "Receiver meter + RX/TX" in the hotspot's settings. SimpleUSB nodes; USBRadio untested</li>

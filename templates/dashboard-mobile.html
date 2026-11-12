@@ -184,6 +184,8 @@
     .am-fill { position:absolute; left:0; top:0; bottom:0; width:0; border-radius:3px; background:var(--good); transition:width .15s linear; }
     .am-fill.hot { background:var(--caution); }
     .am-mark { position:absolute; top:-3px; bottom:-3px; width:1px; background:var(--text-dim); }
+    .am-bar.tx .am-mark { display:none; }
+    .am-val.clip { color:var(--danger); }
     .am-val { flex:0 0 auto; width:38px; text-align:right; font-family:var(--font-mono); font-size:10.5px; color:var(--text-muted); }
     .card-more { display:grid; grid-template-rows:0fr; transition:grid-template-rows .24s ease; }
     .card.open .card-more { grid-template-rows:1fr; }
@@ -1857,9 +1859,18 @@
             var fill = document.getElementById("am-" + id), val = document.getElementById("amv-" + id);
             if (rx) rx.classList.toggle("rx-on", live && e.cos === true);
             if (tx) tx.classList.toggle("tx-on", live && e.ptt === true);
-            var pct = live ? (e.level_pct || 0) : 0;
-            if (fill) { fill.style.width = pct + "%"; fill.classList.toggle("hot", pct > 49 / AM_COLS * 100); }
-            if (val) val.textContent = live ? amKhz(pct) : "—";
+            /* Receiving wins; otherwise, while transmitting, the bar is the
+               outgoing audio peak on a -40..0 dBFS scale (dashboard.html's
+               aslTxDbLabel() -- keep in sync). */
+            var isTx = live && e.cos !== true && e.tx_pct != null;
+            var pct = !live ? 0 : isTx ? e.tx_pct : (e.level_pct || 0);
+            var bar = fill && fill.parentNode;
+            if (bar) bar.classList.toggle("tx", isTx);
+            if (fill) { fill.style.width = pct + "%"; fill.classList.toggle("hot", isTx ? pct > 92 : pct > 49 / AM_COLS * 100); }
+            if (val) {
+                val.textContent = !live ? "—" : isTx ? (pct < 1 ? "—" : Math.round(-40 + pct * 0.4) + " dB") : amKhz(pct);
+                val.classList.toggle("clip", isTx && e.tx_clip > 0);
+            }
         });
     }
     function fetchAudioLevels() {

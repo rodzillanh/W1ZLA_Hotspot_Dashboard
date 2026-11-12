@@ -25,6 +25,18 @@ never sends input at all.
                              PTT Out has NOT yet been seen anything but
                              "Clear" live, so anything other than
                              "Clear"/"Off" counts as transmitting.
+                             (TX confirmed lighting live 2026-11-12 while
+                             a linked node was talking.)
+  susb tune menu-support z   Transmit audio statistics: while the node is
+                             transmitting, one line per second, e.g.
+                             "TxAudioStats: Pk  -7.3  Avg Pwr -19  Min -44
+                             Max -14  dBFS  ClipCnt 0" -- peak/average over
+                             the last second of audio sent to the radio
+                             (res_usbradio.c's ast_radio_print_audio_stats,
+                             50 x 20 ms frames). Prints "Tx not keyed" once
+                             when the transmitter drops. Confirmed live on
+                             node 59929 (2026-11-12). This is what shows
+                             link audio, which never passes the receiver.
 
 Replaces the earlier ChanSpy + AudioSocket tap (see CLAUDE.md), which
 needed a dialplan provisioned on the node and dropped every ~7-10 s.
@@ -51,6 +63,9 @@ _BAR_RE = re.compile(r"\|(=*)>")
 # Input ...") are skipped by the value check below.
 _STATUS_RE = re.compile(r"^\s*(\w+)\s*\|\s*(\w+)\s*\|\s*(\w+)\s*\|\s*(\w+)\s*$")
 _STATUS_VALUES = {"Keyed", "Clear", "Off", "On"}
+# One line of the "z" display.
+_TXSTATS_RE = re.compile(
+    r"TxAudioStats:\s*Pk\s*(-?[\d.]+)\s+Avg Pwr\s*(-?[\d.]+).*?ClipCnt\s*(\d+)")
 
 
 def _is_on(value: str) -> bool:
@@ -74,6 +89,10 @@ class _AslAudioWorker:
         self._cos = None
         self._ptt = None
         self._last_status_at = 0.0
+        self._tx_peak_db = None
+        self._tx_avg_db = None
+        self._tx_clip = 0
+        self._last_tx_at = 0.0
         self._thread = threading.Thread(target=self._loop, daemon=True)
 
     def start(self) -> None:
@@ -97,12 +116,24 @@ class _AslAudioWorker:
             connected = (now - self._last_status_at) <= config.ASL_AUDIO_STALE_SEC
             bar_fresh = (now - self._last_bar_at) <= config.ASL_METER_BAR_HOLD_SEC
             cols = self._level_cols if (connected and bar_fresh and self._cos is not False) else 0
+            # Transmit audio: one reading per second, so held a little
+            # longer than that before it counts as gone.
+            tx_fresh = (connected and self._tx_peak_db is not None
+                        and (now - self._last_tx_at) <= config.ASL_METER_TX_HOLD_SEC)
+            tx_pct = None
+            if tx_fresh:
+                floor = config.ASL_METER_TX_FLOOR_DB
+                tx_pct = round(max(0.0, min(1.0, (self._tx_peak_db - floor) / -floor)) * 100, 1)
             return {
                 "connected": connected,
                 "level_cols": cols,
                 "level_pct": round(cols / config.ASL_METER_BAR_COLS * 100, 1),
                 "cos": self._cos if connected else None,
                 "ptt": self._ptt if connected else None,
+                "tx_pct": tx_pct,
+                "tx_peak_db": self._tx_peak_db if tx_fresh else None,
+                "tx_avg_db": self._tx_avg_db if tx_fresh else None,
+                "tx_clip": self._tx_clip if tx_fresh else None,
             }
 
     def _loop(self) -> None:
@@ -114,6 +145,7 @@ class _AslAudioWorker:
             with self._lock:
                 self._cos = self._ptt = None
                 self._level_cols = 0
+                self._tx_peak_db = self._tx_avg_db = None
                 # A healthy stream that just ended (the remote `timeout`
                 # expiring) restarts at once; a failing one backs off.
                 healthy = time.time() - self._last_status_at < 5
@@ -135,16 +167,18 @@ class _AslAudioWorker:
                            timeout=config.SSH_TIMEOUT)
             transport = client.get_transport()
             chans = {}
-            for which in ("v", "b"):
+            for which in ("v", "b", "z"):
                 ch = transport.open_session()
                 ch.exec_command(self._cmd(which))
                 ch.settimeout(0.0)
                 chans[which] = ch
-            bufs = {"v": "", "b": ""}
+            bufs = {"v": "", "b": "", "z": ""}
             started = time.time()
             while not self._stop_event.is_set():
                 got = False
                 for which, ch in chans.items():
+                    if ch.closed:
+                        continue
                     try:
                         data = ch.recv(4096)
                     except Exception:
@@ -187,6 +221,19 @@ class _AslAudioWorker:
                 with self._lock:
                     self._level_cols = len(m.group(1))
                     self._last_bar_at = time.time()
+        elif which == "z":
+            for seg in parts:
+                if "Tx not keyed" in seg:
+                    with self._lock:
+                        self._tx_peak_db = self._tx_avg_db = None
+                    continue
+                tm = _TXSTATS_RE.search(seg)
+                if tm:
+                    with self._lock:
+                        self._tx_peak_db = float(tm.group(1))
+                        self._tx_avg_db = float(tm.group(2))
+                        self._tx_clip = int(tm.group(3))
+                        self._last_tx_at = time.time()
         else:
             for seg in parts:
                 sm = _STATUS_RE.match(seg)

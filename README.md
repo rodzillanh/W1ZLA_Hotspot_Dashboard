@@ -821,15 +821,22 @@ interface directly instead. The card shows:
 - **TX** lights while your radio is transmitting (PTT).
 - A meter of the received audio's deviation, with 3 kHz and 5 kHz marks
   and an approximate kHz readout. It rests at zero when nothing is being
-  received, and it only measures what your radio hears, not what it
-  transmits.
+  received.
+- While the node transmits (and isn't receiving), the same meter shows
+  the outgoing audio instead: the last second's peak on a -40..0 dBFS
+  scale. This is how link audio shows up: someone talking on a linked
+  node never passes through your receiver, so RX and the receive meter
+  stay flat while TX lights. Hover the readout for the peak, average and
+  clipped-sample count; it turns red if anything clipped. It updates
+  once a second, slower than the receive meter.
 
 Turn it on per hotspot: tick **"Receiver meter + RX/TX"** (Settings →
 Hotspots → edit the node, or the card's own gear-icon drawer). There's
-nothing to install on the node. The dashboard reads the same two displays
-the SimpleUSB tune menu and ASL's own web admin use
-(`susb tune menu-support b` and `v`), over the SSH login already stored
-for that hotspot. Both are display-only and change nothing on the node.
+nothing to install on the node. The dashboard reads the SimpleUSB tune
+menu's own displays (`susb tune menu-support b`, `v` and `z` -- receive
+level, RX/TX status and transmit audio), over the SSH login already
+stored for that hotspot. All three are display-only and change nothing
+on the node.
 
 SimpleUSB nodes are supported. A USBRadio node should work too (the
 dashboard falls back to the `radio` command prefix) but hasn't been
@@ -839,9 +846,14 @@ To check a node by hand, run this while keyed; it should print about 10
 frames a second (and nothing while unkeyed):
 
 ```
-sudo timeout 3 asterisk -rx "susb tune menu-support b" | tr '
-' '
-' | grep -c '>'
+sudo timeout 3 asterisk -rx "susb tune menu-support b" | tr '\r' '\n' | grep -c '>'
+```
+
+For the transmit side, run this while the node is transmitting; it
+prints one `TxAudioStats:` line a second:
+
+```
+sudo timeout 10 asterisk -rx "susb tune menu-support z"
 ```
 
 If you set up the old version of this meter with `provision-audio-meter.sh`,

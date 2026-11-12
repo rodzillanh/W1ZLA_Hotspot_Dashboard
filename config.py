@@ -23,7 +23,7 @@ def _version_tuple(v):
 # version number now, no new names get appended here. See
 # _LAST_NAMED_VERSION below for how APP_CODENAME resolves to None past
 # this list's last entry.
-APP_VERSION = "5.11"
+APP_VERSION = "5.12"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -331,6 +331,7 @@ DIGEST_HIGHLIGHTS = [
     ("5.10", ["New Shortwave card: broadcasts on the air now, ranked by how likely you are to hear them, with tap-to-tune"]),
     ("5.11", ["ASL3 cards: new receiver meter with RX/TX lights, nothing to install on the node",
               "ASL Control: link to AllStarLink's own Node Admin web page"]),
+    ("5.12", ["ASL3 meter now moves while your node transmits, so you can see link audio too"]),
 ]
 
 
@@ -857,6 +858,10 @@ ASL_METER_BAR_COLS = 75
 # The bar sends frames only while the receiver is open, ~10/s; with no
 # frame for this long the level reads zero.
 ASL_METER_BAR_HOLD_SEC = float(os.environ.get("ASL_METER_BAR_HOLD_SEC", 0.6))
+# Transmit audio level ("z" display, one reading per second): held this
+# long before it counts as gone, and drawn on a -40..0 dBFS peak scale.
+ASL_METER_TX_HOLD_SEC = 2.5
+ASL_METER_TX_FLOOR_DB = -40.0
 # Each remote `asterisk -rx` display runs under `timeout` this long, then
 # is restarted -- so one can never outlive a lost connection for long.
 ASL_METER_CMD_MAX_SEC = int(os.environ.get("ASL_METER_CMD_MAX_SEC", 600))

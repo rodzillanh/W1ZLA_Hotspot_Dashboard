@@ -188,6 +188,10 @@
         .vu-mark { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--text-dim); pointer-events: none; }
         .vu-mark::after { content: attr(data-k); position: absolute; top: 9px; left: 50%; transform: translateX(-50%); font-size: 8.5px; font-family: var(--font-mono); color: var(--text-dim); }
         .vu-meter-row.asl { margin-bottom: 18px; }
+        /* While transmitting, the bar is the outgoing audio peak (dBFS),
+           not receiver deviation, so the kHz marks don't apply. */
+        .vu-meter.tx .vu-mark { display: none; }
+        .meter-val.clip { color: var(--danger); }
         .rxtx-pill { flex-shrink: 0; font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 20px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text-dim); }
         .rxtx-pill.rx-on { border-color: var(--live); background: var(--live-dim); color: var(--live); }
         .rxtx-pill.tx-on { border-color: var(--danger); background: var(--danger-dim); color: var(--danger); }
@@ -5239,12 +5243,13 @@ let vuMeters = {};
 function vuMeterRow(ip, asl = false) {
     const segs = Array.from({ length: VU_SEGMENTS }, () => '<span class="vu-seg"></span>').join('');
     if (asl) {
-        // ASL3 receiver meter (asl_audio.py): RX/TX pills, then the
-        // receiver's deviation with the bar's own 3 kHz / 5 kHz marks.
+        // ASL3 meter (asl_audio.py): RX/TX pills, then the receiver's
+        // deviation with the bar's own 3 kHz / 5 kHz marks -- or, while
+        // the node transmits, the outgoing audio peak in dBFS.
         const m = (col, k) => `<span class="vu-mark" data-k="${k}" style="left:${(col / ASL_METER_BAR_COLS * 100).toFixed(2)}%"></span>`;
         return `<div class="vu-meter-row asl">
             <span class="rxtx-pill" id="rx-pill-${ip}" title="Your radio is receiving a signal (COS)">RX</span>
-            <span class="rxtx-pill" id="tx-pill-${ip}" title="Your radio is transmitting (PTT)">TX</span>
+            <span class="rxtx-pill" id="tx-pill-${ip}" title="Your radio is transmitting (PTT) -- the bar then shows the outgoing audio">TX</span>
             <div class="vu-meter" id="vu-${ip}">${segs}${m(32, '3k')}${m(49, '5k')}<span class="vu-peak" id="vu-peak-${ip}"></span></div>
             <span class="meter-val" id="vu-readout-${ip}" style="width:38px">—</span>
         </div>`;
@@ -5303,7 +5308,8 @@ function paintVu(ip, dt) {
         seg.style.background = i < lit ? vuZoneColor(i / segs.length) : 'var(--panel-2)';
     });
     if (peakEl) peakEl.style.left = `calc(${state.peak}% - 1px)`;
-    if (readoutEl) readoutEl.textContent = state.asl ? aslKhzLabel(state.value) : Math.round(state.value) + '%';
+    if (readoutEl) readoutEl.textContent = !state.asl ? Math.round(state.value) + '%'
+        : state.mode === 'tx' ? aslTxDbLabel(state.value) : aslKhzLabel(state.value);
 }
 
 // requestAnimationFrame, not a fixed setInterval -- the spring physics
@@ -5335,16 +5341,32 @@ function aslKhzLabel(pct) {
     return '~' + khz.toFixed(1) + 'k';
 }
 
+// While the node transmits, asl_audio.py's tx_pct is the last second's
+// audio PEAK on a -40..0 dBFS scale (SimpleUSB's "z" display) -- this is
+// what shows link audio, which never passes the receiver.
+const ASL_METER_TX_FLOOR_DB = -40;
+function aslTxDbLabel(pct) {
+    if (pct < 1) return '—';
+    return Math.round(ASL_METER_TX_FLOOR_DB + pct / 100 * -ASL_METER_TX_FLOOR_DB) + ' dB';
+}
+
 // Fed by its own fast poll, decoupled from the main 3s /api/data cycle.
 // The RX/TX pills are updated in place by id (renderCards() rebuilds the
 // card markup every 3s, so they're re-applied from aslRxTx right after).
-let aslRxTx = {};  // hotspot id -> {cos, ptt}
+let aslRxTx = {};  // hotspot id -> {cos, ptt, mode, tip, clip}
 function applyRxTx(id) {
     const st = aslRxTx[id] || {};
     const rx = document.getElementById('rx-pill-' + id);
     const tx = document.getElementById('tx-pill-' + id);
     if (rx) rx.classList.toggle('rx-on', st.cos === true);
     if (tx) tx.classList.toggle('tx-on', st.ptt === true);
+    const meter = document.getElementById('vu-' + id);
+    if (meter) meter.classList.toggle('tx', st.mode === 'tx');
+    const readout = document.getElementById('vu-readout-' + id);
+    if (readout) {
+        readout.classList.toggle('clip', !!st.clip);
+        readout.title = st.tip || '';
+    }
 }
 function fetchAudioLevels() {
     // Keyed by hotspot id, not ip -- two ASL3 entries can share an ip.
@@ -5357,13 +5379,22 @@ function fetchAudioLevels() {
         .then(levels => {
             enabledIds.forEach(key => {
                 const entry = levels[key];
-                const pct = entry && entry.connected ? entry.level_pct : null;
-                aslRxTx[key] = entry && entry.connected ? { cos: entry.cos, ptt: entry.ptt } : {};
+                const live = !!(entry && entry.connected);
+                // Receiving wins (a repeater both receives and transmits);
+                // otherwise show what's going out to the transmitter.
+                const mode = live && entry.cos !== true && entry.tx_pct != null ? 'tx' : 'rx';
+                const pct = !live ? null : mode === 'tx' ? entry.tx_pct : entry.level_pct;
+                const tip = mode === 'tx'
+                    ? `Transmit audio, last second: peak ${entry.tx_peak_db} dBFS, average ${entry.tx_avg_db} dBFS` +
+                      (entry.tx_clip ? `, ${entry.tx_clip} clipped samples` : '')
+                    : (live ? 'Receiver deviation (approximate)' : '');
+                aslRxTx[key] = live ? { cos: entry.cos, ptt: entry.ptt, mode, tip, clip: mode === 'tx' && entry.tx_clip > 0 } : {};
                 applyRxTx(key);
                 if (vuMeters[key]) {
                     vuMeters[key].pct = pct;
+                    vuMeters[key].mode = mode;
                 } else {
-                    vuMeters[key] = { pct, value: 0, velocity: 0, peak: 0, peakHoldT: 0, asl: true };
+                    vuMeters[key] = { pct, value: 0, velocity: 0, peak: 0, peakHoldT: 0, asl: true, mode };
                 }
             });
         })

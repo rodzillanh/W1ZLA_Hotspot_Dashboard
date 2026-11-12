@@ -5571,6 +5571,22 @@ config for per-integration credentials; put it in
   their names; the response is now `{connected, level_pct, level_cols,
   cos, ptt}`. The ASL Control drawer also gained an "Open ASL Node Admin"
   link to `https://<ip>/asl-web-ui/`.
+  **v5.12 added a third display, `z`** (transmit audio stats, read from
+  res_usbradio.c's `ast_radio_print_audio_stats`): one line a second while
+  the transmitter is keyed, `TxAudioStats: Pk -7.3  Avg Pwr -19  Min -44
+  Max -14  dBFS  ClipCnt 0` (peak/average over the last 50 x 20 ms
+  frames), and `Tx not keyed` once when it drops -- confirmed live on node
+  59929 with link audio (2026-11-12, the same capture that first showed
+  PTT Out reading "Keyed"). It exists because link audio never passes the
+  receiver: before it, the meter sat flat while TX was lit. The response
+  gained `tx_pct` (peak on a -40..0 dBFS scale, `ASL_METER_TX_FLOOR_DB`),
+  `tx_peak_db`/`tx_avg_db`/`tx_clip`, all null unless a reading arrived
+  within `ASL_METER_TX_HOLD_SEC` (2.5 s). Both templates show RX deviation
+  when COS is on (a repeater both receives and transmits) and the TX peak
+  otherwise -- dashboard.html's `aslTxDbLabel()` and the mobile
+  `applyAudioLevels()` duplicate that choice; keep them in sync. A node
+  version without `z` just never produces TX readings (its channel is
+  skipped once closed; only `v` decides whether the connection is alive).
 
 - **Every hotspot now has its own generated `id`, independent of `ip` --
   `ip` stopped being an identity key anywhere in this app and went back to
