@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html data-theme="{{ 'dark' if settings.dark_mode else 'light' }}">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Deck keys — {{ settings.dashboard_name }}</title>
+    <style>
+        /* Same instrument-panel tokens as version.html. Rendered from
+           deck.py's GUIDE -- edit the descriptions there, not here. */
+        :root {
+            --bg: #12151a; --card-bg: #1a1e25; --card-border: #2b313b;
+            --text: #eef0f2; --text-muted: #9aa2ad; --text-dim: #5b6470;
+            --accent: #ffb648; --link: #4fd8c4;
+            --live: #4fd8c4; --on: #3ddc84; --keyed: #f2545b; --warn: #f0c419;
+        }
+        [data-theme="light"] {
+            --bg: #eef1f4; --card-bg: #ffffff; --card-border: #dde2e8;
+            --text: #1b1f26; --text-muted: #5b6470; --text-dim: #98a1ab;
+            --accent: #c97a12; --link: #0e8f7d;
+            --live: #0e8f7d; --on: #1f9d5c; --keyed: #c93a44; --warn: #a8720a;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text);
+               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+               font-size: 14px; padding: 20px; max-width: 1100px; margin: 0 auto; }
+        a { color: var(--link); text-decoration: none; font-size: 13px; }
+        a:hover { text-decoration: underline; }
+        h1 { font-size: 18px; font-weight: 500; margin: 12px 0 6px; }
+        .lede { color: var(--text-muted); font-size: 13px; line-height: 1.5; margin-bottom: 12px; max-width: 80ch; }
+        .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px; }
+        .legend b { color: var(--text); font-weight: 600; }
+        .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+        .pages { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 500px), 1fr)); gap: 14px; }
+        .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px; padding: 14px; min-width: 0; }
+        .card h2 { font-size: 15px; font-weight: 600; display: flex; gap: 8px; align-items: baseline; }
+        .card h2 span { font-family: monospace; font-size: 11px; color: var(--accent); font-weight: 500; }
+        .for { font-size: 12px; color: var(--text-muted); margin: 2px 0 10px; }
+        .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        @media (max-width: 560px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        .k { border: 1px solid var(--card-border); border-radius: 7px; padding: 7px 8px; min-width: 0; }
+        .k h3 { font-size: 12.5px; margin-bottom: 3px; }
+        .k p { font-size: 11.5px; line-height: 1.4; color: var(--text-muted); }
+        .k p b { color: var(--keyed); }
+        .info { margin-top: 9px; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--card-border); padding-top: 8px; }
+        .info b { color: var(--text); font-weight: 500; }
+        .notes { margin-top: 16px; font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
+        .notes b { color: var(--text); }
+        .problem { color: var(--keyed); font-size: 12px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <a href="/">← Back to dashboard</a>
+    <a href="/version" style="margin-left:16px">🔍 Version info</a>
+    <h1>🎛️ Stream Deck keys</h1>
+    {% for p in problems %}<p class="problem">Guide out of date: {{ p }}</p>{% endfor %}
+    <p class="lede">Four pages on the Stream Deck Neo. The <b>right touch point</b> goes to the next page and the
+        <b>left</b> one goes back ({{ titles | join(' → ') }} → {{ titles[0] }}). Each key shows its state with
+        its background colour. After you tap a key it flashes <b>OK</b>, or <b>FAILED</b> with the reason for
+        3 seconds.{% if not enabled %} The Stream Deck is turned off right now: Settings → Integrations →
+        Stream Deck.{% endif %}</p>
+    <div class="legend">
+        <span><i class="sw" style="background:var(--live)"></i><b>Cyan</b> on the air / listening / monitoring</span>
+        <span><i class="sw" style="background:var(--on)"></i><b>Green</b> linked / on that frequency / on</span>
+        <span><i class="sw" style="background:var(--keyed)"></i><b>Red</b> someone keyed up now</span>
+        <span><i class="sw" style="background:var(--warn)"></i><b>Yellow</b> in progress / hold counting down</span>
+        <span><i class="sw" style="background:var(--text-dim)"></i><b>Grey text</b> nothing to do right now</span>
+    </div>
+    <div class="pages">
+        {% for page in pages %}
+        <section class="card">
+            <h2>{{ page.title }} <span>{{ loop.index }}/{{ pages | length }}</span></h2>
+            <p class="for">{{ page.for }}</p>
+            <div class="grid">
+                {% for name, desc in page.key_list %}
+                <div class="k"><h3>{{ name }}</h3><p>{{ desc | replace('HOLD', '<b>Hold</b>') | safe }}</p></div>
+                {% endfor %}
+            </div>
+            <p class="info">Info bar: <b>{{ page.info }}</b>.</p>
+        </section>
+        {% endfor %}
+    </div>
+    <p class="notes"><b>Hold keys</b> ({{ hold_keys }}) count down while you hold them. Let go early and they say
+        "Hold to confirm" and do nothing. <b>Changing what's on the keys:</b> favourites come from the dashboard
+        (ASL favourites, Brandmeister and D-STAR favourites). Change them there and the keys follow within a
+        second.</p>
+</body>
+</html>

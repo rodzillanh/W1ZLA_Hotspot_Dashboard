@@ -5649,8 +5649,15 @@ config for per-integration credentials; put it in
   that aren't registered yet). `step_page()` clears the key list so a press
   in the second before the new page is painted can't fire the old page's
   action. The W1AW table duplicates dashboard.html's `renderCwAir()` --
-  keep in sync. Not yet run against a real Companion/Neo: newline in
-  `text` and `size: 14` are unverified.
+  keep in sync. **The key guide (`/deck-guide`, linked from /version and
+  the Settings section) is rendered from `deck.GUIDE`, next to the
+  `_page_*` methods -- any change to what a key shows or does must update
+  its GUIDE entry in the same edit.** `check_guide()` flags a page/key count
+  mismatch on the guide page itself, but can't catch a stale description.
+  Confirmed on a real Neo + Companion 5.0.3: newlines in `text` work;
+  `size` must be "auto" (a number is scaled x2.1 and clips); only row 2
+  column 1 shows on the info bar; bgcolor needs the button's box layer
+  `usage: "color"` and `canModifyStyleInApis: true`.
 
 - **Every hotspot now has its own generated `id`, independent of `ip` --
   `ip` stopped being an identity key anywhere in this app and went back to

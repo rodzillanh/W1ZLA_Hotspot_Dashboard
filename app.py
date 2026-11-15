@@ -49,6 +49,7 @@ from wfweb_memory import WfwebMemoryClient
 from wfweb_packet import WfwebPacketClient
 from cw_copy import CwCopyService
 from deck import DeckController
+import deck as deck_module
 import wfweb_station
 from sstv_rx import SstvReceiver
 from sstv_controller import SstvController
@@ -3512,6 +3513,20 @@ def version_page():
     return render_template("version.html", settings=load_settings(), embed=embed,
                            app_version=config.APP_VERSION, app_codename=config.APP_CODENAME,
                            codename_bio=get_codename_bio(config.APP_CODENAME))
+
+@app.route("/deck-guide")
+def deck_guide_page():
+    """What each Stream Deck key does -- rendered from deck.GUIDE, which sits
+    next to the code that draws the keys, so the two change together."""
+    settings = load_settings()
+    band = settings.get("deck_w1aw_band") or "80"
+    pages = [{"title": deck_module.PAGE_TITLES[p], "for": g["for"], "info": g["info"],
+              "key_list": [(name, desc.format(w1aw_band=band)) for name, desc in g["keys"]]}
+             for p, g in deck_module.GUIDE.items()]
+    return render_template("deck_guide.html", settings=settings, pages=pages,
+                           titles=[deck_module.PAGE_TITLES[p] for p in deck_module.PAGES],
+                           hold_keys=deck_module.HOLD_KEYS, problems=deck_module.check_guide(),
+                           enabled=bool(settings.get("deck_enabled")))
 
 @app.route("/api/check_for_updates")
 def api_check_for_updates():

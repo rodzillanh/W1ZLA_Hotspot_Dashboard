@@ -59,6 +59,91 @@ C = {
     "off": ("#6b737d", "#000000"),      # nothing to do
 }
 
+# The key guide at /deck-guide is rendered from this. It describes what the
+# _page_* methods below do, key by key (row by row, 8 per page, in PAGES
+# order) -- WHEN YOU CHANGE A KEY, CHANGE ITS ENTRY HERE IN THE SAME EDIT.
+# check_guide() (run by the /deck-guide route) catches a page or key count
+# that no longer lines up; it can't catch a stale description.
+GUIDE = {
+    "HF": {
+        "for": "Your rig, through rig control and wfweb.",
+        "info": "frequency and mode",
+        "keys": [
+            ("W1AW", "Shows the W1AW transmission that's on now (cyan) or next. Tap to tune in CW, on the band set "
+                     "in Settings → Integrations → Stream Deck ({w1aw_band} m)."),
+            ("Beacons", "Shows which NCDXF beacon is on 14.100 right now. Tap to tune there in CW."),
+            ("FT8 20m", "Tap to tune 14.074 USB. Green when you're on it."),
+            ("SSTV", "Tap to start listening on your SSTV frequency. Cyan while listening and yellow while a picture "
+                     "comes in; tap again to stop."),
+            ("CW mode", "Green \"IN CW\" when the rig is in CW. Otherwise, tap to switch to CW without changing "
+                        "frequency."),
+            ("CW heard", "The last callsign the CW Copy card decoded. Cyan while it's decoding. Display only."),
+            ("FT8 40m", "Tap to tune 7.074 USB. Green when you're on it."),
+            ("Rig power", "When off, tap to turn the rig on. When on, HOLD 1 s to turn it off. Needs wfweb power "
+                          "control."),
+        ],
+    },
+    "ASL": {
+        "for": "Your first ASL3 node.",
+        "info": "number of links and which node is keyed",
+        "keys": [
+            ("Favourite 1", "Your first pinned ASL favourite. Tap to connect; tap a linked one to disconnect."),
+            ("Favourite 2", "Green linked, red keyed, cyan monitoring, yellow connecting."),
+            ("Favourite 3", "Connects in whatever the Mode key is set to."),
+            ("Favourite 4", "With Multi off, connecting first drops your other linked favourites."),
+            ("Favourite 5", "Pin and reorder favourites in the dashboard's ASL Control drawer."),
+            ("Mode", "Tap to cycle Connect → Monitor → Local monitor. Cyan when it isn't on Connect."),
+            ("Multi", "Green ON keeps your other links when you connect. Goes back to OFF if the dashboard restarts."),
+            ("Disc. all", "HOLD 2 s to drop every link on the node, including permanent ones."),
+        ],
+    },
+    "DV": {
+        "for": "Your first WPSD hotspot that has Brandmeister or D-STAR set up.",
+        "info": "who's talking and on what, or \"quiet\"",
+        "keys": [
+            ("BM TG 1", "Your first Brandmeister talkgroup favourite. Green when linked (shows the slot). Tap to link "
+                        "or unlink."),
+            ("BM TG 2", "Second talkgroup favourite. Links on the slot saved with the favourite."),
+            ("BM TG 3", "Third talkgroup favourite. Needs your Brandmeister API key."),
+            ("BM unlink", "HOLD 2 s to remove every static talkgroup."),
+            ("D-STAR 1", "Your first D-STAR reflector favourite. Green when linked. Tap to link or unlink."),
+            ("D-STAR 2", "Second reflector favourite."),
+            ("YSF", "The YSF reflector it's linked to. Display only (YSF has no remote control)."),
+            ("On air", "Red with the caller and talkgroup while someone's talking. Display only."),
+        ],
+    },
+    "STATUS": {
+        "for": "A glance page. These keys only display.",
+        "info": "hotspots online and how many are active",
+        "keys": [
+            ("Hotspot 1", "Your first hotspot. Red with the caller when active; green with the link count for ASL3."),
+            ("Hotspot 2", "Dark red OFFLINE with how long; grey AWAY for a portable hotspot."),
+            ("Hotspot 3", "Otherwise IDLE, with its mode or talkgroup."),
+            ("Hotspot 4", "The first four in your hotspot list."),
+            ("Next pass", "Your next tracked satellite pass: name, time until it rises, peak elevation. Cyan during "
+                          "the pass."),
+            ("HF 20m", "20 m conditions (N0NBH) for day or night, and the K index. Green good, yellow poor."),
+            ("UTC", "UTC time and date."),
+            ("Local", "Your local time, from the time zone in Settings."),
+        ],
+    },
+}
+HOLD_KEYS = "Rig power off (1 s), Disconnect all (2 s), BM unlink (2 s)"
+
+
+def check_guide():
+    """Problems with GUIDE vs. the deck's real pages ([] when it lines up)."""
+    out = []
+    if list(GUIDE) != PAGES:
+        out.append(f"guide pages {list(GUIDE)} != deck pages {PAGES}")
+    for p, g in GUIDE.items():
+        if len(g["keys"]) != 8:
+            out.append(f"{p}: guide has {len(g['keys'])} keys, the Neo has 8")
+        if not hasattr(DeckController, "_page_" + p.lower()):
+            out.append(f"{p}: no _page_{p.lower()} method")
+    return out
+
+
 # W1AW (Eastern, Mon-Fri), CWops CWT and K1USN SST (UTC) -- same tables as
 # the CW Copy card's strip (dashboard.html renderCwAir); keep them in sync.
 W1AW_BANDS = {"160": 1802500, "80": 3581500, "40": 7047500, "20": 14047500, "17": 18077500, "15": 21067500, "10": 28067500}

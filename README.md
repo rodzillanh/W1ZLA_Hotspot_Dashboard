@@ -1659,6 +1659,8 @@ the keys send their presses back to the dashboard.
   section shows these addresses filled in for your dashboard.
 - Presses go through the same checks as the browser, so Companion needs to
   run on your home network or Tailscale.
+- **Key guide:** `/deck-guide` (linked from the Version page and the
+  Settings section) shows what every key on every page does.
 
 <!-- wiki-group: Optional Cards -->
 ## CW Copy card
