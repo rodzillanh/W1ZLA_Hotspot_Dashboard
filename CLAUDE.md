@@ -8027,7 +8027,13 @@ config for per-integration credentials; put it in
     detected missing head, counts them in `dropped_samples`, and
     `_finalize` rejects any image that lost >3% of its audio (a third-lost
     Martin M1 decoded to streaks that the smoothness gate alone still
-    called "fair").
+    called "fair"). **It recurred 2026-11-14 as the mirror image**: one in
+    three packets lost its 278-sample TAIL (a 682 after a 682), found in
+    two CW recordings that held 108.4 s of audio for 120 s of wall time
+    and decoded as all dits (every dash cut by a 5.8 ms hole every 54 ms
+    -- spotted as waveform jumps every 2601-2602 samples = 3x960-278).
+    `_missing_before()` now fills both cases, in the receiver, the
+    recorder and the test button.
   - **The `sstv` decoder's own header detection is unusable on HF** (needs
     ~28 dB SNR to find a VIS header, measured by mixing synthetic Martin
     M1 into REAL recorded rig noise), while its image decoder, handed the

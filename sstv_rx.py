@@ -33,6 +33,10 @@ which doesn't cover the audio protocol at all:
     (a) zero-fills each detected missing first frame so timing stays
     right, and (b) counts them in `dropped_samples`, which the card's
     "Test audio stream" button reports and every stored image records.
+    The mirror image showed up on 2026-11-14 in two CW recordings: one in
+    three packets lost its 278-sample SECOND frame (a 682 after a 682,
+    ~9.7% of the audio), which turned every dash into dits for the CW
+    decoder. Both are handled by _missing_before().
 
 Decoding uses the `sstv` PyPI package (a Rust decoder, imported as
 `sstv`) with the mode and start point supplied by sstv_vis.py -- see that
@@ -108,6 +112,20 @@ REJECT_AUDIO_MAX_S = 90        # keep at most this much audio of a rejected atte
 MAX_GAP_FRACTION = 0.03        # reject an image whose audio lost more than 3% in transit
 MAX_RESULT_AGE = 60 * 60 * 24 * 60   # ignore any index entries older than this on load
 PAIR_FIRST, PAIR_SECOND = 682, 278   # wfweb's 20 ms packet split, see module docstring
+
+
+def _missing_before(n, rate_div, last_n):
+    """Samples lost just before a frame of n samples, judged from the
+    expected 682/278 alternation: a 278 after a 278 lost its 682 head, a
+    682 after a 682 lost the previous packet's 278 tail. See the module
+    docstring."""
+    if rate_div != 48 or last_n is None:
+        return 0
+    if n == PAIR_SECOND and last_n != PAIR_FIRST:
+        return PAIR_FIRST
+    if n == PAIR_FIRST and last_n == PAIR_FIRST:
+        return PAIR_SECOND
+    return 0
 LEVEL_HISTORY = 12             # one audio-level reading per analyzer tick (~1 s), newest last
 LEVEL_FLOOR_DB = -50.0         # a level meter's bottom: anything at/below this reads 0
 
@@ -674,12 +692,12 @@ class SstvReceiver:
             if self._last_seq is not None and ((seq - self._last_seq) & 0xFFFF) != 1:
                 self._seq_gaps += 1
             self._last_seq = seq
-            if (n == PAIR_SECOND and rate_div == 48 and self._last_n is not None
-                    and self._last_n != PAIR_FIRST):
-                # a 278-sample tail NOT preceded by its 682-sample head: that head
-                # was lost upstream. Keep the timeline intact with silence.
-                self._chunks.append(np.zeros(PAIR_FIRST, dtype=np.int16))
-                self._dropped += PAIR_FIRST
+            lost = _missing_before(n, rate_div, self._last_n)
+            if lost:
+                # a frame of the 682/278 pair went missing upstream. Keep the
+                # timeline intact with silence.
+                self._chunks.append(np.zeros(lost, dtype=np.int16))
+                self._dropped += lost
             self._last_n = n
             self._chunks.append(np.frombuffer(b, dtype="<i2", count=n, offset=6))
             self._frames += 1
@@ -1086,9 +1104,9 @@ class SstvReceiver:
                         continue
                     n = (len(m) - 6) // 2
                     rate_div = m[4] | (m[5] << 8)
-                    if (n == PAIR_SECOND and rate_div == 48 and last_n is not None
-                            and last_n != PAIR_FIRST):
-                        parts.append(bytes(PAIR_FIRST * 2))
+                    lost = _missing_before(n, rate_div, last_n)
+                    if lost:
+                        parts.append(bytes(lost * 2))
                     last_n = n
                     parts.append(bytes(m[6:6 + n * 2]))
                 else:
@@ -1151,7 +1169,7 @@ class SstvReceiver:
                     if m[:1] != b"\x02":
                         continue
                     n = (len(m) - 6) // 2
-                    if n == PAIR_SECOND and last_n is not None and last_n != PAIR_FIRST:
+                    if _missing_before(n, m[4] | (m[5] << 8), last_n):
                         orphans += 1
                     last_n = n
                     frames += 1
@@ -1178,5 +1196,5 @@ class SstvReceiver:
             return False, "Connected, but no audio frames arrived"
         khz =f"{(rate or RATE) // 1000} kHz"
         if orphans:
-            return False, f"Audio is arriving with gaps: {orphans} of {frames} frames lost their head ({khz}). Restarting the wfweb container cleared this once before."
+            return False, f"Audio is arriving with gaps: {orphans} of {frames} packets lost a frame ({khz}). Restarting the wfweb container cleared this once before."
         return True, f"Stream OK · {khz} · {samples / seconds / 1000:.1f}k samples/s · 0 packets dropped"
