@@ -11,9 +11,9 @@ the keys only report presses back here (/api/deck/key/<n>/down|up and
 columns 0 and 3, per the Neo model in @elgato-stream-deck/core) -- and this
 module flips between its own four pages by repainting them.
 
-The info bar is the Neo's LCD segment at row 2, columns 1-2. Whether
-Companion draws a button style there is NOT verified; this paints row 2
-column 1 and it does nothing harmful if Companion ignores it.
+The info bar is the Neo's LCD segment at row 2, columns 1-2; Companion
+shows the buttons at those two cells there (page title on the left, the
+page's live reading on the right).
 
 Actions reuse the dashboard's own routes (rig_tune, asl_connect,
 brandmeister_talkgroup, ircddb_link/unlink, sstv/control,
@@ -221,7 +221,10 @@ class DeckController:
         styles = {}
         for i, k in enumerate(keys):
             styles[(i // 4, i % 4)] = self._style(k)
-        styles[(2, 1)] = {"text": info, "color": "#bfeee6", "bgcolor": "#000000", "size": 14}
+        # The Neo's info bar is two Companion cells (row 2, columns 1 and 2).
+        styles[(2, 1)] = {"text": f"{PAGE_TITLES[page]}\n{self._page + 1}/{len(PAGES)}", "color": "#ffb648",
+                          "bgcolor": "#000000", "size": 14}
+        styles[(2, 2)] = {"text": info, "color": "#bfeee6", "bgcolor": "#000000", "size": 14}
         styles[(2, 0)] = {"text": "<", "color": "#9aa2ad", "bgcolor": "#000000", "size": 14}
         styles[(2, 3)] = {"text": ">", "color": "#9aa2ad", "bgcolor": "#000000", "size": 14}
         for loc, st in styles.items():
@@ -347,8 +350,8 @@ class DeckController:
                   "act": self._power("power_off")}
         else:
             pk = {"label": "Rig power", "value": "OFF", "sub": "tap: on", "act": self._power("power_on")}
-        info = f"{_mhz(f)} {m}".strip() or "Rig not connected"
-        return [w1, bcn, ft20, sk, cwkey, heardkey, ft40, pk], "HF  " + info
+        info = f"{_mhz(f)}\n{m}".strip() if f else "Rig not\nconnected"
+        return [w1, bcn, ft20, sk, cwkey, heardkey, ft40, pk], info
 
     @staticmethod
     def _cw_heard(lines):
@@ -381,7 +384,7 @@ class DeckController:
     def _page_asl(self, s):
         hs = next((h for h in s["data"] if h.get("type") == "asl3"), None)
         if hs is None:
-            return [{"label": "AllStar", "value": "none", "sub": "no ASL3 node", "state": "off"}], "ASL  no ASL3 hotspot"
+            return [{"label": "AllStar", "value": "none", "sub": "no ASL3 node", "state": "off"}], "no ASL3 hotspot"
         links = {str(l.get("node")): l for l in (hs.get("asl_linked_nodes") or [])}
         favs = [f for f in load_asl_favorites() if f.get("pinned", True)][:5]
         keys = []
@@ -412,8 +415,8 @@ class DeckController:
                      "state": "danger" if links else "off", "hold": 2.0,
                      "act": self._asl_action(hs, "0", "disconnect_all") if links else None})
         keyed = next((n for n, l in links.items() if l.get("keyed")), None)
-        info = f"{hs.get('asl_node') or hs.get('name')} · {len(links)} links" + (f" · {keyed} keyed" if keyed else "")
-        return keys, "ASL  " + info
+        info = f"{len(links)} links" + (f"\n{keyed} keyed" if keyed else "")
+        return keys, info
 
     def _asl_action(self, hs, node, action):
         def act():
@@ -446,7 +449,7 @@ class DeckController:
                    and (h.get("brandmeister_id") or h.get("ircddb_reflector") is not None)), None) \
             or next((h for h in s["data"] if h.get("type", "wpsd") == "wpsd"), None)
         if hs is None:
-            return [{"label": "Digital", "value": "none", "sub": "no WPSD hotspot", "state": "off"}], "DV  no WPSD hotspot"
+            return [{"label": "Digital", "value": "none", "sub": "no WPSD hotspot", "state": "off"}], "no WPSD hotspot"
         cfg = next((h for h in load_hotspots() if h.get("id") == hs["id"]), {})
         keys = []
         static = {int(t.get("talkgroup")): t for t in (hs.get("bm_static_tgs") or []) if str(t.get("talkgroup", "")).isdigit()}
@@ -480,12 +483,12 @@ class DeckController:
         if hs.get("is_active") and hs.get("active_call"):
             onair = {"label": "On air", "value": hs["active_call"], "sub": self._mode_txt(hs),
                      "state": "keyed"}
-            info = f"{hs['active_call']} on {hs.get('talkgroup') or hs.get('mode') or ''}"
+            info = f"{hs['active_call']}\n{self._mode_txt(hs)}"
         else:
             onair = {"label": "On air", "value": "-", "sub": hs.get("name", "")[:10], "state": "off"}
-            info = hs.get("name", "") + " · quiet"
+            info = (hs.get("name", "") or "")[:12] + "\nquiet"
         keys.append(onair)
-        return keys, "DV  " + info
+        return keys, info
 
     def _bm(self, hs, tg, slot, action):
         def act():
@@ -565,4 +568,4 @@ class DeckController:
         keys.append({"label": "Local", "value": local.strftime("%H:%M"), "sub": local.strftime("%a")})
         online = sum(1 for h in s["data"] if h.get("status") != "Offline")
         active = sum(1 for h in s["data"] if h.get("is_active") and h.get("status") != "Offline")
-        return keys, f"STATION  {online}/{len(s['data'])} online · {active} active"
+        return keys, f"{online}/{len(s['data'])} online\n{active} active"
