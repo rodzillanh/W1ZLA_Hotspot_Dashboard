@@ -2732,3 +2732,12 @@ everywhere.
   access codes are stored the same way in `cameras.json`.
 - SSH host keys are auto-accepted (`AutoAddPolicy`) — convenient for a small
   fleet of devices you control, but it skips host key verification.
+
+<!-- wiki-group: Admin and Maintenance -->
+## License
+
+GPL-3.0-or-later -- see [LICENSE](LICENSE). The CW decoder
+(`cw_decoder.py`) is translated from wfweb's browser decoder, which is
+GPL-3.0, so the project uses the same licence. The DeepCW model it runs is
+AGPL-3.0 and is not included here: it is downloaded at runtime from your own
+wfweb.
