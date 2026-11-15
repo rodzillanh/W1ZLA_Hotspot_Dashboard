@@ -5625,6 +5625,12 @@ config for per-integration credentials; put it in
     a one-off decode error that looks like a call isn't offered. Pocket
     Dash has no CW screen yet. The temporary `/api/wfweb_record.wav`
     recorder (used to collect the real test audio) is still in app.py.
+  - The "on the air" strip (v5.14, `renderCwAir()`) is client-side tables:
+    W1AW times are EASTERN wall clock (`cwEtToMs()` via Intl, so DST is
+    handled), CWT/SST are UTC; read from arrl.org/cwops.org/k1usn.com on
+    2026-11-15. Code-bulletin length (30 min) is an estimate. The strip is
+    rebuilt only when its signature changes, and never while its band
+    `<select>` has focus (a rebuild would close the open menu).
 
 - **Every hotspot now has its own generated `id`, independent of `ip` --
   `ip` stopped being an identity key anywhere in this app and went back to

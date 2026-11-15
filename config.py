@@ -23,7 +23,7 @@ def _version_tuple(v):
 # version number now, no new names get appended here. See
 # _LAST_NAMED_VERSION below for how APP_CODENAME resolves to None past
 # this list's last entry.
-APP_VERSION = "5.13"
+APP_VERSION = "5.14"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -333,6 +333,7 @@ DIGEST_HIGHLIGHTS = [
               "ASL Control: link to AllStarLink's own Node Admin web page"]),
     ("5.12", ["ASL3 meter now moves while your node transmits, so you can see link audio too"]),
     ("5.13", ["New CW Copy card: Morse decoded from your rig's audio while it's in CW, as a running transcript"]),
+    ("5.14", ["CW Copy card shows W1AW, CWops CWT and K1USN SST when they're on the air, with one-tap tuning"]),
 ]
 
 

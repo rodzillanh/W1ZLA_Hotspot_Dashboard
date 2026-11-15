@@ -117,9 +117,19 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v5.13</span>
+                <span class="release-version">v5.14</span>
                 <span class="release-date">November 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>CW Copy: what's on the air</span> &mdash; a strip under the card's title shows a scheduled CW transmission that's on now (W1AW code practice and bulletins, CWops CWT, K1USN Slow Speed Test), or the next one and how far off it is. Pick a band and tap Tune to put the rig on it in CW; it shows "Tuned" once you're there. "Schedule" lists the next few, plus the NCDXF beacon on 14.100 right now. The schedule is worked out in the browser from fixed tables: W1AW on Eastern time, Monday to Friday; CWT and SST in UTC. CWT and SST have no single frequency, so Tune goes to a typical spot in the band's CW segment</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v5.13</span>
+                <span class="release-date">November 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>CW Copy card</span> &mdash; Morse decoded from the rig's audio while it's in CW, shown as a running transcript with a time stamp per line, the still-changing tail in grey, and a "Heard" row of callsigns (Worked Before badges, QRZ links, a one-tap Quick Log prefill). Decoding runs on this dashboard's server with DeepCW, the same neural decoder wfweb's own page uses: the model is downloaded from your wfweb and cached, audio is only streamed while the rig is in CW, and every open page sees the same copy. Leaving CW keeps the last copy dimmed with a "Switch rig to CW" button. Turn it on under Settings &rarr; Cards; needs the wfweb host and a 64-bit system (onnxruntime)</li>

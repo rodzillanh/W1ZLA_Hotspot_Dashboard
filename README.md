@@ -1656,6 +1656,14 @@ running transcript.
   64-bit system -- the `onnxruntime` package has no 32-bit build, the same
   limit as the SSTV decoder. Decoding uses about a tenth of one CPU core on
   a desktop-class machine while the rig is in CW, and nothing otherwise.
+- **What's on the air:** a strip under the title shows a scheduled CW
+  transmission that's on now, or the next one: W1AW code practice and
+  bulletins (Eastern time, Monday to Friday), the CWops CWT (Wednesday
+  1300z and 1900z, Thursday 0300z and 0700z) and the K1USN Slow Speed Test
+  (Friday 2000z, Monday 0000z). Pick a band and tap **Tune** to put the
+  rig there in CW (needs Rig control). CWT and SST have no single
+  frequency, so Tune goes to a typical spot in the band's CW segment.
+  **Schedule** lists the next few, plus the NCDXF beacon on 14.100.
 - Same drag-and-drop **Card order** placement as every other extra card.
 
 <!-- wiki-group: Optional Cards -->

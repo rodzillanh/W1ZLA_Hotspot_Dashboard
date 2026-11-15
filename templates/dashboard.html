@@ -2080,6 +2080,38 @@
         .cw-foot button:hover { color: var(--text); }
         .cw-foot button.solid { font-size: 11px; color: var(--text); background: var(--panel-2); border: 1px solid var(--border);
             border-radius: 6px; padding: 4px 10px; }
+        /* On-air strip: scheduled CW (W1AW, CWT, SST) that's on now or next */
+        .cw-air { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 5px 8px; margin-bottom: 8px;
+            border: 1px solid var(--border-soft); border-radius: 6px; background: var(--panel-2); font-size: 11.5px; min-width: 0; }
+        .cw-air.on { border-color: var(--card-active-border); background: var(--live-dim); }
+        .cw-air-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+        .cw-air.on .cw-air-dot { background: var(--live); animation: cwAirPing 1.8s infinite; }
+        @keyframes cwAirPing { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--live) 60%, transparent); }
+            70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+        @media (prefers-reduced-motion: reduce) { .cw-air.on .cw-air-dot { animation: none; } }
+        .cw-air-what { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-muted); }
+        .cw-air-what b { color: var(--text); font-weight: 600; }
+        .cw-air.on .cw-air-what b { color: var(--live); }
+        .cw-air-when { font-family: var(--font-mono); color: var(--text-dim); white-space: nowrap; }
+        .cw-air select, .cw-air button, .cw-air-sched button { font: inherit; font-size: 10.5px; color: var(--text);
+            background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 2px 6px; cursor: pointer; }
+        .cw-air button.tune { color: var(--live); border-color: var(--card-active-border); }
+        .cw-air .tuned, .cw-air-sched .tuned { color: var(--good); font-size: 10.5px; white-space: nowrap; }
+        .cw-air button.more { background: transparent; border: 0; color: var(--text-muted); padding: 2px; white-space: nowrap; }
+        .cw-air button.more:hover, .cw-air-sched button:hover { color: var(--text); }
+        .cw-air-sched { margin: -2px 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); }
+        .cw-air-sched-h { display: flex; justify-content: space-between; padding: 7px 10px 5px; font-size: 10.5px;
+            letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+        .cw-air-sched-h span:last-child { text-transform: none; letter-spacing: 0; color: var(--text-dim); }
+        .cw-air-row { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 8px; align-items: center;
+            padding: 6px 10px; border-top: 1px solid var(--border-soft); font-size: 11.5px; }
+        .cw-air-row .w { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); }
+        .cw-air-row.now .w { color: var(--live); font-weight: 600; }
+        .cw-air-row .t { min-width: 0; }
+        .cw-air-row .t b, .cw-air-row .t span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cw-air-row .t b { font-weight: 600; }
+        .cw-air-row .t span { color: var(--text-dim); font-size: 10.5px; }
+        .cw-air-row .f { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); margin-right: 6px; }
         /* --- Shortwave card (HFCC + EiBi, see shortwave.py) --- */
         .sw-head-right { display: flex; align-items: center; gap: 8px; }
         .sw-count { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--live); margin-left: 6px;
@@ -4355,6 +4387,8 @@
                 <div class="card-name" title="Morse decoded from the rig's audio while it's in CW, by wfweb's DeepCW model running on this dashboard's server. Newest at the bottom; the grey text at the end may still change.">🔤 CW Copy<span class="cw-pill" id="cw-pill">…</span></div>
                 <div class="cw-head-right"><span class="cw-freq" id="cw-freq"></span></div>
             </div>
+            <div class="cw-air" id="cw-air"></div>
+            <div id="cw-air-sched"></div>
             <div class="cw-heard" id="cw-heard"></div>
             <div class="cw-copy" id="cw-copy"></div>
             <div class="cw-foot" id="cw-foot"></div>
@@ -9302,13 +9336,176 @@ function renderCwCopyCard() {
 }
 function fetchCwCopy() {
     if (!SHOW_CW_COPY) return;
-    fetch('/api/cw_copy').then(r => r.json()).then(d => { cwData = d; renderCwCopyCard(); }).catch(() => {});
+    fetch('/api/cw_copy').then(r => r.json()).then(d => { cwData = d; renderCwCopyCard(); renderCwAir(); }).catch(() => {});
 }
 if (SHOW_CW_COPY) {
     (function cwLoop() {
         fetchCwCopy();
         setTimeout(cwLoop, cwData && cwData.state === 'decoding' ? CW_POLL_MS : CW_IDLE_POLL_MS);
     })();
+    setTimeout(() => { renderCwAir(); setInterval(renderCwAir, 5000); }, 0);
+}
+
+// On-air strip: scheduled CW that's on now, or next. All computed here from
+// fixed tables (nothing fetched). W1AW runs on Eastern time all year, Mon-Fri
+// (arrl.org/w1aw-operating-schedule); CWT (cwops.org/cwops-tests) and K1USN
+// SST (k1usn.com/sst.html) are fixed in UTC. CWT/SST have no single
+// frequency: Tune goes to a typical spot, and "tuned" means anywhere in the
+// segment. Code bulletin length varies; 30 min is an estimate.
+const CW_AIR_W1AW_BANDS = [['160', 1802500], ['80', 3581500], ['40', 7047500], ['20', 14047500],
+    ['17', 18077500], ['15', 21067500], ['10', 28067500]].map(([b, hz]) => ({ b, hz, lo: hz - 500, hi: hz + 500 }));
+const CW_AIR_CWT_BANDS = [['160', 1828000], ['80', 3528000], ['40', 7028000], ['20', 14028000], ['15', 21028000], ['10', 28028000]]
+    .map(([b, lo]) => ({ b, hz: lo + 2000, lo, hi: lo + 17000 }));
+const CW_AIR_SST_BANDS = [['160', 1810000, 1825000], ['80', 3528000, 3545000], ['40', 7028000, 7045000],
+    ['20', 14028000, 14045000], ['15', 21028000, 21045000], ['10', 28028000, 28045000]]
+    .map(([b, lo, hi]) => ({ b, hz: Math.round((lo + hi) / 2 / 1000) * 1000, lo, hi }));
+const CW_AIR_SRC = {
+    w1aw: { bands: CW_AIR_W1AW_BANDS, rank: 0 },
+    sst: { bands: CW_AIR_SST_BANDS, rank: 1, spread: true },
+    cwt: { bands: CW_AIR_CWT_BANDS, rank: 2, spread: true },
+};
+let cwAirOpen = (() => { try { return localStorage.getItem('cw-air-open') === '1'; } catch (e) { return false; } })();
+let cwAirBand = (() => { try { return localStorage.getItem('cw-air-band') || '80'; } catch (e) { return '80'; } })();
+let cwAirSig = '';
+const CW_ET_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23',
+    year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' });
+function cwEtParts(ms) {
+    const p = {};
+    CW_ET_FMT.formatToParts(new Date(ms)).forEach(x => { p[x.type] = +x.value; });
+    return p;
+}
+// Epoch ms of an Eastern wall-clock time (handles EST/EDT).
+function cwEtToMs(y, m, d, h, mi) {
+    const wall = Date.UTC(y, m - 1, d, h, mi);
+    let ms = wall + 5 * 3600e3;
+    for (let i = 0; i < 2; i++) {
+        const p = cwEtParts(ms);
+        ms += wall - Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
+    }
+    return ms;
+}
+function cwAirEvents(now) {
+    const ev = [], DAY = 86400e3;
+    const et = cwEtParts(now);
+    const FAST = ['W1AW fast practice', '35 down to 10 wpm'], SLOW = ['W1AW slow practice', '5 up to 15 wpm'];
+    const BULL = ['W1AW code bulletin', '18 wpm'];
+    for (let i = -1; i <= 8; i++) {
+        const dt = new Date(Date.UTC(et.year, et.month - 1, et.day + i));
+        const dow = dt.getUTCDay(), y = dt.getUTCFullYear(), m = dt.getUTCMonth() + 1, d = dt.getUTCDate();
+        if (dow >= 1 && dow <= 5) {
+            const mwf = dow % 2 === 1;
+            [[16, mwf ? FAST : SLOW, 60], [17, BULL, 30], [19, mwf ? SLOW : FAST, 60],
+             [20, BULL, 30], [22, mwf ? FAST : SLOW, 60], [23, BULL, 30]].forEach(([h, [name, detail], dur]) => {
+                const start = cwEtToMs(y, m, d, h, 0);
+                ev.push({ src: 'w1aw', name, detail, start, end: start + dur * 60e3 });
+            });
+        }
+        const u = Date.UTC(y, m - 1, d), udow = new Date(u).getUTCDay();
+        if (udow === 3) [13, 19].forEach(h => ev.push({ src: 'cwt', name: 'CWops CWT', detail: '25-35 wpm', start: u + h * 3600e3 }));
+        if (udow === 4) [3, 7].forEach(h => ev.push({ src: 'cwt', name: 'CWops CWT', detail: '25-35 wpm', start: u + h * 3600e3 }));
+        if (udow === 5) ev.push({ src: 'sst', name: 'K1USN Slow Speed Test', detail: 'up to 20 wpm', start: u + 20 * 3600e3 });
+        if (udow === 1) ev.push({ src: 'sst', name: 'K1USN Slow Speed Test', detail: 'up to 20 wpm', start: u });
+    }
+    ev.forEach(e => { if (!e.end) e.end = e.start + 3600e3; });
+    return ev.filter(e => e.end > now).sort((a, b) => a.start - b.start || CW_AIR_SRC[a.src].rank - CW_AIR_SRC[b.src].rank);
+}
+function cwAirBandFor(src) {
+    const bands = CW_AIR_SRC[src].bands;
+    return bands.find(x => x.b === cwAirBand) || bands.find(x => x.b === '80') || bands[0];
+}
+function cwAirTuned(src) {
+    const hz = cwData && cwData.freq_hz;
+    return !!hz && CW_AIR_SRC[src].bands.some(x => hz >= x.lo && hz <= x.hi);
+}
+function cwAirClock(ms) {
+    return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+function cwAirUntil(ms, now) {
+    const mins = Math.round((ms - now) / 60e3);
+    if (mins < 60) return `in ${Math.max(1, mins)} m`;
+    if (mins < 12 * 60) return `in ${Math.floor(mins / 60)} h ${mins % 60} m`;
+    return new Date(ms).toLocaleDateString([], { weekday: 'short' }) + ' ' + cwAirClock(ms);
+}
+function cwAirWhen(e, now) {
+    return e.start <= now ? `ends ${cwAirClock(e.end)}` : cwAirUntil(e.start, now);
+}
+function cwAirMhz(hz) { return (hz / 1e6).toFixed(hz % 1000 ? 4 : 3); }
+function cwAirTune(hz) {
+    if (!RIG_CONTROL_ENABLED) return;
+    fetch('/api/rig_tune', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ freq_hz: hz, mode: 'CW' }) })
+        .then(r => r.json()).then(d => {
+            const ok = !!(d.ok || d.success);
+            rigToast(ok ? ('Rig → ' + (d.message || cwAirMhz(hz) + ' CW')) : ('Tune failed: ' + (d.message || 'rig server error')), ok ? 'ok' : 'err');
+            if (ok) setTimeout(fetchCwCopy, 1500);
+        })
+        .catch(() => rigToast('Tune failed: no response from the dashboard', 'err'));
+}
+function cwAirSetBand(b) {
+    cwAirBand = b;
+    try { localStorage.setItem('cw-air-band', b); } catch (e) {}
+    cwAirSig = '';
+    renderCwAir();
+}
+function cwAirToggle() {
+    cwAirOpen = !cwAirOpen;
+    try { localStorage.setItem('cw-air-open', cwAirOpen ? '1' : '0'); } catch (e) {}
+    cwAirSig = '';
+    renderCwAir();
+}
+function renderCwAir() {
+    const strip = document.getElementById('cw-air'), sched = document.getElementById('cw-air-sched');
+    if (!strip || !sched) return;
+    const now = Date.now();
+    const evs = cwAirEvents(now);
+    const live = evs.filter(e => e.start <= now).sort((a, b) => CW_AIR_SRC[a.src].rank - CW_AIR_SRC[b.src].rank)[0];
+    const e = live || evs[0];
+    const upcoming = evs.filter(x => x !== e).slice(0, 4);
+    const bcn = (typeof beaconAt === 'function') ? beaconAt(beaconSlotNow().baseSlot, 0) : null;
+    // Rebuild only when something structural changes, so an open band menu
+    // isn't destroyed under the pointer; times are refreshed in place.
+    const tuned = e ? cwAirTuned(e.src) : false;
+    const sig = [e && e.src + e.start, !!live, tuned, cwAirOpen, cwAirBand,
+        upcoming.map(x => x.src + x.start).join(), upcoming.map(x => cwAirTuned(x.src)).join()].join('|');
+    const menuOpen = document.activeElement && document.activeElement.tagName === 'SELECT' && strip.contains(document.activeElement);
+    if (sig !== cwAirSig && !menuOpen) {
+        cwAirSig = sig;
+        let right = '';
+        if (e && tuned) right = '<span class="tuned">✓ Tuned</span>';
+        else if (e && live && RIG_CONTROL_ENABLED) {
+            const cur = cwAirBandFor(e.src);
+            right = `<select aria-label="Band" onchange="cwAirSetBand(this.value)">${CW_AIR_SRC[e.src].bands.map(x =>
+                `<option value="${x.b}"${x.b === cur.b ? ' selected' : ''}>${x.b} m</option>`).join('')}</select>`
+                + `<button type="button" class="tune" onclick="cwAirTune(${cur.hz})" title="Tune the rig to ${cwAirMhz(cur.hz)} MHz CW${CW_AIR_SRC[e.src].spread ? `. No fixed frequency: activity spreads across ${cwAirMhz(cur.lo)}-${cwAirMhz(cur.hi)}` : ''}">Tune ${cwAirMhz(cur.hz)}</button>`;
+        }
+        strip.className = 'cw-air' + (live ? ' on' : '');
+        strip.innerHTML = e
+            ? `<span class="cw-air-dot"></span><span class="cw-air-what">${live ? '' : 'Next: '}<b>${escapeHtml(e.name)}</b> · ${escapeHtml(e.detail)}</span>`
+              + `<span class="cw-air-when" id="cw-air-when"></span>${right}`
+              + `<button type="button" class="more" onclick="cwAirToggle()">Schedule ${cwAirOpen ? '▴' : '▾'}</button>`
+            : '';
+        const rowBtn = hz => RIG_CONTROL_ENABLED ? `<button type="button" onclick="cwAirTune(${hz})">Tune</button>` : '';
+        sched.className = cwAirOpen ? 'cw-air-sched' : '';
+        sched.innerHTML = !cwAirOpen ? '' : '<div class="cw-air-sched-h"><span>Coming up</span><span>your time</span></div>'
+            + (bcn ? `<div class="cw-air-row now"><span class="w">NOW</span><span class="t"><b id="cw-air-bcn">NCDXF beacon ${escapeHtml(bcn.call)}</b><span>Callsign, then four dashes · changes every 10 s</span></span>`
+                + `<span><span class="f">14.100</span>${rowBtn(14100000)}</span></div>` : '')
+            + upcoming.map((x, i) => {
+                const bd = cwAirBandFor(x.src);
+                const sub = CW_AIR_SRC[x.src].spread ? `${x.detail} · spread over ${cwAirMhz(bd.lo)}-${cwAirMhz(bd.hi)}` : x.detail;
+                return `<div class="cw-air-row${x.start <= now ? ' now' : ''}"><span class="w" id="cw-air-w${i}"></span>`
+                    + `<span class="t"><b>${escapeHtml(x.name)}</b><span>${escapeHtml(sub)}</span></span>`
+                    + `<span><span class="f">${cwAirMhz(bd.hz)}</span>${cwAirTuned(x.src) ? '<span class="tuned">✓</span>' : rowBtn(bd.hz)}</span></div>`;
+            }).join('');
+    }
+    const whenEl = document.getElementById('cw-air-when');
+    if (whenEl && e) whenEl.textContent = cwAirWhen(e, now);
+    upcoming.forEach((x, i) => {
+        const w = document.getElementById('cw-air-w' + i);
+        if (w) w.textContent = x.start <= now ? 'NOW' : (x.start - now < 12 * 3600e3 ? cwAirClock(x.start)
+            : new Date(x.start).toLocaleDateString([], { weekday: 'short' }) + ' ' + cwAirClock(x.start));
+    });
+    const b = document.getElementById('cw-air-bcn');
+    if (b && bcn) b.textContent = 'NCDXF beacon ' + bcn.call;
 }
 
 // --- Big Ass Clock card ---
