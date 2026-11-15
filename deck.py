@@ -278,7 +278,7 @@ class DeckController:
         s["wfweb"] = wp
         s["cw"] = cw
         s["freq_hz"] = (wp.get("connected") and wp.get("freq_hz")) or cw.get("freq_hz")
-        s["mode"] = ((wp.get("connected") and wp.get("mode")) or cw.get("mode") or "").upper()
+        s["mode"] = str((wp.get("connected") and wp.get("mode")) or cw.get("mode") or "").upper()
         return s
 
     def _tune(self, hz, mode):
@@ -342,7 +342,7 @@ class DeckController:
             sk = {"label": "SSTV", "value": _mhz((sstv.get("config") or {}).get("freq_hz")), "sub": "tap: listen",
                   "act": self._sstv("listen_now") if rig_ok else None}
         wp = s["wfweb"]
-        pw = (wp.get("power_state") or "").lower()
+        pw = str(wp.get("power_state")).lower()        # wfweb sends true/false; tolerate "on"/"off" too
         if not s["settings"].get("wfweb_power_enabled") or not wp.get("connected"):
             pk = {"label": "Rig power", "value": "-", "sub": "wfweb off", "state": "off"}
         elif pw in ("on", "true", "1"):
@@ -560,7 +560,7 @@ class DeckController:
             local = datetime.now()
         day = 6 <= local.hour < 18
         b20 = next((b for b in hf.get("bands") or [] if "20m" in (b.get("name") or "")), None)
-        cond = (b20 or {}).get("day" if day else "night") or "-"
+        cond = str((b20 or {}).get("day" if day else "night") or "-")
         keys.append({"label": "HF 20m", "value": cond.upper(), "sub": f"K={hf.get('k_index', '-')}",
                      "state": "on" if cond.lower() == "good" else ("warn" if cond.lower() == "poor" else "idle")})
         utc = datetime.now(timezone.utc)
