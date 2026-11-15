@@ -11,9 +11,12 @@ the keys only report presses back here (/api/deck/key/<n>/down|up and
 columns 0 and 3, per the Neo model in @elgato-stream-deck/core) -- and this
 module flips between its own four pages by repainting them.
 
-The info bar is the Neo's LCD segment at row 2, columns 1-2; Companion
-shows the buttons at those two cells there (page title on the left, the
-page's live reading on the right).
+The info bar is the Neo's LCD segment; on a real Neo it shows Companion's
+row 2, column 1 cell across the whole bar. Key text is sent with size
+"auto" (Companion shrinks it to fit), and the background lands on the
+button's box layer whose usage is "color" -- Companion's legacy-style
+mapping ignores a box marked "text". Each Companion button also needs
+"Allow modifying style via API" (canModifyStyleInApis) turned on.
 
 Actions reuse the dashboard's own routes (rig_tune, asl_connect,
 brandmeister_talkgroup, ircddb_link/unlink, sstv/control,
@@ -221,12 +224,10 @@ class DeckController:
         styles = {}
         for i, k in enumerate(keys):
             styles[(i // 4, i % 4)] = self._style(k)
-        # The Neo's info bar is two Companion cells (row 2, columns 1 and 2).
-        styles[(2, 1)] = {"text": f"{PAGE_TITLES[page]}\n{self._page + 1}/{len(PAGES)}", "color": "#ffb648",
-                          "bgcolor": "#000000", "size": 14}
-        styles[(2, 2)] = {"text": info, "color": "#bfeee6", "bgcolor": "#000000", "size": 14}
-        styles[(2, 0)] = {"text": "<", "color": "#9aa2ad", "bgcolor": "#000000", "size": 14}
-        styles[(2, 3)] = {"text": ">", "color": "#9aa2ad", "bgcolor": "#000000", "size": 14}
+        # The Neo's whole info bar shows Companion's row 2, column 1 cell
+        # (seen on a real Neo); the touch points (columns 0 and 3) have no screen.
+        styles[(2, 1)] = {"text": f"{PAGE_TITLES[page]}  {self._page + 1}/{len(PAGES)}\n" + info.replace("\n", "  "),
+                          "color": "#ffb648", "bgcolor": "#000000", "size": "auto"}
         for loc, st in styles.items():
             if self._sent.get(loc) == st:
                 continue
@@ -241,7 +242,7 @@ class DeckController:
             text = "\n".join(x for x in (k.get("label", ""), k.get("value", ""), k.get("sub", "")) if x)
         else:
             text = ""
-        return {"text": text, "color": fg, "bgcolor": bg, "size": 14}
+        return {"text": text, "color": fg, "bgcolor": bg, "size": "auto"}
 
     def _push(self, loc, style):
         with self._lock:
