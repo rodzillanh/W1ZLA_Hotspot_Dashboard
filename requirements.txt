@@ -10,5 +10,7 @@ pywebpush>=1.14
 numpy>=1.26
 Pillow>=10.0
 sstv>=0.1; platform_machine == "x86_64" or platform_machine == "AMD64" or platform_machine == "aarch64" or platform_machine == "arm64"
+# CW Copy card (cw_copy.py) -- DeepCW model runtime; 64-bit wheels only, like sstv
+onnxruntime>=1.17; platform_machine == "x86_64" or platform_machine == "AMD64" or platform_machine == "aarch64" or platform_machine == "arm64"
 # IANA time-zone data for zoneinfo (quiet hours) -- slim images/Windows lack a system copy
 tzdata>=2024.1

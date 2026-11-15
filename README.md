@@ -1626,6 +1626,39 @@ the Rig Panel's power control uses).
 - Same drag-and-drop **Card order** placement as every other extra card.
 
 <!-- wiki-group: Optional Cards -->
+## CW Copy card
+
+Optional dashboard card (Settings → Cards → "Show CW Copy card") that
+decodes Morse from your rig's audio while it's in CW and shows it as a
+running transcript.
+
+- **How it works:** the dashboard opens its own connection to wfweb (the
+  same host settings as the SSTV card), switches wfweb's audio stream on
+  only while the rig reports a CW mode, and decodes it on the dashboard's
+  server with **DeepCW**, the neural decoder wfweb's own CW page uses
+  (`cw_decoder.py` is a port of that decoder, checked word for word
+  against it). Every open page sees the same copy, and a page opened
+  later still shows the recent transcript.
+- **The model** (DeepCW, AGPL-3.0, about 15 MB) is downloaded from your
+  wfweb at `/models/deepcw.onnx` the first time and cached under
+  `CONFIG_DIR/cw/`; it is not shipped with this project.
+- **What you see:** one line per over with its time, the newest at the
+  bottom, and the last few characters in grey while the decoder may still
+  correct them. A **Heard** row lists callsigns that followed "DE" or
+  came up twice, with Worked Before badges, QRZ links, and a Quick Log
+  button when the QRZ Quick Log card is on. Leaving CW keeps the last copy,
+  dimmed, with a **Switch rig to CW** button (needs Rig control).
+- **Audio dropouts:** if wfweb drops part of its audio packets (a real,
+  recurring wfweb fault), the gaps are filled with silence and the card's
+  footer shows how much is being lost. Restarting the wfweb container has
+  cleared it before.
+- **Requirements:** a wfweb host under Settings → Integrations, and a
+  64-bit system -- the `onnxruntime` package has no 32-bit build, the same
+  limit as the SSTV decoder. Decoding uses about a tenth of one CPU core on
+  a desktop-class machine while the rig is in CW, and nothing otherwise.
+- Same drag-and-drop **Card order** placement as every other extra card.
+
+<!-- wiki-group: Optional Cards -->
 ## License Quiz card
 <!-- wiki-image: license-quiz-card.png -->
 

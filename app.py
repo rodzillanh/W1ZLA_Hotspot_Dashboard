@@ -47,6 +47,7 @@ from rig_panel import RigPanelPoller
 from wfweb_power import WfwebPowerClient
 from wfweb_memory import WfwebMemoryClient
 from wfweb_packet import WfwebPacketClient
+from cw_copy import CwCopyService
 import wfweb_station
 from sstv_rx import SstvReceiver
 from sstv_controller import SstvController
@@ -122,6 +123,7 @@ rig_panel_poller = RigPanelPoller()
 # both typically point at the same physical rig. See wfweb_power.py.
 wfweb_power_client = WfwebPowerClient()
 wfweb_packet_client = WfwebPacketClient()
+cw_copy_service = CwCopyService()
 
 
 def _sstv_tune(freq_hz, mode):
@@ -441,6 +443,18 @@ def _rebuild_wfweb_packet() -> None:
     )
 
 _rebuild_wfweb_packet()
+
+
+def _rebuild_cw_copy() -> None:
+    """(Re)point the CW Copy decoder (cw_copy.py) at wfweb -- gated by the
+    card's own show_cw_copy toggle; shares the wfweb host settings."""
+    s = load_settings()
+    cw_copy_service.configure(
+        s.get("show_cw_copy"), s.get("wfweb_host", ""),
+        s.get("wfweb_port", 8080), s.get("wfweb_use_ssl", True),
+    )
+
+_rebuild_cw_copy()
 
 
 def _rebuild_wfweb_logbook() -> None:
@@ -936,6 +950,13 @@ def api_settings_post():
             pass
     if "show_repeaters" in data:
         settings["show_repeaters"] = bool(data["show_repeaters"])
+    if "show_cw_copy" in data:
+        settings["show_cw_copy"] = bool(data["show_cw_copy"])
+    if "cw_copy_position" in data:
+        try:
+            settings["cw_copy_position"] = max(0, int(data["cw_copy_position"]))
+        except (TypeError, ValueError):
+            pass
     if "show_shortwave" in data:
         settings["show_shortwave"] = bool(data["show_shortwave"])
     if "shortwave_position" in data:
@@ -1037,7 +1058,7 @@ def api_settings_post():
         "qso_stats_page", "top_activity_page", "pota_page",
         "hf_favorites_page", "rig_panel_page", "dvswitch_page", "qrz_quick_log_page",
         "beacons_page", "repeaters_page", "sstv_page", "hotspot_health_page", "my_signal_page",
-        "shortwave_page",
+        "shortwave_page", "cw_copy_page",
     ):
         if _page_key in data:
             try:
@@ -1165,6 +1186,8 @@ def api_settings_post():
     if any(k in data for k in ("show_wfweb_packet", "wfweb_host", "wfweb_port", "wfweb_use_ssl",
                                "wfweb_packet_mode")):
         _rebuild_wfweb_packet()
+    if any(k in data for k in ("show_cw_copy", "wfweb_host", "wfweb_port", "wfweb_use_ssl")):
+        _rebuild_cw_copy()
     if settings.get("wfweb_station_sync_enabled") and any(
         k in data for k in ("station_grid", "wfweb_station_sync_enabled", "wfweb_host", "wfweb_logbook_rest_port")
     ):
@@ -1493,6 +1516,7 @@ _SENTINEL_DEFS = [
     ("__hotspot_health__", "show_hotspot_health", "hotspot_health_position", "🩺", "Hotspot Health", "uptime, temperature and reboots card"),
     ("__sstv__", "show_sstv", "sstv_position", "🖼️", "SSTV", "last decoded SSTV image card"),
     ("__wfweb_packet__", "show_wfweb_packet", "wfweb_packet_position", "📦", "Packet Monitor", "wfweb AX.25/APRS decode card"),
+    ("__cw_copy__", "show_cw_copy", "cw_copy_position", "🔤", "CW Copy", "Morse decoded from wfweb audio card"),
 ]
 
 _CAMERA_TYPE_LABELS = {"rtsp": "RTSP", "wyze": "Wyze", "bambu_a1": "Bambu A1"}
@@ -2960,6 +2984,17 @@ def api_sstv_test_stream():
     )
     return jsonify({"success": ok, "message": message})
 
+@app.route("/api/cw_copy")
+def api_cw_copy():
+    """CW Copy card: decoder state + the recent transcript (cw_copy.py)."""
+    return jsonify(cw_copy_service.status())
+
+@app.route("/api/cw_copy/clear", methods=["POST"])
+def api_cw_copy_clear():
+    """The card's Clear button -- empties the transcript for everyone."""
+    cw_copy_service.clear()
+    return jsonify({"ok": True})
+
 @app.route("/api/wfweb_record.wav")
 def api_wfweb_record():
     """TEMPORARY (CW decoder prototype, see cw_decoder.py): record N seconds
@@ -3393,6 +3428,8 @@ def _whats_available_groups(settings, hotspots):
              g("show_flights_overhead"), "/setup?item=flights_overhead#cards"),
             ("SSTV", "Decode a slow-scan picture from a live transmission",
              g("show_sstv"), "/setup?item=sstv#cards"),
+            ("CW Copy", "Morse decoded from the rig's audio while it's in CW, as a running transcript",
+             g("show_cw_copy"), "/setup?item=cw_copy#cards"),
             ("Weather", "Current conditions and a 7-day forecast for your location",
              bool(g("weather_location")), "/setup#general"),
         ]),

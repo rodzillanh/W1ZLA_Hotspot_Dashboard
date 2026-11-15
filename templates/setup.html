@@ -933,6 +933,15 @@
                      id="sstv-toggle" onclick="this.classList.toggle('on')"></div>
             </div>
             <div class="toggle-row">
+                <span class="toggle-label">Show CW Copy card
+                    <span style="font-size:10px;color:var(--text-dim)">
+                        (Morse decoded from the rig's audio while it's in CW, as a running transcript. Decoding runs on this dashboard's server with wfweb's DeepCW model, downloaded from your wfweb. Needs the wfweb host under Settings → Integrations, and a 64-bit system)
+                    </span>
+                </span>
+                <div class="toggle {{ 'on' if settings.get('show_cw_copy', False) else '' }}"
+                     id="cw-copy-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle-row">
                 <span class="toggle-label">Show DVSwitch card
                     <span style="font-size:10px;color:var(--text-dim)">
                         (only appears if an ASL3 hotspot also has "This node also runs DVSwitch" on -- turn this off to hide the card while keeping that enabled)
@@ -1122,6 +1131,7 @@
             {% set hotspot_health_pos = settings.get('hotspot_health_position', 0) if (settings.get('show_hotspot_health', False) and settings.get('hotspot_health_page', 1) == page) else -1 %}
             {% set sstv_pos = settings.get('sstv_position', 0) if (settings.get('show_sstv', False) and settings.get('sstv_page', 1) == page) else -1 %}
             {% set wfweb_packet_pos = settings.get('wfweb_packet_position', 0) if (settings.get('show_wfweb_packet', False) and settings.get('wfweb_packet_page', 1) == page) else -1 %}
+            {% set cw_copy_pos = settings.get('cw_copy_position', 0) if (settings.get('show_cw_copy', False) and settings.get('cw_copy_page', 1) == page) else -1 %}
             {# DVSwitch (v3.99) -- one consolidated card, shown when the
                "Show DVSwitch card" toggle (show_dvswitch, default on) is
                on AND any hotspot has dvswitch_enabled set. #}
@@ -1322,6 +1332,13 @@
                     <span class="drag-handle">⠿</span>
                     <span class="node-name">📦 Packet Monitor</span>
                     <span class="node-meta">wfweb AX.25/APRS decode card</span>
+                </div>
+                {% endif %}
+                {% if loop.index0 == cw_copy_pos %}
+                <div class="drag-row fleet-activity-row" draggable="true" data-ip="__cw_copy__">
+                    <span class="drag-handle">⠿</span>
+                    <span class="node-name">🔤 CW Copy</span>
+                    <span class="node-meta">Morse decoded from wfweb audio card</span>
                 </div>
                 {% endif %}
                 {% if show_cams %}
@@ -2935,6 +2952,7 @@ function saveCards() {
             show_my_signal: document.getElementById('my-signal-toggle').classList.contains('on'),
             health_warm_c: parseInt(document.getElementById('health-warm-c').value, 10) || 70,
             show_sstv: document.getElementById('sstv-toggle').classList.contains('on'),
+            show_cw_copy: document.getElementById('cw-copy-toggle').classList.contains('on'),
             show_dvswitch: document.getElementById('dvswitch-card-toggle').classList.contains('on'),
             brandmeister_alerts_enabled: document.getElementById('brandmeister-alerts-toggle').classList.contains('on'),
             qrz_logbook_enabled: document.getElementById('qrz-logbook-toggle').classList.contains('on'),
@@ -3125,6 +3143,7 @@ const SENTINEL_POSITION_FIELDS = [
     ['__my_signal__', 'my_signal_position'],
     ['__sstv__', 'sstv_position'],
     ['__wfweb_packet__', 'wfweb_packet_position'],
+    ['__cw_copy__', 'cw_copy_position'],
     ['__dvswitch__', 'dvswitch_position'],
 ];
 
@@ -4886,7 +4905,7 @@ if (location.hash) {
         top_activity: 'top-activity-toggle', pota: 'pota-toggle',
         hf_favorites: 'hf-favorites-toggle', rig_panel: 'rig-panel-toggle',
         qrz_quick_log: 'qrz-quick-log-toggle', beacons: 'beacons-toggle',
-        repeaters: 'repeaters-toggle', shortwave: 'shortwave-toggle', sstv: 'sstv-toggle', dvswitch: 'dvswitch-card-toggle', hotspot_health: 'hotspot-health-toggle', my_signal: 'my-signal-toggle',
+        repeaters: 'repeaters-toggle', shortwave: 'shortwave-toggle', sstv: 'sstv-toggle', cw_copy: 'cw-copy-toggle', dvswitch: 'dvswitch-card-toggle', hotspot_health: 'hotspot-health-toggle', my_signal: 'my-signal-toggle',
         aprs_inbox: 'aprs-inbox-toggle', hamalert_card: 'hamalert-toggle',
         fleet_alerts: 'fleet-alerts-toggle', digipi_card: 'digipi-toggle',
         starlink_trains: 'starlink-trains-toggle',

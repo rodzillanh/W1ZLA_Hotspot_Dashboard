@@ -117,9 +117,22 @@
 
         <div class="release">
             <div class="release-header">
-                <span class="release-version">v5.12</span>
+                <span class="release-version">v5.13</span>
                 <span class="release-date">November 2026</span>
                 <span class="release-tag">current</span>
+            </div>
+            <ul class="change-list">
+                <li><span>CW Copy card</span> &mdash; Morse decoded from the rig's audio while it's in CW, shown as a running transcript with a time stamp per line, the still-changing tail in grey, and a "Heard" row of callsigns (Worked Before badges, QRZ links, a one-tap Quick Log prefill). Decoding runs on this dashboard's server with DeepCW, the same neural decoder wfweb's own page uses: the model is downloaded from your wfweb and cached, audio is only streamed while the rig is in CW, and every open page sees the same copy. Leaving CW keeps the last copy dimmed with a "Switch rig to CW" button. Turn it on under Settings &rarr; Cards; needs the wfweb host and a 64-bit system (onnxruntime)</li>
+                <li><span>wfweb audio dropouts repaired</span> &mdash; wfweb was found losing the second half of one audio packet in three (about 10% of the audio, enough to turn every CW dash into dits). The SSTV receiver now fills both kinds of loss with silence so timing stays right, and its "Test audio stream" button reports it</li>
+                <li><span>Packet Monitor card order</span> &mdash; its saved position and dashboard page were never applied; now they are</li>
+                <li><span>Licence</span> &mdash; the project is now GPL-3.0-or-later (see LICENSE)</li>
+            </ul>
+        </div>
+
+        <div class="release">
+            <div class="release-header">
+                <span class="release-version">v5.12</span>
+                <span class="release-date">November 2026</span>
             </div>
             <ul class="change-list">
                 <li><span>ASL3 meter shows transmit audio</span> &mdash; while the node is transmitting and not receiving, the ASL3 card's meter (desktop and Pocket Dash) now shows the audio going out to the radio: the last second's peak on a -40..0 dBFS scale, from the SimpleUSB driver's own transmit statistics (<code>susb tune menu-support z</code>). Link audio never passes the receiver, so before this the meter sat flat while TX was lit. Hover the readout for peak, average and clipped samples; it turns red if anything clipped. Updates once a second</li>

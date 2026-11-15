@@ -2044,6 +2044,42 @@
         .rpt-foot { font-size: 10.5px; color: var(--text-dim); padding-top: 6px; margin-top: 4px; border-top: 1px solid var(--border-soft);
             line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .rpt-empty { color: var(--text-muted); font-size: 12px; text-align: center; padding: 34px 10px; }
+        /* --- CW Copy card (cw_copy.py: DeepCW on this server) --- */
+        .cw-head-right { display: flex; align-items: center; gap: 8px; }
+        .cw-freq { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); }
+        .cw-pill { font-family: var(--font-mono); font-size: 10px; padding: 2px 7px; border-radius: 20px; margin-left: 8px;
+            border: 1px solid var(--border); background: var(--panel-2); color: var(--text-muted); vertical-align: 2px; }
+        .cw-pill.live { border-color: var(--card-active-border); background: var(--live-dim); color: var(--live); }
+        .cw-pill.warn { border-color: var(--fav-border); background: var(--caution-dim); color: var(--caution); }
+        .cw-pill.err { border-color: var(--danger-border); background: var(--danger-dim); color: var(--danger); }
+        .cw-heard { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; min-height: 22px; }
+        .cw-heard-lbl { font-size: 10.5px; color: var(--text-muted); }
+        .cw-chip { font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: 20px;
+            background: var(--panel-2); border: 1px solid var(--border); color: var(--text); }
+        .cw-chip a { color: inherit; text-decoration: none; }
+        .cw-chip a:hover { color: var(--link); }
+        .cw-ql { margin-left: auto; font: inherit; font-size: 10.5px; color: var(--text-muted); background: transparent;
+            border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+        .cw-ql:hover { color: var(--text); }
+        .cw-copy { height: 178px; overflow-y: auto; overflow-x: hidden; background: var(--bg); border: 1px solid var(--border-soft);
+            border-radius: 6px; padding: 8px 10px; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.65;
+            scrollbar-width: thin; scrollbar-color: var(--border) transparent; overflow-wrap: anywhere; }
+        .cw-copy::-webkit-scrollbar { width: 6px; }
+        .cw-copy::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        .cw-copy.dim { color: var(--text-dim); }
+        .cw-copy .ts { color: var(--text-dim); margin-right: 6px; }
+        .cw-copy a { color: inherit; text-decoration: underline; text-decoration-color: var(--text-dim); }
+        .cw-copy a:hover { color: var(--link); }
+        .cw-copy .pend { color: var(--text-dim); font-style: italic; }
+        .cw-note { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px; color: var(--text-muted);
+            margin-top: 8px; line-height: 1.45; }
+        .cw-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px;
+            font-size: 10.5px; color: var(--text-dim); }
+        .cw-foot .warn { color: var(--caution); }
+        .cw-foot button { font: inherit; font-size: 10.5px; color: var(--text-muted); background: transparent; border: 0; padding: 0; cursor: pointer; }
+        .cw-foot button:hover { color: var(--text); }
+        .cw-foot button.solid { font-size: 11px; color: var(--text); background: var(--panel-2); border: 1px solid var(--border);
+            border-radius: 6px; padding: 4px 10px; }
         /* --- Shortwave card (HFCC + EiBi, see shortwave.py) --- */
         .sw-head-right { display: flex; align-items: center; gap: 8px; }
         .sw-count { font-family: var(--font-mono); font-size: 10px; font-weight: 600; color: var(--live); margin-left: 6px;
@@ -4312,6 +4348,18 @@
             <div class="wp-unavailable" id="wp-unavailable" style="display:none">Set a wfweb host under Settings → Integrations to enable this card.</div>
         </div>
         {% endif %}
+        {% if settings.get('show_cw_copy', False) %}
+        <div class="metrics-card" id="cw-copy-card"
+             style="order:{{ settings.get('cw_copy_position', 0) }}">
+            <div class="metrics-header">
+                <div class="card-name" title="Morse decoded from the rig's audio while it's in CW, by wfweb's DeepCW model running on this dashboard's server. Newest at the bottom; the grey text at the end may still change.">🔤 CW Copy<span class="cw-pill" id="cw-pill">…</span></div>
+                <div class="cw-head-right"><span class="cw-freq" id="cw-freq"></span></div>
+            </div>
+            <div class="cw-heard" id="cw-heard"></div>
+            <div class="cw-copy" id="cw-copy"></div>
+            <div class="cw-foot" id="cw-foot"></div>
+        </div>
+        {% endif %}
         {% if settings.get('show_hf_conditions', False) %}
         <div class="metrics-card" id="hf-conditions-card"
              style="order:{{ settings.get('hf_conditions_position', 0) }}">
@@ -4835,6 +4883,7 @@ const HEALTH_WARM_C          = {{ settings.get('health_warm_c', 70) }};
 const HEALTH_TEMP_UNIT       = "{{ settings.get('weather_unit', 'F') }}";
 const SSTV_PAGE              = {{ settings.get('sstv_page', 1) }};
 const WFWEB_PACKET_PAGE      = {{ settings.get('wfweb_packet_page', 1) }};
+const CW_COPY_PAGE           = {{ settings.get('cw_copy_page', 1) }};
 const DVSWITCH_PAGE          = {{ settings.get('dvswitch_page', 1) }};
 const DASHBOARD2_NAME        = {{ settings.get('dashboard2_name', 'Dashboard 2') | tojson }};
 // Whether the "Dashboard 2" tab even appears -- presence-derived (any
@@ -4956,6 +5005,8 @@ const SSTV_POLL_MS = 3000;
 const SSTV_RX_POLL_MS = 1500;  // faster while an image is being received, so the preview keeps up
 const SHOW_WFWEB_PACKET = {{ 'true' if settings.get('show_wfweb_packet', False) else 'false' }};
 const WFWEB_PACKET_POSITION = {{ settings.get('wfweb_packet_position', 0) }};
+const SHOW_CW_COPY = {{ 'true' if settings.get('show_cw_copy', False) else 'false' }};
+const CW_COPY_POSITION = {{ settings.get('cw_copy_position', 0) }};
 const WFWEB_PACKET_POLL_MS = 3000;
 const POTA_POLL_MS = 20000;  // matches pota.py's spot cache TTL
 const SOTA_CARD_POLL_MS = 120000;  // matches sota.py's CACHE_TTL, same as the map overlay's own interval
@@ -5568,7 +5619,7 @@ const SENTINEL_KEY_TO_DATA_IP = {
     topactivity: '__top_activity__', pota: '__pota__', dvswitch: '__dvswitch__',
     hffav: '__hf_favorites__', rigpanel: '__rig_panel__', qrzquicklog: '__qrz_quick_log__',
     beacons: '__beacons__', repeaters: '__repeaters__', shortwave: '__shortwave__', sstv: '__sstv__', hotspothealth: '__hotspot_health__', mysignal: '__my_signal__',
-    wfwebpacket: '__wfweb_packet__',
+    wfwebpacket: '__wfweb_packet__', cwcopy: '__cw_copy__',
 };
 function sentinelDataIp(key) {
     if (key.startsWith('cam-')) return '__camera__' + key.slice(4);
@@ -5843,6 +5894,9 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (SHOW_WFWEB_PACKET && WFWEB_PACKET_PAGE === page) {
         sentinels.push({ key: 'wfwebpacket', pos: Math.max(0, WFWEB_PACKET_POSITION) });
     }
+    if (SHOW_CW_COPY && CW_COPY_PAGE === page) {
+        sentinels.push({ key: 'cwcopy', pos: Math.max(0, CW_COPY_POSITION) });
+    }
     // Cameras pushed LAST -- must match setup.html's Cards-tab drag-list
     // template order exactly (fleet, aslfav, hfcond, bandplan,
     // licensequiz, wspractivity, digipi, bigclock, notifications, satellites,
@@ -5935,6 +5989,10 @@ function renderCards(data, page = 1, container = document.getElementById('cards'
     if (hotspotHealthCard && 'hotspothealth' in sentinelOrders) { moveIfNeeded(hotspotHealthCard, cardsOuter); hotspotHealthCard.style.order = sentinelOrders.hotspothealth; }
     const sstvCard = document.getElementById('sstv-card');
     if (sstvCard && 'sstv' in sentinelOrders) { moveIfNeeded(sstvCard, cardsOuter); sstvCard.style.order = sentinelOrders.sstv; }
+    const wfwebPacketCard = document.getElementById('wfweb-packet-card');
+    if (wfwebPacketCard && 'wfwebpacket' in sentinelOrders) { moveIfNeeded(wfwebPacketCard, cardsOuter); wfwebPacketCard.style.order = sentinelOrders.wfwebpacket; }
+    const cwCopyCard = document.getElementById('cw-copy-card');
+    if (cwCopyCard && 'cwcopy' in sentinelOrders) { moveIfNeeded(cwCopyCard, cardsOuter); cwCopyCard.style.order = sentinelOrders.cwcopy; }
     if (SHOW_CAMERAS) {
         cameras.forEach(cam => {
             const camCard = document.getElementById('camera-card-' + cam.id);
@@ -9131,6 +9189,126 @@ function fetchWfwebPacket() {
 if (SHOW_WFWEB_PACKET) {
     fetchWfwebPacket();
     setInterval(fetchWfwebPacket, WFWEB_PACKET_POLL_MS);
+}
+
+// --- CW Copy card -- see cw_copy.py. The server decodes (DeepCW, the
+// model wfweb's own page uses) and keeps the transcript; this only renders
+// it. "Heard" callsigns are ones that follow DE or appear twice, so a
+// one-off decoding error that happens to look like a call isn't offered.
+const CW_POLL_MS = 2000, CW_IDLE_POLL_MS = 6000;
+const CW_CALL_RE = /^([A-Z]{1,2}|[A-Z][0-9]|[0-9][A-Z])[0-9][A-Z]{1,4}$/;
+let cwData = null;
+function cwFmtFreq(hz) {
+    if (!hz) return '';
+    const mhz = Math.floor(hz / 1e6), khz = Math.floor(hz % 1e6 / 1e3), dec = Math.floor(hz % 1e3 / 10);
+    return `${mhz}.${String(khz).padStart(3, '0')}.${String(dec).padStart(2, '0')}`;
+}
+function cwHeardCalls(lines) {
+    const counts = {}, order = [];
+    lines.slice(-20).forEach(l => {
+        const w = (l.text || '').split(' ');
+        w.forEach((tok, i) => {
+            const t = tok.replace(/\/[A-Z0-9]+$/, '');
+            if (!CW_CALL_RE.test(t)) return;
+            counts[t] = (counts[t] || 0) + (i > 0 && w[i - 1] === 'DE' ? 2 : 1);
+            order.push(t);
+        });
+    });
+    const out = [];
+    for (let i = order.length - 1; i >= 0 && out.length < 4; i--) {
+        const c = order[i];
+        if (counts[c] >= 2 && !out.includes(c)) out.push(c);
+    }
+    return out;
+}
+function cwLineHtml(l, heard) {
+    const d = l.t ? new Date(l.t * 1000) : null;
+    const ts = d ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : '';
+    const text = (l.text || '').split(' ').map(tok => {
+        const base = tok.replace(/\/[A-Z0-9]+$/, '');
+        return heard.includes(base) && QRZ_ENABLED
+            ? `<a href="https://www.qrz.com/db/${encodeURIComponent(base)}" target="_blank" rel="noopener">${escapeHtml(tok)}</a>`
+            : escapeHtml(tok);
+    }).join(' ');
+    return `<div><span class="ts">${ts}</span>${text}</div>`;
+}
+function cwQuickLog(call) {
+    const el = document.getElementById('ql-call');
+    if (!el) return;
+    el.value = call;
+    if (typeof qlClearAuto === 'function') qlClearAuto('ql-call');
+    const card = document.getElementById('qrz-quick-log-card');
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.focus();
+}
+function cwSwitchToCw() {
+    if (!cwData || !cwData.freq_hz) return;
+    fetch('/api/rig_tune', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ freq_hz: cwData.freq_hz, mode: 'CW' }) })
+        .then(r => r.json()).then(d => {
+            const ok = !!(d.success || d.ok);
+            rigToast(ok ? 'Rig set to CW' : (d.message || 'Tune failed'), ok ? 'ok' : 'err');
+            if (ok) setTimeout(fetchCwCopy, 1500);
+        })
+        .catch(() => rigToast('Tune failed', 'err'));
+}
+function cwClear() {
+    fetch('/api/cw_copy/clear', { method: 'POST' }).then(() => fetchCwCopy()).catch(() => {});
+}
+function renderCwCopyCard() {
+    const d = cwData;
+    const pill = document.getElementById('cw-pill'), freqEl = document.getElementById('cw-freq');
+    const heardEl = document.getElementById('cw-heard'), box = document.getElementById('cw-copy');
+    const foot = document.getElementById('cw-foot');
+    if (!d || !pill || !box) return;
+    const labels = { decoding: ['● decoding', 'live'], starting: ['starting', 'warn'], idle: ['idle', ''],
+        loading: ['loading model', 'warn'], connecting: ['connecting', 'warn'], error: ['error', 'err'], off: ['off', ''] };
+    const lab = labels[d.state] || [d.state, ''];
+    pill.textContent = lab[0];
+    pill.className = 'cw-pill' + (lab[1] ? ' ' + lab[1] : '');
+    freqEl.textContent = [cwFmtFreq(d.freq_hz), d.mode].filter(Boolean).join(' · ');
+
+    const lines = d.lines || [];
+    const heard = cwHeardCalls(lines);
+    const live = d.state === 'decoding';
+    heardEl.innerHTML = heard.length ? '<span class="cw-heard-lbl">Heard:</span>' + heard.map(c =>
+        `<span class="cw-chip">${QRZ_ENABLED ? `<a href="https://www.qrz.com/db/${encodeURIComponent(c)}" target="_blank" rel="noopener">${escapeHtml(c)}</a>` : escapeHtml(c)}${(typeof workedBadgeHtml === 'function') ? ' ' + workedBadgeHtml(c) : ''}</span>`).join('')
+        + (SHOW_QRZ_QUICK_LOG && live ? `<button type="button" class="cw-ql" data-call="${escapeHtml(heard[0])}" onclick="cwQuickLog(this.dataset.call)">Quick Log ${escapeHtml(heard[0])}</button>` : '')
+        : '';
+
+    let note = '';
+    if (d.state === 'off') note = 'Set a wfweb host under Settings → Integrations to use this card.';
+    else if (d.state === 'error') note = escapeHtml(d.error || 'The decoder stopped.');
+    else if (d.state === 'connecting') note = 'Connecting to wfweb…' + (d.error ? ` (${escapeHtml(d.error)})` : '');
+    else if (d.state === 'loading') note = 'Loading the DeepCW model from wfweb…';
+    else if (d.state === 'idle') note = d.mode ? `The rig is in ${escapeHtml(d.mode)}. Copy resumes when it's back in CW.` : "Waiting for the rig's mode from wfweb…";
+    else if (d.state === 'starting') note = 'Starting audio from wfweb…';
+    else if (!lines.length && !d.pending) note = 'Listening. Copy appears here a few seconds after a station sends.';
+
+    const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 24;
+    box.classList.toggle('dim', !live);
+    box.innerHTML = lines.map(l => cwLineHtml(l, heard)).join('')
+        + (live && d.pending ? `<div class="pend">${escapeHtml(d.pending)}</div>` : '')
+        + (note ? `<div class="cw-note">${note}</div>` : '');
+    if (atBottom || !box.dataset.scrolled) { box.scrollTop = box.scrollHeight; box.dataset.scrolled = '1'; }
+
+    const loss = d.audio_loss_pct;
+    const left = (live && loss != null && loss >= 2)
+        ? `<span class="warn" title="wfweb is losing part of each audio packet. The gaps are filled with silence so timing stays right, but copy suffers. Restarting the wfweb container has cleared this before.">wfweb is dropping ${loss}% of the audio</span>`
+        : (d.state === 'idle' && lines.length ? 'Last copy kept, dimmed' : 'Decoded here with DeepCW · newest at the bottom');
+    let right = lines.length ? '<button type="button" onclick="cwClear()">Clear</button>' : '';
+    if (d.state === 'idle' && RIG_CONTROL_ENABLED && d.freq_hz) right = '<button type="button" class="solid" onclick="cwSwitchToCw()">Switch rig to CW</button>';
+    foot.innerHTML = `<span>${left}</span>${right}`;
+}
+function fetchCwCopy() {
+    if (!SHOW_CW_COPY) return;
+    fetch('/api/cw_copy').then(r => r.json()).then(d => { cwData = d; renderCwCopyCard(); }).catch(() => {});
+}
+if (SHOW_CW_COPY) {
+    (function cwLoop() {
+        fetchCwCopy();
+        setTimeout(cwLoop, cwData && cwData.state === 'decoding' ? CW_POLL_MS : CW_IDLE_POLL_MS);
+    })();
 }
 
 // --- Big Ass Clock card ---

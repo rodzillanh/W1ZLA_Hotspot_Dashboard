@@ -286,6 +286,13 @@ sstv_controller.py and exact start in noise); sstv_rx.py is the wfweb-audio
                    process (like wfweb_power.py), NOT a separate container.
                    See the SSTV gotcha entry below before touching any of it.
 
+cw_decoder.py,     CW Copy card (v5.13). cw_decoder.py is a numpy+onnxruntime
+cw_copy.py         port of wfweb's DeepCW browser worker (GPL-3.0, so that file
+                   carries an SPDX GPL header); cw_copy.py is the service: own
+                   wfweb WebSocket, audio on only while the rig is in CW, model
+                   fetched from the user's wfweb, transcript in CONFIG_DIR/cw.
+                   See the "CW Copy card (v5.13)" gotcha below.
+
 worked.py          Worked Before index for the "3x / 5x ✓ / new band" callsign
                    badges: one entry per BASE callsign from qsos.json, cached
                    by the file's mtime/size, served by /api/worked. The JS
@@ -5587,6 +5594,37 @@ config for per-integration credentials; put it in
   `applyAudioLevels()` duplicate that choice; keep them in sync. A node
   version without `z` just never produces TX readings (its channel is
   skipped once closed; only `v` decides whether the connection is alive).
+
+- **CW Copy card (v5.13, `cw_decoder.py` + `cw_copy.py`).** wfweb decodes
+  nothing server-side (CW/RTTY/FT8/JS8/SSTV all run in its browser page),
+  and its author (Alain K1FM, 2026-11-14) declined both "relay the page's
+  decode" and "decode on the server", suggesting the dashboard decode the
+  audio itself with his worker (`resources/web-shared/cw-decoder-worker.js`
+  in adecarolis/wfweb). Done as a Python port rather than running his JS
+  under Node (no Node in the image):
+  - **Verified against his worker, not assumed**: his own test suite
+    (`tests/cw_decoder_sim.mjs`, ported to Python with the same mulberry32
+    noise) passes 12/12, and five synthetic recordings (15-32 wpm, clean to
+    -16 dB) plus the user's real band recordings give IDENTICAL committed
+    and pending text on every one-second tick under both, errors included.
+    If the port is ever touched, re-run that comparison (portable Node +
+    his worker + the vendored `ort/` files from his repo), not just a smoke
+    test. Model metadata: 3200 Hz, fft 256, hop 48, bins 400-1200 Hz,
+    log1p, CTC blank 41; window 12 s re-decoded every tick, commit after
+    3 s, forced at 8 s, last word after 1.5 s quiet.
+  - **Model is fetched, never bundled**: `/models/deepcw.onnx` + `.json`
+    from the user's wfweb (AGPL-3.0 model), cached in `CONFIG_DIR/cw` with
+    its ETag. ~135-150 ms per tick on one thread of a desktop CPU; a Pi is
+    unmeasured. `onnxruntime` has a 64-bit-only requirements marker, same as
+    `sstv`.
+  - **Real band audio first decoded as all dits**: wfweb was dropping the
+    278-sample tail of one packet in three (see the SSTV gotcha's
+    "mirror image" note). `sstv_rx._missing_before()` is shared by both
+    modules; the card's footer shows the loss % (>= 2%).
+  - "Heard" calls are ones after DE or seen twice in the last 20 lines --
+    a one-off decode error that looks like a call isn't offered. Pocket
+    Dash has no CW screen yet. The temporary `/api/wfweb_record.wav`
+    recorder (used to collect the real test audio) is still in app.py.
 
 - **Every hotspot now has its own generated `id`, independent of `ip` --
   `ip` stopped being an identity key anywhere in this app and went back to

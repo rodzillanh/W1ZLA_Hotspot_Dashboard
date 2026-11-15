@@ -23,7 +23,7 @@ def _version_tuple(v):
 # version number now, no new names get appended here. See
 # _LAST_NAMED_VERSION below for how APP_CODENAME resolves to None past
 # this list's last entry.
-APP_VERSION = "5.12"
+APP_VERSION = "5.13"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -332,6 +332,7 @@ DIGEST_HIGHLIGHTS = [
     ("5.11", ["ASL3 cards: new receiver meter with RX/TX lights, nothing to install on the node",
               "ASL Control: link to AllStarLink's own Node Admin web page"]),
     ("5.12", ["ASL3 meter now moves while your node transmits, so you can see link audio too"]),
+    ("5.13", ["New CW Copy card: Morse decoded from your rig's audio while it's in CW, as a running transcript"]),
 ]
 
 
@@ -1371,6 +1372,11 @@ DEFAULT_SETTINGS = {
     "sstv_restore": True,
     "sstv_quality_gate": True,
     "sstv_keep": 12,
+    # CW Copy card (cw_copy.py): decodes Morse from wfweb's RX audio on this
+    # server while the rig is in CW. Uses the wfweb host settings.
+    "show_cw_copy": False,
+    "cw_copy_position": 0,
+    "cw_copy_page": 1,
     # APRS.fi — requires a free API key from https://aprs.fi/page/api.
     # Blank disables it.
     "aprs_api_key": "",
