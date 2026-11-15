@@ -2960,6 +2960,41 @@ def api_sstv_test_stream():
     )
     return jsonify({"success": ok, "message": message})
 
+@app.route("/api/wfweb_record.wav")
+def api_wfweb_record():
+    """TEMPORARY (CW decoder prototype, see cw_decoder.py): record N seconds
+    (default 120, max 300) of wfweb's RX audio to a WAV download, over a
+    one-off connection like the SSTV 'Test audio stream' button -- so real
+    band audio can be run through both DeepCW decoders offline. The browser
+    waits the full duration before the download starts."""
+    import io
+    import wave as _wave
+    s = load_settings()
+    try:
+        seconds = max(5, min(300, int(request.args.get("seconds", 120))))
+    except ValueError:
+        seconds = 120
+    ok, result = SstvReceiver.record_audio(
+        s.get("wfweb_host", ""), s.get("wfweb_port", 8080),
+        s.get("wfweb_use_ssl", True), seconds)
+    if not ok:
+        return jsonify({"error": result}), 503
+    samples, rate, rig = result
+    buf = io.BytesIO()
+    with _wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(rate)
+        wf.writeframes(samples)
+    freq = rig.get("freq_hz")
+    name = "wfweb_%s_%s_%s.wav" % (
+        time.strftime("%Y%m%d-%H%M%S"),
+        f"{freq / 1e6:.4f}MHz" if freq else "unknown",
+        re.sub(r"[^A-Za-z0-9]", "", rig.get("mode") or "") or "mode")
+    buf.seek(0)
+    return send_file(buf, mimetype="audio/wav", as_attachment=True,
+                     download_name=name, max_age=0)
+
 @app.route("/api/sota_spots")
 def api_sota_spots():
     """Live Summits on the Air activator spots for the Live map's optional

@@ -1052,6 +1052,74 @@ class SstvReceiver:
     # ---------- settings-page test ----------
 
     @staticmethod
+    def record_audio(host, port, use_ssl, seconds):
+        """TEMPORARY (CW decoder prototype): `seconds` of RX audio over a
+        fresh one-off connection, never touching the live receiver. A
+        missing head frame is filled with silence, as in _on_audio. Returns
+        (True, (int16 LE bytes, sample_rate, rig_dict)) or (False, message)."""
+        host = (host or "").strip()
+        port = _as_int(port) or 8080
+        if not host:
+            return False, "wfweb host is not set (Settings -> Integrations)"
+        scheme = "wss" if use_ssl else "ws"
+        sslopt = {"cert_reqs": ssl.CERT_NONE} if use_ssl else None
+        try:
+            ws = websocket.create_connection(f"{scheme}://{host}:{port}/", timeout=6, sslopt=sslopt)
+        except Exception as e:
+            return False, f"Could not connect to wfweb: {e}"
+        parts = []
+        rate = None
+        rig = {}
+        last_n = None
+        try:
+            ws.settimeout(2)
+            ws.send(json.dumps({"cmd": "enableAudio", "value": True}))
+            ws.send(json.dumps({"cmd": "getStatus"}))
+            end = time.time() + seconds
+            while time.time() < end:
+                try:
+                    m = ws.recv()
+                except websocket.WebSocketTimeoutException:
+                    continue
+                if isinstance(m, (bytes, bytearray)):
+                    if m[:1] != b"\x02" or len(m) < 8:
+                        continue
+                    n = (len(m) - 6) // 2
+                    rate_div = m[4] | (m[5] << 8)
+                    if (n == PAIR_SECOND and rate_div == 48 and last_n is not None
+                            and last_n != PAIR_FIRST):
+                        parts.append(bytes(PAIR_FIRST * 2))
+                    last_n = n
+                    parts.append(bytes(m[6:6 + n * 2]))
+                else:
+                    try:
+                        j = json.loads(m)
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+                    if not isinstance(j, dict):
+                        continue
+                    if j.get("type") == "audioStatus":
+                        rate = _as_int(j.get("sampleRate")) or rate
+                    if "frequency" in j:
+                        rig["freq_hz"] = _as_int(j["frequency"])
+                    if isinstance(j.get("mode"), str):
+                        rig["mode"] = j["mode"]
+            try:
+                ws.send(json.dumps({"cmd": "enableAudio", "value": False}))
+            except Exception:
+                pass
+        except Exception as e:
+            return False, f"Stream error: {e}"
+        finally:
+            try:
+                ws.close()
+            except Exception:
+                pass
+        if not parts:
+            return False, "Connected, but no audio frames arrived"
+        return True, (b"".join(parts), rate or RATE, rig)
+
+    @staticmethod
     def test_stream(host, port, use_ssl, seconds=4.0):
         """Settings/drawer 'Test audio stream': a fresh one-off connection
         that enables audio briefly and reports what actually arrived --
