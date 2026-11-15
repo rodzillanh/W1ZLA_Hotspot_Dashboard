@@ -1663,7 +1663,8 @@ running transcript.
   (Friday 2000z, Monday 0000z). Pick a band and tap **Tune** to put the
   rig there in CW (needs Rig control). CWT and SST have no single
   frequency, so Tune goes to a typical spot in the band's CW segment.
-  **Schedule** lists the next few, plus the NCDXF beacon on 14.100.
+  **Schedule ›** opens a side drawer with the whole week, by day, plus the
+  NCDXF beacon on 14.100, each with its own Tune button.
 - Same drag-and-drop **Card order** placement as every other extra card.
 
 <!-- wiki-group: Optional Cards -->

@@ -2093,16 +2093,15 @@
         .cw-air-what b { color: var(--text); font-weight: 600; }
         .cw-air.on .cw-air-what b { color: var(--live); }
         .cw-air-when { font-family: var(--font-mono); color: var(--text-dim); white-space: nowrap; }
-        .cw-air select, .cw-air button, .cw-air-sched button { font: inherit; font-size: 10.5px; color: var(--text);
+        .cw-air select, .cw-air button, .cw-air-row button { font: inherit; font-size: 10.5px; color: var(--text);
             background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 2px 6px; cursor: pointer; }
         .cw-air button.tune { color: var(--live); border-color: var(--card-active-border); }
-        .cw-air .tuned, .cw-air-sched .tuned { color: var(--good); font-size: 10.5px; white-space: nowrap; }
+        .cw-air .tuned, .cw-air-row .tuned { color: var(--good); font-size: 10.5px; white-space: nowrap; }
         .cw-air button.more { background: transparent; border: 0; color: var(--text-muted); padding: 2px; white-space: nowrap; }
-        .cw-air button.more:hover, .cw-air-sched button:hover { color: var(--text); }
-        .cw-air-sched { margin: -2px 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); }
-        .cw-air-sched-h { display: flex; justify-content: space-between; padding: 7px 10px 5px; font-size: 10.5px;
-            letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
-        .cw-air-sched-h span:last-child { text-transform: none; letter-spacing: 0; color: var(--text-dim); }
+        .cw-air button.more:hover, .cw-air-row button:hover { color: var(--text); }
+        .cw-air-band { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+        .cw-air-band span { font-size: 10.5px; color: var(--text-dim); flex-basis: 100%; }
+        .cw-air-band select { font: inherit; font-size: 12px; color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; }
         .cw-air-row { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 8px; align-items: center;
             padding: 6px 10px; border-top: 1px solid var(--border-soft); font-size: 11.5px; }
         .cw-air-row .w { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); }
@@ -4388,7 +4387,6 @@
                 <div class="cw-head-right"><span class="cw-freq" id="cw-freq"></span></div>
             </div>
             <div class="cw-air" id="cw-air"></div>
-            <div id="cw-air-sched"></div>
             <div class="cw-heard" id="cw-heard"></div>
             <div class="cw-copy" id="cw-copy"></div>
             <div class="cw-foot" id="cw-foot"></div>
@@ -4780,6 +4778,7 @@
 <div class="hs-drawer" id="my-signal-drawer"></div>
 <div class="hs-drawer" id="sstv-drawer"></div>
 <div class="hs-drawer" id="shortwave-drawer"></div>
+<div class="hs-drawer" id="cw-air-drawer"></div>
 
 <!-- ASL Control's "Disconnect all links on this node" confirm dialog
      (v4.8) -- a standalone overlay, not one more hs-drawer, since it
@@ -9364,7 +9363,6 @@ const CW_AIR_SRC = {
     sst: { bands: CW_AIR_SST_BANDS, rank: 1, spread: true },
     cwt: { bands: CW_AIR_CWT_BANDS, rank: 2, spread: true },
 };
-let cwAirOpen = (() => { try { return localStorage.getItem('cw-air-open') === '1'; } catch (e) { return false; } })();
 let cwAirBand = (() => { try { return localStorage.getItem('cw-air-band') || '80'; } catch (e) { return '80'; } })();
 let cwAirSig = '';
 const CW_ET_FMT = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23',
@@ -9445,28 +9443,87 @@ function cwAirSetBand(b) {
     cwAirBand = b;
     try { localStorage.setItem('cw-air-band', b); } catch (e) {}
     cwAirSig = '';
+    cwAirDrawerSig = '';
     renderCwAir();
 }
-function cwAirToggle() {
-    cwAirOpen = !cwAirOpen;
-    try { localStorage.setItem('cw-air-open', cwAirOpen ? '1' : '0'); } catch (e) {}
-    cwAirSig = '';
-    renderCwAir();
+function openCwAirDrawer() {
+    closeAllDrawers();
+    document.getElementById('cw-air-drawer').classList.add('open');
+    document.getElementById('hs-drawer-backdrop').classList.add('open');
+    cwAirDrawerSig = '';
+    renderCwAirDrawer();
+}
+function cwAirDayLabel(ms, now) {
+    const d = new Date(ms), t = new Date(now), tm = new Date(now + 86400e3);
+    const key = x => x.getFullYear() + '-' + x.getMonth() + '-' + x.getDate();
+    if (key(d) === key(t)) return 'Today';
+    if (key(d) === key(tm)) return 'Tomorrow';
+    return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+}
+let cwAirDrawerSig = '';
+// The full week, grouped by day. Rebuilt when the list or tuned state
+// changes (not while its band menu is open); clock text updated in place.
+function renderCwAirDrawer() {
+    const d = document.getElementById('cw-air-drawer');
+    if (!d || !d.classList.contains('open')) return;
+    const now = Date.now();
+    const evs = cwAirEvents(now).filter(x => x.start < now + 7 * 86400e3);
+    const bcn = (typeof beaconAt === 'function') ? beaconAt(beaconSlotNow().baseSlot, 0) : null;
+    const sig = [cwAirBand, evs.map(x => x.src + x.start + (x.start <= now) + cwAirTuned(x.src)).join()].join('|');
+    const menuOpen = document.activeElement && document.activeElement.tagName === 'SELECT' && d.contains(document.activeElement);
+    if (sig !== cwAirDrawerSig && !menuOpen) {
+        cwAirDrawerSig = sig;
+        const rowBtn = hz => RIG_CONTROL_ENABLED ? `<button type="button" onclick="cwAirTune(${hz})">Tune</button>` : '';
+        const bands = ['160', '80', '40', '20', '17', '15', '10'];
+        let html = '', lastDay = '';
+        evs.forEach((x, i) => {
+            const day = x.start <= now ? 'On now' : cwAirDayLabel(x.start, now);
+            if (day !== lastDay) { html += `<div class="sw-grp">${escapeHtml(day)}</div>`; lastDay = day; }
+            const bd = cwAirBandFor(x.src);
+            const sub = CW_AIR_SRC[x.src].spread ? `${x.detail} · spread over ${cwAirMhz(bd.lo)}-${cwAirMhz(bd.hi)}` : x.detail;
+            html += `<div class="cw-air-row${x.start <= now ? ' now' : ''}"><span class="w" id="cw-air-dw${i}"></span>`
+                + `<span class="t"><b>${escapeHtml(x.name)}</b><span>${escapeHtml(sub)}</span></span>`
+                + (cwAirTuned(x.src) ? '<span class="tuned" title="The rig is already in its frequency range">✓ Tuned</span>'
+                    : `<span><span class="f">${cwAirMhz(bd.hz)}</span>${rowBtn(bd.hz)}</span>`) + '</div>';
+        });
+        d.innerHTML = `
+            <div class="hs-drawer-header">
+                <div class="hs-drawer-title-row">
+                    <div class="hs-drawer-title">🔤 CW on the air</div>
+                    <div class="hs-drawer-close" onclick="closeAllDrawers()">✕</div>
+                </div>
+                <div class="hs-drawer-sub">W1AW, CWops CWT and K1USN SST for the next week, in your time</div>
+            </div>
+            <div class="hs-drawer-body">
+                <div class="cw-air-band">Tune on
+                    <select aria-label="Band" onchange="cwAirSetBand(this.value)">${bands.map(bb =>
+                        `<option value="${bb}"${bb === cwAirBand ? ' selected' : ''}>${bb} m</option>`).join('')}</select>
+                    <span>CWT and SST have no 17 m, so on 17 m their rows use 80 m.</span>
+                </div>
+                ${bcn ? `<div class="sw-grp">Always on</div><div class="cw-air-row now"><span class="w">NOW</span><span class="t"><b id="cw-air-dbcn">NCDXF beacon ${escapeHtml(bcn.call)}</b><span>Callsign, then four dashes · a different beacon every 10 s</span></span><span><span class="f">14.100</span>${rowBtn(14100000)}</span></div>` : ''}
+                ${html}
+                <div class="rpt-foot" title="W1AW: arrl.org/w1aw-operating-schedule (Eastern time, Mon-Fri). CWT: cwops.org/cwops-tests. SST: k1usn.com/sst.html. Code-bulletin length is an estimate.">Schedules from ARRL, CWops and K1USN · checked Nov 2026</div>
+            </div>`;
+    }
+    evs.forEach((x, i) => {
+        const w = document.getElementById('cw-air-dw' + i);
+        if (w) w.textContent = x.start <= now ? 'NOW' : cwAirClock(x.start);
+    });
+    const bb = document.getElementById('cw-air-dbcn');
+    if (bb && bcn) bb.textContent = 'NCDXF beacon ' + bcn.call;
 }
 function renderCwAir() {
-    const strip = document.getElementById('cw-air'), sched = document.getElementById('cw-air-sched');
-    if (!strip || !sched) return;
+    renderCwAirDrawer();
+    const strip = document.getElementById('cw-air');
+    if (!strip) return;
     const now = Date.now();
     const evs = cwAirEvents(now);
     const live = evs.filter(e => e.start <= now).sort((a, b) => CW_AIR_SRC[a.src].rank - CW_AIR_SRC[b.src].rank)[0];
     const e = live || evs[0];
-    const upcoming = evs.filter(x => x !== e).slice(0, 4);
-    const bcn = (typeof beaconAt === 'function') ? beaconAt(beaconSlotNow().baseSlot, 0) : null;
     // Rebuild only when something structural changes, so an open band menu
     // isn't destroyed under the pointer; times are refreshed in place.
     const tuned = e ? cwAirTuned(e.src) : false;
-    const sig = [e && e.src + e.start, !!live, tuned, cwAirOpen, cwAirBand,
-        upcoming.map(x => x.src + x.start).join(), upcoming.map(x => cwAirTuned(x.src)).join()].join('|');
+    const sig = [e && e.src + e.start, !!live, tuned, cwAirBand].join('|');
     const menuOpen = document.activeElement && document.activeElement.tagName === 'SELECT' && strip.contains(document.activeElement);
     if (sig !== cwAirSig && !menuOpen) {
         cwAirSig = sig;
@@ -9482,30 +9539,11 @@ function renderCwAir() {
         strip.innerHTML = e
             ? `<span class="cw-air-dot"></span><span class="cw-air-what">${live ? '' : 'Next: '}<b>${escapeHtml(e.name)}</b> · ${escapeHtml(e.detail)}</span>`
               + `<span class="cw-air-when" id="cw-air-when"></span>${right}`
-              + `<button type="button" class="more" onclick="cwAirToggle()">Schedule ${cwAirOpen ? '▴' : '▾'}</button>`
+              + `<button type="button" class="more" onclick="openCwAirDrawer()" title="The full week's schedule">Schedule ›</button>`
             : '';
-        const rowBtn = hz => RIG_CONTROL_ENABLED ? `<button type="button" onclick="cwAirTune(${hz})">Tune</button>` : '';
-        sched.className = cwAirOpen ? 'cw-air-sched' : '';
-        sched.innerHTML = !cwAirOpen ? '' : '<div class="cw-air-sched-h"><span>Coming up</span><span>your time</span></div>'
-            + (bcn ? `<div class="cw-air-row now"><span class="w">NOW</span><span class="t"><b id="cw-air-bcn">NCDXF beacon ${escapeHtml(bcn.call)}</b><span>Callsign, then four dashes · changes every 10 s</span></span>`
-                + `<span><span class="f">14.100</span>${rowBtn(14100000)}</span></div>` : '')
-            + upcoming.map((x, i) => {
-                const bd = cwAirBandFor(x.src);
-                const sub = CW_AIR_SRC[x.src].spread ? `${x.detail} · spread over ${cwAirMhz(bd.lo)}-${cwAirMhz(bd.hi)}` : x.detail;
-                return `<div class="cw-air-row${x.start <= now ? ' now' : ''}"><span class="w" id="cw-air-w${i}"></span>`
-                    + `<span class="t"><b>${escapeHtml(x.name)}</b><span>${escapeHtml(sub)}</span></span>`
-                    + `<span><span class="f">${cwAirMhz(bd.hz)}</span>${cwAirTuned(x.src) ? '<span class="tuned">✓</span>' : rowBtn(bd.hz)}</span></div>`;
-            }).join('');
     }
     const whenEl = document.getElementById('cw-air-when');
     if (whenEl && e) whenEl.textContent = cwAirWhen(e, now);
-    upcoming.forEach((x, i) => {
-        const w = document.getElementById('cw-air-w' + i);
-        if (w) w.textContent = x.start <= now ? 'NOW' : (x.start - now < 12 * 3600e3 ? cwAirClock(x.start)
-            : new Date(x.start).toLocaleDateString([], { weekday: 'short' }) + ' ' + cwAirClock(x.start));
-    });
-    const b = document.getElementById('cw-air-bcn');
-    if (b && bcn) b.textContent = 'NCDXF beacon ' + bcn.call;
 }
 
 // --- Big Ass Clock card ---
@@ -15293,6 +15331,7 @@ function closeAllDrawers() {
     document.getElementById('my-signal-drawer').classList.remove('open');
     document.getElementById('sstv-drawer').classList.remove('open');
     document.getElementById('shortwave-drawer').classList.remove('open');
+    document.getElementById('cw-air-drawer').classList.remove('open');
     document.getElementById('hs-drawer-backdrop').classList.remove('open');
 }
 function closeHotspotDrawer() { closeAllDrawers(); }
