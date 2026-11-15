@@ -23,7 +23,7 @@ def _version_tuple(v):
 # version number now, no new names get appended here. See
 # _LAST_NAMED_VERSION below for how APP_CODENAME resolves to None past
 # this list's last entry.
-APP_VERSION = "5.14"
+APP_VERSION = "5.15"
 VERSION_CODENAMES = [
     "Elvis",            # v3.49 -- Elvis Presley (1935-1977)
     "Bowie",            # v3.50 -- David Bowie (1947-2016)
@@ -334,6 +334,7 @@ DIGEST_HIGHLIGHTS = [
     ("5.12", ["ASL3 meter now moves while your node transmits, so you can see link audio too"]),
     ("5.13", ["New CW Copy card: Morse decoded from your rig's audio while it's in CW, as a running transcript"]),
     ("5.14", ["CW Copy card shows W1AW, CWops CWT and K1USN SST when they're on the air, with one-tap tuning"]),
+    ("5.15", ["Stream Deck Neo support through Bitfocus Companion: HF rig, AllStar, digital voice and station pages"]),
 ]
 
 
@@ -1549,6 +1550,12 @@ DEFAULT_SETTINGS = {
     # credential -- RBN has no password, any typed callsign logs in.
     "rbn_enabled": False,
     "rbn_callsign": "",
+    # Stream Deck (through Bitfocus Companion, see deck.py): the dashboard
+    # paints ten buttons on one Companion page and they report presses back.
+    "deck_enabled": False,
+    "deck_companion_url": "",
+    "deck_companion_page": 1,
+    "deck_w1aw_band": "80",
     # DX cluster filter on the Spots card -- a persistent Telnet
     # connection to a user-CHOSEN classic packet DX cluster (DXSpider/
     # AR-Cluster/etc., see dxcluster.py), unlike RBN's one fixed global

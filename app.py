@@ -48,6 +48,7 @@ from wfweb_power import WfwebPowerClient
 from wfweb_memory import WfwebMemoryClient
 from wfweb_packet import WfwebPacketClient
 from cw_copy import CwCopyService
+from deck import DeckController
 import wfweb_station
 from sstv_rx import SstvReceiver
 from sstv_controller import SstvController
@@ -455,6 +456,35 @@ def _rebuild_cw_copy() -> None:
     )
 
 _rebuild_cw_copy()
+
+
+def _deck_get(path):
+    try:
+        r = app.test_client().get(path)
+        return r.get_json(silent=True)
+    except Exception:
+        return None
+
+
+def _deck_post(path, body):
+    try:
+        r = app.test_client().post(path, json=body)
+        return r.get_json(silent=True)
+    except Exception:
+        return None
+
+
+# Stream Deck through Companion (deck.py): reads and acts through the
+# dashboard's own routes via the test client, so every key press goes
+# through the same validation and control gate as the browser.
+deck = DeckController(_deck_get, _deck_post)
+
+
+def _rebuild_deck() -> None:
+    s = load_settings()
+    deck.configure(s.get("deck_enabled"), s.get("deck_companion_url", ""), s.get("deck_companion_page", 1))
+
+_rebuild_deck()
 
 
 def _rebuild_wfweb_logbook() -> None:
@@ -1099,6 +1129,17 @@ def api_settings_post():
         settings["qrz_logbook_api_key"] = data["qrz_logbook_api_key"].strip()
     if "rbn_enabled" in data:
         settings["rbn_enabled"] = bool(data["rbn_enabled"])
+    if "deck_enabled" in data:
+        settings["deck_enabled"] = bool(data["deck_enabled"])
+    if "deck_companion_url" in data:
+        settings["deck_companion_url"] = str(data["deck_companion_url"]).strip()
+    if "deck_companion_page" in data:
+        try:
+            settings["deck_companion_page"] = max(1, min(99, int(data["deck_companion_page"])))
+        except (TypeError, ValueError):
+            pass
+    if "deck_w1aw_band" in data and str(data["deck_w1aw_band"]) in ("160", "80", "40", "20", "17", "15", "10"):
+        settings["deck_w1aw_band"] = str(data["deck_w1aw_band"])
     if "rbn_callsign" in data:
         settings["rbn_callsign"] = data["rbn_callsign"].strip().upper()
     if "dxcluster_enabled" in data:
@@ -1167,6 +1208,8 @@ def api_settings_post():
         _rebuild_qrz_logbook()
     if any(k in data for k in ("rbn_enabled", "rbn_callsign")):
         _rebuild_rbn()
+    if any(k in data for k in ("deck_enabled", "deck_companion_url", "deck_companion_page")):
+        _rebuild_deck()
     if any(k in data for k in ("dxcluster_enabled", "dxcluster_host", "dxcluster_callsign")):
         _rebuild_dxcluster()
     if "push_vapid_contact" in data:
@@ -3353,6 +3396,8 @@ def _whats_available_groups(settings, hotspots):
              g("wsjtx_enabled"), "/setup?item=wsjtx#integrations"),
             ("HamAlert", "Alerts for your own DXCC/callsign/band triggers",
              g("hamalert_enabled"), "/setup?item=hamalert#integrations"),
+            ("Stream Deck", "Four pages of live keys on a Stream Deck Neo, through Bitfocus Companion",
+             g("deck_enabled"), "/setup?item=deck#integrations"),
             ("DigiPi", "APRS/Direwolf packet activity from a DigiPi hotspot",
              g("digipi_enabled"), "/setup?item=digipi#integrations"),
         ]),
@@ -3675,6 +3720,35 @@ def _control_gate(hotspot_id=None):
         return jsonify({"success": False, "ok": False, "offline": True,
                         "message": "That hotspot is offline right now"}), 409
     return None
+
+
+@app.route("/api/deck/key/<int:n>/<phase>", methods=["POST", "GET"])
+def api_deck_key(n, phase):
+    """A Stream Deck key (0-7, row by row) went down or up -- sent by the
+    Companion button's press/release HTTP actions. See deck.py."""
+    blocked = _control_gate()
+    if blocked:
+        return blocked
+    if phase not in ("down", "up") or not 0 <= n <= 7:
+        return jsonify({"ok": False, "message": "Unknown key"}), 400
+    deck.key(n, phase)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/deck/page/<direction>", methods=["POST", "GET"])
+def api_deck_page(direction):
+    """The Neo's touch points: flip the deck's page (HF / ASL / DV / Station)."""
+    blocked = _control_gate()
+    if blocked:
+        return blocked
+    if direction not in ("next", "prev"):
+        return jsonify({"ok": False, "message": "Use next or prev"}), 400
+    return jsonify({"ok": True, "page": deck.step_page(1 if direction == "next" else -1)})
+
+
+@app.route("/api/deck/status")
+def api_deck_status():
+    return jsonify(deck.status())
 
 
 @app.route("/api/whoami")
@@ -4810,6 +4884,7 @@ def api_import_backup():
         _rebuild_qrz_logbook()
         _rebuild_rbn()
         _rebuild_dxcluster()
+        _rebuild_deck()
 
     return jsonify({"ok": True, "result": result})
 
@@ -5065,6 +5140,7 @@ def _sstv_controller_loop():
 
 def main():
     threading.Thread(target=_sstv_controller_loop, daemon=True).start()
+    deck.start()
     threading.Thread(target=monitor.run_forever, daemon=True).start()
     threading.Thread(target=monitor.run_slow_checks_forever, daemon=True).start()
     threading.Thread(target=_mqtt_publish_loop, daemon=True).start()

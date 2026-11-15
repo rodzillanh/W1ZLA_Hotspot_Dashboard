@@ -2113,6 +2113,60 @@
     </div>
 
     <div class="section">
+        <div class="section-title">Stream Deck (Companion)
+            <span style="font-size:10px;color:var(--text-dim);font-weight:400;
+                         text-transform:none;letter-spacing:0;margin-left:6px">
+                optional — four pages of keys for a Stream Deck Neo
+            </span>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">
+            The dashboard paints the keys through <a href="https://bitfocus.io/companion" target="_blank" rel="noopener">Bitfocus Companion</a>'s
+            remote-control API and the keys send presses back. Pages: <b>HF rig</b>, <b>AllStar</b>,
+            <b>Digital voice</b>, <b>Station</b>; flip them with the Neo's touch points.
+        </p>
+        <div class="form-grid" style="margin-bottom:10px">
+            <div style="grid-column:1/-1;display:flex;align-items:center">
+                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                    <input type="checkbox" id="deck-enabled" {% if settings.get('deck_enabled', False) %}checked{% endif %}>
+                    Drive the Stream Deck
+                </label>
+            </div>
+            <div>
+                <label>Companion address</label>
+                <input type="text" id="deck-url" placeholder="http://192.168.1.50:8000"
+                       value="{{ settings.get('deck_companion_url', '') }}">
+            </div>
+            <div>
+                <label>Companion page for the Neo</label>
+                <input type="number" id="deck-page" min="1" max="99" value="{{ settings.get('deck_companion_page', 1) }}">
+            </div>
+            <div>
+                <label>W1AW key tunes to</label>
+                <select id="deck-w1aw-band">
+                    {% for b in ['160','80','40','20','17','15','10'] %}
+                    <option value="{{ b }}" {% if settings.get('deck_w1aw_band', '80') == b %}selected{% endif %}>{{ b }} m</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <details style="margin-bottom:12px;font-size:12px;color:var(--text-muted);line-height:1.55">
+            <summary style="cursor:pointer;color:var(--text)">Setting up the buttons in Companion</summary>
+            <ol style="margin:8px 0 0;padding-left:18px">
+                <li>Add a <b>Generic: HTTP Requests</b> connection (no base URL needed).</li>
+                <li>On the page above, for each of the Neo's 8 keys add a button with two actions:
+                    a <b>press</b> action POST to <code>{{ request.host_url }}api/deck/key/<i>N</i>/down</code>
+                    and a <b>release</b> action POST to <code>{{ request.host_url }}api/deck/key/<i>N</i>/up</code>.
+                    N is 0-3 across the top row and 4-7 across the bottom row.</li>
+                <li>On the two touch points (bottom left and right) add one press action each:
+                    <code>{{ request.host_url }}api/deck/page/prev</code> and <code>…/page/next</code>.</li>
+                <li>Leave the button text blank. The dashboard writes it within a second.</li>
+            </ol>
+        </details>
+        <button class="btn btn-primary" onclick="saveDeck()">Save Stream Deck settings</button>
+        <span class="status-txt" id="deck-status"></span>
+    </div>
+
+    <div class="section">
         <div class="section-title">DX Cluster
             <span style="font-size:10px;color:var(--text-dim);font-weight:400;
                          text-transform:none;letter-spacing:0;margin-left:6px">
@@ -4568,6 +4622,34 @@ function saveRbn() {
     });
 }
 
+function saveDeck() {
+    const status = document.getElementById('deck-status');
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            deck_enabled: document.getElementById('deck-enabled').checked,
+            deck_companion_url: document.getElementById('deck-url').value.trim(),
+            deck_companion_page: parseInt(document.getElementById('deck-page').value, 10) || 1,
+            deck_w1aw_band: document.getElementById('deck-w1aw-band').value,
+        })
+    }).then(() => {
+        status.textContent = '✓ Saved -- checking Companion…';
+        setTimeout(deckStatus, 2500);
+    });
+}
+
+function deckStatus() {
+    const status = document.getElementById('deck-status');
+    fetch('/api/deck/status').then(r => r.json()).then(d => {
+        if (!d.enabled) status.textContent = '';
+        else if (d.error) status.textContent = '✕ ' + d.error;
+        else if (d.last_ok) status.textContent = `✓ Companion reached · showing the ${d.page} page`;
+        else status.textContent = 'Waiting for the first update…';
+    }).catch(() => {});
+}
+deckStatus();
+
 async function testRbn() {
     const status = document.getElementById('rbn-status');
     status.textContent = 'Testing...';
@@ -4881,6 +4963,7 @@ if (location.hash) {
         ['wfweb power',             'Radio & rig',               'toggle', () => tog('wfweb-pwr-enabled-toggle'), 'wfweb'],
         ['Packet Monitor',          'Radio & rig',               'toggle', () => tog('wfweb-packet-enabled-toggle'), 'wfweb_packet'],
         ['wfweb station sync',      'Radio & rig',               'toggle', () => tog('wfweb-station-sync-toggle'), 'wfweb_station'],
+        ['Stream Deck',             'Radio & rig',               'toggle', () => chk('deck-enabled'), 'deck'],
         ['DigiPi',                  'Radio & rig',               'cfg',    () => val('digipi-ip'), 'digipi'],
         ['Parks on the Air',        'Spots & propagation',       'cfg',    () => val('pota-callsign'), 'pota_callsign'],
         ['PSK Reporter',            'Spots & propagation',       'cfg',    () => val('psk-callsign'), 'psk_reporter'],

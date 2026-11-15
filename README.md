@@ -1625,6 +1625,41 @@ the Rig Panel's power control uses).
   unaffected.
 - Same drag-and-drop **Card order** placement as every other extra card.
 
+<!-- wiki-group: Integrations -->
+## Stream Deck (Companion)
+
+Optional (Settings → Integrations → "Stream Deck"). Four pages of live keys
+on a Stream Deck **Neo**, driven through
+[Bitfocus Companion](https://bitfocus.io/companion). The dashboard paints
+the keys' text and colour through Companion's own remote-control API, and
+the keys send their presses back to the dashboard.
+
+- **Pages** (flip them with the Neo's touch points):
+  - **HF rig:** W1AW now/next, NCDXF beacons on 14.100, FT8 on 20 m and
+    40 m, SSTV listen/stop, switch to CW, the last callsign the CW
+    decoder heard, rig power.
+  - **AllStar:** your five pinned ASL favourites (green linked, red keyed,
+    cyan monitor), a mode key (connect / monitor / local monitor),
+    Multi-connect, Disconnect all.
+  - **Digital voice:** your first three Brandmeister talkgroup favourites
+    and first two D-STAR reflector favourites (tap to link or unlink),
+    Brandmeister unlink-all, YSF link, who's on air.
+  - **Station:** your first four hotspots, the next satellite pass, 20 m
+    conditions, UTC and local time.
+- **Hold to confirm:** Disconnect all, Brandmeister unlink-all and rig off
+  only fire after you hold the key (2 s, 2 s, 1 s). The key counts down
+  while you hold.
+- **Setting it up in Companion:** add a *Generic: HTTP Requests* connection.
+  On one Companion page, give each of the Neo's 8 keys a press action POST
+  to `http://<dashboard>/api/deck/key/N/down` and a release action POST to
+  `.../api/deck/key/N/up` (N is 0-3 across the top row, 4-7 across the
+  bottom). Give the two touch points a press action POST to
+  `.../api/deck/page/prev` and `.../api/deck/page/next`. Then enter
+  Companion's address and that page number in Settings. The Settings
+  section shows these addresses filled in for your dashboard.
+- Presses go through the same checks as the browser, so Companion needs to
+  run on your home network or Tailscale.
+
 <!-- wiki-group: Optional Cards -->
 ## CW Copy card
 

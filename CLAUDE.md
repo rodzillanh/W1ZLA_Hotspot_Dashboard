@@ -5632,6 +5632,26 @@ config for per-integration credentials; put it in
     rebuilt only when its signature changes, and never while its band
     `<select>` has focus (a rebuild would close the open menu).
 
+- **Stream Deck through Companion (v5.15, `deck.py`).** Companion's
+  generic-http module can send requests but can NOT poll a URL into a
+  variable or feedback (confirmed from its source: the only interval is the
+  image-from-URL feedback), so the direction is reversed: the dashboard
+  PAINTS keys via Companion's remote-control API (`POST
+  /api/location/<page>/<row>/<col>/style`, JSON `{text,color,bgcolor,size}`,
+  rows/cols 0-based) and Companion's buttons only POST presses back
+  (`/api/deck/key/<n>/down|up`, `/api/deck/page/next|prev`). The deck's
+  four pages live HERE, on one Companion page (keys rows 0-1, touch points
+  row 2 cols 0/3, info bar = Neo LCD segment at row 2 col 1 -- Companion
+  drawing a style there is UNVERIFIED). Actions go through the dashboard's
+  own routes via `app.test_client()` (`_deck_get`/`_deck_post`), so the
+  control gate and validation are identical to the browser. The thread is
+  started by `deck.start()` in `main()`, never at import (it calls routes
+  that aren't registered yet). `step_page()` clears the key list so a press
+  in the second before the new page is painted can't fire the old page's
+  action. The W1AW table duplicates dashboard.html's `renderCwAir()` --
+  keep in sync. Not yet run against a real Companion/Neo: newline in
+  `text` and `size: 14` are unverified.
+
 - **Every hotspot now has its own generated `id`, independent of `ip` --
   `ip` stopped being an identity key anywhere in this app and went back to
   meaning exactly one thing: the SSH/HTTP connection target.** Prompted by
